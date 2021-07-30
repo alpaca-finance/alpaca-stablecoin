@@ -29,7 +29,7 @@ interface PipLike {
     function peek() external returns (bytes32, bool);
 }
 
-contract Spotter {
+contract PriceOracle {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address guy) external auth { wards[guy] = 1;  }
@@ -40,15 +40,15 @@ contract Spotter {
     }
 
     // --- Data ---
-    struct Ilk {
+    struct CollateralType {
         PipLike pip;  // Price Feed
         uint256 mat;  // Liquidation ratio [ray]
     }
 
-    mapping (bytes32 => Ilk) public ilks;
+    mapping (bytes32 => CollateralType) public collateralTypes;
 
     CDPEngineLike public vat;  // CDP Engine
-    uint256 public par;  // ref per dai [ray]
+    uint256 public stableCoinReferencePrice;  // ref per dai [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
 
     uint256 public live;
 
@@ -63,7 +63,7 @@ contract Spotter {
     constructor(address vat_) public {
         wards[msg.sender] = 1;
         vat = CDPEngineLike(vat_);
-        par = ONE;
+        stableCoinReferencePrice = ONE;
         live = 1;
     }
 
@@ -80,26 +80,26 @@ contract Spotter {
     // --- Administration ---
     function file(bytes32 ilk, bytes32 what, address pip_) external auth {
         require(live == 1, "Spotter/not-live");
-        if (what == "pip") ilks[ilk].pip = PipLike(pip_);
+        if (what == "pip") collateralTypes[ilk].pip = PipLike(pip_);
         else revert("Spotter/file-unrecognized-param");
     }
     function file(bytes32 what, uint data) external auth {
         require(live == 1, "Spotter/not-live");
-        if (what == "par") par = data;
+        if (what == "stableCoinReferencePrice") stableCoinReferencePrice = data;
         else revert("Spotter/file-unrecognized-param");
     }
     function file(bytes32 ilk, bytes32 what, uint data) external auth {
         require(live == 1, "Spotter/not-live");
-        if (what == "mat") ilks[ilk].mat = data;
+        if (what == "mat") collateralTypes[ilk].mat = data;
         else revert("Spotter/file-unrecognized-param");
     }
 
     // --- Update value ---
     function poke(bytes32 ilk) external {
-        (bytes32 val, bool has) = ilks[ilk].pip.peek();
-        uint256 spot = has ? rdiv(rdiv(mul(uint(val), 10 ** 9), par), ilks[ilk].mat) : 0;
-        vat.file(ilk, "spot", spot);
-        emit Poke(ilk, val, spot);
+        (bytes32 val, bool has) = collateralTypes[ilk].pip.peek();
+        uint256 priceWithSafetyMargin = has ? rdiv(rdiv(mul(uint(val), 10 ** 9), stableCoinReferencePrice), collateralTypes[ilk].mat) : 0;
+        vat.file(ilk, "priceWithSafetyMargin", priceWithSafetyMargin);
+        emit Poke(ilk, val, priceWithSafetyMargin);
     }
 
     function cage() external auth {
