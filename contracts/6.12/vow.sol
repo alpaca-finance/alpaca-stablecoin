@@ -35,7 +35,7 @@ interface FlapLike {
     function live() external returns (uint);
 }
 
-interface VatLike {
+interface CDPEngineLike {
     function dai (address) external view returns (uint);
     function sin (address) external view returns (uint);
     function heal(uint256) external;
@@ -54,7 +54,7 @@ contract Vow {
     }
 
     // --- Data ---
-    VatLike public vat;        // CDP Engine
+    CDPEngineLike public vat;        // CDP Engine
     FlapLike public flapper;   // Surplus Auction House
     FlopLike public flopper;   // Debt Auction House
 
@@ -74,7 +74,7 @@ contract Vow {
     // --- Init ---
     constructor(address vat_, address flapper_, address flopper_) public {
         wards[msg.sender] = 1;
-        vat     = VatLike(vat_);
+        vat     = CDPEngineLike(vat_);
         flapper = FlapLike(flapper_);
         flopper = FlopLike(flopper_);
         vat.hope(flapper_);

@@ -21,7 +21,7 @@ pragma solidity >=0.5.12;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface VatLike {
+interface CDPEngineLike {
     function file(bytes32, bytes32, uint) external;
 }
 
@@ -47,7 +47,7 @@ contract Spotter {
 
     mapping (bytes32 => Ilk) public ilks;
 
-    VatLike public vat;  // CDP Engine
+    CDPEngineLike public vat;  // CDP Engine
     uint256 public par;  // ref per dai [ray]
 
     uint256 public live;
@@ -62,7 +62,7 @@ contract Spotter {
     // --- Init ---
     constructor(address vat_) public {
         wards[msg.sender] = 1;
-        vat = VatLike(vat_);
+        vat = CDPEngineLike(vat_);
         par = ONE;
         live = 1;
     }

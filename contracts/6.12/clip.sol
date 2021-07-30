@@ -19,7 +19,7 @@
 
 pragma solidity >=0.6.12;
 
-interface VatLike {
+interface CDPEngineLike {
     function move(address,address,uint256) external;
     function flux(bytes32,address,address,uint256) external;
     function ilks(bytes32) external returns (uint256, uint256, uint256, uint256, uint256);
@@ -60,7 +60,7 @@ contract Clipper {
 
     // --- Data ---
     bytes32  immutable public ilk;   // Collateral type of this Clipper
-    VatLike  immutable public vat;   // Core CDP Engine
+    CDPEngineLike  immutable public vat;   // Core CDP Engine
 
     DogLike     public dog;      // Liquidation module
     address     public vow;      // Recipient of dai raised in auctions
@@ -135,7 +135,7 @@ contract Clipper {
 
     // --- Init ---
     constructor(address vat_, address spotter_, address dog_, bytes32 ilk_) public {
-        vat     = VatLike(vat_);
+        vat     = CDPEngineLike(vat_);
         spotter = SpotterLike(spotter_);
         dog     = DogLike(dog_);
         ilk     = ilk_;
@@ -207,7 +207,7 @@ contract Clipper {
     // --- Auction ---
 
     // get the price directly from the OSM
-    // Could get this from rmul(Vat.ilks(ilk).spot, Spotter.mat()) instead, but
+    // Could get this from rmul(CDPEngine.ilks(ilk).spot, Spotter.mat()) instead, but
     // if mat has changed since the last poke, the resulting value will be
     // incorrect.
     function getFeedPrice() internal returns (uint256 feedPrice) {
@@ -316,7 +316,7 @@ contract Clipper {
     // To avoid partial purchases resulting in very small leftover auctions that will
     // never be cleared, any partial purchase must leave at least `Clipper.chost`
     // remaining DAI target. `chost` is an asynchronously updated value equal to
-    // (Vat.dust * Dog.chop(ilk) / WAD) where the values are understood to be determined
+    // (CDPEngine.dust * Dog.chop(ilk) / WAD) where the values are understood to be determined
     // by whatever they were when Clipper.upchost() was last called. Purchase amounts
     // will be minimally decreased when necessary to respect this limit; i.e., if the
     // specified `amt` would leave `tab < chost` but `tab > 0`, the amount actually
@@ -458,7 +458,7 @@ contract Clipper {
 
     // Public function to update the cached dust*chop value.
     function upchost() external {
-        (,,,, uint256 _dust) = VatLike(vat).ilks(ilk);
+        (,,,, uint256 _dust) = CDPEngineLike(vat).ilks(ilk);
         chost = wmul(_dust, dog.chop(ilk));
     }
 

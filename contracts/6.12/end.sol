@@ -21,7 +21,7 @@
 
 pragma solidity >=0.6.12;
 
-interface VatLike {
+interface CDPEngineLike {
     function dai(address) external view returns (uint256);
     function ilks(bytes32 ilk) external returns (
         uint256 Art,   // [wad]
@@ -235,7 +235,7 @@ contract End {
     }
 
     // --- Data ---
-    VatLike  public vat;   // CDP Engine
+    CDPEngineLike  public vat;   // CDP Engine
     CatLike  public cat;
     DogLike  public dog;
     VowLike  public vow;   // Debt Engine
@@ -306,7 +306,7 @@ contract End {
     // --- Administration ---
     function file(bytes32 what, address data) external auth {
         require(live == 1, "End/not-live");
-        if (what == "vat")  vat = VatLike(data);
+        if (what == "vat")  vat = CDPEngineLike(data);
         else if (what == "cat")   cat = CatLike(data);
         else if (what == "dog")   dog = DogLike(data);
         else if (what == "vow")   vow = VowLike(data);

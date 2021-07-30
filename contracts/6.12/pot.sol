@@ -42,7 +42,7 @@ pragma solidity >=0.5.12;
 
 */
 
-interface VatLike {
+interface CDPEngineLike {
     function move(address,address,uint256) external;
     function suck(address,address,uint256) external;
 }
@@ -64,7 +64,7 @@ contract Pot {
     uint256 public dsr;   // The Dai Savings Rate          [ray]
     uint256 public chi;   // The Rate Accumulator          [ray]
 
-    VatLike public vat;   // CDP Engine
+    CDPEngineLike public vat;   // CDP Engine
     address public vow;   // Debt Engine
     uint256 public rho;   // Time of last drip     [unix epoch time]
 
@@ -73,7 +73,7 @@ contract Pot {
     // --- Init ---
     constructor(address vat_) public {
         wards[msg.sender] = 1;
-        vat = VatLike(vat_);
+        vat = CDPEngineLike(vat_);
         dsr = ONE;
         chi = ONE;
         rho = now;

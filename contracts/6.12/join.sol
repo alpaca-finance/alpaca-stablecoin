@@ -34,14 +34,14 @@ interface DSTokenLike {
     function burn(address,uint) external;
 }
 
-interface VatLike {
+interface CDPEngineLike {
     function slip(bytes32,address,int) external;
     function move(address,address,uint) external;
 }
 
 /*
-    Here we provide *adapters* to connect the Vat to arbitrary external
-    token implementations, creating a bounded context for the Vat. The
+    Here we provide *adapters* to connect the CDPEngine to arbitrary external
+    token implementations, creating a bounded context for the CDPEngine. The
     adapters here are provided as working examples:
 
       - `GemJoin`: For well behaved ERC20 tokens, with simple transfer
@@ -73,7 +73,7 @@ contract GemJoin {
         _;
     }
 
-    VatLike public vat;   // CDP Engine
+    CDPEngineLike public vat;   // CDP Engine
     bytes32 public ilk;   // Collateral Type
     GemLike public gem;
     uint    public dec;
@@ -82,7 +82,7 @@ contract GemJoin {
     constructor(address vat_, bytes32 ilk_, address gem_) public {
         wards[msg.sender] = 1;
         live = 1;
-        vat = VatLike(vat_);
+        vat = CDPEngineLike(vat_);
         ilk = ilk_;
         gem = GemLike(gem_);
         dec = gem.decimals();
@@ -113,14 +113,14 @@ contract DaiJoin {
         _;
     }
 
-    VatLike public vat;      // CDP Engine
+    CDPEngineLike public vat;      // CDP Engine
     DSTokenLike public dai;  // Stablecoin Token
     uint    public live;     // Active Flag
 
     constructor(address vat_, address dai_) public {
         wards[msg.sender] = 1;
         live = 1;
-        vat = VatLike(vat_);
+        vat = CDPEngineLike(vat_);
         dai = DSTokenLike(dai_);
     }
     function cage() external auth {

@@ -23,7 +23,7 @@ pragma solidity >=0.5.12;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface VatLike {
+interface CDPEngineLike {
     function move(address,address,uint) external;
 }
 interface GemLike {
@@ -62,7 +62,7 @@ contract Flapper {
 
     mapping (uint => Bid) public bids;
 
-    VatLike  public   vat;  // CDP Engine
+    CDPEngineLike  public   vat;  // CDP Engine
     GemLike  public   gem;
 
     uint256  constant ONE = 1.00E18;
@@ -82,7 +82,7 @@ contract Flapper {
     // --- Init ---
     constructor(address vat_, address gem_) public {
         wards[msg.sender] = 1;
-        vat = VatLike(vat_);
+        vat = CDPEngineLike(vat_);
         gem = GemLike(gem_);
         live = 1;
     }
