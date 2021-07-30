@@ -61,7 +61,7 @@ contract CDPEngine {
 
     uint256 public totalStablecoinIssued;  // Total Dai Issued    [rad]
     uint256 public vice;  // Total Unbacked Dai  [rad]
-    uint256 public Line;  // Total Debt Ceiling  [rad]
+    uint256 public totalDebtCeiling;  // Total Debt Ceiling  [rad]
     uint256 public live;  // Active Flag
 
     // --- Init ---
@@ -103,7 +103,7 @@ contract CDPEngine {
     }
     function file(bytes32 what, uint data) external auth {
         require(live == 1, "CDPEngine/not-live");
-        if (what == "Line") Line = data;
+        if (what == "totalDebtCeiling") totalDebtCeiling = data;
         else revert("CDPEngine/file-unrecognized-param");
     }
     function file(bytes32 ilk, bytes32 what, uint data) external auth {
@@ -158,8 +158,8 @@ contract CDPEngine {
         totalStablecoinIssued     = add(totalStablecoinIssued, debtValue);
 
         // either debt has decreased, or debt ceilings are not exceeded
-        require(either(debtShare <= 0, both(mul(collateralType.totalDebtShare, collateralType.debtAccumulatedRate) <= collateralType.debtCeiling, debt <= Line)), "CDPEngine/ceiling-exceeded");
-        // position is either less risky than before, or it is safe
+        require(either(debtShare <= 0, both(mul(collateralType.totalDebtShare, collateralType.debtAccumulatedRate) <= collateralType.debtCeiling, totalStablecoinIssued <= totalDebtCeiling)), "CDPEngine/ceiling-exceeded");
+        // position is either less risky than before, or it is safe :: check work factor
         require(either(both(debtShare <= 0, collateralValue >= 0), positionDebtValue <= mul(position.lockedCollateral, collateralType.priceWithSafetyMargin)), "CDPEngine/not-safe");
 
         // position is either more safe, or the owner consents
@@ -225,13 +225,13 @@ contract CDPEngine {
         systemDebt[u] = sub(systemDebt[u], rad);
         stablecoin[u] = sub(stablecoin[u], rad);
         vice   = sub(vice,   rad);
-        debt   = sub(debt,   rad);
+        totalStablecoinIssued   = sub(totalStablecoinIssued,   rad);
     }
     function suck(address u, address v, uint rad) external auth {
         systemDebt[u] = add(systemDebt[u], rad);
         stablecoin[v] = add(stablecoin[v], rad);
         vice   = add(vice,   rad);
-        debt   = add(debt,   rad);
+        totalStablecoinIssued   = add(totalStablecoinIssued,   rad);
     }
 
     // --- Rates ---
@@ -241,6 +241,6 @@ contract CDPEngine {
         ilk.debtAccumulatedRate = add(ilk.debtAccumulatedRate, debtAccumulatedRate);
         int rad  = mul(ilk.totalDebtShare, debtAccumulatedRate);
         stablecoin[u]   = add(stablecoin[u], rad);
-        debt     = add(debt,   rad);
+        totalStablecoinIssued     = add(totalStablecoinIssued,   rad);
     }
 }
