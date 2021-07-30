@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// join.sol -- Basic token adapters
+/// deposit.sol -- Basic token adapters
 
 // Copyright (C) 2018 Rain <rainbreak@riseup.net>
 //
@@ -23,13 +23,13 @@ pragma solidity >=0.5.12;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface GemLike {
+interface CollateralTokenLike {
     function decimals() external view returns (uint);
     function transfer(address,uint) external returns (bool);
     function transferFrom(address,address,uint) external returns (bool);
 }
 
-interface DSTokenLike {
+interface StablecoinLike {
     function mint(address,uint) external;
     function burn(address,uint) external;
 }
@@ -44,12 +44,12 @@ interface CDPEngineLike {
     token implementations, creating a bounded context for the CDPEngine. The
     adapters here are provided as working examples:
 
-      - `GemJoin`: For well behaved ERC20 tokens, with simple transfer
+      - `CollateralTokenSafe`: For well behaved ERC20 tokens, with simple transfer
                    semantics.
 
       - `ETHJoin`: For native Ether.
 
-      - `DaiJoin`: For connecting internal Dai balances to an external
+      - `StablecoinSafe`: For connecting internal Dai balances to an external
                    `DSToken` implementation.
 
     In practice, adapter implementations will be varied and specific to
@@ -58,70 +58,70 @@ interface CDPEngineLike {
 
     Adapters need to implement two basic methods:
 
-      - `join`: enter collateral into the system
-      - `exit`: remove collateral from the system
+      - `deposit`: enter collateral into the system
+      - `withdraw`: remove collateral from the system
 
 */
 
-contract GemJoin {
+contract CollateralTokenSafe {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth { wards[usr] = 1; }
     function deny(address usr) external auth { wards[usr] = 0; }
     modifier auth {
-        require(wards[msg.sender] == 1, "GemJoin/not-authorized");
+        require(wards[msg.sender] == 1, "CollateralTokenSafe/not-authorized");
         _;
     }
 
-    CDPEngineLike public vat;   // CDP Engine
-    bytes32 public ilk;   // Collateral Type
-    GemLike public gem;
+    CDPEngineLike public cdpEngine;   // CDP Engine
+    bytes32 public collateralType;   // Collateral Type
+    CollateralTokenLike public collateralToken;
     uint    public dec;
     uint    public live;  // Active Flag
 
-    constructor(address vat_, bytes32 ilk_, address gem_) public {
+    constructor(address cdpEngine_, bytes32 collateralType_, address collateralToken_) public {
         wards[msg.sender] = 1;
         live = 1;
-        vat = CDPEngineLike(vat_);
-        ilk = ilk_;
-        gem = GemLike(gem_);
-        dec = gem.decimals();
+        cdpEngine = CDPEngineLike(cdpEngine_);
+        collateralType = collateralType_;
+        collateralToken = CollateralTokenLike(collateralToken_);
+        dec = collateralToken.decimals();
     }
     function cage() external auth {
         live = 0;
     }
-    function join(address usr, uint wad) external {
-        require(live == 1, "GemJoin/not-live");
-        require(int(wad) >= 0, "GemJoin/overflow");
-        vat.slip(ilk, usr, int(wad));
-        require(gem.transferFrom(msg.sender, address(this), wad), "GemJoin/failed-transfer");
+    function deposit(address usr, uint wad) external {
+        require(live == 1, "CollateralTokenSafe/not-live");
+        require(int(wad) >= 0, "CollateralTokenSafe/overflow");
+        cdpEngine.slip(collateralType, usr, int(wad));
+        require(collateralToken.transferFrom(msg.sender, address(this), wad), "CollateralTokenSafe/failed-transfer");
     }
-    function exit(address usr, uint wad) external {
-        require(wad <= 2 ** 255, "GemJoin/overflow");
-        vat.slip(ilk, msg.sender, -int(wad));
-        require(gem.transfer(usr, wad), "GemJoin/failed-transfer");
+    function withdraw(address usr, uint wad) external {
+        require(wad <= 2 ** 255, "CollateralTokenSafe/overflow");
+        cdpEngine.slip(collateralType, msg.sender, -int(wad));
+        require(collateralToken.transfer(usr, wad), "CollateralTokenSafe/failed-transfer");
     }
 }
 
-contract DaiJoin {
+contract StablecoinSafe {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth { wards[usr] = 1; }
     function deny(address usr) external auth { wards[usr] = 0; }
     modifier auth {
-        require(wards[msg.sender] == 1, "DaiJoin/not-authorized");
+        require(wards[msg.sender] == 1, "StablecoinSafe/not-authorized");
         _;
     }
 
-    CDPEngineLike public vat;      // CDP Engine
-    DSTokenLike public dai;  // Stablecoin Token
+    CDPEngineLike public cdpEngine;      // CDP Engine
+    StablecoinLike public stablecoin;  // Stablecoin Token
     uint    public live;     // Active Flag
 
-    constructor(address vat_, address dai_) public {
+    constructor(address cdpEngine_, address stablecoin_) public {
         wards[msg.sender] = 1;
         live = 1;
-        vat = CDPEngineLike(vat_);
-        dai = DSTokenLike(dai_);
+        cdpEngine = CDPEngineLike(cdpEngine_);
+        stablecoin = StablecoinLike(stablecoin_);
     }
     function cage() external auth {
         live = 0;
@@ -130,13 +130,13 @@ contract DaiJoin {
     function mul(uint x, uint y) internal pure returns (uint z) {
         require(y == 0 || (z = x * y) / y == x);
     }
-    function join(address usr, uint wad) external {
-        vat.move(address(this), usr, mul(ONE, wad));
-        dai.burn(msg.sender, wad);
+    function deposit(address usr, uint wad) external {
+        cdpEngine.move(address(this), usr, mul(ONE, wad));
+        stablecoin.burn(msg.sender, wad);
     }
-    function exit(address usr, uint wad) external {
-        require(live == 1, "DaiJoin/not-live");
-        vat.move(msg.sender, address(this), mul(ONE, wad));
-        dai.mint(usr, wad);
+    function withdraw(address usr, uint wad) external {
+        require(live == 1, "StablecoinSafe/not-live");
+        cdpEngine.move(msg.sender, address(this), mul(ONE, wad));
+        stablecoin.mint(usr, wad);
     }
 }
