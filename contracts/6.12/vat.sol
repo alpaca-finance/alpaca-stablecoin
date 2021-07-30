@@ -60,7 +60,7 @@ contract CDPEngine {
     mapping (address => uint256)                   public systemDebt;  // [rad]
 
     uint256 public totalStablecoinIssued;  // Total Dai Issued    [rad]
-    uint256 public vice;  // Total Unbacked Dai  [rad]
+    uint256 public totalUnbackedStablecoin;  // Total Unbacked Dai  [rad]
     uint256 public totalDebtCeiling;  // Total Debt Ceiling  [rad]
     uint256 public live;  // Active Flag
 
@@ -140,7 +140,7 @@ contract CDPEngine {
     }
 
     // --- CDP Manipulation ---
-    function frob(bytes32 collateralIndex, address positionOwner, address collateralOwner, address stablecoinRecipient, int collateralValue, int debtShare) external {
+    function adjustPosition(bytes32 collateralIndex, address positionOwner, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external {
         // system is live
         require(live == 1, "CDPEngine/not-live");
 
@@ -167,27 +167,27 @@ contract CDPEngine {
         // collateral src consents
         require(either(collateralValue <= 0, wish(collateralOwner, msg.sender)), "CDPEngine/not-allowed-v");
         // debt dst consents
-        require(either(debtShare >= 0, wish(stablecoinRecipient, msg.sender)), "CDPEngine/not-allowed-w");
+        require(either(debtShare >= 0, wish(stablecoinOwner, msg.sender)), "CDPEngine/not-allowed-w");
 
         // position has no debt, or a non-debtFloory amount
         require(either(position.debtShare == 0, positionDebtValue >= collateralType.debtFloor), "CDPEngine/debtFloor");
 
         collateralToken[collateralIndex][collateralOwner] = sub(collateralToken[collateralIndex][collateralOwner], collateralValue);
-        stablecoin[stablecoinRecipient]    = add(stablecoin[stablecoinRecipient],    debtValue);
+        stablecoin[stablecoinOwner]    = add(stablecoin[stablecoinOwner],    debtValue);
 
         positions[collateralIndex][positionOwner] = position;
         collateralTypes[collateralIndex]    = collateralType;
     }
     // --- CDP Fungibility ---
-    function fork(bytes32 ilk, address src, address dst, int collateralValue, int debtValue) external {
-        Position storage u = positions[ilk][src];
-        Position storage v = positions[ilk][dst];
-        CollateralType storage i = collateralTypes[ilk];
+    function movePosition(bytes32 collateralType, address src, address dst, int collateralValue, int debtShare) external {
+        Position storage u = positions[collateralType][src];
+        Position storage v = positions[collateralType][dst];
+        CollateralType storage i = collateralTypes[collateralType];
 
         u.lockedCollateral = sub(u.lockedCollateral, collateralValue);
-        u.debtShare = sub(u.debtShare, debtValue);
+        u.debtShare = sub(u.debtShare, debtShare);
         v.lockedCollateral = add(v.lockedCollateral, collateralValue);
-        v.debtShare = add(v.debtShare, debtValue);
+        v.debtShare = add(v.debtShare, debtShare);
 
         uint utab = mul(u.debtShare, i.debtAccumulatedRate);
         uint vtab = mul(v.debtShare, i.debtAccumulatedRate);
@@ -204,42 +204,42 @@ contract CDPEngine {
         require(either(vtab >= i.debtFloor, v.debtShare == 0), "CDPEngine/debtFloor-dst");
     }
     // --- CDP Confiscation ---
-    function grab(bytes32 i, address u, address v, address w, int collateralValue, int debtValue) external auth {
-        Position storage urn = positions[i][u];
-        CollateralType storage ilk = collateralTypes[i];
+    function confiscatePosition(bytes32 collateralIndex, address positionOwner, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external auth {
+        Position storage position = positions[collateralIndex][positionOwner];
+        CollateralType storage collateralType = collateralTypes[collateralIndex];
 
-        urn.lockedCollateral = add(urn.lockedCollateral, collateralValue);
-        urn.debtShare = add(urn.debtShare, debtValue);
-        ilk.totalDebtShare = add(ilk.totalDebtShare, debtValue);
+        position.lockedCollateral = add(position.lockedCollateral, collateralValue);
+        position.debtShare = add(position.debtShare, debtShare);
+        collateralType.totalDebtShare = add(collateralType.totalDebtShare, debtShare);
 
-        int dtab = mul(ilk.debtAccumulatedRate, debtValue);
+        int debtValue = mul(collateralType.debtAccumulatedRate, debtShare);
 
-        collateralToken[i][v] = sub(collateralToken[i][v], collateralValue);
-        systemDebt[w]    = sub(systemDebt[w],    dtab);
-        vice      = sub(vice,      dtab);
+        collateralToken[collateralIndex][collateralOwner] = sub(collateralToken[collateralIndex][collateralOwner], collateralValue);
+        systemDebt[stablecoinOwner]    = sub(systemDebt[stablecoinOwner],    debtValue);
+        totalUnbackedStablecoin      = sub(totalUnbackedStablecoin,      debtValue);
     }
 
     // --- Settlement ---
-    function heal(uint rad) external {
+    function settleSystemDebt(uint rad) external {
         address u = msg.sender;
         systemDebt[u] = sub(systemDebt[u], rad);
         stablecoin[u] = sub(stablecoin[u], rad);
-        vice   = sub(vice,   rad);
+        totalUnbackedStablecoin   = sub(totalUnbackedStablecoin,   rad);
         totalStablecoinIssued   = sub(totalStablecoinIssued,   rad);
     }
-    function suck(address u, address v, uint rad) external auth {
-        systemDebt[u] = add(systemDebt[u], rad);
-        stablecoin[v] = add(stablecoin[v], rad);
-        vice   = add(vice,   rad);
+    function mintUnbackedStablecoin(address from, address to, uint rad) external auth {
+        systemDebt[from] = add(systemDebt[from], rad);
+        stablecoin[to] = add(stablecoin[to], rad);
+        totalUnbackedStablecoin   = add(totalUnbackedStablecoin,   rad);
         totalStablecoinIssued   = add(totalStablecoinIssued,   rad);
     }
 
     // --- Rates ---
-    function fold(bytes32 i, address u, int debtAccumulatedRate) external auth {
+    function accrue(bytes32 collateralIndex, address u, int debtAccumulatedRate) external auth {
         require(live == 1, "CDPEngine/not-live");
-        CollateralType storage ilk = collateralTypes[i];
-        ilk.debtAccumulatedRate = add(ilk.debtAccumulatedRate, debtAccumulatedRate);
-        int rad  = mul(ilk.totalDebtShare, debtAccumulatedRate);
+        CollateralType storage collateralType = collateralTypes[collateralIndex];
+        collateralType.debtAccumulatedRate = add(collateralType.debtAccumulatedRate, debtAccumulatedRate);
+        int rad  = mul(collateralType.totalDebtShare, debtAccumulatedRate);
         stablecoin[u]   = add(stablecoin[u], rad);
         totalStablecoinIssued     = add(totalStablecoinIssued,   rad);
     }
