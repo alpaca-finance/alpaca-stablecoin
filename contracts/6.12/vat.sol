@@ -140,11 +140,11 @@ contract CDPEngine {
     }
 
     // --- CDP Manipulation ---
-    function adjustPosition(bytes32 collateralIndex, address positionOwner, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external {
+    function adjustPosition(bytes32 collateralIndex, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external {
         // system is live
         require(live == 1, "CDPEngine/not-live");
 
-        Position memory position = positions[collateralIndex][positionOwner];
+        Position memory position = positions[collateralIndex][positionAddress];
         CollateralType memory collateralType = collateralTypes[collateralIndex];
         // collateralType has been initialised
         require(collateralType.debtAccumulatedRate != 0, "CDPEngine/collateralType-not-init");
@@ -163,7 +163,7 @@ contract CDPEngine {
         require(either(both(debtShare <= 0, collateralValue >= 0), positionDebtValue <= mul(position.lockedCollateral, collateralType.priceWithSafetyMargin)), "CDPEngine/not-safe");
 
         // position is either more safe, or the owner consents
-        require(either(both(debtShare <= 0, collateralValue >= 0), wish(positionOwner, msg.sender)), "CDPEngine/not-allowed-u");
+        require(either(both(debtShare <= 0, collateralValue >= 0), wish(positionAddress, msg.sender)), "CDPEngine/not-allowed-u");
         // collateral src consents
         require(either(collateralValue <= 0, wish(collateralOwner, msg.sender)), "CDPEngine/not-allowed-v");
         // debt dst consents
@@ -175,7 +175,7 @@ contract CDPEngine {
         collateralToken[collateralIndex][collateralOwner] = sub(collateralToken[collateralIndex][collateralOwner], collateralValue);
         stablecoin[stablecoinOwner]    = add(stablecoin[stablecoinOwner],    debtValue);
 
-        positions[collateralIndex][positionOwner] = position;
+        positions[collateralIndex][positionAddress] = position;
         collateralTypes[collateralIndex]    = collateralType;
     }
     // --- CDP Fungibility ---
@@ -204,8 +204,8 @@ contract CDPEngine {
         require(either(vtab >= i.debtFloor, v.debtShare == 0), "CDPEngine/debtFloor-dst");
     }
     // --- CDP Confiscation ---
-    function confiscatePosition(bytes32 collateralIndex, address positionOwner, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external auth {
-        Position storage position = positions[collateralIndex][positionOwner];
+    function confiscatePosition(bytes32 collateralIndex, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external auth {
+        Position storage position = positions[collateralIndex][positionAddress];
         CollateralType storage collateralType = collateralTypes[collateralIndex];
 
         position.lockedCollateral = add(position.lockedCollateral, collateralValue);

@@ -20,7 +20,7 @@
 pragma solidity >=0.6.12;
 
 interface ClipperLike {
-    function ilk() external view returns (bytes32);
+    function collateralType() external view returns (bytes32);
     function kick(
         uint256 tab,
         uint256 lot,
@@ -30,18 +30,18 @@ interface ClipperLike {
 }
 
 interface CDPEngineLike {
-    function ilks(bytes32) external view returns (
+    function collateralTypes(bytes32) external view returns (
         uint256 Art,  // [wad]
-        uint256 rate, // [ray]
-        uint256 spot, // [ray]
+        uint256 debtAccumulatedRate, // [ray]
+        uint256 priceWithSafetyMargin, // [ray]
         uint256 line, // [rad]
-        uint256 dust  // [rad]
+        uint256 debtFloor  // [rad]
     );
-    function urns(bytes32,address) external view returns (
-        uint256 ink,  // [wad]
-        uint256 art   // [wad]
+    function positions(bytes32,address) external view returns (
+        uint256 lockedCollateral,  // [wad]
+        uint256 debtShare   // [wad]
     );
-    function grab(bytes32,address,address,address,int256,int256) external;
+    function confiscate(bytes32,address,address,address,int256,int256) external;
     function hope(address) external;
     function nope(address) external;
 }
@@ -50,32 +50,32 @@ interface VowLike {
     function fess(uint256) external;
 }
 
-contract Dog {
+contract LiquidationEngine {
     // --- Auth ---
-    mapping (address => uint256) public wards;
-    function rely(address usr) external auth { wards[usr] = 1; emit Rely(usr); }
-    function deny(address usr) external auth { wards[usr] = 0; emit Deny(usr); }
+    mapping (address => uint256) public whitelist;
+    function rely(address usr) external auth { whitelist[usr] = 1; emit Rely(usr); }
+    function deny(address usr) external auth { whitelist[usr] = 0; emit Deny(usr); }
     modifier auth {
-        require(wards[msg.sender] == 1, "Dog/not-authorized");
+        require(whitelist[msg.sender] == 1, "LiquidationEngine/not-authorized");
         _;
     }
 
     // --- Data ---
-    struct Ilk {
+    struct CollateralType {
         address clip;  // Liquidator
-        uint256 chop;  // Liquidation Penalty                                          [wad]
-        uint256 hole;  // Max DAI needed to cover debt+fees of active auctions per ilk [rad]
-        uint256 dirt;  // Amt DAI needed to cover debt+fees of active auctions per ilk [rad]
+        uint256 liquidationPenalty;  // Liquidation Penalty                                          [wad]
+        uint256 maxStablecoinNeeded;  // Max DAI needed to cover debt+fees of active auctions per collateralType [rad]
+        uint256 amountStablecoinNeeded;  // Amt DAI needed to cover debt+fees of active auctions per collateralType [rad]
     }
 
-    CDPEngineLike immutable public vat;  // CDP Engine
+    CDPEngineLike immutable public cdpEngine;  // CDP Engine
 
-    mapping (bytes32 => Ilk) public ilks;
+    mapping (bytes32 => CollateralType) public collateralTypes;
 
     VowLike public vow;   // Debt Engine
     uint256 public live;  // Active Flag
-    uint256 public Hole;  // Max DAI needed to cover debt+fees of active auctions [rad]
-    uint256 public Dirt;  // Amt DAI needed to cover debt+fees of active auctions [rad]
+    uint256 public maxStablecoinNeeded;  // Max DAI needed to cover debt+fees of active auctions [rad]
+    uint256 public amountStablecoinNeeded;  // Amt DAI needed to cover debt+fees of active auctions [rad]
 
     // --- Events ---
     event Rely(address indexed usr);
@@ -83,11 +83,11 @@ contract Dog {
 
     event File(bytes32 indexed what, uint256 data);
     event File(bytes32 indexed what, address data);
-    event File(bytes32 indexed ilk, bytes32 indexed what, uint256 data);
-    event File(bytes32 indexed ilk, bytes32 indexed what, address clip);
+    event File(bytes32 indexed collateralType, bytes32 indexed what, uint256 data);
+    event File(bytes32 indexed collateralType, bytes32 indexed what, address clip);
 
     event Bark(
-      bytes32 indexed ilk,
+      bytes32 indexed collateralType,
       address indexed urn,
       uint256 ink,
       uint256 art,
@@ -95,14 +95,14 @@ contract Dog {
       address clip,
       uint256 indexed id
     );
-    event Digs(bytes32 indexed ilk, uint256 rad);
+    event Digs(bytes32 indexed collateralType, uint256 rad);
     event Cage();
 
     // --- Init ---
-    constructor(address vat_) public {
-        vat = CDPEngineLike(vat_);
+    constructor(address cdpEngine_) public {
+        cdpEngine = CDPEngineLike(cdpEngine_);
         live = 1;
-        wards[msg.sender] = 1;
+        whitelist[msg.sender] = 1;
         emit Rely(msg.sender);
     }
 
@@ -125,32 +125,32 @@ contract Dog {
     // --- Administration ---
     function file(bytes32 what, address data) external auth {
         if (what == "vow") vow = VowLike(data);
-        else revert("Dog/file-unrecognized-param");
+        else revert("LiquidationEngine/file-unrecognized-param");
         emit File(what, data);
     }
     function file(bytes32 what, uint256 data) external auth {
-        if (what == "Hole") Hole = data;
-        else revert("Dog/file-unrecognized-param");
+        if (what == "maxStablecoinNeeded") maxStablecoinNeeded = data;
+        else revert("LiquidationEngine/file-unrecognized-param");
         emit File(what, data);
     }
-    function file(bytes32 ilk, bytes32 what, uint256 data) external auth {
-        if (what == "chop") {
-            require(data >= WAD, "Dog/file-chop-lt-WAD");
-            ilks[ilk].chop = data;
-        } else if (what == "hole") ilks[ilk].hole = data;
-        else revert("Dog/file-unrecognized-param");
-        emit File(ilk, what, data);
+    function file(bytes32 collateralType, bytes32 what, uint256 data) external auth {
+        if (what == "liquidationPenalty") {
+            require(data >= WAD, "LiquidationEngine/file-liquidationPenalty-lt-WAD");
+            collateralTypes[collateralType].liquidationPenalty = data;
+        } else if (what == "maxStablecoinNeeded") collateralTypes[collateralType].maxStablecoinNeeded = data;
+        else revert("LiquidationEngine/file-unrecognized-param");
+        emit File(collateralType, what, data);
     }
-    function file(bytes32 ilk, bytes32 what, address clip) external auth {
+    function file(bytes32 collateralType, bytes32 what, address clip) external auth {
         if (what == "clip") {
-            require(ilk == ClipperLike(clip).ilk(), "Dog/file-ilk-neq-clip.ilk");
-            ilks[ilk].clip = clip;
-        } else revert("Dog/file-unrecognized-param");
-        emit File(ilk, what, clip);
+            require(collateralType == ClipperLike(clip).collateralType(), "LiquidationEngine/file-collateralType-neq-clip.collateralType");
+            collateralTypes[collateralType].clip = clip;
+        } else revert("LiquidationEngine/file-unrecognized-param");
+        emit File(collateralType, what, clip);
     }
 
-    function chop(bytes32 ilk) external view returns (uint256) {
-        return ilks[ilk].chop;
+    function liquidationPenalty(bytes32 collateralType) external view returns (uint256) {
+        return collateralTypes[collateralType].liquidationPenalty;
     }
 
     // --- CDP Liquidation: all bark and no bite ---
@@ -160,86 +160,86 @@ contract Dog {
     // The third argument is the address that will receive the liquidation reward, if any.
     //
     // The entire Vault will be liquidated except when the target amount of DAI to be raised in
-    // the resulting auction (debt of Vault + liquidation penalty) causes either Dirt to exceed
-    // Hole or ilk.dirt to exceed ilk.hole by an economically significant amount. In that
-    // case, a partial liquidation is performed to respect the global and per-ilk limits on
+    // the resulting auction (debt of Vault + liquidation penalty) causes either amountStablecoinNeeded to exceed
+    // maxStablecoinNeeded or collateralType.amountStablecoinNeeded to exceed collateralType.maxStablecoinNeeded by an economically significant amount. In that
+    // case, a partial liquidation is performed to respect the global and per-collateralType limits on
     // outstanding DAI target. The one exception is if the resulting auction would likely
-    // have too little collateral to be interesting to Keepers (debt taken from Vault < ilk.dust),
+    // have too little collateral to be interesting to Keepers (debt taken from Vault < collateralType.debtFloor),
     // in which case the function reverts. Please refer to the code and comments within if
     // more detail is desired.
-    function bark(bytes32 ilk, address urn, address kpr) external returns (uint256 id) {
-        require(live == 1, "Dog/not-live");
+    function bark(bytes32 collateralType, address positionAddress, address keeperAddress) external returns (uint256 id) {
+        require(live == 1, "LiquidationEngine/not-live");
 
-        (uint256 ink, uint256 art) = vat.urns(ilk, urn);
-        Ilk memory milk = ilks[ilk];
-        uint256 dart;
-        uint256 rate;
-        uint256 dust;
+        (uint256 positionLockedCollateral, uint256 positionDebtShare) = cdpEngine.positions(collateralType, positionAddress);
+        CollateralType memory mcollateralType = collateralTypes[collateralType];
+        uint256 debtShareToBeLiquidated;
+        uint256 debtAccumulatedRate;
+        uint256 debtFloor;
         {
-            uint256 spot;
-            (,rate, spot,, dust) = vat.ilks(ilk);
-            require(spot > 0 && mul(ink, spot) < mul(art, rate), "Dog/not-unsafe");
+            uint256 priceWithSafetyMargin;
+            (,debtAccumulatedRate, priceWithSafetyMargin,, debtFloor) = cdpEngine.collateralTypes(collateralType);
+            require(priceWithSafetyMargin > 0 && mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate), "LiquidationEngine/not-unsafe");
 
             // Get the minimum value between:
-            // 1) Remaining space in the general Hole
-            // 2) Remaining space in the collateral hole
-            require(Hole > Dirt && milk.hole > milk.dirt, "Dog/liquidation-limit-hit");
-            uint256 room = min(Hole - Dirt, milk.hole - milk.dirt);
+            // 1) Remaining space in the general maxStablecoinNeeded
+            // 2) Remaining space in the collateral maxStablecoinNeeded
+            require(maxStablecoinNeeded > amountStablecoinNeeded && mcollateralType.maxStablecoinNeeded > mcollateralType.amountStablecoinNeeded, "LiquidationEngine/liquidation-limit-hit");
+            uint256 room = min(maxStablecoinNeeded - amountStablecoinNeeded, mcollateralType.maxStablecoinNeeded - mcollateralType.amountStablecoinNeeded);
 
             // uint256.max()/(RAD*WAD) = 115,792,089,237,316
-            dart = min(art, mul(room, WAD) / rate / milk.chop);
+            debtShareToBeLiquidated = min(positionDebtShare, mul(room, WAD) / debtAccumulatedRate / mcollateralType.liquidationPenalty);
 
             // Partial liquidation edge case logic
-            if (art > dart) {
-                if (mul(art - dart, rate) < dust) {
+            if (positionDebtShare > debtShareToBeLiquidated) {
+                if (mul(positionDebtShare - debtShareToBeLiquidated, debtAccumulatedRate) < debtFloor) {
 
-                    // If the leftover Vault would be dusty, just liquidate it entirely.
-                    // This will result in at least one of dirt_i > hole_i or Dirt > Hole becoming true.
-                    // The amount of excess will be bounded above by ceiling(dust_i * chop_i / WAD).
-                    // This deviation is assumed to be small compared to both hole_i and Hole, so that
+                    // If the leftover Vault would be debtFloory, just liquidate it entirely.
+                    // This will result in at least one of amountStablecoinNeeded_i > maxStablecoinNeeded_i or amountStablecoinNeeded > maxStablecoinNeeded becoming true.
+                    // The amount of excess will be bounded above by ceiling(debtFloor_i * liquidationPenalty_i / WAD).
+                    // This deviation is assumed to be small compared to both maxStablecoinNeeded_i and maxStablecoinNeeded, so that
                     // the extra amount of target DAI over the limits intended is not of economic concern.
-                    dart = art;
+                    debtShareToBeLiquidated = positionDebtShare;
                 } else {
 
-                    // In a partial liquidation, the resulting auction should also be non-dusty.
-                    require(mul(dart, rate) >= dust, "Dog/dusty-auction-from-partial-liquidation");
+                    // In a partial liquidation, the resulting auction should also be non-debtFloory.
+                    require(mul(debtShareToBeLiquidated, debtAccumulatedRate) >= debtFloor, "LiquidationEngine/debtFloory-auction-from-partial-liquidation");
                 }
             }
         }
 
-        uint256 dink = mul(ink, dart) / art;
+        uint256 collateralAmountToBeLiquidated = mul(positionLockedCollateral, debtShareToBeLiquidated) / positionDebtShare;
 
-        require(dink > 0, "Dog/null-auction");
-        require(dart <= 2**255 && dink <= 2**255, "Dog/overflow");
+        require(collateralAmountToBeLiquidated > 0, "LiquidationEngine/null-auction");
+        require(debtShareToBeLiquidated <= 2**255 && collateralAmountToBeLiquidated <= 2**255, "LiquidationEngine/overflow");
 
-        vat.grab(
-            ilk, urn, milk.clip, address(vow), -int256(dink), -int256(dart)
+        cdpEngine.confiscate(
+            collateralType, positionAddress, mcollateralType.clip, address(vow), -int256(collateralAmountToBeLiquidated), -int256(debtShareToBeLiquidated)
         );
 
-        uint256 due = mul(dart, rate);
-        vow.fess(due);
+        uint256 debtValueToBeLiquidatedWithoutPenalty = mul(debtShareToBeLiquidated, debtAccumulatedRate);
+        vow.fess(debtValueToBeLiquidatedWithoutPenalty);
 
         {   // Avoid stack too deep
-            // This calcuation will overflow if dart*rate exceeds ~10^14
-            uint256 tab = mul(due, milk.chop) / WAD;
-            Dirt = add(Dirt, tab);
-            ilks[ilk].dirt = add(milk.dirt, tab);
+            // This calcuation will overflow if debtShareToBeLiquidated*debtAccumulatedRate exceeds ~10^14
+            uint256 debtValueToBeLiquidatedWithPenalty = mul(debtValueToBeLiquidatedWithoutPenalty, mcollateralType.liquidationPenalty) / WAD;
+            amountStablecoinNeeded = add(amountStablecoinNeeded, debtValueToBeLiquidatedWithPenalty);
+            collateralTypes[collateralType].amountStablecoinNeeded = add(mcollateralType.amountStablecoinNeeded, debtValueToBeLiquidatedWithPenalty);
 
-            id = ClipperLike(milk.clip).kick({
-                tab: tab,
-                lot: dink,
-                usr: urn,
-                kpr: kpr
+            id = ClipperLike(mcollateralType.clip).kick({
+                tab: debtValueToBeLiquidatedWithPenalty,
+                lot: collateralAmountToBeLiquidated,
+                usr: positionAddress,
+                kpr: keeperAddress
             });
         }
 
-        emit Bark(ilk, urn, dink, dart, due, milk.clip, id);
+        emit Bark(collateralType, positionAddress, collateralAmountToBeLiquidated, debtShareToBeLiquidated, debtValueToBeLiquidatedWithoutPenalty, mcollateralType.clip, id);
     }
 
-    function digs(bytes32 ilk, uint256 rad) external auth {
-        Dirt = sub(Dirt, rad);
-        ilks[ilk].dirt = sub(ilks[ilk].dirt, rad);
-        emit Digs(ilk, rad);
+    function digs(bytes32 collateralType, uint256 rad) external auth {
+        amountStablecoinNeeded = sub(amountStablecoinNeeded, rad);
+        collateralTypes[collateralType].amountStablecoinNeeded = sub(collateralTypes[collateralType].amountStablecoinNeeded, rad);
+        emit Digs(collateralType, rad);
     }
 
     function cage() external auth {
