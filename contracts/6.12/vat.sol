@@ -41,7 +41,7 @@ contract CDPEngine {
     }
 
     // --- Data ---
-    struct CollateralType {
+    struct CollateralPool {
         uint256 totalDebtShare;   // Total Normalised Debt     [wad]
         uint256 debtAccumulatedRate;  // Accumulated Rates         [ray]
         uint256 priceWithSafetyMargin;  // Price with Safety Margin  [ray]
@@ -53,7 +53,7 @@ contract CDPEngine {
         uint256 debtShare;   // Normalised Debt    [wad]
     }
 
-    mapping (bytes32 => CollateralType)                       public collateralTypes;
+    mapping (bytes32 => CollateralPool)                       public collateralPools;
     mapping (bytes32 => mapping (address => Position )) public positions;
     mapping (bytes32 => mapping (address => uint)) public collateralToken;  // [wad]
     mapping (address => uint256)                   public stablecoin;  // [rad]
@@ -97,20 +97,20 @@ contract CDPEngine {
     }
 
     // --- Administration ---
-    function init(bytes32 ilk) external auth {
-        require(collateralTypes[ilk].debtAccumulatedRate == 0, "CDPEngine/ilk-already-init");
-        collateralTypes[ilk].debtAccumulatedRate = 10 ** 27;
+    function init(bytes32 poolId) external auth {
+        require(collateralPools[poolId].debtAccumulatedRate == 0, "CDPEngine/collateral-pool-already-init");
+        collateralPools[poolId].debtAccumulatedRate = 10 ** 27;
     }
     function file(bytes32 what, uint data) external auth {
         require(live == 1, "CDPEngine/not-live");
         if (what == "totalDebtCeiling") totalDebtCeiling = data;
         else revert("CDPEngine/file-unrecognized-param");
     }
-    function file(bytes32 ilk, bytes32 what, uint data) external auth {
+    function file(bytes32 poolId, bytes32 what, uint data) external auth {
         require(live == 1, "CDPEngine/not-live");
-        if (what == "priceWithSafetyMargin") collateralTypes[ilk].priceWithSafetyMargin = data;
-        else if (what == "debtCeiling") collateralTypes[ilk].debtCeiling = data;
-        else if (what == "debtFloor") collateralTypes[ilk].debtFloor = data;
+        if (what == "priceWithSafetyMargin") collateralPools[poolId].priceWithSafetyMargin = data;
+        else if (what == "debtCeiling") collateralPools[poolId].debtCeiling = data;
+        else if (what == "debtFloor") collateralPools[poolId].debtFloor = data;
         else revert("CDPEngine/file-unrecognized-param");
     }
     function cage() external auth {
@@ -118,13 +118,13 @@ contract CDPEngine {
     }
 
     // --- Fungibility ---
-    function slip(bytes32 ilk, address usr, int256 wad) external auth {
-        collateralToken[ilk][usr] = add(collateralToken[ilk][usr], wad);
+    function slip(bytes32 poolId, address usr, int256 wad) external auth {
+        collateralToken[poolId][usr] = add(collateralToken[poolId][usr], wad);
     }
-    function flux(bytes32 ilk, address src, address dst, uint256 wad) external {
+    function flux(bytes32 poolId, address src, address dst, uint256 wad) external {
         require(wish(src, msg.sender), "CDPEngine/not-allowed");
-        collateralToken[ilk][src] = sub(collateralToken[ilk][src], wad);
-        collateralToken[ilk][dst] = add(collateralToken[ilk][dst], wad);
+        collateralToken[poolId][src] = sub(collateralToken[poolId][src], wad);
+        collateralToken[poolId][dst] = add(collateralToken[poolId][dst], wad);
     }
     function move(address src, address dst, uint256 rad) external {
         require(wish(src, msg.sender), "CDPEngine/not-allowed");
@@ -140,27 +140,27 @@ contract CDPEngine {
     }
 
     // --- CDP Manipulation ---
-    function adjustPosition(bytes32 collateralIndex, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external {
+    function adjustPosition(bytes32 poolId, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external {
         // system is live
         require(live == 1, "CDPEngine/not-live");
 
-        Position memory position = positions[collateralIndex][positionAddress];
-        CollateralType memory collateralType = collateralTypes[collateralIndex];
-        // collateralType has been initialised
-        require(collateralType.debtAccumulatedRate != 0, "CDPEngine/collateralType-not-init");
+        Position memory position = positions[poolId][positionAddress];
+        CollateralPool memory collateralPool = collateralPools[poolId];
+        // collateralPool has been initialised
+        require(collateralPool.debtAccumulatedRate != 0, "CDPEngine/collateralPool-not-init");
 
         position.lockedCollateral = add(position.lockedCollateral, collateralValue);
         position.debtShare = add(position.debtShare, debtShare);
-        collateralType.totalDebtShare = add(collateralType.totalDebtShare, debtShare);
+        collateralPool.totalDebtShare = add(collateralPool.totalDebtShare, debtShare);
 
-        int debtValue = mul(collateralType.debtAccumulatedRate, debtShare);
-        uint positionDebtValue = mul(collateralType.debtAccumulatedRate, position.debtShare);
+        int debtValue = mul(collateralPool.debtAccumulatedRate, debtShare);
+        uint positionDebtValue = mul(collateralPool.debtAccumulatedRate, position.debtShare);
         totalStablecoinIssued     = add(totalStablecoinIssued, debtValue);
 
         // either debt has decreased, or debt ceilings are not exceeded
-        require(either(debtShare <= 0, both(mul(collateralType.totalDebtShare, collateralType.debtAccumulatedRate) <= collateralType.debtCeiling, totalStablecoinIssued <= totalDebtCeiling)), "CDPEngine/ceiling-exceeded");
+        require(either(debtShare <= 0, both(mul(collateralPool.totalDebtShare, collateralPool.debtAccumulatedRate) <= collateralPool.debtCeiling, totalStablecoinIssued <= totalDebtCeiling)), "CDPEngine/ceiling-exceeded");
         // position is either less risky than before, or it is safe :: check work factor
-        require(either(both(debtShare <= 0, collateralValue >= 0), positionDebtValue <= mul(position.lockedCollateral, collateralType.priceWithSafetyMargin)), "CDPEngine/not-safe");
+        require(either(both(debtShare <= 0, collateralValue >= 0), positionDebtValue <= mul(position.lockedCollateral, collateralPool.priceWithSafetyMargin)), "CDPEngine/not-safe");
 
         // position is either more safe, or the owner consents
         require(either(both(debtShare <= 0, collateralValue >= 0), wish(positionAddress, msg.sender)), "CDPEngine/not-allowed-u");
@@ -170,19 +170,19 @@ contract CDPEngine {
         require(either(debtShare >= 0, wish(stablecoinOwner, msg.sender)), "CDPEngine/not-allowed-w");
 
         // position has no debt, or a non-debtFloory amount
-        require(either(position.debtShare == 0, positionDebtValue >= collateralType.debtFloor), "CDPEngine/debtFloor");
+        require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "CDPEngine/debtFloor");
 
-        collateralToken[collateralIndex][collateralOwner] = sub(collateralToken[collateralIndex][collateralOwner], collateralValue);
+        collateralToken[poolId][collateralOwner] = sub(collateralToken[poolId][collateralOwner], collateralValue);
         stablecoin[stablecoinOwner]    = add(stablecoin[stablecoinOwner],    debtValue);
 
-        positions[collateralIndex][positionAddress] = position;
-        collateralTypes[collateralIndex]    = collateralType;
+        positions[poolId][positionAddress] = position;
+        collateralPools[poolId]    = collateralPool;
     }
     // --- CDP Fungibility ---
-    function movePosition(bytes32 collateralIndex, address src, address dst, int collateralValue, int debtShare) external {
-        Position storage u = positions[collateralIndex][src];
-        Position storage v = positions[collateralIndex][dst];
-        CollateralType storage i = collateralTypes[collateralIndex];
+    function movePosition(bytes32 poolId, address src, address dst, int collateralValue, int debtShare) external {
+        Position storage u = positions[poolId][src];
+        Position storage v = positions[poolId][dst];
+        CollateralPool storage i = collateralPools[poolId];
 
         u.lockedCollateral = sub(u.lockedCollateral, collateralValue);
         u.debtShare = sub(u.debtShare, debtShare);
@@ -204,17 +204,17 @@ contract CDPEngine {
         require(either(vtab >= i.debtFloor, v.debtShare == 0), "CDPEngine/debtFloor-dst");
     }
     // --- CDP Confiscation ---
-    function confiscatePosition(bytes32 collateralIndex, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external auth {
-        Position storage position = positions[collateralIndex][positionAddress];
-        CollateralType storage collateralType = collateralTypes[collateralIndex];
+    function confiscatePosition(bytes32 poolId, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external auth {
+        Position storage position = positions[poolId][positionAddress];
+        CollateralPool storage collateralPool = collateralPools[poolId];
 
         position.lockedCollateral = add(position.lockedCollateral, collateralValue);
         position.debtShare = add(position.debtShare, debtShare);
-        collateralType.totalDebtShare = add(collateralType.totalDebtShare, debtShare);
+        collateralPool.totalDebtShare = add(collateralPool.totalDebtShare, debtShare);
 
-        int debtValue = mul(collateralType.debtAccumulatedRate, debtShare);
+        int debtValue = mul(collateralPool.debtAccumulatedRate, debtShare);
 
-        collateralToken[collateralIndex][collateralOwner] = sub(collateralToken[collateralIndex][collateralOwner], collateralValue);
+        collateralToken[poolId][collateralOwner] = sub(collateralToken[poolId][collateralOwner], collateralValue);
         systemBadDebt[stablecoinOwner]    = sub(systemBadDebt[stablecoinOwner],    debtValue);
         totalUnbackedStablecoin      = sub(totalUnbackedStablecoin,      debtValue);
     }
@@ -235,11 +235,11 @@ contract CDPEngine {
     }
 
     // --- Rates ---
-    function accrue(bytes32 collateralIndex, address u, int debtAccumulatedRate) external auth {
+    function accrue(bytes32 poolId, address u, int debtAccumulatedRate) external auth {
         require(live == 1, "CDPEngine/not-live");
-        CollateralType storage collateralType = collateralTypes[collateralIndex];
-        collateralType.debtAccumulatedRate = add(collateralType.debtAccumulatedRate, debtAccumulatedRate);
-        int rad  = mul(collateralType.totalDebtShare, debtAccumulatedRate);
+        CollateralPool storage collateralPool = collateralPools[poolId];
+        collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);
+        int rad  = mul(collateralPool.totalDebtShare, debtAccumulatedRate);
         stablecoin[u]   = add(stablecoin[u], rad);
         totalStablecoinIssued     = add(totalStablecoinIssued,   rad);
     }

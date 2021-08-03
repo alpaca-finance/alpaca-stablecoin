@@ -22,7 +22,7 @@ pragma solidity >=0.6.12;
 interface CDPEngineLike {
     function move(address,address,uint256) external;
     function flux(bytes32,address,address,uint256) external;
-    function collateralTypes(bytes32) external returns (uint256, uint256, uint256, uint256, uint256);
+    function collateralPools(bytes32) external returns (uint256, uint256, uint256, uint256, uint256);
     function suck(address,address,uint256) external;
 }
 
@@ -32,7 +32,7 @@ interface PipLike {
 
 interface PriceOracleLike {
     function stableCoinReferencePrice() external returns (uint256);
-    function collateralTypes(bytes32) external returns (PipLike, uint256);
+    function collateralPools(bytes32) external returns (PipLike, uint256);
 }
 
 interface LiquidationEngineLike {
@@ -59,7 +59,7 @@ contract Clipper {
     }
 
     // --- Data ---
-    bytes32  immutable public collateralType;   // Collateral type of this Clipper
+    bytes32  immutable public collateralPool;   // Collateral type of this Clipper
     CDPEngineLike  immutable public cdpEngine;   // Core CDP Engine
 
     LiquidationEngineLike     public liquidationEngine;      // Liquidation module
@@ -72,7 +72,7 @@ contract Clipper {
     uint256 public priceDropBeforeReset;   // Percentage drop before auction reset                              [ray]
     uint64  public liquidatorBountyRate;   // Percentage of tab to suck from vow to incentivize liquidators         [wad]
     uint192 public liquidatorTip;    // Flat fee to suck from vow to incentivize liquidators                  [rad]
-    uint256 public minimumRemainingDebt;  // Cache the collateralType debtFloor times the collateralType liquidationPenalty to prevent excessive SLOADs [rad]
+    uint256 public minimumRemainingDebt;  // Cache the collateralPool debtFloor times the collateralPool liquidationPenalty to prevent excessive SLOADs [rad]
 
     uint256   public kicks;   // Total auctions
     uint256[] public active;  // Array of active auction ids
@@ -134,11 +134,11 @@ contract Clipper {
     event Yank(uint256 id);
 
     // --- Init ---
-    constructor(address cdpEngine_, address spotter_, address liquidationEngine_, bytes32 collateralType_) public {
+    constructor(address cdpEngine_, address spotter_, address liquidationEngine_, bytes32 collateralPool_) public {
         cdpEngine     = CDPEngineLike(cdpEngine_);
         spotter = PriceOracleLike(spotter_);
         liquidationEngine     = LiquidationEngineLike(liquidationEngine_);
-        collateralType     = collateralType_;
+        collateralPool     = collateralPool_;
         startingPriceBuffer     = RAY;
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
@@ -207,11 +207,11 @@ contract Clipper {
     // --- Auction ---
 
     // get the price directly from the OSM
-    // Could get this from rmul(CDPEngine.collateralTypes(collateralType).spot, Spotter.mat()) instead, but
+    // Could get this from rmul(CDPEngine.collateralPools(collateralPool).spot, Spotter.mat()) instead, but
     // if mat has changed since the last poke, the resulting value will be
     // incorrect.
     function getFeedPrice() internal returns (uint256 feedPrice) {
-        (PipLike pip, ) = spotter.collateralTypes(collateralType);
+        (PipLike pip, ) = spotter.collateralPools(collateralPool);
         (bytes32 val, bool has) = pip.peek();
         require(has, "Clipper/invalid-price");
         feedPrice = rdiv(mul(uint256(val), BLN), spotter.stableCoinReferencePrice());
@@ -316,7 +316,7 @@ contract Clipper {
     // To avoid partial purchases resulting in very small leftover auctions that will
     // never be cleared, any partial purchase must leave at least `Clipper.minimumRemainingDebt`
     // remaining DAI target. `minimumRemainingDebt` is an asynchronously updated value equal to
-    // (CDPEngine.debtFloor * Dog.liquidationPenalty(collateralType) / WAD) where the values are understood to be determined
+    // (CDPEngine.debtFloor * Dog.liquidationPenalty(collateralPool) / WAD) where the values are understood to be determined
     // by whatever they were when Clipper.updateMinimumRemainingDebt() was last called. Purchase amounts
     // will be minimally decreased when necessary to respect this limit; i.e., if the
     // specified `collateralAmountToBuy` would leave `debt < minimumRemainingDebt` but `debt > 0`, the amount actually
@@ -385,7 +385,7 @@ contract Clipper {
             collateralAmount = collateralAmount - slice;
 
             // Send collateral to who
-            cdpEngine.flux(collateralType, address(this), who, slice);
+            cdpEngine.flux(collateralPool, address(this), who, slice);
 
             // Do external call (if data is defined) but to be
             // extremely careful we don't allow to do it to the two
@@ -399,13 +399,13 @@ contract Clipper {
             cdpEngine.move(msg.sender, vow, owe);
 
             // Removes Dai out for liquidation from accumulator
-            liquidationEngine_.digs(collateralType, collateralAmount == 0 ? debt + owe : owe);
+            liquidationEngine_.digs(collateralPool, collateralAmount == 0 ? debt + owe : owe);
         }
 
         if (collateralAmount == 0) {
             _remove(id);
         } else if (debt == 0) {
-            cdpEngine.flux(collateralType, address(this), positionAddress, collateralAmount);
+            cdpEngine.flux(collateralPool, address(this), positionAddress, collateralAmount);
             _remove(id);
         } else {
             sales[id].debt = debt;
@@ -458,15 +458,15 @@ contract Clipper {
 
     // Public function to update the cached debtFloor*liquidationPenalty value.
     function updateMinimumRemainingDebt() external {
-        (,,,, uint256 _debtFloor) = CDPEngineLike(cdpEngine).collateralTypes(collateralType);
-        minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralType));
+        (,,,, uint256 _debtFloor) = CDPEngineLike(cdpEngine).collateralPools(collateralPool);
+        minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPool));
     }
 
     // Cancel an auction during Emergency Shutdown or via governance action.
     function yank(uint256 id) external auth lock {
         require(sales[id].positionAddress != address(0), "Clipper/not-running-auction");
-        liquidationEngine.digs(collateralType, sales[id].debt);
-        cdpEngine.flux(collateralType, address(this), msg.sender, sales[id].collateralAmount);
+        liquidationEngine.digs(collateralPool, sales[id].debt);
+        cdpEngine.flux(collateralPool, address(this), msg.sender, sales[id].collateralAmount);
         _remove(id);
         emit Yank(id);
     }

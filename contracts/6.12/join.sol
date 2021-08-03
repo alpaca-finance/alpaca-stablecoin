@@ -74,16 +74,16 @@ contract CollateralTokenAdapter {
     }
 
     CDPEngineLike public cdpEngine;   // CDP Engine
-    bytes32 public collateralType;   // Collateral Type
+    bytes32 public collateralPool;   // Collateral Type
     CollateralTokenLike public collateralToken;
     uint    public dec;
     uint    public live;  // Active Flag
 
-    constructor(address cdpEngine_, bytes32 collateralType_, address collateralToken_) public {
+    constructor(address cdpEngine_, bytes32 collateralPool_, address collateralToken_) public {
         wards[msg.sender] = 1;
         live = 1;
         cdpEngine = CDPEngineLike(cdpEngine_);
-        collateralType = collateralType_;
+        collateralPool = collateralPool_;
         collateralToken = CollateralTokenLike(collateralToken_);
         dec = collateralToken.decimals();
     }
@@ -93,12 +93,12 @@ contract CollateralTokenAdapter {
     function deposit(address usr, uint wad) external {
         require(live == 1, "CollateralTokenAdapter/not-live");
         require(int(wad) >= 0, "CollateralTokenAdapter/overflow");
-        cdpEngine.slip(collateralType, usr, int(wad));
+        cdpEngine.slip(collateralPool, usr, int(wad));
         require(collateralToken.transferFrom(msg.sender, address(this), wad), "CollateralTokenAdapter/failed-transfer");
     }
     function withdraw(address usr, uint wad) external {
         require(wad <= 2 ** 255, "CollateralTokenAdapter/overflow");
-        cdpEngine.slip(collateralType, msg.sender, -int(wad));
+        cdpEngine.slip(collateralPool, msg.sender, -int(wad));
         require(collateralToken.transfer(usr, wad), "CollateralTokenAdapter/failed-transfer");
     }
 }

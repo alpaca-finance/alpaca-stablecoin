@@ -40,12 +40,12 @@ contract PriceOracle {
     }
 
     // --- Data ---
-    struct CollateralType {
+    struct CollateralPool {
         PipLike pip;  // Price Feed
-        uint256 mat;  // Liquidation ratio [ray]
+        uint256 liquidationRatio;  // Liquidation ratio [ray]
     }
 
-    mapping (bytes32 => CollateralType) public collateralTypes;
+    mapping (bytes32 => CollateralPool) public collateralPools;
 
     CDPEngineLike public vat;  // CDP Engine
     uint256 public stableCoinReferencePrice;  // ref per dai [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
@@ -54,7 +54,7 @@ contract PriceOracle {
 
     // --- Events ---
     event Poke(
-      bytes32 ilk,
+      bytes32 poolId,
       bytes32 val,  // [wad]
       uint256 spot  // [ray]
     );
@@ -78,9 +78,9 @@ contract PriceOracle {
     }
 
     // --- Administration ---
-    function file(bytes32 ilk, bytes32 what, address pip_) external auth {
+    function file(bytes32 poolId, bytes32 what, address pip_) external auth {
         require(live == 1, "Spotter/not-live");
-        if (what == "pip") collateralTypes[ilk].pip = PipLike(pip_);
+        if (what == "pip") collateralPools[poolId].pip = PipLike(pip_);
         else revert("Spotter/file-unrecognized-param");
     }
     function file(bytes32 what, uint data) external auth {
@@ -88,18 +88,18 @@ contract PriceOracle {
         if (what == "stableCoinReferencePrice") stableCoinReferencePrice = data;
         else revert("Spotter/file-unrecognized-param");
     }
-    function file(bytes32 ilk, bytes32 what, uint data) external auth {
+    function file(bytes32 poolId, bytes32 what, uint data) external auth {
         require(live == 1, "Spotter/not-live");
-        if (what == "mat") collateralTypes[ilk].mat = data;
+        if (what == "liquidationRatio") collateralPools[poolId].liquidationRatio = data;
         else revert("Spotter/file-unrecognized-param");
     }
 
     // --- Update value ---
-    function poke(bytes32 ilk) external {
-        (bytes32 val, bool has) = collateralTypes[ilk].pip.peek();
-        uint256 priceWithSafetyMargin = has ? rdiv(rdiv(mul(uint(val), 10 ** 9), stableCoinReferencePrice), collateralTypes[ilk].mat) : 0;
-        vat.file(ilk, "priceWithSafetyMargin", priceWithSafetyMargin);
-        emit Poke(ilk, val, priceWithSafetyMargin);
+    function poke(bytes32 poolId) external {
+        (bytes32 val, bool has) = collateralPools[poolId].pip.peek();
+        uint256 priceWithSafetyMargin = has ? rdiv(rdiv(mul(uint(val), 10 ** 9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio) : 0;
+        vat.file(poolId, "priceWithSafetyMargin", priceWithSafetyMargin);
+        emit Poke(poolId, val, priceWithSafetyMargin);
     }
 
     function cage() external auth {

@@ -24,7 +24,7 @@ pragma solidity >=0.5.12;
 // New deployments of this contract will need to include custom events (TO DO).
 
 interface CDPEngineLike {
-    function collateralTypes(bytes32) external returns (
+    function collateralPools(bytes32) external returns (
         uint256 Art,   // [wad]
         uint256 rate   // [ray]
     );
@@ -42,12 +42,12 @@ contract StabilityFeeCollector {
     }
 
     // --- Data ---
-    struct CollateralType {
+    struct CollateralPool {
         uint256 stabilityFeeRate;  // Collateral-specific, per-second stability fee contribution [ray]
         uint256  lastAccumulationTime;  // Time of last drip [unix epoch time]
     }
 
-    mapping (bytes32 => CollateralType) public collateralTypes;
+    mapping (bytes32 => CollateralPool) public collateralPools;
     CDPEngineLike                  public cdpEngine;   // CDP Engine
     address                  public debtEngine;   // Debt Engine
     uint256                  public globalStabilityFeeRate;  // Global, per-second stability fee contribution [ray]
@@ -98,15 +98,15 @@ contract StabilityFeeCollector {
     }
 
     // --- Administration ---
-    function init(bytes32 collateralType) external auth {
-        CollateralType storage i = collateralTypes[collateralType];
-        require(i.stabilityFeeRate == 0, "StabilityFeeCollector/collateralType-already-init");
+    function init(bytes32 collateralPool) external auth {
+        CollateralPool storage i = collateralPools[collateralPool];
+        require(i.stabilityFeeRate == 0, "StabilityFeeCollector/collateralPool-already-init");
         i.stabilityFeeRate = ONE;
         i.lastAccumulationTime  = now;
     }
-    function file(bytes32 collateralType, bytes32 what, uint data) external auth {
-        require(now == collateralTypes[collateralType].lastAccumulationTime, "StabilityFeeCollector/lastAccumulationTime-not-updated");
-        if (what == "stabilityFeeRate") collateralTypes[collateralType].stabilityFeeRate = data;
+    function file(bytes32 collateralPool, bytes32 what, uint data) external auth {
+        require(now == collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/lastAccumulationTime-not-updated");
+        if (what == "stabilityFeeRate") collateralPools[collateralPool].stabilityFeeRate = data;
         else revert("StabilityFeeCollector/file-unrecognized-param");
     }
     function file(bytes32 what, uint data) external auth {
@@ -119,11 +119,11 @@ contract StabilityFeeCollector {
     }
 
     // --- Stability Fee Collection ---
-    function drip(bytes32 collateralType) external returns (uint rate) {
-        require(now >= collateralTypes[collateralType].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
-        (, uint prev) = cdpEngine.collateralTypes(collateralType);
-        rate = rmul(rpow(add(globalStabilityFeeRate, collateralTypes[collateralType].stabilityFeeRate), now - collateralTypes[collateralType].lastAccumulationTime, ONE), prev);
-        cdpEngine.fold(collateralType, debtEngine, diff(rate, prev));
-        collateralTypes[collateralType].lastAccumulationTime = now;
+    function drip(bytes32 collateralPool) external returns (uint rate) {
+        require(now >= collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
+        (, uint prev) = cdpEngine.collateralPools(collateralPool);
+        rate = rmul(rpow(add(globalStabilityFeeRate, collateralPools[collateralPool].stabilityFeeRate), now - collateralPools[collateralPool].lastAccumulationTime, ONE), prev);
+        cdpEngine.fold(collateralPool, debtEngine, diff(rate, prev));
+        collateralPools[collateralPool].lastAccumulationTime = now;
     }
 }
