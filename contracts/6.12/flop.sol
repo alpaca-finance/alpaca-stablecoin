@@ -23,7 +23,7 @@ pragma solidity >=0.5.12;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface CDPEngineLike {
+interface GovernmentLike {
     function move(address,address,uint) external;
     function suck(address,address,uint) external;
 }
@@ -67,7 +67,7 @@ contract BadDebtAuctionHouse {
 
     mapping (uint => Bid) public bids;
 
-    CDPEngineLike  public   cdpEngine;  // CDP Engine
+    GovernmentLike  public   government;  // CDP Engine
     GemLike  public   alpaca;
 
     uint256  constant ONE = 1.00E18;
@@ -88,9 +88,9 @@ contract BadDebtAuctionHouse {
     );
 
     // --- Init ---
-    constructor(address cdpEngine_, address alpaca_) public {
+    constructor(address government_, address alpaca_) public {
         whitelist[msg.sender] = 1;
-        cdpEngine = CDPEngineLike(cdpEngine_);
+        government = GovernmentLike(government_);
         alpaca = GemLike(alpaca_);
         live = 1;
     }
@@ -145,7 +145,7 @@ contract BadDebtAuctionHouse {
         require(mul(minimumBidIncrease, lot) <= mul(bids[id].lot, ONE), "BadDebtAuctionHouse/insufficient-decrease");
 
         if (msg.sender != bids[id].bidder) {
-            cdpEngine.move(msg.sender, bids[id].bidder, bid);
+            government.move(msg.sender, bids[id].bidder, bid);
 
             // on first dent, clear as much totalBadDebtInAuction as possible
             if (bids[id].bidExpiry == 0) {
@@ -174,7 +174,7 @@ contract BadDebtAuctionHouse {
     function yank(uint id) external {
         require(live == 0, "BadDebtAuctionHouse/still-live");
         require(bids[id].bidder != address(0), "BadDebtAuctionHouse/bidder-not-set");
-        cdpEngine.suck(debtEngine, bids[id].bidder, bids[id].bid);
+        government.suck(debtEngine, bids[id].bidder, bids[id].bid);
         delete bids[id];
     }
 }

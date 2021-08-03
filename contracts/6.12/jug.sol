@@ -23,7 +23,7 @@ pragma solidity >=0.5.12;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface CDPEngineLike {
+interface GovernmentLike {
     function collateralPools(bytes32) external returns (
         uint256 Art,   // [wad]
         uint256 rate   // [ray]
@@ -48,14 +48,14 @@ contract StabilityFeeCollector {
     }
 
     mapping (bytes32 => CollateralPool) public collateralPools;
-    CDPEngineLike                  public cdpEngine;   // CDP Engine
+    GovernmentLike                  public government;   // CDP Engine
     address                  public debtEngine;   // Debt Engine
     uint256                  public globalStabilityFeeRate;  // Global, per-second stability fee contribution [ray]
 
     // --- Init ---
-    constructor(address cdpEngine_) public {
+    constructor(address government_) public {
         whitelist[msg.sender] = 1;
-        cdpEngine = CDPEngineLike(cdpEngine_);
+        government = GovernmentLike(government_);
     }
 
     // --- Math ---
@@ -121,9 +121,9 @@ contract StabilityFeeCollector {
     // --- Stability Fee Collection ---
     function drip(bytes32 collateralPool) external returns (uint rate) {
         require(now >= collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
-        (, uint prev) = cdpEngine.collateralPools(collateralPool);
+        (, uint prev) = government.collateralPools(collateralPool);
         rate = rmul(rpow(add(globalStabilityFeeRate, collateralPools[collateralPool].stabilityFeeRate), now - collateralPools[collateralPool].lastAccumulationTime, ONE), prev);
-        cdpEngine.fold(collateralPool, debtEngine, diff(rate, prev));
+        government.fold(collateralPool, debtEngine, diff(rate, prev));
         collateralPools[collateralPool].lastAccumulationTime = now;
     }
 }

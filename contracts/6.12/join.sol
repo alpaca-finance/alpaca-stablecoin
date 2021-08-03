@@ -34,14 +34,14 @@ interface StablecoinLike {
     function burn(address,uint) external;
 }
 
-interface CDPEngineLike {
+interface GovernmentLike {
     function slip(bytes32,address,int) external;
     function move(address,address,uint) external;
 }
 
 /*
-    Here we provide *adapters* to connect the CDPEngine to arbitrary external
-    token implementations, creating a bounded context for the CDPEngine. The
+    Here we provide *adapters* to connect the Government to arbitrary external
+    token implementations, creating a bounded context for the Government. The
     adapters here are provided as working examples:
 
       - `CollateralTokenAdapter`: For well behaved ERC20 tokens, with simple transfer
@@ -73,16 +73,16 @@ contract CollateralTokenAdapter {
         _;
     }
 
-    CDPEngineLike public cdpEngine;   // CDP Engine
+    GovernmentLike public government;   // CDP Engine
     bytes32 public collateralPool;   // Collateral Type
     CollateralTokenLike public collateralToken;
     uint    public dec;
     uint    public live;  // Active Flag
 
-    constructor(address cdpEngine_, bytes32 collateralPool_, address collateralToken_) public {
+    constructor(address government_, bytes32 collateralPool_, address collateralToken_) public {
         wards[msg.sender] = 1;
         live = 1;
-        cdpEngine = CDPEngineLike(cdpEngine_);
+        government = GovernmentLike(government_);
         collateralPool = collateralPool_;
         collateralToken = CollateralTokenLike(collateralToken_);
         dec = collateralToken.decimals();
@@ -93,12 +93,12 @@ contract CollateralTokenAdapter {
     function deposit(address usr, uint wad) external {
         require(live == 1, "CollateralTokenAdapter/not-live");
         require(int(wad) >= 0, "CollateralTokenAdapter/overflow");
-        cdpEngine.slip(collateralPool, usr, int(wad));
+        government.slip(collateralPool, usr, int(wad));
         require(collateralToken.transferFrom(msg.sender, address(this), wad), "CollateralTokenAdapter/failed-transfer");
     }
     function withdraw(address usr, uint wad) external {
         require(wad <= 2 ** 255, "CollateralTokenAdapter/overflow");
-        cdpEngine.slip(collateralPool, msg.sender, -int(wad));
+        government.slip(collateralPool, msg.sender, -int(wad));
         require(collateralToken.transfer(usr, wad), "CollateralTokenAdapter/failed-transfer");
     }
 }
@@ -113,14 +113,14 @@ contract StablecoinAdapter {
         _;
     }
 
-    CDPEngineLike public cdpEngine;      // CDP Engine
+    GovernmentLike public government;      // CDP Engine
     StablecoinLike public stablecoin;  // Stablecoin Token
     uint    public live;     // Active Flag
 
-    constructor(address cdpEngine_, address stablecoin_) public {
+    constructor(address government_, address stablecoin_) public {
         wards[msg.sender] = 1;
         live = 1;
-        cdpEngine = CDPEngineLike(cdpEngine_);
+        government = GovernmentLike(government_);
         stablecoin = StablecoinLike(stablecoin_);
     }
     function cage() external auth {
@@ -131,12 +131,12 @@ contract StablecoinAdapter {
         require(y == 0 || (z = x * y) / y == x);
     }
     function deposit(address usr, uint wad) external {
-        cdpEngine.move(address(this), usr, mul(ONE, wad));
+        government.move(address(this), usr, mul(ONE, wad));
         stablecoin.burn(msg.sender, wad);
     }
     function withdraw(address usr, uint wad) external {
         require(live == 1, "StablecoinAdapter/not-live");
-        cdpEngine.move(msg.sender, address(this), mul(ONE, wad));
+        government.move(msg.sender, address(this), mul(ONE, wad));
         stablecoin.mint(usr, wad);
     }
 }

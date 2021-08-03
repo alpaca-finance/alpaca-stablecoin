@@ -35,7 +35,7 @@ interface SurplusAuctionHouseLike {
     function live() external returns (uint);
 }
 
-interface CDPEngineLike {
+interface GovernmentLike {
     function dai (address) external view returns (uint);
     function systemBadDebt (address) external view returns (uint);
     function heal(uint256) external;
@@ -54,7 +54,7 @@ contract DebtEngine {
     }
 
     // --- Data ---
-    CDPEngineLike public cdpEngine;        // CDP Engine
+    GovernmentLike public government;        // CDP Engine
     SurplusAuctionHouseLike public surplusAuctionHouse;   // Surplus Auction House
     BadDebtAuctionHouseLike public badDebtAuctionHouse;   // Debt Auction House
 
@@ -72,12 +72,12 @@ contract DebtEngine {
     uint256 public live;  // Active Flag
 
     // --- Init ---
-    constructor(address cdpEngine_, address surplusAuctionHouse_, address badDebtAuctionHouse_) public {
+    constructor(address government_, address surplusAuctionHouse_, address badDebtAuctionHouse_) public {
         whitelist[msg.sender] = 1;
-        cdpEngine     = CDPEngineLike(cdpEngine_);
+        government     = GovernmentLike(government_);
         surplusAuctionHouse = SurplusAuctionHouseLike(surplusAuctionHouse_);
         badDebtAuctionHouse = BadDebtAuctionHouseLike(badDebtAuctionHouse_);
-        cdpEngine.hope(surplusAuctionHouse_);
+        government.hope(surplusAuctionHouse_);
         live = 1;
     }
 
@@ -104,9 +104,9 @@ contract DebtEngine {
 
     function file(bytes32 what, address data) external auth {
         if (what == "surplusAuctionHouse") {
-            cdpEngine.nope(address(surplusAuctionHouse));
+            government.nope(address(surplusAuctionHouse));
             surplusAuctionHouse = SurplusAuctionHouseLike(data);
-            cdpEngine.hope(data);
+            government.hope(data);
         }
         else if (what == "badDebtAuctionHouse") badDebtAuctionHouse = BadDebtAuctionHouseLike(data);
         else revert("DebtEngine/file-unrecognized-param");
@@ -126,28 +126,28 @@ contract DebtEngine {
 
     // Debt settlement
     function heal(uint rad) external {
-        require(rad <= cdpEngine.dai(address(this)), "DebtEngine/insufficient-surplus");
-        require(rad <= sub(sub(cdpEngine.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "DebtEngine/insufficient-debt");
-        cdpEngine.heal(rad);
+        require(rad <= government.dai(address(this)), "DebtEngine/insufficient-surplus");
+        require(rad <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "DebtEngine/insufficient-debt");
+        government.heal(rad);
     }
     function kiss(uint rad) external {
         require(rad <= totalBadDebtInAuction, "DebtEngine/not-enough-ash");
-        require(rad <= cdpEngine.dai(address(this)), "DebtEngine/insufficient-surplus");
+        require(rad <= government.dai(address(this)), "DebtEngine/insufficient-surplus");
         totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
-        cdpEngine.heal(rad);
+        government.heal(rad);
     }
 
     // Debt auction
     function flop() external returns (uint id) {
-        require(badDebtFixedBidSize <= sub(sub(cdpEngine.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "DebtEngine/insufficient-debt");
-        require(cdpEngine.dai(address(this)) == 0, "DebtEngine/surplus-not-zero");
+        require(badDebtFixedBidSize <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "DebtEngine/insufficient-debt");
+        require(government.dai(address(this)) == 0, "DebtEngine/surplus-not-zero");
         totalBadDebtInAuction = add(totalBadDebtInAuction, badDebtFixedBidSize);
         id = badDebtAuctionHouse.kick(address(this), alpacaInitialLotSizeForBadDebt, badDebtFixedBidSize);
     }
     // Surplus auction
     function flap() external returns (uint id) {
-        require(cdpEngine.dai(address(this)) >= add(add(cdpEngine.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer), "DebtEngine/insufficient-surplus");
-        require(sub(sub(cdpEngine.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction) == 0, "DebtEngine/debt-not-zero");
+        require(government.dai(address(this)) >= add(add(government.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer), "DebtEngine/insufficient-surplus");
+        require(sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction) == 0, "DebtEngine/debt-not-zero");
         id = surplusAuctionHouse.kick(surplusAuctionFixedLotSize, 0);
     }
 
@@ -156,8 +156,8 @@ contract DebtEngine {
         live = 0;
         totalBadDebtValue = 0;
         totalBadDebtInAuction = 0;
-        surplusAuctionHouse.cage(cdpEngine.dai(address(surplusAuctionHouse)));
+        surplusAuctionHouse.cage(government.dai(address(surplusAuctionHouse)));
         badDebtAuctionHouse.cage();
-        cdpEngine.heal(min(cdpEngine.dai(address(this)), cdpEngine.systemBadDebt(address(this))));
+        government.heal(min(government.dai(address(this)), government.systemBadDebt(address(this))));
     }
 }

@@ -29,7 +29,7 @@ interface ClipperLike {
     ) external returns (uint256);
 }
 
-interface CDPEngineLike {
+interface GovernmentLike {
     function collateralPools(bytes32) external view returns (
         uint256 Art,  // [wad]
         uint256 debtAccumulatedRate, // [ray]
@@ -68,7 +68,7 @@ contract LiquidationEngine {
         uint256 stablecoinNeededForDebtRepay;  // Amt DAI needed to cover debt+fees of active auctions per collateralPool [rad]
     }
 
-    CDPEngineLike immutable public cdpEngine;  // CDP Engine
+    GovernmentLike immutable public government;  // CDP Engine
 
     mapping (bytes32 => CollateralPool) public collateralPools;
 
@@ -99,8 +99,8 @@ contract LiquidationEngine {
     event Cage();
 
     // --- Init ---
-    constructor(address cdpEngine_) public {
-        cdpEngine = CDPEngineLike(cdpEngine_);
+    constructor(address government_) public {
+        government = GovernmentLike(government_);
         live = 1;
         whitelist[msg.sender] = 1;
         emit Rely(msg.sender);
@@ -170,14 +170,14 @@ contract LiquidationEngine {
     function bark(bytes32 collateralPool, address positionAddress, address liquidatorAddress) external returns (uint256 id) {
         require(live == 1, "LiquidationEngine/not-live");
 
-        (uint256 positionLockedCollateral, uint256 positionDebtShare) = cdpEngine.positions(collateralPool, positionAddress);
+        (uint256 positionLockedCollateral, uint256 positionDebtShare) = government.positions(collateralPool, positionAddress);
         CollateralPool memory mcollateralPool = collateralPools[collateralPool];
         uint256 debtShareToBeLiquidated;
         uint256 debtAccumulatedRate;
         uint256 debtFloor;
         {
             uint256 priceWithSafetyMargin;
-            (,debtAccumulatedRate, priceWithSafetyMargin,, debtFloor) = cdpEngine.collateralPools(collateralPool);
+            (,debtAccumulatedRate, priceWithSafetyMargin,, debtFloor) = government.collateralPools(collateralPool);
             require(priceWithSafetyMargin > 0 && mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate), "LiquidationEngine/not-unsafe");
 
             // Get the minimum value between:
@@ -212,7 +212,7 @@ contract LiquidationEngine {
         require(collateralAmountToBeLiquidated > 0, "LiquidationEngine/null-auction");
         require(debtShareToBeLiquidated <= 2**255 && collateralAmountToBeLiquidated <= 2**255, "LiquidationEngine/overflow");
 
-        cdpEngine.confiscate(
+        government.confiscate(
             collateralPool, positionAddress, mcollateralPool.clip, address(vow), -int256(collateralAmountToBeLiquidated), -int256(debtShareToBeLiquidated)
         );
 

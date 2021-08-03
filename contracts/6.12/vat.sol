@@ -23,13 +23,13 @@ pragma solidity >=0.5.12;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract CDPEngine {
+contract Government {
     // --- Auth ---
-    mapping (address => uint) public wards;
-    function rely(address usr) external auth { require(live == 1, "CDPEngine/not-live"); wards[usr] = 1; }
-    function deny(address usr) external auth { require(live == 1, "CDPEngine/not-live"); wards[usr] = 0; }
+    mapping (address => uint) public whitelist;
+    function rely(address usr) external auth { require(live == 1, "Government/not-live"); whitelist[usr] = 1; }
+    function deny(address usr) external auth { require(live == 1, "Government/not-live"); whitelist[usr] = 0; }
     modifier auth {
-        require(wards[msg.sender] == 1, "CDPEngine/not-authorized");
+        require(whitelist[msg.sender] == 1, "Government/not-authorized");
         _;
     }
 
@@ -66,7 +66,7 @@ contract CDPEngine {
 
     // --- Init ---
     constructor() public {
-        wards[msg.sender] = 1;
+        whitelist[msg.sender] = 1;
         live = 1;
     }
 
@@ -98,20 +98,20 @@ contract CDPEngine {
 
     // --- Administration ---
     function init(bytes32 poolId) external auth {
-        require(collateralPools[poolId].debtAccumulatedRate == 0, "CDPEngine/collateral-pool-already-init");
+        require(collateralPools[poolId].debtAccumulatedRate == 0, "Government/collateral-pool-already-init");
         collateralPools[poolId].debtAccumulatedRate = 10 ** 27;
     }
     function file(bytes32 what, uint data) external auth {
-        require(live == 1, "CDPEngine/not-live");
+        require(live == 1, "Government/not-live");
         if (what == "totalDebtCeiling") totalDebtCeiling = data;
-        else revert("CDPEngine/file-unrecognized-param");
+        else revert("Government/file-unrecognized-param");
     }
     function file(bytes32 poolId, bytes32 what, uint data) external auth {
-        require(live == 1, "CDPEngine/not-live");
+        require(live == 1, "Government/not-live");
         if (what == "priceWithSafetyMargin") collateralPools[poolId].priceWithSafetyMargin = data;
         else if (what == "debtCeiling") collateralPools[poolId].debtCeiling = data;
         else if (what == "debtFloor") collateralPools[poolId].debtFloor = data;
-        else revert("CDPEngine/file-unrecognized-param");
+        else revert("Government/file-unrecognized-param");
     }
     function cage() external auth {
         live = 0;
@@ -122,12 +122,12 @@ contract CDPEngine {
         collateralToken[poolId][usr] = add(collateralToken[poolId][usr], wad);
     }
     function flux(bytes32 poolId, address src, address dst, uint256 wad) external {
-        require(wish(src, msg.sender), "CDPEngine/not-allowed");
+        require(wish(src, msg.sender), "Government/not-allowed");
         collateralToken[poolId][src] = sub(collateralToken[poolId][src], wad);
         collateralToken[poolId][dst] = add(collateralToken[poolId][dst], wad);
     }
     function move(address src, address dst, uint256 rad) external {
-        require(wish(src, msg.sender), "CDPEngine/not-allowed");
+        require(wish(src, msg.sender), "Government/not-allowed");
         stablecoin[src] = sub(stablecoin[src], rad);
         stablecoin[dst] = add(stablecoin[dst], rad);
     }
@@ -142,12 +142,12 @@ contract CDPEngine {
     // --- CDP Manipulation ---
     function adjustPosition(bytes32 poolId, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external {
         // system is live
-        require(live == 1, "CDPEngine/not-live");
+        require(live == 1, "Government/not-live");
 
         Position memory position = positions[poolId][positionAddress];
         CollateralPool memory collateralPool = collateralPools[poolId];
         // collateralPool has been initialised
-        require(collateralPool.debtAccumulatedRate != 0, "CDPEngine/collateralPool-not-init");
+        require(collateralPool.debtAccumulatedRate != 0, "Government/collateralPool-not-init");
 
         position.lockedCollateral = add(position.lockedCollateral, collateralValue);
         position.debtShare = add(position.debtShare, debtShare);
@@ -158,19 +158,19 @@ contract CDPEngine {
         totalStablecoinIssued     = add(totalStablecoinIssued, debtValue);
 
         // either debt has decreased, or debt ceilings are not exceeded
-        require(either(debtShare <= 0, both(mul(collateralPool.totalDebtShare, collateralPool.debtAccumulatedRate) <= collateralPool.debtCeiling, totalStablecoinIssued <= totalDebtCeiling)), "CDPEngine/ceiling-exceeded");
+        require(either(debtShare <= 0, both(mul(collateralPool.totalDebtShare, collateralPool.debtAccumulatedRate) <= collateralPool.debtCeiling, totalStablecoinIssued <= totalDebtCeiling)), "Government/ceiling-exceeded");
         // position is either less risky than before, or it is safe :: check work factor
-        require(either(both(debtShare <= 0, collateralValue >= 0), positionDebtValue <= mul(position.lockedCollateral, collateralPool.priceWithSafetyMargin)), "CDPEngine/not-safe");
+        require(either(both(debtShare <= 0, collateralValue >= 0), positionDebtValue <= mul(position.lockedCollateral, collateralPool.priceWithSafetyMargin)), "Government/not-safe");
 
         // position is either more safe, or the owner consents
-        require(either(both(debtShare <= 0, collateralValue >= 0), wish(positionAddress, msg.sender)), "CDPEngine/not-allowed-u");
+        require(either(both(debtShare <= 0, collateralValue >= 0), wish(positionAddress, msg.sender)), "Government/not-allowed-u");
         // collateral src consents
-        require(either(collateralValue <= 0, wish(collateralOwner, msg.sender)), "CDPEngine/not-allowed-v");
+        require(either(collateralValue <= 0, wish(collateralOwner, msg.sender)), "Government/not-allowed-v");
         // debt dst consents
-        require(either(debtShare >= 0, wish(stablecoinOwner, msg.sender)), "CDPEngine/not-allowed-w");
+        require(either(debtShare >= 0, wish(stablecoinOwner, msg.sender)), "Government/not-allowed-w");
 
         // position has no debt, or a non-debtFloory amount
-        require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "CDPEngine/debtFloor");
+        require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "Government/debtFloor");
 
         collateralToken[poolId][collateralOwner] = sub(collateralToken[poolId][collateralOwner], collateralValue);
         stablecoin[stablecoinOwner]    = add(stablecoin[stablecoinOwner],    debtValue);
@@ -193,15 +193,15 @@ contract CDPEngine {
         uint vtab = mul(v.debtShare, i.debtAccumulatedRate);
 
         // both sides consent
-        require(both(wish(src, msg.sender), wish(dst, msg.sender)), "CDPEngine/not-allowed");
+        require(both(wish(src, msg.sender), wish(dst, msg.sender)), "Government/not-allowed");
 
         // both sides safe
-        require(utab <= mul(u.lockedCollateral, i.priceWithSafetyMargin), "CDPEngine/not-safe-src");
-        require(vtab <= mul(v.lockedCollateral, i.priceWithSafetyMargin), "CDPEngine/not-safe-dst");
+        require(utab <= mul(u.lockedCollateral, i.priceWithSafetyMargin), "Government/not-safe-src");
+        require(vtab <= mul(v.lockedCollateral, i.priceWithSafetyMargin), "Government/not-safe-dst");
 
         // both sides non-debtFloory
-        require(either(utab >= i.debtFloor, u.debtShare == 0), "CDPEngine/debtFloor-src");
-        require(either(vtab >= i.debtFloor, v.debtShare == 0), "CDPEngine/debtFloor-dst");
+        require(either(utab >= i.debtFloor, u.debtShare == 0), "Government/debtFloor-src");
+        require(either(vtab >= i.debtFloor, v.debtShare == 0), "Government/debtFloor-dst");
     }
     // --- CDP Confiscation ---
     function confiscatePosition(bytes32 poolId, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external auth {
@@ -236,7 +236,7 @@ contract CDPEngine {
 
     // --- Rates ---
     function accrue(bytes32 poolId, address u, int debtAccumulatedRate) external auth {
-        require(live == 1, "CDPEngine/not-live");
+        require(live == 1, "Government/not-live");
         CollateralPool storage collateralPool = collateralPools[poolId];
         collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);
         int rad  = mul(collateralPool.totalDebtShare, debtAccumulatedRate);

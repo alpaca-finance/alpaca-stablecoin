@@ -23,7 +23,7 @@ pragma solidity >=0.5.12;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface CDPEngineLike {
+interface GovernmentLike {
     function move(address,address,uint) external;
 }
 interface GemLike {
@@ -62,7 +62,7 @@ contract Flapper {
 
     mapping (uint => Bid) public bids;
 
-    CDPEngineLike  public   cdpEngine;  // CDP Engine
+    GovernmentLike  public   government;  // CDP Engine
     GemLike  public   alpaca;
 
     uint256  constant ONE = 1.00E18;
@@ -80,9 +80,9 @@ contract Flapper {
     );
 
     // --- Init ---
-    constructor(address cdpEngine_, address alpaca_) public {
+    constructor(address government_, address alpaca_) public {
         whitelist[msg.sender] = 1;
-        cdpEngine = CDPEngineLike(cdpEngine_);
+        government = GovernmentLike(government_);
         alpaca = GemLike(alpaca_);
         live = 1;
     }
@@ -114,7 +114,7 @@ contract Flapper {
         bids[id].bidder = msg.sender;  // configurable??
         bids[id].auctionExpiry = add(uint48(now), auctionLength);
 
-        cdpEngine.move(msg.sender, address(this), lot);
+        government.move(msg.sender, address(this), lot);
 
         emit Kick(id, lot, bid);
     }
@@ -145,14 +145,14 @@ contract Flapper {
     function deal(uint id) external {
         require(live == 1, "Flapper/not-live");
         require(bids[id].bidExpiry != 0 && (bids[id].bidExpiry < now || bids[id].auctionExpiry < now), "Flapper/not-finished");
-        cdpEngine.move(address(this), bids[id].bidder, bids[id].lot);
+        government.move(address(this), bids[id].bidder, bids[id].lot);
         alpaca.burn(address(this), bids[id].bid);
         delete bids[id];
     }
 
     function cage(uint rad) external auth {
        live = 0;
-       cdpEngine.move(address(this), msg.sender, rad);
+       government.move(address(this), msg.sender, rad);
     }
     function yank(uint id) external {
         require(live == 0, "Flapper/still-live");

@@ -42,7 +42,7 @@ pragma solidity >=0.5.12;
 
 */
 
-interface CDPEngineLike {
+interface GovernmentLike {
     function move(address,address,uint256) external;
     function suck(address,address,uint256) external;
 }
@@ -64,16 +64,16 @@ contract StablecoinSavings {
     uint256 public savingsRate;   // The Dai Savings Rate          [ray]
     uint256 public sharePrice;   // The Rate Accumulator          [ray]
 
-    CDPEngineLike public cdpEngine;   // CDP Engine
+    GovernmentLike public government;   // CDP Engine
     address public debtEngine;   // Debt Engine
     uint256 public lastAccumulationTime;   // Time of last drip     [unix epoch time]
 
     uint256 public live;  // Active Flag
 
     // --- Init ---
-    constructor(address cdpEngine_) public {
+    constructor(address government_) public {
         wards[msg.sender] = 1;
-        cdpEngine = CDPEngineLike(cdpEngine_);
+        government = GovernmentLike(government_);
         savingsRate = ONE;
         sharePrice = ONE;
         lastAccumulationTime = now;
@@ -147,7 +147,7 @@ contract StablecoinSavings {
         uint sharePrice_ = sub(tmp, sharePrice);
         sharePrice = tmp;
         lastAccumulationTime = now;
-        cdpEngine.suck(address(debtEngine), address(this), mul(totalShare, sharePrice_));
+        government.suck(address(debtEngine), address(this), mul(totalShare, sharePrice_));
     }
 
     // --- Savings Dai Management ---
@@ -155,12 +155,12 @@ contract StablecoinSavings {
         require(now == lastAccumulationTime, "StablecoinSavings/lastAccumulationTime-not-updated");
         share[msg.sender] = add(share[msg.sender], shareAmount);
         totalShare             = add(totalShare,             shareAmount);
-        cdpEngine.move(msg.sender, address(this), mul(sharePrice, shareAmount));
+        government.move(msg.sender, address(this), mul(sharePrice, shareAmount));
     }
 
     function exit(uint shareAmount) external {
         share[msg.sender] = sub(share[msg.sender], shareAmount);
         totalShare             = sub(totalShare,             shareAmount);
-        cdpEngine.move(address(this), msg.sender, mul(sharePrice, shareAmount));
+        government.move(address(this), msg.sender, mul(sharePrice, shareAmount));
     }
 }

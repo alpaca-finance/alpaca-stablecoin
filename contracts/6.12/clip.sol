@@ -19,7 +19,7 @@
 
 pragma solidity >=0.6.12;
 
-interface CDPEngineLike {
+interface GovernmentLike {
     function move(address,address,uint256) external;
     function flux(bytes32,address,address,uint256) external;
     function collateralPools(bytes32) external returns (uint256, uint256, uint256, uint256, uint256);
@@ -60,7 +60,7 @@ contract Clipper {
 
     // --- Data ---
     bytes32  immutable public collateralPool;   // Collateral type of this Clipper
-    CDPEngineLike  immutable public cdpEngine;   // Core CDP Engine
+    GovernmentLike  immutable public government;   // Core CDP Engine
 
     LiquidationEngineLike     public liquidationEngine;      // Liquidation module
     address     public vow;      // Recipient of dai raised in auctions
@@ -134,8 +134,8 @@ contract Clipper {
     event Yank(uint256 id);
 
     // --- Init ---
-    constructor(address cdpEngine_, address spotter_, address liquidationEngine_, bytes32 collateralPool_) public {
-        cdpEngine     = CDPEngineLike(cdpEngine_);
+    constructor(address government_, address spotter_, address liquidationEngine_, bytes32 collateralPool_) public {
+        government     = GovernmentLike(government_);
         spotter = PriceOracleLike(spotter_);
         liquidationEngine     = LiquidationEngineLike(liquidationEngine_);
         collateralPool     = collateralPool_;
@@ -207,7 +207,7 @@ contract Clipper {
     // --- Auction ---
 
     // get the price directly from the OSM
-    // Could get this from rmul(CDPEngine.collateralPools(collateralPool).spot, Spotter.mat()) instead, but
+    // Could get this from rmul(Government.collateralPools(collateralPool).spot, Spotter.mat()) instead, but
     // if mat has changed since the last poke, the resulting value will be
     // incorrect.
     function getFeedPrice() internal returns (uint256 feedPrice) {
@@ -259,7 +259,7 @@ contract Clipper {
         uint256 prize;
         if (_liquidatorTip > 0 || _liquidatorBountyRate > 0) {
             prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-            cdpEngine.suck(vow, liquidatorAddress, prize);
+            government.suck(vow, liquidatorAddress, prize);
         }
 
         emit Kick(id, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize);
@@ -300,7 +300,7 @@ contract Clipper {
             uint256 _minimumRemainingDebt = minimumRemainingDebt;
             if (debt >= _minimumRemainingDebt && mul(collateralAmount, feedPrice) >= _minimumRemainingDebt) {
                 prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-                cdpEngine.suck(vow, liquidatorAddress, prize);
+                government.suck(vow, liquidatorAddress, prize);
             }
         }
 
@@ -316,7 +316,7 @@ contract Clipper {
     // To avoid partial purchases resulting in very small leftover auctions that will
     // never be cleared, any partial purchase must leave at least `Clipper.minimumRemainingDebt`
     // remaining DAI target. `minimumRemainingDebt` is an asynchronously updated value equal to
-    // (CDPEngine.debtFloor * Dog.liquidationPenalty(collateralPool) / WAD) where the values are understood to be determined
+    // (Government.debtFloor * Dog.liquidationPenalty(collateralPool) / WAD) where the values are understood to be determined
     // by whatever they were when Clipper.updateMinimumRemainingDebt() was last called. Purchase amounts
     // will be minimally decreased when necessary to respect this limit; i.e., if the
     // specified `collateralAmountToBuy` would leave `debt < minimumRemainingDebt` but `debt > 0`, the amount actually
@@ -385,18 +385,18 @@ contract Clipper {
             collateralAmount = collateralAmount - slice;
 
             // Send collateral to who
-            cdpEngine.flux(collateralPool, address(this), who, slice);
+            government.flux(collateralPool, address(this), who, slice);
 
             // Do external call (if data is defined) but to be
             // extremely careful we don't allow to do it to the two
             // contracts which the Clipper needs to be authorized
             LiquidationEngineLike liquidationEngine_ = liquidationEngine;
-            if (data.length > 0 && who != address(cdpEngine) && who != address(liquidationEngine_)) {
+            if (data.length > 0 && who != address(government) && who != address(liquidationEngine_)) {
                 FlashLendingCallee(who).flashLendingCall(msg.sender, owe, slice, data);
             }
 
             // Get DAI from caller
-            cdpEngine.move(msg.sender, vow, owe);
+            government.move(msg.sender, vow, owe);
 
             // Removes Dai out for liquidation from accumulator
             liquidationEngine_.digs(collateralPool, collateralAmount == 0 ? debt + owe : owe);
@@ -405,7 +405,7 @@ contract Clipper {
         if (collateralAmount == 0) {
             _remove(id);
         } else if (debt == 0) {
-            cdpEngine.flux(collateralPool, address(this), positionAddress, collateralAmount);
+            government.flux(collateralPool, address(this), positionAddress, collateralAmount);
             _remove(id);
         } else {
             sales[id].debt = debt;
@@ -458,7 +458,7 @@ contract Clipper {
 
     // Public function to update the cached debtFloor*liquidationPenalty value.
     function updateMinimumRemainingDebt() external {
-        (,,,, uint256 _debtFloor) = CDPEngineLike(cdpEngine).collateralPools(collateralPool);
+        (,,,, uint256 _debtFloor) = GovernmentLike(government).collateralPools(collateralPool);
         minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPool));
     }
 
@@ -466,7 +466,7 @@ contract Clipper {
     function yank(uint256 id) external auth lock {
         require(sales[id].positionAddress != address(0), "Clipper/not-running-auction");
         liquidationEngine.digs(collateralPool, sales[id].debt);
-        cdpEngine.flux(collateralPool, address(this), msg.sender, sales[id].collateralAmount);
+        government.flux(collateralPool, address(this), msg.sender, sales[id].collateralAmount);
         _remove(id);
         emit Yank(id);
     }
