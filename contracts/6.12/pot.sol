@@ -66,7 +66,7 @@ contract StablecoinSavings {
 
     CDPEngineLike public cdpEngine;   // CDP Engine
     address public debtEngine;   // Debt Engine
-    uint256 public lastAccumulationBlock;   // Time of last drip     [unix epoch time]
+    uint256 public lastAccumulationTime;   // Time of last drip     [unix epoch time]
 
     uint256 public live;  // Active Flag
 
@@ -76,7 +76,7 @@ contract StablecoinSavings {
         cdpEngine = CDPEngineLike(cdpEngine_);
         savingsRate = ONE;
         sharePrice = ONE;
-        lastAccumulationBlock = now;
+        lastAccumulationTime = now;
         live = 1;
     }
 
@@ -125,7 +125,7 @@ contract StablecoinSavings {
     // --- Administration ---
     function file(bytes32 what, uint256 data) external auth {
         require(live == 1, "StablecoinSavings/not-live");
-        require(now == lastAccumulationBlock, "StablecoinSavings/lastAccumulationBlock-not-updated");
+        require(now == lastAccumulationTime, "StablecoinSavings/lastAccumulationTime-not-updated");
         if (what == "savingsRate") savingsRate = data;
         else revert("StablecoinSavings/file-unrecognized-param");
     }
@@ -142,17 +142,17 @@ contract StablecoinSavings {
 
     // --- Savings Rate Accumulation ---
     function drip() external returns (uint tmp) {
-        require(now >= lastAccumulationBlock, "StablecoinSavings/invalid-now");
-        tmp = rmul(rpow(savingsRate, now - lastAccumulationBlock, ONE), sharePrice);
+        require(now >= lastAccumulationTime, "StablecoinSavings/invalid-now");
+        tmp = rmul(rpow(savingsRate, now - lastAccumulationTime, ONE), sharePrice);
         uint sharePrice_ = sub(tmp, sharePrice);
         sharePrice = tmp;
-        lastAccumulationBlock = now;
+        lastAccumulationTime = now;
         cdpEngine.suck(address(debtEngine), address(this), mul(totalShare, sharePrice_));
     }
 
     // --- Savings Dai Management ---
     function join(uint shareAmount) external {
-        require(now == lastAccumulationBlock, "StablecoinSavings/lastAccumulationBlock-not-updated");
+        require(now == lastAccumulationTime, "StablecoinSavings/lastAccumulationTime-not-updated");
         share[msg.sender] = add(share[msg.sender], shareAmount);
         totalShare             = add(totalShare,             shareAmount);
         cdpEngine.move(msg.sender, address(this), mul(sharePrice, shareAmount));

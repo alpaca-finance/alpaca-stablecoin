@@ -24,38 +24,38 @@ pragma solidity >=0.5.12;
 // New deployments of this contract will need to include custom events (TO DO).
 
 interface CDPEngineLike {
-    function ilks(bytes32) external returns (
+    function collateralTypes(bytes32) external returns (
         uint256 Art,   // [wad]
         uint256 rate   // [ray]
     );
     function fold(bytes32,address,int) external;
 }
 
-contract Jug {
+contract StabilityFeeCollector {
     // --- Auth ---
-    mapping (address => uint) public wards;
-    function rely(address usr) external auth { wards[usr] = 1; }
-    function deny(address usr) external auth { wards[usr] = 0; }
+    mapping (address => uint) public whitelist;
+    function rely(address usr) external auth { whitelist[usr] = 1; }
+    function deny(address usr) external auth { whitelist[usr] = 0; }
     modifier auth {
-        require(wards[msg.sender] == 1, "Jug/not-authorized");
+        require(whitelist[msg.sender] == 1, "StabilityFeeCollector/not-authorized");
         _;
     }
 
     // --- Data ---
-    struct Ilk {
-        uint256 duty;  // Collateral-specific, per-second stability fee contribution [ray]
-        uint256  rho;  // Time of last drip [unix epoch time]
+    struct CollateralType {
+        uint256 stabilityFeeRate;  // Collateral-specific, per-second stability fee contribution [ray]
+        uint256  lastAccumulationTime;  // Time of last drip [unix epoch time]
     }
 
-    mapping (bytes32 => Ilk) public ilks;
-    CDPEngineLike                  public vat;   // CDP Engine
-    address                  public vow;   // Debt Engine
-    uint256                  public base;  // Global, per-second stability fee contribution [ray]
+    mapping (bytes32 => CollateralType) public collateralTypes;
+    CDPEngineLike                  public cdpEngine;   // CDP Engine
+    address                  public debtEngine;   // Debt Engine
+    uint256                  public globalStabilityFeeRate;  // Global, per-second stability fee contribution [ray]
 
     // --- Init ---
-    constructor(address vat_) public {
-        wards[msg.sender] = 1;
-        vat = CDPEngineLike(vat_);
+    constructor(address cdpEngine_) public {
+        whitelist[msg.sender] = 1;
+        cdpEngine = CDPEngineLike(cdpEngine_);
     }
 
     // --- Math ---
@@ -98,32 +98,32 @@ contract Jug {
     }
 
     // --- Administration ---
-    function init(bytes32 ilk) external auth {
-        Ilk storage i = ilks[ilk];
-        require(i.duty == 0, "Jug/ilk-already-init");
-        i.duty = ONE;
-        i.rho  = now;
+    function init(bytes32 collateralType) external auth {
+        CollateralType storage i = collateralTypes[collateralType];
+        require(i.stabilityFeeRate == 0, "StabilityFeeCollector/collateralType-already-init");
+        i.stabilityFeeRate = ONE;
+        i.lastAccumulationTime  = now;
     }
-    function file(bytes32 ilk, bytes32 what, uint data) external auth {
-        require(now == ilks[ilk].rho, "Jug/rho-not-updated");
-        if (what == "duty") ilks[ilk].duty = data;
-        else revert("Jug/file-unrecognized-param");
+    function file(bytes32 collateralType, bytes32 what, uint data) external auth {
+        require(now == collateralTypes[collateralType].lastAccumulationTime, "StabilityFeeCollector/lastAccumulationTime-not-updated");
+        if (what == "stabilityFeeRate") collateralTypes[collateralType].stabilityFeeRate = data;
+        else revert("StabilityFeeCollector/file-unrecognized-param");
     }
     function file(bytes32 what, uint data) external auth {
-        if (what == "base") base = data;
-        else revert("Jug/file-unrecognized-param");
+        if (what == "globalStabilityFeeRate") globalStabilityFeeRate = data;
+        else revert("StabilityFeeCollector/file-unrecognized-param");
     }
     function file(bytes32 what, address data) external auth {
-        if (what == "vow") vow = data;
-        else revert("Jug/file-unrecognized-param");
+        if (what == "debtEngine") debtEngine = data;
+        else revert("StabilityFeeCollector/file-unrecognized-param");
     }
 
     // --- Stability Fee Collection ---
-    function drip(bytes32 ilk) external returns (uint rate) {
-        require(now >= ilks[ilk].rho, "Jug/invalid-now");
-        (, uint prev) = vat.ilks(ilk);
-        rate = rmul(rpow(add(base, ilks[ilk].duty), now - ilks[ilk].rho, ONE), prev);
-        vat.fold(ilk, vow, diff(rate, prev));
-        ilks[ilk].rho = now;
+    function drip(bytes32 collateralType) external returns (uint rate) {
+        require(now >= collateralTypes[collateralType].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
+        (, uint prev) = cdpEngine.collateralTypes(collateralType);
+        rate = rmul(rpow(add(globalStabilityFeeRate, collateralTypes[collateralType].stabilityFeeRate), now - collateralTypes[collateralType].lastAccumulationTime, ONE), prev);
+        cdpEngine.fold(collateralType, debtEngine, diff(rate, prev));
+        collateralTypes[collateralType].lastAccumulationTime = now;
     }
 }
