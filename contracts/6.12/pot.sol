@@ -33,8 +33,8 @@ pragma solidity >=0.5.12;
 
          --- `save` your `dai` in the `pot` ---
 
-   - `dsr`: the Dai Savings Rate
-   - `pie`: user balance of Savings Dai
+   - `savingsRate`: the Dai Savings Rate
+   - `share`: user balance of Savings Dai
 
    - `join`: start saving some dai
    - `exit`: remove some dai
@@ -47,36 +47,36 @@ interface CDPEngineLike {
     function suck(address,address,uint256) external;
 }
 
-contract Pot {
+contract StablecoinSavings {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address guy) external auth { wards[guy] = 1; }
     function deny(address guy) external auth { wards[guy] = 0; }
     modifier auth {
-        require(wards[msg.sender] == 1, "Pot/not-authorized");
+        require(wards[msg.sender] == 1, "StablecoinSavings/not-authorized");
         _;
     }
 
     // --- Data ---
-    mapping (address => uint256) public pie;  // Normalised Savings Dai [wad]
+    mapping (address => uint256) public share;  // Normalised Savings Dai [wad]
 
-    uint256 public Pie;   // Total Normalised Savings Dai  [wad]
-    uint256 public dsr;   // The Dai Savings Rate          [ray]
-    uint256 public chi;   // The Rate Accumulator          [ray]
+    uint256 public totalShare;   // Total Normalised Savings Dai  [wad]
+    uint256 public savingsRate;   // The Dai Savings Rate          [ray]
+    uint256 public sharePrice;   // The Rate Accumulator          [ray]
 
-    CDPEngineLike public vat;   // CDP Engine
-    address public vow;   // Debt Engine
-    uint256 public rho;   // Time of last drip     [unix epoch time]
+    CDPEngineLike public cdpEngine;   // CDP Engine
+    address public debtEngine;   // Debt Engine
+    uint256 public lastAccumulationBlock;   // Time of last drip     [unix epoch time]
 
     uint256 public live;  // Active Flag
 
     // --- Init ---
-    constructor(address vat_) public {
+    constructor(address cdpEngine_) public {
         wards[msg.sender] = 1;
-        vat = CDPEngineLike(vat_);
-        dsr = ONE;
-        chi = ONE;
-        rho = now;
+        cdpEngine = CDPEngineLike(cdpEngine_);
+        savingsRate = ONE;
+        sharePrice = ONE;
+        lastAccumulationBlock = now;
         live = 1;
     }
 
@@ -124,43 +124,43 @@ contract Pot {
 
     // --- Administration ---
     function file(bytes32 what, uint256 data) external auth {
-        require(live == 1, "Pot/not-live");
-        require(now == rho, "Pot/rho-not-updated");
-        if (what == "dsr") dsr = data;
-        else revert("Pot/file-unrecognized-param");
+        require(live == 1, "StablecoinSavings/not-live");
+        require(now == lastAccumulationBlock, "StablecoinSavings/lastAccumulationBlock-not-updated");
+        if (what == "savingsRate") savingsRate = data;
+        else revert("StablecoinSavings/file-unrecognized-param");
     }
 
     function file(bytes32 what, address addr) external auth {
-        if (what == "vow") vow = addr;
-        else revert("Pot/file-unrecognized-param");
+        if (what == "debtEngine") debtEngine = addr;
+        else revert("StablecoinSavings/file-unrecognized-param");
     }
 
     function cage() external auth {
         live = 0;
-        dsr = ONE;
+        savingsRate = ONE;
     }
 
     // --- Savings Rate Accumulation ---
     function drip() external returns (uint tmp) {
-        require(now >= rho, "Pot/invalid-now");
-        tmp = rmul(rpow(dsr, now - rho, ONE), chi);
-        uint chi_ = sub(tmp, chi);
-        chi = tmp;
-        rho = now;
-        vat.suck(address(vow), address(this), mul(Pie, chi_));
+        require(now >= lastAccumulationBlock, "StablecoinSavings/invalid-now");
+        tmp = rmul(rpow(savingsRate, now - lastAccumulationBlock, ONE), sharePrice);
+        uint sharePrice_ = sub(tmp, sharePrice);
+        sharePrice = tmp;
+        lastAccumulationBlock = now;
+        cdpEngine.suck(address(debtEngine), address(this), mul(totalShare, sharePrice_));
     }
 
     // --- Savings Dai Management ---
-    function join(uint wad) external {
-        require(now == rho, "Pot/rho-not-updated");
-        pie[msg.sender] = add(pie[msg.sender], wad);
-        Pie             = add(Pie,             wad);
-        vat.move(msg.sender, address(this), mul(chi, wad));
+    function join(uint shareAmount) external {
+        require(now == lastAccumulationBlock, "StablecoinSavings/lastAccumulationBlock-not-updated");
+        share[msg.sender] = add(share[msg.sender], shareAmount);
+        totalShare             = add(totalShare,             shareAmount);
+        cdpEngine.move(msg.sender, address(this), mul(sharePrice, shareAmount));
     }
 
-    function exit(uint wad) external {
-        pie[msg.sender] = sub(pie[msg.sender], wad);
-        Pie             = sub(Pie,             wad);
-        vat.move(address(this), msg.sender, mul(chi, wad));
+    function exit(uint shareAmount) external {
+        share[msg.sender] = sub(share[msg.sender], shareAmount);
+        totalShare             = sub(totalShare,             shareAmount);
+        cdpEngine.move(address(this), msg.sender, mul(sharePrice, shareAmount));
     }
 }
