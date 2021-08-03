@@ -19,8 +19,8 @@
 
 pragma solidity >=0.6.12;
 
-interface CollateralAuctioneer {
-    function collateralPool() external view returns (bytes32);
+interface CollateralAuctioneerLike {
+    function collateralPoolId() external view returns (bytes32);
     function kick(
         uint256 tab,
         uint256 lot,
@@ -83,11 +83,11 @@ contract LiquidationEngine {
 
     event File(bytes32 indexed what, uint256 data);
     event File(bytes32 indexed what, address data);
-    event File(bytes32 indexed collateralPool, bytes32 indexed what, uint256 data);
-    event File(bytes32 indexed collateralPool, bytes32 indexed what, address auctioneer);
+    event File(bytes32 indexed collateralPoolId, bytes32 indexed what, uint256 data);
+    event File(bytes32 indexed collateralPoolId, bytes32 indexed what, address auctioneer);
 
     event Bark(
-      bytes32 indexed collateralPool,
+      bytes32 indexed collateralPoolId,
       address indexed urn,
       uint256 ink,
       uint256 art,
@@ -95,7 +95,7 @@ contract LiquidationEngine {
       address auctioneer,
       uint256 indexed id
     );
-    event Digs(bytes32 indexed collateralPool, uint256 rad);
+    event Digs(bytes32 indexed collateralPoolId, uint256 rad);
     event Cage();
 
     // --- Init ---
@@ -133,24 +133,24 @@ contract LiquidationEngine {
         else revert("LiquidationEngine/file-unrecognized-param");
         emit File(what, data);
     }
-    function file(bytes32 collateralPool, bytes32 what, uint256 data) external auth {
+    function file(bytes32 collateralPoolId, bytes32 what, uint256 data) external auth {
         if (what == "liquidationPenalty") {
             require(data >= WAD, "LiquidationEngine/file-liquidationPenalty-lt-WAD");
-            collateralPools[collateralPool].liquidationPenalty = data;
-        } else if (what == "maxStablecoinNeeded") collateralPools[collateralPool].maxStablecoinNeeded = data;
+            collateralPools[collateralPoolId].liquidationPenalty = data;
+        } else if (what == "maxStablecoinNeeded") collateralPools[collateralPoolId].maxStablecoinNeeded = data;
         else revert("LiquidationEngine/file-unrecognized-param");
-        emit File(collateralPool, what, data);
+        emit File(collateralPoolId, what, data);
     }
-    function file(bytes32 collateralPool, bytes32 what, address auctioneer) external auth {
+    function file(bytes32 collateralPoolId, bytes32 what, address auctioneer) external auth {
         if (what == "auctioneer") {
-            require(collateralPool == CollateralAuctioneer(auctioneer).collateralPool(), "LiquidationEngine/file-collateralPool-neq-auctioneer.collateralPool");
-            collateralPools[collateralPool].auctioneer = auctioneer;
+            require(collateralPoolId == CollateralAuctioneerLike(auctioneer).collateralPoolId(), "LiquidationEngine/file-collateralPoolId-neq-auctioneer.collateralPoolId");
+            collateralPools[collateralPoolId].auctioneer = auctioneer;
         } else revert("LiquidationEngine/file-unrecognized-param");
-        emit File(collateralPool, what, auctioneer);
+        emit File(collateralPoolId, what, auctioneer);
     }
 
-    function liquidationPenalty(bytes32 collateralPool) external view returns (uint256) {
-        return collateralPools[collateralPool].liquidationPenalty;
+    function liquidationPenalty(bytes32 collateralPoolId) external view returns (uint256) {
+        return collateralPools[collateralPoolId].liquidationPenalty;
     }
 
     // --- CDP Liquidation: all bark and no bite ---
@@ -167,17 +167,17 @@ contract LiquidationEngine {
     // have too little collateral to be interesting to Keepers (debt taken from Vault < collateralPool.debtFloor),
     // in which case the function reverts. Please refer to the code and comments within if
     // more detail is desired.
-    function bark(bytes32 collateralPool, address positionAddress, address liquidatorAddress) external returns (uint256 id) {
+    function bark(bytes32 collateralPoolId, address positionAddress, address liquidatorAddress) external returns (uint256 id) {
         require(live == 1, "LiquidationEngine/not-live");
 
-        (uint256 positionLockedCollateral, uint256 positionDebtShare) = government.positions(collateralPool, positionAddress);
-        CollateralPool memory mcollateralPool = collateralPools[collateralPool];
+        (uint256 positionLockedCollateral, uint256 positionDebtShare) = government.positions(collateralPoolId, positionAddress);
+        CollateralPool memory mcollateralPool = collateralPools[collateralPoolId];
         uint256 debtShareToBeLiquidated;
         uint256 debtAccumulatedRate;
         uint256 debtFloor;
         {
             uint256 priceWithSafetyMargin;
-            (,debtAccumulatedRate, priceWithSafetyMargin,, debtFloor) = government.collateralPools(collateralPool);
+            (,debtAccumulatedRate, priceWithSafetyMargin,, debtFloor) = government.collateralPools(collateralPoolId);
             require(priceWithSafetyMargin > 0 && mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate), "LiquidationEngine/not-unsafe");
 
             // Get the minimum value between:
@@ -213,7 +213,7 @@ contract LiquidationEngine {
         require(debtShareToBeLiquidated <= 2**255 && collateralAmountToBeLiquidated <= 2**255, "LiquidationEngine/overflow");
 
         government.confiscate(
-            collateralPool, positionAddress, mcollateralPool.auctioneer, address(systemAuctionHouse), -int256(collateralAmountToBeLiquidated), -int256(debtShareToBeLiquidated)
+            collateralPoolId, positionAddress, mcollateralPool.auctioneer, address(systemAuctionHouse), -int256(collateralAmountToBeLiquidated), -int256(debtShareToBeLiquidated)
         );
 
         uint256 debtValueToBeLiquidatedWithoutPenalty = mul(debtShareToBeLiquidated, debtAccumulatedRate);
@@ -223,9 +223,9 @@ contract LiquidationEngine {
             // This calcuation will overflow if debtShareToBeLiquidated*debtAccumulatedRate exceeds ~10^14
             uint256 debtValueToBeLiquidatedWithPenalty = mul(debtValueToBeLiquidatedWithoutPenalty, mcollateralPool.liquidationPenalty) / WAD;
             stablecoinNeededForDebtRepay = add(stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
-            collateralPools[collateralPool].stablecoinNeededForDebtRepay = add(mcollateralPool.stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
+            collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = add(mcollateralPool.stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
 
-            id = CollateralAuctioneer(mcollateralPool.auctioneer).kick({
+            id = CollateralAuctioneerLike(mcollateralPool.auctioneer).kick({
                 tab: debtValueToBeLiquidatedWithPenalty,
                 lot: collateralAmountToBeLiquidated,
                 usr: positionAddress,
@@ -233,13 +233,13 @@ contract LiquidationEngine {
             });
         }
 
-        emit Bark(collateralPool, positionAddress, collateralAmountToBeLiquidated, debtShareToBeLiquidated, debtValueToBeLiquidatedWithoutPenalty, mcollateralPool.auctioneer, id);
+        emit Bark(collateralPoolId, positionAddress, collateralAmountToBeLiquidated, debtShareToBeLiquidated, debtValueToBeLiquidatedWithoutPenalty, mcollateralPool.auctioneer, id);
     }
 
-    function digs(bytes32 collateralPool, uint256 rad) external auth {
+    function digs(bytes32 collateralPoolId, uint256 rad) external auth {
         stablecoinNeededForDebtRepay = sub(stablecoinNeededForDebtRepay, rad);
-        collateralPools[collateralPool].stablecoinNeededForDebtRepay = sub(collateralPools[collateralPool].stablecoinNeededForDebtRepay, rad);
-        emit Digs(collateralPool, rad);
+        collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = sub(collateralPools[collateralPoolId].stablecoinNeededForDebtRepay, rad);
+        emit Digs(collateralPoolId, rad);
     }
 
     function cage() external auth {

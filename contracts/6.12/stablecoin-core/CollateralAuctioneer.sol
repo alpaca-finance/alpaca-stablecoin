@@ -44,7 +44,7 @@ interface FlashLendingCallee {
     function flashLendingCall(address, uint256, uint256, bytes calldata) external;
 }
 
-interface AbacusLike {
+interface CalculatorLike {
     function price(uint256, uint256) external view returns (uint256);
 }
 
@@ -59,13 +59,13 @@ contract CollateralAuctioneer {
     }
 
     // --- Data ---
-    bytes32  immutable public collateralPool;   // Collateral type of this CollateralAuctioneer
+    bytes32  immutable public collateralPoolId;   // Collateral type of this CollateralAuctioneer
     GovernmentLike  immutable public government;   // Core CDP Engine
 
     LiquidationEngineLike     public liquidationEngine;      // Liquidation module
     address     public systemAuctionHouse;      // Recipient of dai raised in auctions
-    PriceOracleLike public spotter;  // Collateral price module
-    AbacusLike  public calc;     // Current price calculator
+    PriceOracleLike public priceOracle;  // Collateral price module
+    CalculatorLike  public calc;     // Current price calculator
 
     uint256 public startingPriceBuffer;    // Multiplicative factor to increase starting price                  [ray]
     uint256 public auctionTimeLimit;   // Time elapsed before auction reset                                 [seconds]
@@ -134,11 +134,11 @@ contract CollateralAuctioneer {
     event Yank(uint256 id);
 
     // --- Init ---
-    constructor(address government_, address spotter_, address liquidationEngine_, bytes32 collateralPool_) public {
+    constructor(address government_, address priceOracle_, address liquidationEngine_, bytes32 collateralPoolId_) public {
         government     = GovernmentLike(government_);
-        spotter = PriceOracleLike(spotter_);
+        priceOracle = PriceOracleLike(priceOracle_);
         liquidationEngine     = LiquidationEngineLike(liquidationEngine_);
-        collateralPool     = collateralPool_;
+        collateralPoolId     = collateralPoolId_;
         startingPriceBuffer     = RAY;
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
@@ -169,10 +169,10 @@ contract CollateralAuctioneer {
         emit File(what, data);
     }
     function file(bytes32 what, address data) external auth lock {
-        if (what == "spotter") spotter = PriceOracleLike(data);
+        if (what == "priceOracle") priceOracle = PriceOracleLike(data);
         else if (what == "liquidationEngine")    liquidationEngine = LiquidationEngineLike(data);
         else if (what == "systemAuctionHouse")    systemAuctionHouse = data;
-        else if (what == "calc")  calc = AbacusLike(data);
+        else if (what == "calc")  calc = CalculatorLike(data);
         else revert("CollateralAuctioneer/file-unrecognized-param");
         emit File(what, data);
     }
@@ -207,14 +207,14 @@ contract CollateralAuctioneer {
     // --- Auction ---
 
     // get the price directly from the OSM
-    // Could get this from rmul(Government.collateralPools(collateralPool).spot, Spotter.mat()) instead, but
+    // Could get this from rmul(Government.collateralPools(collateralPoolId).spot, Spotter.mat()) instead, but
     // if mat has changed since the last poke, the resulting value will be
     // incorrect.
     function getFeedPrice() internal returns (uint256 feedPrice) {
-        (PipLike pip, ) = spotter.collateralPools(collateralPool);
+        (PipLike pip, ) = priceOracle.collateralPools(collateralPoolId);
         (bytes32 val, bool has) = pip.peek();
         require(has, "CollateralAuctioneer/invalid-price");
-        feedPrice = rdiv(mul(uint256(val), BLN), spotter.stableCoinReferencePrice());
+        feedPrice = rdiv(mul(uint256(val), BLN), priceOracle.stableCoinReferencePrice());
     }
 
     // start an auction
@@ -316,7 +316,7 @@ contract CollateralAuctioneer {
     // To avoid partial purchases resulting in very small leftover auctions that will
     // never be cleared, any partial purchase must leave at least `CollateralAuctioneer.minimumRemainingDebt`
     // remaining DAI target. `minimumRemainingDebt` is an asynchronously updated value equal to
-    // (Government.debtFloor * Dog.liquidationPenalty(collateralPool) / WAD) where the values are understood to be determined
+    // (Government.debtFloor * Dog.liquidationPenalty(collateralPoolId) / WAD) where the values are understood to be determined
     // by whatever they were when CollateralAuctioneer.updateMinimumRemainingDebt() was last called. Purchase amounts
     // will be minimally decreased when necessary to respect this limit; i.e., if the
     // specified `collateralAmountToBuy` would leave `debt < minimumRemainingDebt` but `debt > 0`, the amount actually
@@ -385,7 +385,7 @@ contract CollateralAuctioneer {
             collateralAmount = collateralAmount - slice;
 
             // Send collateral to who
-            government.flux(collateralPool, address(this), who, slice);
+            government.flux(collateralPoolId, address(this), who, slice);
 
             // Do external call (if data is defined) but to be
             // extremely careful we don't allow to do it to the two
@@ -399,13 +399,13 @@ contract CollateralAuctioneer {
             government.move(msg.sender, systemAuctionHouse, owe);
 
             // Removes Dai out for liquidation from accumulator
-            liquidationEngine_.digs(collateralPool, collateralAmount == 0 ? debt + owe : owe);
+            liquidationEngine_.digs(collateralPoolId, collateralAmount == 0 ? debt + owe : owe);
         }
 
         if (collateralAmount == 0) {
             _remove(id);
         } else if (debt == 0) {
-            government.flux(collateralPool, address(this), positionAddress, collateralAmount);
+            government.flux(collateralPoolId, address(this), positionAddress, collateralAmount);
             _remove(id);
         } else {
             sales[id].debt = debt;
@@ -458,15 +458,15 @@ contract CollateralAuctioneer {
 
     // Public function to update the cached debtFloor*liquidationPenalty value.
     function updateMinimumRemainingDebt() external {
-        (,,,, uint256 _debtFloor) = GovernmentLike(government).collateralPools(collateralPool);
-        minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPool));
+        (,,,, uint256 _debtFloor) = GovernmentLike(government).collateralPools(collateralPoolId);
+        minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPoolId));
     }
 
     // Cancel an auction during Emergency Shutdown or via governance action.
     function yank(uint256 id) external auth lock {
         require(sales[id].positionAddress != address(0), "CollateralAuctioneer/not-running-auction");
-        liquidationEngine.digs(collateralPool, sales[id].debt);
-        government.flux(collateralPool, address(this), msg.sender, sales[id].collateralAmount);
+        liquidationEngine.digs(collateralPoolId, sales[id].debt);
+        government.flux(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
         _remove(id);
         emit Yank(id);
     }

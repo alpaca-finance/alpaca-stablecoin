@@ -97,20 +97,20 @@ contract Government {
     }
 
     // --- Administration ---
-    function init(bytes32 poolId) external auth {
-        require(collateralPools[poolId].debtAccumulatedRate == 0, "Government/collateral-pool-already-init");
-        collateralPools[poolId].debtAccumulatedRate = 10 ** 27;
+    function init(bytes32 collateralPoolId) external auth {
+        require(collateralPools[collateralPoolId].debtAccumulatedRate == 0, "Government/collateral-pool-already-init");
+        collateralPools[collateralPoolId].debtAccumulatedRate = 10 ** 27;
     }
     function file(bytes32 what, uint data) external auth {
         require(live == 1, "Government/not-live");
         if (what == "totalDebtCeiling") totalDebtCeiling = data;
         else revert("Government/file-unrecognized-param");
     }
-    function file(bytes32 poolId, bytes32 what, uint data) external auth {
+    function file(bytes32 collateralPoolId, bytes32 what, uint data) external auth {
         require(live == 1, "Government/not-live");
-        if (what == "priceWithSafetyMargin") collateralPools[poolId].priceWithSafetyMargin = data;
-        else if (what == "debtCeiling") collateralPools[poolId].debtCeiling = data;
-        else if (what == "debtFloor") collateralPools[poolId].debtFloor = data;
+        if (what == "priceWithSafetyMargin") collateralPools[collateralPoolId].priceWithSafetyMargin = data;
+        else if (what == "debtCeiling") collateralPools[collateralPoolId].debtCeiling = data;
+        else if (what == "debtFloor") collateralPools[collateralPoolId].debtFloor = data;
         else revert("Government/file-unrecognized-param");
     }
     function cage() external auth {
@@ -118,13 +118,13 @@ contract Government {
     }
 
     // --- Fungibility ---
-    function slip(bytes32 poolId, address usr, int256 wad) external auth {
-        collateralToken[poolId][usr] = add(collateralToken[poolId][usr], wad);
+    function slip(bytes32 collateralPoolId, address usr, int256 wad) external auth {
+        collateralToken[collateralPoolId][usr] = add(collateralToken[collateralPoolId][usr], wad);
     }
-    function flux(bytes32 poolId, address src, address dst, uint256 wad) external {
+    function flux(bytes32 collateralPoolId, address src, address dst, uint256 wad) external {
         require(wish(src, msg.sender), "Government/not-allowed");
-        collateralToken[poolId][src] = sub(collateralToken[poolId][src], wad);
-        collateralToken[poolId][dst] = add(collateralToken[poolId][dst], wad);
+        collateralToken[collateralPoolId][src] = sub(collateralToken[collateralPoolId][src], wad);
+        collateralToken[collateralPoolId][dst] = add(collateralToken[collateralPoolId][dst], wad);
     }
     function move(address src, address dst, uint256 rad) external {
         require(wish(src, msg.sender), "Government/not-allowed");
@@ -140,12 +140,12 @@ contract Government {
     }
 
     // --- CDP Manipulation ---
-    function adjustPosition(bytes32 poolId, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external {
+    function adjustPosition(bytes32 collateralPoolId, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external {
         // system is live
         require(live == 1, "Government/not-live");
 
-        Position memory position = positions[poolId][positionAddress];
-        CollateralPool memory collateralPool = collateralPools[poolId];
+        Position memory position = positions[collateralPoolId][positionAddress];
+        CollateralPool memory collateralPool = collateralPools[collateralPoolId];
         // collateralPool has been initialised
         require(collateralPool.debtAccumulatedRate != 0, "Government/collateralPool-not-init");
 
@@ -172,17 +172,17 @@ contract Government {
         // position has no debt, or a non-debtFloory amount
         require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "Government/debtFloor");
 
-        collateralToken[poolId][collateralOwner] = sub(collateralToken[poolId][collateralOwner], collateralValue);
+        collateralToken[collateralPoolId][collateralOwner] = sub(collateralToken[collateralPoolId][collateralOwner], collateralValue);
         stablecoin[stablecoinOwner]    = add(stablecoin[stablecoinOwner],    debtValue);
 
-        positions[poolId][positionAddress] = position;
-        collateralPools[poolId]    = collateralPool;
+        positions[collateralPoolId][positionAddress] = position;
+        collateralPools[collateralPoolId]    = collateralPool;
     }
     // --- CDP Fungibility ---
-    function movePosition(bytes32 poolId, address src, address dst, int collateralValue, int debtShare) external {
-        Position storage u = positions[poolId][src];
-        Position storage v = positions[poolId][dst];
-        CollateralPool storage i = collateralPools[poolId];
+    function movePosition(bytes32 collateralPoolId, address src, address dst, int collateralValue, int debtShare) external {
+        Position storage u = positions[collateralPoolId][src];
+        Position storage v = positions[collateralPoolId][dst];
+        CollateralPool storage i = collateralPools[collateralPoolId];
 
         u.lockedCollateral = sub(u.lockedCollateral, collateralValue);
         u.debtShare = sub(u.debtShare, debtShare);
@@ -204,9 +204,9 @@ contract Government {
         require(either(vtab >= i.debtFloor, v.debtShare == 0), "Government/debtFloor-dst");
     }
     // --- CDP Confiscation ---
-    function confiscatePosition(bytes32 poolId, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external auth {
-        Position storage position = positions[poolId][positionAddress];
-        CollateralPool storage collateralPool = collateralPools[poolId];
+    function confiscatePosition(bytes32 collateralPoolId, address positionAddress, address collateralOwner, address stablecoinOwner, int collateralValue, int debtShare) external auth {
+        Position storage position = positions[collateralPoolId][positionAddress];
+        CollateralPool storage collateralPool = collateralPools[collateralPoolId];
 
         position.lockedCollateral = add(position.lockedCollateral, collateralValue);
         position.debtShare = add(position.debtShare, debtShare);
@@ -214,7 +214,7 @@ contract Government {
 
         int debtValue = mul(collateralPool.debtAccumulatedRate, debtShare);
 
-        collateralToken[poolId][collateralOwner] = sub(collateralToken[poolId][collateralOwner], collateralValue);
+        collateralToken[collateralPoolId][collateralOwner] = sub(collateralToken[collateralPoolId][collateralOwner], collateralValue);
         systemBadDebt[stablecoinOwner]    = sub(systemBadDebt[stablecoinOwner],    debtValue);
         totalUnbackedStablecoin      = sub(totalUnbackedStablecoin,      debtValue);
     }
@@ -235,9 +235,9 @@ contract Government {
     }
 
     // --- Rates ---
-    function accrue(bytes32 poolId, address u, int debtAccumulatedRate) external auth {
+    function accrue(bytes32 collateralPoolId, address u, int debtAccumulatedRate) external auth {
         require(live == 1, "Government/not-live");
-        CollateralPool storage collateralPool = collateralPools[poolId];
+        CollateralPool storage collateralPool = collateralPools[collateralPoolId];
         collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);
         int rad  = mul(collateralPool.totalDebtShare, debtAccumulatedRate);
         stablecoin[u]   = add(stablecoin[u], rad);

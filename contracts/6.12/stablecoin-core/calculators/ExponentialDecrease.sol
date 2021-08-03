@@ -17,7 +17,7 @@
 
 pragma solidity >=0.6.12;
 
-interface Abacus {
+interface Calculator {
     // 1st arg: initial price               [ray]
     // 2nd arg: seconds since auction start [seconds]
     // returns: current auction price       [ray]
@@ -27,7 +27,7 @@ interface Abacus {
 // While an equivalent function can be obtained by setting step = 1 in StairstepExponentialDecrease,
 // this continous (i.e. per-second) exponential decrease has be implemented as it is more gas-efficient
 // than using the stairstep version with step = 1 (primarily due to 1 fewer SLOAD per price calculation).
-contract ExponentialDecrease is Abacus {
+contract ExponentialDecrease is Calculator {
 
     // --- Auth ---
     mapping (address => uint256) public wards;
