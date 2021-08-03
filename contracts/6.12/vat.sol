@@ -179,10 +179,10 @@ contract CDPEngine {
         collateralTypes[collateralIndex]    = collateralType;
     }
     // --- CDP Fungibility ---
-    function movePosition(bytes32 collateralType, address src, address dst, int collateralValue, int debtShare) external {
-        Position storage u = positions[collateralType][src];
-        Position storage v = positions[collateralType][dst];
-        CollateralType storage i = collateralTypes[collateralType];
+    function movePosition(bytes32 collateralIndex, address src, address dst, int collateralValue, int debtShare) external {
+        Position storage u = positions[collateralIndex][src];
+        Position storage v = positions[collateralIndex][dst];
+        CollateralType storage i = collateralTypes[collateralIndex];
 
         u.lockedCollateral = sub(u.lockedCollateral, collateralValue);
         u.debtShare = sub(u.debtShare, debtShare);

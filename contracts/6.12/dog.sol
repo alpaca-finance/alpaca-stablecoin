@@ -65,7 +65,7 @@ contract LiquidationEngine {
         address clip;  // Liquidator
         uint256 liquidationPenalty;  // Liquidation Penalty                                          [wad]
         uint256 maxStablecoinNeeded;  // Max DAI needed to cover debt+fees of active auctions per collateralType [rad]
-        uint256 amountStablecoinNeeded;  // Amt DAI needed to cover debt+fees of active auctions per collateralType [rad]
+        uint256 stablecoinNeededForDebtRepay;  // Amt DAI needed to cover debt+fees of active auctions per collateralType [rad]
     }
 
     CDPEngineLike immutable public cdpEngine;  // CDP Engine
@@ -75,7 +75,7 @@ contract LiquidationEngine {
     VowLike public vow;   // Debt Engine
     uint256 public live;  // Active Flag
     uint256 public maxStablecoinNeeded;  // Max DAI needed to cover debt+fees of active auctions [rad]
-    uint256 public amountStablecoinNeeded;  // Amt DAI needed to cover debt+fees of active auctions [rad]
+    uint256 public stablecoinNeededForDebtRepay;  // Amt DAI needed to cover debt+fees of active auctions [rad]
 
     // --- Events ---
     event Rely(address indexed usr);
@@ -160,14 +160,14 @@ contract LiquidationEngine {
     // The third argument is the address that will receive the liquidation reward, if any.
     //
     // The entire Vault will be liquidated except when the target amount of DAI to be raised in
-    // the resulting auction (debt of Vault + liquidation penalty) causes either amountStablecoinNeeded to exceed
-    // maxStablecoinNeeded or collateralType.amountStablecoinNeeded to exceed collateralType.maxStablecoinNeeded by an economically significant amount. In that
+    // the resulting auction (debt of Vault + liquidation penalty) causes either stablecoinNeededForDebtRepay to exceed
+    // maxStablecoinNeeded or collateralType.stablecoinNeededForDebtRepay to exceed collateralType.maxStablecoinNeeded by an economically significant amount. In that
     // case, a partial liquidation is performed to respect the global and per-collateralType limits on
     // outstanding DAI target. The one exception is if the resulting auction would likely
     // have too little collateral to be interesting to Keepers (debt taken from Vault < collateralType.debtFloor),
     // in which case the function reverts. Please refer to the code and comments within if
     // more detail is desired.
-    function bark(bytes32 collateralType, address positionAddress, address keeperAddress) external returns (uint256 id) {
+    function bark(bytes32 collateralType, address positionAddress, address liquidatorAddress) external returns (uint256 id) {
         require(live == 1, "LiquidationEngine/not-live");
 
         (uint256 positionLockedCollateral, uint256 positionDebtShare) = cdpEngine.positions(collateralType, positionAddress);
@@ -183,8 +183,8 @@ contract LiquidationEngine {
             // Get the minimum value between:
             // 1) Remaining space in the general maxStablecoinNeeded
             // 2) Remaining space in the collateral maxStablecoinNeeded
-            require(maxStablecoinNeeded > amountStablecoinNeeded && mcollateralType.maxStablecoinNeeded > mcollateralType.amountStablecoinNeeded, "LiquidationEngine/liquidation-limit-hit");
-            uint256 room = min(maxStablecoinNeeded - amountStablecoinNeeded, mcollateralType.maxStablecoinNeeded - mcollateralType.amountStablecoinNeeded);
+            require(maxStablecoinNeeded > stablecoinNeededForDebtRepay && mcollateralType.maxStablecoinNeeded > mcollateralType.stablecoinNeededForDebtRepay, "LiquidationEngine/liquidation-limit-hit");
+            uint256 room = min(maxStablecoinNeeded - stablecoinNeededForDebtRepay, mcollateralType.maxStablecoinNeeded - mcollateralType.stablecoinNeededForDebtRepay);
 
             // uint256.max()/(RAD*WAD) = 115,792,089,237,316
             debtShareToBeLiquidated = min(positionDebtShare, mul(room, WAD) / debtAccumulatedRate / mcollateralType.liquidationPenalty);
@@ -194,7 +194,7 @@ contract LiquidationEngine {
                 if (mul(positionDebtShare - debtShareToBeLiquidated, debtAccumulatedRate) < debtFloor) {
 
                     // If the leftover Vault would be debtFloory, just liquidate it entirely.
-                    // This will result in at least one of amountStablecoinNeeded_i > maxStablecoinNeeded_i or amountStablecoinNeeded > maxStablecoinNeeded becoming true.
+                    // This will result in at least one of stablecoinNeededForDebtRepay_i > maxStablecoinNeeded_i or stablecoinNeededForDebtRepay > maxStablecoinNeeded becoming true.
                     // The amount of excess will be bounded above by ceiling(debtFloor_i * liquidationPenalty_i / WAD).
                     // This deviation is assumed to be small compared to both maxStablecoinNeeded_i and maxStablecoinNeeded, so that
                     // the extra amount of target DAI over the limits intended is not of economic concern.
@@ -222,14 +222,14 @@ contract LiquidationEngine {
         {   // Avoid stack too deep
             // This calcuation will overflow if debtShareToBeLiquidated*debtAccumulatedRate exceeds ~10^14
             uint256 debtValueToBeLiquidatedWithPenalty = mul(debtValueToBeLiquidatedWithoutPenalty, mcollateralType.liquidationPenalty) / WAD;
-            amountStablecoinNeeded = add(amountStablecoinNeeded, debtValueToBeLiquidatedWithPenalty);
-            collateralTypes[collateralType].amountStablecoinNeeded = add(mcollateralType.amountStablecoinNeeded, debtValueToBeLiquidatedWithPenalty);
+            stablecoinNeededForDebtRepay = add(stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
+            collateralTypes[collateralType].stablecoinNeededForDebtRepay = add(mcollateralType.stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
 
             id = ClipperLike(mcollateralType.clip).kick({
                 tab: debtValueToBeLiquidatedWithPenalty,
                 lot: collateralAmountToBeLiquidated,
                 usr: positionAddress,
-                kpr: keeperAddress
+                kpr: liquidatorAddress
             });
         }
 
@@ -237,8 +237,8 @@ contract LiquidationEngine {
     }
 
     function digs(bytes32 collateralType, uint256 rad) external auth {
-        amountStablecoinNeeded = sub(amountStablecoinNeeded, rad);
-        collateralTypes[collateralType].amountStablecoinNeeded = sub(collateralTypes[collateralType].amountStablecoinNeeded, rad);
+        stablecoinNeededForDebtRepay = sub(stablecoinNeededForDebtRepay, rad);
+        collateralTypes[collateralType].stablecoinNeededForDebtRepay = sub(collateralTypes[collateralType].stablecoinNeededForDebtRepay, rad);
         emit Digs(collateralType, rad);
     }
 
