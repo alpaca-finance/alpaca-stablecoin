@@ -57,7 +57,7 @@ contract CDPEngine {
     mapping (bytes32 => mapping (address => Position )) public positions;
     mapping (bytes32 => mapping (address => uint)) public collateralToken;  // [wad]
     mapping (address => uint256)                   public stablecoin;  // [rad]
-    mapping (address => uint256)                   public systemDebt;  // [rad]
+    mapping (address => uint256)                   public systemBadDebt;  // [rad]
 
     uint256 public totalStablecoinIssued;  // Total Dai Issued    [rad]
     uint256 public totalUnbackedStablecoin;  // Total Unbacked Dai  [rad]
@@ -215,20 +215,20 @@ contract CDPEngine {
         int debtValue = mul(collateralType.debtAccumulatedRate, debtShare);
 
         collateralToken[collateralIndex][collateralOwner] = sub(collateralToken[collateralIndex][collateralOwner], collateralValue);
-        systemDebt[stablecoinOwner]    = sub(systemDebt[stablecoinOwner],    debtValue);
+        systemBadDebt[stablecoinOwner]    = sub(systemBadDebt[stablecoinOwner],    debtValue);
         totalUnbackedStablecoin      = sub(totalUnbackedStablecoin,      debtValue);
     }
 
     // --- Settlement ---
     function settleSystemDebt(uint rad) external {
         address u = msg.sender;
-        systemDebt[u] = sub(systemDebt[u], rad);
+        systemBadDebt[u] = sub(systemBadDebt[u], rad);
         stablecoin[u] = sub(stablecoin[u], rad);
         totalUnbackedStablecoin   = sub(totalUnbackedStablecoin,   rad);
         totalStablecoinIssued   = sub(totalStablecoinIssued,   rad);
     }
     function mintUnbackedStablecoin(address from, address to, uint rad) external auth {
-        systemDebt[from] = add(systemDebt[from], rad);
+        systemBadDebt[from] = add(systemBadDebt[from], rad);
         stablecoin[to] = add(stablecoin[to], rad);
         totalUnbackedStablecoin   = add(totalUnbackedStablecoin,   rad);
         totalStablecoinIssued   = add(totalStablecoinIssued,   rad);

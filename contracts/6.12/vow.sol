@@ -23,13 +23,13 @@ pragma solidity >=0.5.12;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface FlopLike {
+interface BadDebtAuctionHouseLike {
     function kick(address gal, uint lot, uint bid) external returns (uint);
     function cage() external;
     function live() external returns (uint);
 }
 
-interface FlapLike {
+interface SurplusAuctionHouseLike {
     function kick(uint lot, uint bid) external returns (uint);
     function cage(uint) external;
     function live() external returns (uint);
@@ -37,47 +37,47 @@ interface FlapLike {
 
 interface CDPEngineLike {
     function dai (address) external view returns (uint);
-    function sin (address) external view returns (uint);
+    function systemBadDebt (address) external view returns (uint);
     function heal(uint256) external;
     function hope(address) external;
     function nope(address) external;
 }
 
-contract Vow {
+contract DebtEngine {
     // --- Auth ---
-    mapping (address => uint) public wards;
-    function rely(address usr) external auth { require(live == 1, "Vow/not-live"); wards[usr] = 1; }
-    function deny(address usr) external auth { wards[usr] = 0; }
+    mapping (address => uint) public whitelist;
+    function rely(address usr) external auth { require(live == 1, "DebtEngine/not-live"); whitelist[usr] = 1; }
+    function deny(address usr) external auth { whitelist[usr] = 0; }
     modifier auth {
-        require(wards[msg.sender] == 1, "Vow/not-authorized");
+        require(whitelist[msg.sender] == 1, "DebtEngine/not-authorized");
         _;
     }
 
     // --- Data ---
-    CDPEngineLike public vat;        // CDP Engine
-    FlapLike public flapper;   // Surplus Auction House
-    FlopLike public flopper;   // Debt Auction House
+    CDPEngineLike public cdpEngine;        // CDP Engine
+    SurplusAuctionHouseLike public surplusAuctionHouse;   // Surplus Auction House
+    BadDebtAuctionHouseLike public badDebtAuctionHouse;   // Debt Auction House
 
-    mapping (uint256 => uint256) public sin;  // debt queue
-    uint256 public Sin;   // Queued debt            [rad]
-    uint256 public Ash;   // On-auction debt        [rad]
+    mapping (uint256 => uint256) public badDebtQueue;  // debt queue
+    uint256 public totalBadDebtValue;   // Queued debt            [rad]
+    uint256 public totalBadDebtInAuction;   // On-auction debt        [rad]
 
-    uint256 public wait;  // Flop delay             [seconds]
-    uint256 public dump;  // Flop initial lot size  [wad]
-    uint256 public sump;  // Flop fixed bid size    [rad]
+    uint256 public badDebtAuctionDelay;  // Flop delay             [seconds]
+    uint256 public alpacaInitialLotSizeForBadDebt;  // Flop initial lot size  [wad]
+    uint256 public badDebtFixedBidSize;  // Flop fixed bid size    [rad]
 
-    uint256 public bump;  // Flap fixed lot size    [rad]
-    uint256 public hump;  // Surplus buffer         [rad]
+    uint256 public surplusAuctionFixedLotSize;  // Flap fixed lot size    [rad]
+    uint256 public surplusBuffer;  // Surplus buffer         [rad]
 
     uint256 public live;  // Active Flag
 
     // --- Init ---
-    constructor(address vat_, address flapper_, address flopper_) public {
-        wards[msg.sender] = 1;
-        vat     = CDPEngineLike(vat_);
-        flapper = FlapLike(flapper_);
-        flopper = FlopLike(flopper_);
-        vat.hope(flapper_);
+    constructor(address cdpEngine_, address surplusAuctionHouse_, address badDebtAuctionHouse_) public {
+        whitelist[msg.sender] = 1;
+        cdpEngine     = CDPEngineLike(cdpEngine_);
+        surplusAuctionHouse = SurplusAuctionHouseLike(surplusAuctionHouse_);
+        badDebtAuctionHouse = BadDebtAuctionHouseLike(badDebtAuctionHouse_);
+        cdpEngine.hope(surplusAuctionHouse_);
         live = 1;
     }
 
@@ -94,70 +94,70 @@ contract Vow {
 
     // --- Administration ---
     function file(bytes32 what, uint data) external auth {
-        if (what == "wait") wait = data;
-        else if (what == "bump") bump = data;
-        else if (what == "sump") sump = data;
-        else if (what == "dump") dump = data;
-        else if (what == "hump") hump = data;
-        else revert("Vow/file-unrecognized-param");
+        if (what == "badDebtAuctionDelay") badDebtAuctionDelay = data;
+        else if (what == "surplusAuctionFixedLotSize") surplusAuctionFixedLotSize = data;
+        else if (what == "badDebtFixedBidSize") badDebtFixedBidSize = data;
+        else if (what == "alpacaInitialLotSizeForBadDebt") alpacaInitialLotSizeForBadDebt = data;
+        else if (what == "surplusBuffer") surplusBuffer = data;
+        else revert("DebtEngine/file-unrecognized-param");
     }
 
     function file(bytes32 what, address data) external auth {
-        if (what == "flapper") {
-            vat.nope(address(flapper));
-            flapper = FlapLike(data);
-            vat.hope(data);
+        if (what == "surplusAuctionHouse") {
+            cdpEngine.nope(address(surplusAuctionHouse));
+            surplusAuctionHouse = SurplusAuctionHouseLike(data);
+            cdpEngine.hope(data);
         }
-        else if (what == "flopper") flopper = FlopLike(data);
-        else revert("Vow/file-unrecognized-param");
+        else if (what == "badDebtAuctionHouse") badDebtAuctionHouse = BadDebtAuctionHouseLike(data);
+        else revert("DebtEngine/file-unrecognized-param");
     }
 
     // Push to debt-queue
     function fess(uint tab) external auth {
-        sin[now] = add(sin[now], tab);
-        Sin = add(Sin, tab);
+        badDebtQueue[now] = add(badDebtQueue[now], tab);
+        totalBadDebtValue = add(totalBadDebtValue, tab);
     }
     // Pop from debt-queue
-    function flog(uint era) external {
-        require(add(era, wait) <= now, "Vow/wait-not-finished");
-        Sin = sub(Sin, sin[era]);
-        sin[era] = 0;
+    function flog(uint currentTimestamp) external {
+        require(add(currentTimestamp, badDebtAuctionDelay) <= now, "DebtEngine/badDebtAuctionDelay-not-finished");
+        totalBadDebtValue = sub(totalBadDebtValue, badDebtQueue[currentTimestamp]);
+        badDebtQueue[currentTimestamp] = 0;
     }
 
     // Debt settlement
     function heal(uint rad) external {
-        require(rad <= vat.dai(address(this)), "Vow/insufficient-surplus");
-        require(rad <= sub(sub(vat.sin(address(this)), Sin), Ash), "Vow/insufficient-debt");
-        vat.heal(rad);
+        require(rad <= cdpEngine.dai(address(this)), "DebtEngine/insufficient-surplus");
+        require(rad <= sub(sub(cdpEngine.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "DebtEngine/insufficient-debt");
+        cdpEngine.heal(rad);
     }
     function kiss(uint rad) external {
-        require(rad <= Ash, "Vow/not-enough-ash");
-        require(rad <= vat.dai(address(this)), "Vow/insufficient-surplus");
-        Ash = sub(Ash, rad);
-        vat.heal(rad);
+        require(rad <= totalBadDebtInAuction, "DebtEngine/not-enough-ash");
+        require(rad <= cdpEngine.dai(address(this)), "DebtEngine/insufficient-surplus");
+        totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
+        cdpEngine.heal(rad);
     }
 
     // Debt auction
     function flop() external returns (uint id) {
-        require(sump <= sub(sub(vat.sin(address(this)), Sin), Ash), "Vow/insufficient-debt");
-        require(vat.dai(address(this)) == 0, "Vow/surplus-not-zero");
-        Ash = add(Ash, sump);
-        id = flopper.kick(address(this), dump, sump);
+        require(badDebtFixedBidSize <= sub(sub(cdpEngine.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "DebtEngine/insufficient-debt");
+        require(cdpEngine.dai(address(this)) == 0, "DebtEngine/surplus-not-zero");
+        totalBadDebtInAuction = add(totalBadDebtInAuction, badDebtFixedBidSize);
+        id = badDebtAuctionHouse.kick(address(this), alpacaInitialLotSizeForBadDebt, badDebtFixedBidSize);
     }
     // Surplus auction
     function flap() external returns (uint id) {
-        require(vat.dai(address(this)) >= add(add(vat.sin(address(this)), bump), hump), "Vow/insufficient-surplus");
-        require(sub(sub(vat.sin(address(this)), Sin), Ash) == 0, "Vow/debt-not-zero");
-        id = flapper.kick(bump, 0);
+        require(cdpEngine.dai(address(this)) >= add(add(cdpEngine.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer), "DebtEngine/insufficient-surplus");
+        require(sub(sub(cdpEngine.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction) == 0, "DebtEngine/debt-not-zero");
+        id = surplusAuctionHouse.kick(surplusAuctionFixedLotSize, 0);
     }
 
     function cage() external auth {
-        require(live == 1, "Vow/not-live");
+        require(live == 1, "DebtEngine/not-live");
         live = 0;
-        Sin = 0;
-        Ash = 0;
-        flapper.cage(vat.dai(address(flapper)));
-        flopper.cage();
-        vat.heal(min(vat.dai(address(this)), vat.sin(address(this))));
+        totalBadDebtValue = 0;
+        totalBadDebtInAuction = 0;
+        surplusAuctionHouse.cage(cdpEngine.dai(address(surplusAuctionHouse)));
+        badDebtAuctionHouse.cage();
+        cdpEngine.heal(min(cdpEngine.dai(address(this)), cdpEngine.systemBadDebt(address(this))));
     }
 }
