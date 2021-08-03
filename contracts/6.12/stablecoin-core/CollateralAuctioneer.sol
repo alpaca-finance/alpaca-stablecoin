@@ -48,30 +48,30 @@ interface AbacusLike {
     function price(uint256, uint256) external view returns (uint256);
 }
 
-contract Clipper {
+contract CollateralAuctioneer {
     // --- Auth ---
     mapping (address => uint256) public wards;
     function rely(address positionAddress) external auth { wards[positionAddress] = 1; emit Rely(positionAddress); }
     function deny(address positionAddress) external auth { wards[positionAddress] = 0; emit Deny(positionAddress); }
     modifier auth {
-        require(wards[msg.sender] == 1, "Clipper/not-authorized");
+        require(wards[msg.sender] == 1, "CollateralAuctioneer/not-authorized");
         _;
     }
 
     // --- Data ---
-    bytes32  immutable public collateralPool;   // Collateral type of this Clipper
+    bytes32  immutable public collateralPool;   // Collateral type of this CollateralAuctioneer
     GovernmentLike  immutable public government;   // Core CDP Engine
 
     LiquidationEngineLike     public liquidationEngine;      // Liquidation module
-    address     public vow;      // Recipient of dai raised in auctions
+    address     public systemAuctionHouse;      // Recipient of dai raised in auctions
     PriceOracleLike public spotter;  // Collateral price module
     AbacusLike  public calc;     // Current price calculator
 
     uint256 public startingPriceBuffer;    // Multiplicative factor to increase starting price                  [ray]
     uint256 public auctionTimeLimit;   // Time elapsed before auction reset                                 [seconds]
     uint256 public priceDropBeforeReset;   // Percentage drop before auction reset                              [ray]
-    uint64  public liquidatorBountyRate;   // Percentage of tab to suck from vow to incentivize liquidators         [wad]
-    uint192 public liquidatorTip;    // Flat fee to suck from vow to incentivize liquidators                  [rad]
+    uint64  public liquidatorBountyRate;   // Percentage of tab to suck from systemAuctionHouse to incentivize liquidators         [wad]
+    uint192 public liquidatorTip;    // Flat fee to suck from systemAuctionHouse to incentivize liquidators                  [rad]
     uint256 public minimumRemainingDebt;  // Cache the collateralPool debtFloor times the collateralPool liquidationPenalty to prevent excessive SLOADs [rad]
 
     uint256   public kicks;   // Total auctions
@@ -146,14 +146,14 @@ contract Clipper {
 
     // --- Synchronization ---
     modifier lock {
-        require(locked == 0, "Clipper/system-locked");
+        require(locked == 0, "CollateralAuctioneer/system-locked");
         locked = 1;
         _;
         locked = 0;
     }
 
     modifier isStopped(uint256 level) {
-        require(stopped < level, "Clipper/stopped-incorrect");
+        require(stopped < level, "CollateralAuctioneer/stopped-incorrect");
         _;
     }
 
@@ -165,15 +165,15 @@ contract Clipper {
         else if (what == "liquidatorBountyRate")       liquidatorBountyRate = uint64(data);   // Percentage of debt to incentivize (max: 2^64 - 1 => 18.xxx WAD = 18xx%)
         else if (what == "liquidatorTip")         liquidatorTip = uint192(data);  // Flat fee to incentivize liquidators (max: 2^192 - 1 => 6.277T RAD)
         else if (what == "stopped") stopped = data;           // Set breaker (0, 1, 2, or 3)
-        else revert("Clipper/file-unrecognized-param");
+        else revert("CollateralAuctioneer/file-unrecognized-param");
         emit File(what, data);
     }
     function file(bytes32 what, address data) external auth lock {
         if (what == "spotter") spotter = PriceOracleLike(data);
         else if (what == "liquidationEngine")    liquidationEngine = LiquidationEngineLike(data);
-        else if (what == "vow")    vow = data;
+        else if (what == "systemAuctionHouse")    systemAuctionHouse = data;
         else if (what == "calc")  calc = AbacusLike(data);
-        else revert("Clipper/file-unrecognized-param");
+        else revert("CollateralAuctioneer/file-unrecognized-param");
         emit File(what, data);
     }
 
@@ -213,7 +213,7 @@ contract Clipper {
     function getFeedPrice() internal returns (uint256 feedPrice) {
         (PipLike pip, ) = spotter.collateralPools(collateralPool);
         (bytes32 val, bool has) = pip.peek();
-        require(has, "Clipper/invalid-price");
+        require(has, "CollateralAuctioneer/invalid-price");
         feedPrice = rdiv(mul(uint256(val), BLN), spotter.stableCoinReferencePrice());
     }
 
@@ -233,11 +233,11 @@ contract Clipper {
         address liquidatorAddress   // Address that will receive incentives
     ) external auth lock isStopped(1) returns (uint256 id) {
         // Input validation
-        require(debt  >          0, "Clipper/zero-debt");
-        require(collateralAmount  >          0, "Clipper/zero-collateralAmount");
-        require(positionAddress != address(0), "Clipper/zero-positionAddress");
+        require(debt  >          0, "CollateralAuctioneer/zero-debt");
+        require(collateralAmount  >          0, "CollateralAuctioneer/zero-collateralAmount");
+        require(positionAddress != address(0), "CollateralAuctioneer/zero-positionAddress");
         id = ++kicks;
-        require(id   >          0, "Clipper/overflow");
+        require(id   >          0, "CollateralAuctioneer/overflow");
 
         active.push(id);
 
@@ -250,7 +250,7 @@ contract Clipper {
 
         uint256 startingPrice;
         startingPrice = rmul(getFeedPrice(), startingPriceBuffer);
-        require(startingPrice > 0, "Clipper/zero-starting-price");
+        require(startingPrice > 0, "CollateralAuctioneer/zero-starting-price");
         sales[id].startingPrice = startingPrice;
 
         // incentive to kick auction
@@ -259,7 +259,7 @@ contract Clipper {
         uint256 prize;
         if (_liquidatorTip > 0 || _liquidatorBountyRate > 0) {
             prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-            government.suck(vow, liquidatorAddress, prize);
+            government.suck(systemAuctionHouse, liquidatorAddress, prize);
         }
 
         emit Kick(id, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize);
@@ -276,12 +276,12 @@ contract Clipper {
         uint96  auctionStartBlock = sales[id].auctionStartBlock;
         uint256 startingPrice = sales[id].startingPrice;
 
-        require(positionAddress != address(0), "Clipper/not-running-auction");
+        require(positionAddress != address(0), "CollateralAuctioneer/not-running-auction");
 
         // Check that auction needs reset
         // and compute current price [ray]
         (bool done,) = status(auctionStartBlock, startingPrice);
-        require(done, "Clipper/cannot-reset");
+        require(done, "CollateralAuctioneer/cannot-reset");
 
         uint256 debt   = sales[id].debt;
         uint256 collateralAmount   = sales[id].collateralAmount;
@@ -289,7 +289,7 @@ contract Clipper {
 
         uint256 feedPrice = getFeedPrice();
         startingPrice = rmul(feedPrice, startingPriceBuffer);
-        require(startingPrice > 0, "Clipper/zero-starting-price");
+        require(startingPrice > 0, "CollateralAuctioneer/zero-starting-price");
         sales[id].startingPrice = startingPrice;
 
         // incentive to redo auction
@@ -300,7 +300,7 @@ contract Clipper {
             uint256 _minimumRemainingDebt = minimumRemainingDebt;
             if (debt >= _minimumRemainingDebt && mul(collateralAmount, feedPrice) >= _minimumRemainingDebt) {
                 prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-                government.suck(vow, liquidatorAddress, prize);
+                government.suck(systemAuctionHouse, liquidatorAddress, prize);
             }
         }
 
@@ -314,10 +314,10 @@ contract Clipper {
     // amount of collateral purchased will instead be just enough to collect `debt` DAI.
     //
     // To avoid partial purchases resulting in very small leftover auctions that will
-    // never be cleared, any partial purchase must leave at least `Clipper.minimumRemainingDebt`
+    // never be cleared, any partial purchase must leave at least `CollateralAuctioneer.minimumRemainingDebt`
     // remaining DAI target. `minimumRemainingDebt` is an asynchronously updated value equal to
     // (Government.debtFloor * Dog.liquidationPenalty(collateralPool) / WAD) where the values are understood to be determined
-    // by whatever they were when Clipper.updateMinimumRemainingDebt() was last called. Purchase amounts
+    // by whatever they were when CollateralAuctioneer.updateMinimumRemainingDebt() was last called. Purchase amounts
     // will be minimally decreased when necessary to respect this limit; i.e., if the
     // specified `collateralAmountToBuy` would leave `debt < minimumRemainingDebt` but `debt > 0`, the amount actually
     // purchased will be such that `debt == minimumRemainingDebt`.
@@ -335,7 +335,7 @@ contract Clipper {
         address positionAddress = sales[id].positionAddress;
         uint96  auctionStartBlock = sales[id].auctionStartBlock;
 
-        require(positionAddress != address(0), "Clipper/not-running-auction");
+        require(positionAddress != address(0), "CollateralAuctioneer/not-running-auction");
 
         uint256 price;
         {
@@ -343,11 +343,11 @@ contract Clipper {
             (done, price) = status(auctionStartBlock, sales[id].startingPrice);
 
             // Check that auction doesn't need reset
-            require(!done, "Clipper/needs-reset");
+            require(!done, "CollateralAuctioneer/needs-reset");
         }
 
         // Ensure price is acceptable to buyer
-        require(maxPrice >= price, "Clipper/too-expensive");
+        require(maxPrice >= price, "CollateralAuctioneer/too-expensive");
 
         uint256 collateralAmount = sales[id].collateralAmount;
         uint256 debt = sales[id].debt;
@@ -371,7 +371,7 @@ contract Clipper {
                 uint256 _minimumRemainingDebt = minimumRemainingDebt;
                 if (debt - owe < _minimumRemainingDebt) {    // safe as owe < debt
                     // If debt <= minimumRemainingDebt, buyers have to take the entire collateralAmount.
-                    require(debt > _minimumRemainingDebt, "Clipper/no-partial-purchase");
+                    require(debt > _minimumRemainingDebt, "CollateralAuctioneer/no-partial-purchase");
                     // Adjust amount to pay
                     owe = debt - _minimumRemainingDebt;      // owe' <= owe
                     // Adjust slice
@@ -389,14 +389,14 @@ contract Clipper {
 
             // Do external call (if data is defined) but to be
             // extremely careful we don't allow to do it to the two
-            // contracts which the Clipper needs to be authorized
+            // contracts which the CollateralAuctioneer needs to be authorized
             LiquidationEngineLike liquidationEngine_ = liquidationEngine;
             if (data.length > 0 && who != address(government) && who != address(liquidationEngine_)) {
                 FlashLendingCallee(who).flashLendingCall(msg.sender, owe, slice, data);
             }
 
             // Get DAI from caller
-            government.move(msg.sender, vow, owe);
+            government.move(msg.sender, systemAuctionHouse, owe);
 
             // Removes Dai out for liquidation from accumulator
             liquidationEngine_.digs(collateralPool, collateralAmount == 0 ? debt + owe : owe);
@@ -464,7 +464,7 @@ contract Clipper {
 
     // Cancel an auction during Emergency Shutdown or via governance action.
     function yank(uint256 id) external auth lock {
-        require(sales[id].positionAddress != address(0), "Clipper/not-running-auction");
+        require(sales[id].positionAddress != address(0), "CollateralAuctioneer/not-running-auction");
         liquidationEngine.digs(collateralPool, sales[id].debt);
         government.flux(collateralPool, address(this), msg.sender, sales[id].collateralAmount);
         _remove(id);

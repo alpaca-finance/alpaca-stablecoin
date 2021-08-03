@@ -66,7 +66,7 @@ interface PotLike {
     function cage() external;
 }
 
-interface VowLike {
+interface SystemAuctionHouse {
     function cage() external;
 }
 
@@ -199,7 +199,7 @@ interface SpotLike {
        - only callable after processing time period elapsed
        - assumption that all under-collateralised CDPs are processed
        - fixes the total outstanding supply of dai
-       - may also require extra CDP processing to cover vow surplus
+       - may also require extra CDP processing to cover systemAuctionHouse surplus
 
     7. `flow(ilk)`:
         - calculate the `fix`, the cash price for a given ilk
@@ -238,7 +238,7 @@ contract End {
     GovernmentLike  public vat;   // CDP Engine
     CatLike  public cat;
     DogLike  public dog;
-    VowLike  public vow;   // Debt Engine
+    SystemAuctionHouse  public systemAuctionHouse;   // Debt Engine
     PotLike  public pot;
     SpotLike public spot;
 
@@ -309,7 +309,7 @@ contract End {
         if (what == "vat")  vat = GovernmentLike(data);
         else if (what == "cat")   cat = CatLike(data);
         else if (what == "dog")   dog = DogLike(data);
-        else if (what == "vow")   vow = VowLike(data);
+        else if (what == "systemAuctionHouse")   systemAuctionHouse = SystemAuctionHouse(data);
         else if (what == "pot")   pot = PotLike(data);
         else if (what == "spot") spot = SpotLike(data);
         else revert("End/file-unrecognized-param");
@@ -330,7 +330,7 @@ contract End {
         vat.cage();
         cat.cage();
         dog.cage();
-        vow.cage();
+        systemAuctionHouse.cage();
         spot.cage();
         pot.cage();
         emit Cage();
@@ -354,13 +354,13 @@ contract End {
         (, uint256 rate,,,) = vat.ilks(ilk);
         (, uint256 tab, uint256 lot, address usr,,) = clip.sales(id);
 
-        vat.suck(address(vow), address(vow),  tab);
+        vat.suck(address(systemAuctionHouse), address(systemAuctionHouse),  tab);
         clip.yank(id);
 
         uint256 art = tab / rate;
         Art[ilk] = add(Art[ilk], art);
         require(int256(lot) >= 0 && int256(art) >= 0, "End/overflow");
-        vat.grab(ilk, usr, address(this), address(vow), int256(lot), int256(art));
+        vat.grab(ilk, usr, address(this), address(systemAuctionHouse), int256(lot), int256(art));
         emit Snip(ilk, id, usr, tab, lot, art);
     }
 
@@ -372,15 +372,15 @@ contract End {
         (, uint256 rate,,,) = vat.ilks(ilk);
         (uint256 bid, uint256 lot,,,, address usr,, uint256 tab) = flip.bids(id);
 
-        vat.suck(address(vow), address(vow),  tab);
-        vat.suck(address(vow), address(this), bid);
+        vat.suck(address(systemAuctionHouse), address(systemAuctionHouse),  tab);
+        vat.suck(address(systemAuctionHouse), address(this), bid);
         vat.hope(address(flip));
         flip.yank(id);
 
         uint256 art = tab / rate;
         Art[ilk] = add(Art[ilk], art);
         require(int256(lot) >= 0 && int256(art) >= 0, "End/overflow");
-        vat.grab(ilk, usr, address(this), address(vow), int256(lot), int256(art));
+        vat.grab(ilk, usr, address(this), address(systemAuctionHouse), int256(lot), int256(art));
         emit Skip(ilk, id, usr, tab, lot, art);
     }
 
@@ -394,7 +394,7 @@ contract End {
         gap[ilk] = add(gap[ilk], sub(owe, wad));
 
         require(wad <= 2**255 && art <= 2**255, "End/overflow");
-        vat.grab(ilk, urn, address(this), address(vow), -int256(wad), -int256(art));
+        vat.grab(ilk, urn, address(this), address(systemAuctionHouse), -int256(wad), -int256(art));
         emit Skim(ilk, urn, wad, art);
     }
 
@@ -403,14 +403,14 @@ contract End {
         (uint256 ink, uint256 art) = vat.urns(ilk, msg.sender);
         require(art == 0, "End/art-not-zero");
         require(ink <= 2**255, "End/overflow");
-        vat.grab(ilk, msg.sender, msg.sender, address(vow), -int256(ink), 0);
+        vat.grab(ilk, msg.sender, msg.sender, address(systemAuctionHouse), -int256(ink), 0);
         emit Free(ilk, msg.sender, ink);
     }
 
     function thaw() external {
         require(live == 0, "End/still-live");
         require(debt == 0, "End/debt-not-zero");
-        require(vat.dai(address(vow)) == 0, "End/surplus-not-zero");
+        require(vat.dai(address(systemAuctionHouse)) == 0, "End/surplus-not-zero");
         require(block.timestamp >= add(when, wait), "End/wait-not-finished");
         debt = vat.debt();
         emit Thaw();
@@ -427,7 +427,7 @@ contract End {
 
     function pack(uint256 wad) external {
         require(debt != 0, "End/debt-zero");
-        vat.move(msg.sender, address(vow), mul(wad, RAY));
+        vat.move(msg.sender, address(systemAuctionHouse), mul(wad, RAY));
         bag[msg.sender] = add(bag[msg.sender], wad);
         emit Pack(msg.sender, wad);
     }

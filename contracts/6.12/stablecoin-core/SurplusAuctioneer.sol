@@ -26,7 +26,7 @@ pragma solidity >=0.5.12;
 interface GovernmentLike {
     function move(address,address,uint) external;
 }
-interface GemLike {
+interface CollateralTokenLike {
     function move(address,address,uint) external;
     function burn(address,uint) external;
 }
@@ -41,13 +41,13 @@ interface GemLike {
  - `auctionExpiry` max auction duration
 */
 
-contract Flapper {
+contract SurplusAuctioneer {
     // --- Auth ---
     mapping (address => uint) public whitelist;
     function rely(address usr) external auth { whitelist[usr] = 1; }
     function deny(address usr) external auth { whitelist[usr] = 0; }
     modifier auth {
-        require(whitelist[msg.sender] == 1, "Flapper/not-authorized");
+        require(whitelist[msg.sender] == 1, "SurplusAuctioneer/not-authorized");
         _;
     }
 
@@ -63,7 +63,7 @@ contract Flapper {
     mapping (uint => Bid) public bids;
 
     GovernmentLike  public   government;  // CDP Engine
-    GemLike  public   alpaca;
+    CollateralTokenLike  public   alpaca;
 
     uint256  constant ONE = 1.00E18;
     uint256  public   minimumBidIncrease = 1.05E18;  // 5% minimum bid increase
@@ -83,7 +83,7 @@ contract Flapper {
     constructor(address government_, address alpaca_) public {
         whitelist[msg.sender] = 1;
         government = GovernmentLike(government_);
-        alpaca = GemLike(alpaca_);
+        alpaca = CollateralTokenLike(alpaca_);
         live = 1;
     }
 
@@ -100,13 +100,13 @@ contract Flapper {
         if (what == "minimumBidIncrease") minimumBidIncrease = data;
         else if (what == "bidLifetime") bidLifetime = uint48(data);
         else if (what == "auctionLength") auctionLength = uint48(data);
-        else revert("Flapper/file-unrecognized-param");
+        else revert("SurplusAuctioneer/file-unrecognized-param");
     }
 
     // --- Auction ---
     function kick(uint lot, uint bid) external auth returns (uint id) {
-        require(live == 1, "Flapper/not-live");
-        require(kicks < uint(-1), "Flapper/overflow");
+        require(live == 1, "SurplusAuctioneer/not-live");
+        require(kicks < uint(-1), "SurplusAuctioneer/overflow");
         id = ++kicks;
 
         bids[id].bid = bid;
@@ -119,19 +119,19 @@ contract Flapper {
         emit Kick(id, lot, bid);
     }
     function tick(uint id) external {
-        require(bids[id].auctionExpiry < now, "Flapper/not-finished");
-        require(bids[id].bidExpiry == 0, "Flapper/bid-already-placed");
+        require(bids[id].auctionExpiry < now, "SurplusAuctioneer/not-finished");
+        require(bids[id].bidExpiry == 0, "SurplusAuctioneer/bid-already-placed");
         bids[id].auctionExpiry = add(uint48(now), auctionLength);
     }
     function tend(uint id, uint lot, uint bid) external {
-        require(live == 1, "Flapper/not-live");
-        require(bids[id].bidder != address(0), "Flapper/bidder-not-set");
-        require(bids[id].bidExpiry > now || bids[id].bidExpiry == 0, "Flapper/already-finished-bidExpiry");
-        require(bids[id].auctionExpiry > now, "Flapper/already-finished-auctionExpiry");
+        require(live == 1, "SurplusAuctioneer/not-live");
+        require(bids[id].bidder != address(0), "SurplusAuctioneer/bidder-not-set");
+        require(bids[id].bidExpiry > now || bids[id].bidExpiry == 0, "SurplusAuctioneer/already-finished-bidExpiry");
+        require(bids[id].auctionExpiry > now, "SurplusAuctioneer/already-finished-auctionExpiry");
 
-        require(lot == bids[id].lot, "Flapper/lot-not-matching");
-        require(bid >  bids[id].bid, "Flapper/bid-not-higher");
-        require(mul(bid, ONE) >= mul(minimumBidIncrease, bids[id].bid), "Flapper/insufficient-increase");
+        require(lot == bids[id].lot, "SurplusAuctioneer/lot-not-matching");
+        require(bid >  bids[id].bid, "SurplusAuctioneer/bid-not-higher");
+        require(mul(bid, ONE) >= mul(minimumBidIncrease, bids[id].bid), "SurplusAuctioneer/insufficient-increase");
 
         if (msg.sender != bids[id].bidder) {
             alpaca.move(msg.sender, bids[id].bidder, bids[id].bid);
@@ -143,8 +143,8 @@ contract Flapper {
         bids[id].bidExpiry = add(uint48(now), bidLifetime);
     }
     function deal(uint id) external {
-        require(live == 1, "Flapper/not-live");
-        require(bids[id].bidExpiry != 0 && (bids[id].bidExpiry < now || bids[id].auctionExpiry < now), "Flapper/not-finished");
+        require(live == 1, "SurplusAuctioneer/not-live");
+        require(bids[id].bidExpiry != 0 && (bids[id].bidExpiry < now || bids[id].auctionExpiry < now), "SurplusAuctioneer/not-finished");
         government.move(address(this), bids[id].bidder, bids[id].lot);
         alpaca.burn(address(this), bids[id].bid);
         delete bids[id];
@@ -155,8 +155,8 @@ contract Flapper {
        government.move(address(this), msg.sender, rad);
     }
     function yank(uint id) external {
-        require(live == 0, "Flapper/still-live");
-        require(bids[id].bidder != address(0), "Flapper/bidder-not-set");
+        require(live == 0, "SurplusAuctioneer/still-live");
+        require(bids[id].bidder != address(0), "SurplusAuctioneer/bidder-not-set");
         alpaca.move(address(this), bids[id].bidder, bids[id].bid);
         delete bids[id];
     }

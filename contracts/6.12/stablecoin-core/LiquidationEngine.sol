@@ -19,7 +19,7 @@
 
 pragma solidity >=0.6.12;
 
-interface ClipperLike {
+interface CollateralAuctioneer {
     function collateralPool() external view returns (bytes32);
     function kick(
         uint256 tab,
@@ -46,7 +46,7 @@ interface GovernmentLike {
     function nope(address) external;
 }
 
-interface VowLike {
+interface SystemAuctionHouse {
     function fess(uint256) external;
 }
 
@@ -62,7 +62,7 @@ contract LiquidationEngine {
 
     // --- Data ---
     struct CollateralPool {
-        address clip;  // Liquidator
+        address auctioneer;  // Liquidator
         uint256 liquidationPenalty;  // Liquidation Penalty                                          [wad]
         uint256 maxStablecoinNeeded;  // Max DAI needed to cover debt+fees of active auctions per collateralPool [rad]
         uint256 stablecoinNeededForDebtRepay;  // Amt DAI needed to cover debt+fees of active auctions per collateralPool [rad]
@@ -72,7 +72,7 @@ contract LiquidationEngine {
 
     mapping (bytes32 => CollateralPool) public collateralPools;
 
-    VowLike public vow;   // Debt Engine
+    SystemAuctionHouse public systemAuctionHouse;   // Debt Engine
     uint256 public live;  // Active Flag
     uint256 public maxStablecoinNeeded;  // Max DAI needed to cover debt+fees of active auctions [rad]
     uint256 public stablecoinNeededForDebtRepay;  // Amt DAI needed to cover debt+fees of active auctions [rad]
@@ -84,7 +84,7 @@ contract LiquidationEngine {
     event File(bytes32 indexed what, uint256 data);
     event File(bytes32 indexed what, address data);
     event File(bytes32 indexed collateralPool, bytes32 indexed what, uint256 data);
-    event File(bytes32 indexed collateralPool, bytes32 indexed what, address clip);
+    event File(bytes32 indexed collateralPool, bytes32 indexed what, address auctioneer);
 
     event Bark(
       bytes32 indexed collateralPool,
@@ -92,7 +92,7 @@ contract LiquidationEngine {
       uint256 ink,
       uint256 art,
       uint256 due,
-      address clip,
+      address auctioneer,
       uint256 indexed id
     );
     event Digs(bytes32 indexed collateralPool, uint256 rad);
@@ -124,7 +124,7 @@ contract LiquidationEngine {
 
     // --- Administration ---
     function file(bytes32 what, address data) external auth {
-        if (what == "vow") vow = VowLike(data);
+        if (what == "systemAuctionHouse") systemAuctionHouse = SystemAuctionHouse(data);
         else revert("LiquidationEngine/file-unrecognized-param");
         emit File(what, data);
     }
@@ -141,12 +141,12 @@ contract LiquidationEngine {
         else revert("LiquidationEngine/file-unrecognized-param");
         emit File(collateralPool, what, data);
     }
-    function file(bytes32 collateralPool, bytes32 what, address clip) external auth {
-        if (what == "clip") {
-            require(collateralPool == ClipperLike(clip).collateralPool(), "LiquidationEngine/file-collateralPool-neq-clip.collateralPool");
-            collateralPools[collateralPool].clip = clip;
+    function file(bytes32 collateralPool, bytes32 what, address auctioneer) external auth {
+        if (what == "auctioneer") {
+            require(collateralPool == CollateralAuctioneer(auctioneer).collateralPool(), "LiquidationEngine/file-collateralPool-neq-auctioneer.collateralPool");
+            collateralPools[collateralPool].auctioneer = auctioneer;
         } else revert("LiquidationEngine/file-unrecognized-param");
-        emit File(collateralPool, what, clip);
+        emit File(collateralPool, what, auctioneer);
     }
 
     function liquidationPenalty(bytes32 collateralPool) external view returns (uint256) {
@@ -213,11 +213,11 @@ contract LiquidationEngine {
         require(debtShareToBeLiquidated <= 2**255 && collateralAmountToBeLiquidated <= 2**255, "LiquidationEngine/overflow");
 
         government.confiscate(
-            collateralPool, positionAddress, mcollateralPool.clip, address(vow), -int256(collateralAmountToBeLiquidated), -int256(debtShareToBeLiquidated)
+            collateralPool, positionAddress, mcollateralPool.auctioneer, address(systemAuctionHouse), -int256(collateralAmountToBeLiquidated), -int256(debtShareToBeLiquidated)
         );
 
         uint256 debtValueToBeLiquidatedWithoutPenalty = mul(debtShareToBeLiquidated, debtAccumulatedRate);
-        vow.fess(debtValueToBeLiquidatedWithoutPenalty);
+        systemAuctionHouse.fess(debtValueToBeLiquidatedWithoutPenalty);
 
         {   // Avoid stack too deep
             // This calcuation will overflow if debtShareToBeLiquidated*debtAccumulatedRate exceeds ~10^14
@@ -225,7 +225,7 @@ contract LiquidationEngine {
             stablecoinNeededForDebtRepay = add(stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
             collateralPools[collateralPool].stablecoinNeededForDebtRepay = add(mcollateralPool.stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
 
-            id = ClipperLike(mcollateralPool.clip).kick({
+            id = CollateralAuctioneer(mcollateralPool.auctioneer).kick({
                 tab: debtValueToBeLiquidatedWithPenalty,
                 lot: collateralAmountToBeLiquidated,
                 usr: positionAddress,
@@ -233,7 +233,7 @@ contract LiquidationEngine {
             });
         }
 
-        emit Bark(collateralPool, positionAddress, collateralAmountToBeLiquidated, debtShareToBeLiquidated, debtValueToBeLiquidatedWithoutPenalty, mcollateralPool.clip, id);
+        emit Bark(collateralPool, positionAddress, collateralAmountToBeLiquidated, debtShareToBeLiquidated, debtValueToBeLiquidatedWithoutPenalty, mcollateralPool.auctioneer, id);
     }
 
     function digs(bytes32 collateralPool, uint256 rad) external auth {
