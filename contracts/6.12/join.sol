@@ -44,12 +44,12 @@ interface CDPEngineLike {
     token implementations, creating a bounded context for the CDPEngine. The
     adapters here are provided as working examples:
 
-      - `CollateralTokenSafe`: For well behaved ERC20 tokens, with simple transfer
+      - `CollateralTokenAdapter`: For well behaved ERC20 tokens, with simple transfer
                    semantics.
 
       - `ETHJoin`: For native Ether.
 
-      - `StablecoinSafe`: For connecting internal Dai balances to an external
+      - `StablecoinAdapter`: For connecting internal Dai balances to an external
                    `DSToken` implementation.
 
     In practice, adapter implementations will be varied and specific to
@@ -63,13 +63,13 @@ interface CDPEngineLike {
 
 */
 
-contract CollateralTokenSafe {
+contract CollateralTokenAdapter {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth { wards[usr] = 1; }
     function deny(address usr) external auth { wards[usr] = 0; }
     modifier auth {
-        require(wards[msg.sender] == 1, "CollateralTokenSafe/not-authorized");
+        require(wards[msg.sender] == 1, "CollateralTokenAdapter/not-authorized");
         _;
     }
 
@@ -91,25 +91,25 @@ contract CollateralTokenSafe {
         live = 0;
     }
     function deposit(address usr, uint wad) external {
-        require(live == 1, "CollateralTokenSafe/not-live");
-        require(int(wad) >= 0, "CollateralTokenSafe/overflow");
+        require(live == 1, "CollateralTokenAdapter/not-live");
+        require(int(wad) >= 0, "CollateralTokenAdapter/overflow");
         cdpEngine.slip(collateralType, usr, int(wad));
-        require(collateralToken.transferFrom(msg.sender, address(this), wad), "CollateralTokenSafe/failed-transfer");
+        require(collateralToken.transferFrom(msg.sender, address(this), wad), "CollateralTokenAdapter/failed-transfer");
     }
     function withdraw(address usr, uint wad) external {
-        require(wad <= 2 ** 255, "CollateralTokenSafe/overflow");
+        require(wad <= 2 ** 255, "CollateralTokenAdapter/overflow");
         cdpEngine.slip(collateralType, msg.sender, -int(wad));
-        require(collateralToken.transfer(usr, wad), "CollateralTokenSafe/failed-transfer");
+        require(collateralToken.transfer(usr, wad), "CollateralTokenAdapter/failed-transfer");
     }
 }
 
-contract StablecoinSafe {
+contract StablecoinAdapter {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth { wards[usr] = 1; }
     function deny(address usr) external auth { wards[usr] = 0; }
     modifier auth {
-        require(wards[msg.sender] == 1, "StablecoinSafe/not-authorized");
+        require(wards[msg.sender] == 1, "StablecoinAdapter/not-authorized");
         _;
     }
 
@@ -135,7 +135,7 @@ contract StablecoinSafe {
         stablecoin.burn(msg.sender, wad);
     }
     function withdraw(address usr, uint wad) external {
-        require(live == 1, "StablecoinSafe/not-live");
+        require(live == 1, "StablecoinAdapter/not-live");
         cdpEngine.move(msg.sender, address(this), mul(ONE, wad));
         stablecoin.mint(usr, wad);
     }

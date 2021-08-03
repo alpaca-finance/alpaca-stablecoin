@@ -32,43 +32,43 @@ interface GemLike {
 }
 
 /*
-   This thing lets you sell some dai in return for gems.
+   This thing lets you sell some dai in return for alpacas.
 
  - `lot` dai in return for bid
- - `bid` gems paid
- - `ttl` single bid lifetime
- - `beg` minimum bid increase
- - `end` max auction duration
+ - `bid` alpacas paid
+ - `bidLifetime` single bid lifetime
+ - `minimumBidIncrease` minimum bid increase
+ - `auctionExpiry` max auction duration
 */
 
 contract Flapper {
     // --- Auth ---
-    mapping (address => uint) public wards;
-    function rely(address usr) external auth { wards[usr] = 1; }
-    function deny(address usr) external auth { wards[usr] = 0; }
+    mapping (address => uint) public whitelist;
+    function rely(address usr) external auth { whitelist[usr] = 1; }
+    function deny(address usr) external auth { whitelist[usr] = 0; }
     modifier auth {
-        require(wards[msg.sender] == 1, "Flapper/not-authorized");
+        require(whitelist[msg.sender] == 1, "Flapper/not-authorized");
         _;
     }
 
     // --- Data ---
     struct Bid {
-        uint256 bid;  // gems paid               [wad]
+        uint256 bid;  // alpacas paid               [wad]
         uint256 lot;  // dai in return for bid   [rad]
-        address guy;  // high bidder
-        uint48  tic;  // bid expiry time         [unix epoch time]
-        uint48  end;  // auction expiry time     [unix epoch time]
+        address bidder;  // high bidder
+        uint48  bidExpiry;  // bid expiry time         [unix epoch time]
+        uint48  auctionExpiry;  // auction expiry time     [unix epoch time]
     }
 
     mapping (uint => Bid) public bids;
 
-    CDPEngineLike  public   vat;  // CDP Engine
-    GemLike  public   gem;
+    CDPEngineLike  public   cdpEngine;  // CDP Engine
+    GemLike  public   alpaca;
 
     uint256  constant ONE = 1.00E18;
-    uint256  public   beg = 1.05E18;  // 5% minimum bid increase
-    uint48   public   ttl = 3 hours;  // 3 hours bid duration         [seconds]
-    uint48   public   tau = 2 days;   // 2 days total auction length  [seconds]
+    uint256  public   minimumBidIncrease = 1.05E18;  // 5% minimum bid increase
+    uint48   public   bidLifetime = 3 hours;  // 3 hours bid duration         [seconds]
+    uint48   public   auctionLength = 2 days;   // 2 days total auction length  [seconds]
     uint256  public kicks = 0;
     uint256  public live;  // Active Flag
 
@@ -80,10 +80,10 @@ contract Flapper {
     );
 
     // --- Init ---
-    constructor(address vat_, address gem_) public {
-        wards[msg.sender] = 1;
-        vat = CDPEngineLike(vat_);
-        gem = GemLike(gem_);
+    constructor(address cdpEngine_, address alpaca_) public {
+        whitelist[msg.sender] = 1;
+        cdpEngine = CDPEngineLike(cdpEngine_);
+        alpaca = GemLike(alpaca_);
         live = 1;
     }
 
@@ -97,9 +97,9 @@ contract Flapper {
 
     // --- Admin ---
     function file(bytes32 what, uint data) external auth {
-        if (what == "beg") beg = data;
-        else if (what == "ttl") ttl = uint48(data);
-        else if (what == "tau") tau = uint48(data);
+        if (what == "minimumBidIncrease") minimumBidIncrease = data;
+        else if (what == "bidLifetime") bidLifetime = uint48(data);
+        else if (what == "auctionLength") auctionLength = uint48(data);
         else revert("Flapper/file-unrecognized-param");
     }
 
@@ -111,53 +111,53 @@ contract Flapper {
 
         bids[id].bid = bid;
         bids[id].lot = lot;
-        bids[id].guy = msg.sender;  // configurable??
-        bids[id].end = add(uint48(now), tau);
+        bids[id].bidder = msg.sender;  // configurable??
+        bids[id].auctionExpiry = add(uint48(now), auctionLength);
 
-        vat.move(msg.sender, address(this), lot);
+        cdpEngine.move(msg.sender, address(this), lot);
 
         emit Kick(id, lot, bid);
     }
     function tick(uint id) external {
-        require(bids[id].end < now, "Flapper/not-finished");
-        require(bids[id].tic == 0, "Flapper/bid-already-placed");
-        bids[id].end = add(uint48(now), tau);
+        require(bids[id].auctionExpiry < now, "Flapper/not-finished");
+        require(bids[id].bidExpiry == 0, "Flapper/bid-already-placed");
+        bids[id].auctionExpiry = add(uint48(now), auctionLength);
     }
     function tend(uint id, uint lot, uint bid) external {
         require(live == 1, "Flapper/not-live");
-        require(bids[id].guy != address(0), "Flapper/guy-not-set");
-        require(bids[id].tic > now || bids[id].tic == 0, "Flapper/already-finished-tic");
-        require(bids[id].end > now, "Flapper/already-finished-end");
+        require(bids[id].bidder != address(0), "Flapper/bidder-not-set");
+        require(bids[id].bidExpiry > now || bids[id].bidExpiry == 0, "Flapper/already-finished-bidExpiry");
+        require(bids[id].auctionExpiry > now, "Flapper/already-finished-auctionExpiry");
 
         require(lot == bids[id].lot, "Flapper/lot-not-matching");
         require(bid >  bids[id].bid, "Flapper/bid-not-higher");
-        require(mul(bid, ONE) >= mul(beg, bids[id].bid), "Flapper/insufficient-increase");
+        require(mul(bid, ONE) >= mul(minimumBidIncrease, bids[id].bid), "Flapper/insufficient-increase");
 
-        if (msg.sender != bids[id].guy) {
-            gem.move(msg.sender, bids[id].guy, bids[id].bid);
-            bids[id].guy = msg.sender;
+        if (msg.sender != bids[id].bidder) {
+            alpaca.move(msg.sender, bids[id].bidder, bids[id].bid);
+            bids[id].bidder = msg.sender;
         }
-        gem.move(msg.sender, address(this), bid - bids[id].bid);
+        alpaca.move(msg.sender, address(this), bid - bids[id].bid);
 
         bids[id].bid = bid;
-        bids[id].tic = add(uint48(now), ttl);
+        bids[id].bidExpiry = add(uint48(now), bidLifetime);
     }
     function deal(uint id) external {
         require(live == 1, "Flapper/not-live");
-        require(bids[id].tic != 0 && (bids[id].tic < now || bids[id].end < now), "Flapper/not-finished");
-        vat.move(address(this), bids[id].guy, bids[id].lot);
-        gem.burn(address(this), bids[id].bid);
+        require(bids[id].bidExpiry != 0 && (bids[id].bidExpiry < now || bids[id].auctionExpiry < now), "Flapper/not-finished");
+        cdpEngine.move(address(this), bids[id].bidder, bids[id].lot);
+        alpaca.burn(address(this), bids[id].bid);
         delete bids[id];
     }
 
     function cage(uint rad) external auth {
        live = 0;
-       vat.move(address(this), msg.sender, rad);
+       cdpEngine.move(address(this), msg.sender, rad);
     }
     function yank(uint id) external {
         require(live == 0, "Flapper/still-live");
-        require(bids[id].guy != address(0), "Flapper/guy-not-set");
-        gem.move(address(this), bids[id].guy, bids[id].bid);
+        require(bids[id].bidder != address(0), "Flapper/bidder-not-set");
+        alpaca.move(address(this), bids[id].bidder, bids[id].bid);
         delete bids[id];
     }
 }
