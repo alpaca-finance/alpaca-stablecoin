@@ -63,46 +63,6 @@ interface GovernmentLike {
 
 */
 
-contract CollateralTokenAdapter {
-    // --- Auth ---
-    mapping (address => uint) public wards;
-    function rely(address usr) external auth { wards[usr] = 1; }
-    function deny(address usr) external auth { wards[usr] = 0; }
-    modifier auth {
-        require(wards[msg.sender] == 1, "CollateralTokenAdapter/not-authorized");
-        _;
-    }
-
-    GovernmentLike public government;   // CDP Engine
-    bytes32 public collateralPool;   // Collateral Type
-    CollateralTokenLike public collateralToken;
-    uint    public dec;
-    uint    public live;  // Active Flag
-
-    constructor(address government_, bytes32 collateralPool_, address collateralToken_) public {
-        wards[msg.sender] = 1;
-        live = 1;
-        government = GovernmentLike(government_);
-        collateralPool = collateralPool_;
-        collateralToken = CollateralTokenLike(collateralToken_);
-        dec = collateralToken.decimals();
-    }
-    function cage() external auth {
-        live = 0;
-    }
-    function deposit(address usr, uint wad) external {
-        require(live == 1, "CollateralTokenAdapter/not-live");
-        require(int(wad) >= 0, "CollateralTokenAdapter/overflow");
-        government.slip(collateralPool, usr, int(wad));
-        require(collateralToken.transferFrom(msg.sender, address(this), wad), "CollateralTokenAdapter/failed-transfer");
-    }
-    function withdraw(address usr, uint wad) external {
-        require(wad <= 2 ** 255, "CollateralTokenAdapter/overflow");
-        government.slip(collateralPool, msg.sender, -int(wad));
-        require(collateralToken.transfer(usr, wad), "CollateralTokenAdapter/failed-transfer");
-    }
-}
-
 contract StablecoinAdapter {
     // --- Auth ---
     mapping (address => uint) public wards;
