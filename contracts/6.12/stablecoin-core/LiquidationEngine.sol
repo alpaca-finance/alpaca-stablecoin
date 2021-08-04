@@ -64,7 +64,7 @@ contract LiquidationEngine {
     struct CollateralPool {
         address auctioneer;  // Liquidator
         uint256 liquidationPenalty;  // Liquidation Penalty                                          [wad]
-        uint256 maxStablecoinNeeded;  // Max DAI needed to cover debt+fees of active auctions per collateralPool [rad]
+        uint256 liquidationMaxSize;  // Max DAI needed to cover debt+fees of active auctions per collateralPool [rad]
         uint256 stablecoinNeededForDebtRepay;  // Amt DAI needed to cover debt+fees of active auctions per collateralPool [rad]
     }
 
@@ -74,7 +74,7 @@ contract LiquidationEngine {
 
     SystemAuctionHouse public systemAuctionHouse;   // Debt Engine
     uint256 public live;  // Active Flag
-    uint256 public maxStablecoinNeeded;  // Max DAI needed to cover debt+fees of active auctions [rad]
+    uint256 public liquidationMaxSize;  // Max DAI needed to cover debt+fees of active auctions [rad]
     uint256 public stablecoinNeededForDebtRepay;  // Amt DAI needed to cover debt+fees of active auctions [rad]
 
     // --- Events ---
@@ -129,7 +129,7 @@ contract LiquidationEngine {
         emit File(what, data);
     }
     function file(bytes32 what, uint256 data) external auth {
-        if (what == "maxStablecoinNeeded") maxStablecoinNeeded = data;
+        if (what == "liquidationMaxSize") liquidationMaxSize = data;
         else revert("LiquidationEngine/file-unrecognized-param");
         emit File(what, data);
     }
@@ -137,7 +137,7 @@ contract LiquidationEngine {
         if (what == "liquidationPenalty") {
             require(data >= WAD, "LiquidationEngine/file-liquidationPenalty-lt-WAD");
             collateralPools[collateralPoolId].liquidationPenalty = data;
-        } else if (what == "maxStablecoinNeeded") collateralPools[collateralPoolId].maxStablecoinNeeded = data;
+        } else if (what == "liquidationMaxSize") collateralPools[collateralPoolId].liquidationMaxSize = data;
         else revert("LiquidationEngine/file-unrecognized-param");
         emit File(collateralPoolId, what, data);
     }
@@ -161,7 +161,7 @@ contract LiquidationEngine {
     //
     // The entire Vault will be liquidated except when the target amount of DAI to be raised in
     // the resulting auction (debt of Vault + liquidation penalty) causes either stablecoinNeededForDebtRepay to exceed
-    // maxStablecoinNeeded or collateralPool.stablecoinNeededForDebtRepay to exceed collateralPool.maxStablecoinNeeded by an economically significant amount. In that
+    // liquidationMaxSize or collateralPool.stablecoinNeededForDebtRepay to exceed collateralPool.liquidationMaxSize by an economically significant amount. In that
     // case, a partial liquidation is performed to respect the global and per-collateralPool limits on
     // outstanding DAI target. The one exception is if the resulting auction would likely
     // have too little collateral to be interesting to Keepers (debt taken from Vault < collateralPool.debtFloor),
@@ -181,10 +181,10 @@ contract LiquidationEngine {
             require(priceWithSafetyMargin > 0 && mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate), "LiquidationEngine/not-unsafe");
 
             // Get the minimum value between:
-            // 1) Remaining space in the general maxStablecoinNeeded
-            // 2) Remaining space in the collateral maxStablecoinNeeded
-            require(maxStablecoinNeeded > stablecoinNeededForDebtRepay && mcollateralPool.maxStablecoinNeeded > mcollateralPool.stablecoinNeededForDebtRepay, "LiquidationEngine/liquidation-limit-hit");
-            uint256 room = min(maxStablecoinNeeded - stablecoinNeededForDebtRepay, mcollateralPool.maxStablecoinNeeded - mcollateralPool.stablecoinNeededForDebtRepay);
+            // 1) Remaining space in the general liquidationMaxSize
+            // 2) Remaining space in the collateral liquidationMaxSize
+            require(liquidationMaxSize > stablecoinNeededForDebtRepay && mcollateralPool.liquidationMaxSize > mcollateralPool.stablecoinNeededForDebtRepay, "LiquidationEngine/liquidation-limit-hit");
+            uint256 room = min(liquidationMaxSize - stablecoinNeededForDebtRepay, mcollateralPool.liquidationMaxSize - mcollateralPool.stablecoinNeededForDebtRepay);
 
             // uint256.max()/(RAD*WAD) = 115,792,089,237,316
             debtShareToBeLiquidated = min(positionDebtShare, mul(room, WAD) / debtAccumulatedRate / mcollateralPool.liquidationPenalty);
@@ -194,9 +194,9 @@ contract LiquidationEngine {
                 if (mul(positionDebtShare - debtShareToBeLiquidated, debtAccumulatedRate) < debtFloor) {
 
                     // If the leftover Vault would be debtFloory, just liquidate it entirely.
-                    // This will result in at least one of stablecoinNeededForDebtRepay_i > maxStablecoinNeeded_i or stablecoinNeededForDebtRepay > maxStablecoinNeeded becoming true.
+                    // This will result in at least one of stablecoinNeededForDebtRepay_i > liquidationMaxSize_i or stablecoinNeededForDebtRepay > liquidationMaxSize becoming true.
                     // The amount of excess will be bounded above by ceiling(debtFloor_i * liquidationPenalty_i / WAD).
-                    // This deviation is assumed to be small compared to both maxStablecoinNeeded_i and maxStablecoinNeeded, so that
+                    // This deviation is assumed to be small compared to both liquidationMaxSize_i and liquidationMaxSize, so that
                     // the extra amount of target DAI over the limits intended is not of economic concern.
                     debtShareToBeLiquidated = positionDebtShare;
                 } else {

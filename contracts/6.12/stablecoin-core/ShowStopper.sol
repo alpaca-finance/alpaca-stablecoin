@@ -22,47 +22,38 @@
 pragma solidity >=0.6.12;
 
 interface GovernmentLike {
-    function dai(address) external view returns (uint256);
-    function ilks(bytes32 ilk) external returns (
-        uint256 Art,   // [wad]
-        uint256 rate,  // [ray]
-        uint256 spot,  // [ray]
-        uint256 line,  // [rad]
-        uint256 dust   // [rad]
+    function stablecoin(address) external view returns (uint256);
+    function collateralPools(bytes32 collateralPoolId) external returns (
+        uint256 totalDebtShare,   // [wad]
+        uint256 debtAccumulatedRate,  // [ray]
+        uint256 priceWithSafetyMargin,  // [ray]
+        uint256 debtCeiling,  // [rad]
+        uint256 debtFloor   // [rad]
     );
-    function urns(bytes32 ilk, address urn) external returns (
-        uint256 ink,   // [wad]
-        uint256 art    // [wad]
+    function positions(bytes32 collateralPoolId, address urn) external returns (
+        uint256 lockedCollateral,   // [wad]
+        uint256 debtShare    // [wad]
     );
     function debt() external returns (uint256);
     function move(address src, address dst, uint256 rad) external;
     function hope(address) external;
-    function flux(bytes32 ilk, address src, address dst, uint256 rad) external;
+    function flux(bytes32 collateralPoolId, address src, address dst, uint256 rad) external;
     function grab(bytes32 i, address u, address v, address w, int256 dink, int256 dart) external;
     function suck(address u, address v, uint256 rad) external;
     function cage() external;
 }
 
-interface CatLike {
-    function ilks(bytes32) external returns (
-        address flip,
-        uint256 chop,  // [ray]
-        uint256 lump   // [rad]
+interface LiquidationEngineLike {
+    function collateralPools(bytes32) external returns (
+        address auctioneer,
+        uint256 liquidationPenalty,
+        uint256 liquidationMaxSize,
+        uint256 stablecoinNeededForDebtRepay
     );
     function cage() external;
 }
 
-interface DogLike {
-    function ilks(bytes32) external returns (
-        address clip,
-        uint256 chop,
-        uint256 hole,
-        uint256 dirt
-    );
-    function cage() external;
-}
-
-interface PotLike {
+interface StablecoinSavingsLike {
     function cage() external;
 }
 
@@ -70,28 +61,14 @@ interface SystemAuctionHouse {
     function cage() external;
 }
 
-interface FlipLike {
-    function bids(uint256 id) external view returns (
-        uint256 bid,   // [rad]
-        uint256 lot,   // [wad]
-        address guy,
-        uint48  tic,   // [unix epoch time]
-        uint48  end,   // [unix epoch time]
-        address usr,
-        address gal,
-        uint256 tab    // [rad]
-    );
-    function yank(uint256 id) external;
-}
-
-interface ClipLike {
+interface CollateralAuctioneerLike {
     function sales(uint256 id) external view returns (
         uint256 pos,
-        uint256 tab,
-        uint256 lot,
-        address usr,
-        uint96  tic,
-        uint256 top
+        uint256 debt,
+        uint256 collateralAmount,
+        address positionAddress,
+        uint96  auctionStartBlock,
+        uint256 startingPrice
     );
     function yank(uint256 id) external;
 }
@@ -100,11 +77,11 @@ interface PriceFeedLike {
     function read() external view returns (bytes32);
 }
 
-interface SpotLike {
+interface PriceOracleLike {
     function par() external view returns (uint256);
-    function ilks(bytes32) external view returns (
+    function collateralPools(bytes32) external view returns (
         PriceFeedLike priceFeed,
-        uint256 mat    // [ray]
+        uint256 liquidationRatio    // [ray]
     );
     function cage() external;
 }
@@ -113,7 +90,7 @@ interface SpotLike {
     This is the `End` and it coordinates Global Settlement. This is an
     involved, stateful process that takes place over nine steps.
 
-    First we freeze the system and lock the prices for each ilk.
+    First we freeze the system and lock the prices for each collateralPoolId.
 
     1. `cage()`:
         - freezes user entrypoints
@@ -121,13 +98,13 @@ interface SpotLike {
         - starts cooldown period
         - stops pot drips
 
-    2. `cage(ilk)`:
-       - set the cage price for each `ilk`, reading off the price feed
+    2. `cage(collateralPoolId)`:
+       - set the cage price for each `collateralPoolId`, reading off the price feed
 
     We must process some system state before it is possible to calculate
     the final dai / collateral price. In particular, we need to determine
 
-      a. `gap`, the collateral shortfall per collateral type by
+      a. `shortfall`, the collateral shortfall per collateral type by
          considering under-collateralised CDPs.
 
       b. `debt`, the outstanding dai supply after including system
@@ -136,7 +113,7 @@ interface SpotLike {
     We determine (a) by processing all under-collateralised CDPs with
     `skim`:
 
-    3. `skim(ilk, urn)`:
+    3. `skim(collateralPoolId, urn)`:
        - cancels CDP debt
        - any excess collateral remains
        - backing collateral taken
@@ -162,7 +139,7 @@ interface SpotLike {
            processing calls. This option allows dai holders to retrieve
            their collateral faster.
 
-           `skip(ilk, id)`:
+           `skip(collateralPoolId, id)`:
             - cancel individual flip auctions in the `tend` (forward) phase
             - retrieves collateral and debt (including penalty) to owner's CDP
             - returns dai to last bidder
@@ -180,7 +157,7 @@ interface SpotLike {
 
     4b. i) `snip`: cancel all ongoing auctions and seize the collateral.
 
-           `snip(ilk, id)`:
+           `snip(collateralPoolId, id)`:
             - cancel individual running clip auctions
             - retrieves remaining collateral and debt (including penalty)
               to owner's CDP
@@ -188,7 +165,7 @@ interface SpotLike {
     When a CDP has been processed and has no debt remaining, the
     remaining collateral can be removed.
 
-    5. `free(ilk)`:
+    5. `free(collateralPoolId)`:
         - remove collateral from the caller's CDP
         - owner can call as needed
 
@@ -201,8 +178,8 @@ interface SpotLike {
        - fixes the total outstanding supply of dai
        - may also require extra CDP processing to cover systemAuctionHouse surplus
 
-    7. `flow(ilk)`:
-        - calculate the `fix`, the cash price for a given ilk
+    7. `flow(collateralPoolId)`:
+        - calculate the `fix`, the cash price for a given collateralPoolId
         - adjusts the `fix` in the case of deficit / surplus
 
     At this point we have computed the final price for each collateral
@@ -219,12 +196,12 @@ interface SpotLike {
     Finally, collateral can be obtained with `cash`. The bigger the bag,
     the more collateral can be released.
 
-    9. `cash(ilk, wad)`:
-        - exchange some dai from your bag for gems from a specific ilk
+    9. `cash(collateralPoolId, wad)`:
+        - exchange some dai from your bag for gems from a specific collateralPoolId
         - the number of gems is limited by how big your bag is
 */
 
-contract End {
+contract ShowStopper {
     // --- Auth ---
     mapping (address => uint256) public wards;
     function rely(address usr) external auth { wards[usr] = 1; emit Rely(usr); }
@@ -235,22 +212,21 @@ contract End {
     }
 
     // --- Data ---
-    GovernmentLike  public vat;   // CDP Engine
-    CatLike  public cat;
-    DogLike  public dog;
+    GovernmentLike  public government;   // CDP Engine
+    LiquidationEngineLike  public liquidationEngine;
     SystemAuctionHouse  public systemAuctionHouse;   // Debt Engine
-    PotLike  public pot;
-    SpotLike public spot;
+    StablecoinSavingsLike  public stablecoinSavings;
+    PriceOracleLike public priceOracle;
 
     uint256  public live;  // Active Flag
     uint256  public when;  // Time of cage                   [unix epoch time]
     uint256  public wait;  // Processing Cooldown Length             [seconds]
     uint256  public debt;  // Total outstanding dai following processing [rad]
 
-    mapping (bytes32 => uint256) public tag;  // Cage price              [ray]
-    mapping (bytes32 => uint256) public gap;  // Collateral shortfall    [wad]
-    mapping (bytes32 => uint256) public Art;  // Total debt per ilk      [wad]
-    mapping (bytes32 => uint256) public fix;  // Final cash price        [ray]
+    mapping (bytes32 => uint256) public cagePrice;  // Cage price              [ray]
+    mapping (bytes32 => uint256) public shortfall;  // Collateral shortfall    [wad]
+    mapping (bytes32 => uint256) public totalDebtShare;  // Total debt per collateralPoolId      [wad]
+    mapping (bytes32 => uint256) public finalCashPrice;  // Final cash price        [ray]
 
     mapping (address => uint256)                      public bag;  //    [wad]
     mapping (bytes32 => mapping (address => uint256)) public out;  //    [wad]
@@ -263,15 +239,15 @@ contract End {
     event File(bytes32 indexed what, address data);
 
     event Cage();
-    event Cage(bytes32 indexed ilk);
-    event Snip(bytes32 indexed ilk, uint256 indexed id, address indexed usr, uint256 tab, uint256 lot, uint256 art);
-    event Skip(bytes32 indexed ilk, uint256 indexed id, address indexed usr, uint256 tab, uint256 lot, uint256 art);
-    event Skim(bytes32 indexed ilk, address indexed urn, uint256 wad, uint256 art);
-    event Free(bytes32 indexed ilk, address indexed usr, uint256 ink);
+    event Cage(bytes32 indexed collateralPoolId);
+    event Snip(bytes32 indexed collateralPoolId, uint256 indexed id, address indexed usr, uint256 tab, uint256 lot, uint256 art);
+    event Skip(bytes32 indexed collateralPoolId, uint256 indexed id, address indexed usr, uint256 tab, uint256 lot, uint256 art);
+    event Skim(bytes32 indexed collateralPoolId, address indexed urn, uint256 wad, uint256 art);
+    event Free(bytes32 indexed collateralPoolId, address indexed usr, uint256 ink);
     event Thaw();
-    event Flow(bytes32 indexed ilk);
+    event Flow(bytes32 indexed collateralPoolId);
     event Pack(address indexed usr, uint256 wad);
-    event Cash(bytes32 indexed ilk, address indexed usr, uint256 wad);
+    event Cash(bytes32 indexed collateralPoolId, address indexed usr, uint256 wad);
 
     // --- Init ---
     constructor() public {
@@ -306,12 +282,11 @@ contract End {
     // --- Administration ---
     function file(bytes32 what, address data) external auth {
         require(live == 1, "End/not-live");
-        if (what == "vat")  vat = GovernmentLike(data);
-        else if (what == "cat")   cat = CatLike(data);
-        else if (what == "dog")   dog = DogLike(data);
+        if (what == "government")  government = GovernmentLike(data);
+        else if (what == "liquidationEngine")   liquidationEngine = LiquidationEngineLike(data);
         else if (what == "systemAuctionHouse")   systemAuctionHouse = SystemAuctionHouse(data);
-        else if (what == "pot")   pot = PotLike(data);
-        else if (what == "spot") spot = SpotLike(data);
+        else if (what == "stablecoinSavings")   stablecoinSavings = StablecoinSavingsLike(data);
+        else if (what == "priceOracle") priceOracle = PriceOracleLike(data);
         else revert("End/file-unrecognized-param");
         emit File(what, data);
     }
@@ -327,115 +302,94 @@ contract End {
         require(live == 1, "End/not-live");
         live = 0;
         when = block.timestamp;
-        vat.cage();
-        cat.cage();
-        dog.cage();
+        government.cage();
+        liquidationEngine.cage();
         systemAuctionHouse.cage();
-        spot.cage();
-        pot.cage();
+        priceOracle.cage();
+        stablecoinSavings.cage();
         emit Cage();
     }
 
-    function cage(bytes32 ilk) external {
+    function cage(bytes32 collateralPoolId) external {
         require(live == 0, "End/still-live");
-        require(tag[ilk] == 0, "End/tag-ilk-already-defined");
-        (Art[ilk],,,,) = vat.ilks(ilk);
-        (PriceFeedLike priceFeed,) = spot.ilks(ilk);
+        require(cagePrice[collateralPoolId] == 0, "End/cagePrice-collateralPoolId-already-defined");
+        (totalDebtShare[collateralPoolId],,,,) = government.collateralPools(collateralPoolId);
+        (PriceFeedLike priceFeed,) = priceOracle.collateralPools(collateralPoolId);
         // par is a ray, priceFeed returns a wad
-        tag[ilk] = wdiv(spot.par(), uint256(priceFeed.read()));
-        emit Cage(ilk);
+        cagePrice[collateralPoolId] = wdiv(priceOracle.par(), uint256(priceFeed.read()));
+        emit Cage(collateralPoolId);
     }
 
-    function snip(bytes32 ilk, uint256 id) external {
-        require(tag[ilk] != 0, "End/tag-ilk-not-defined");
+    function snip(bytes32 collateralPoolId, uint256 id) external {
+        require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
 
-        (address _clip,,,) = dog.ilks(ilk);
-        ClipLike clip = ClipLike(_clip);
-        (, uint256 rate,,,) = vat.ilks(ilk);
-        (, uint256 tab, uint256 lot, address usr,,) = clip.sales(id);
+        (address _auctioneer,,,) = liquidationEngine.collateralPools(collateralPoolId);
+        CollateralAuctioneerLike auctioneer = CollateralAuctioneerLike(_auctioneer);
+        (, uint256 debtAccumulatedRate,,,) = government.collateralPools(collateralPoolId);
+        (, uint256 tab, uint256 lot, address usr,,) = auctioneer.sales(id);
 
-        vat.suck(address(systemAuctionHouse), address(systemAuctionHouse),  tab);
-        clip.yank(id);
+        government.suck(address(systemAuctionHouse), address(systemAuctionHouse),  tab);
+        auctioneer.yank(id);
 
-        uint256 art = tab / rate;
-        Art[ilk] = add(Art[ilk], art);
-        require(int256(lot) >= 0 && int256(art) >= 0, "End/overflow");
-        vat.grab(ilk, usr, address(this), address(systemAuctionHouse), int256(lot), int256(art));
-        emit Snip(ilk, id, usr, tab, lot, art);
+        uint256 debtShare = tab / debtAccumulatedRate;
+        totalDebtShare[collateralPoolId] = add(totalDebtShare[collateralPoolId], debtShare);
+        require(int256(lot) >= 0 && int256(debtShare) >= 0, "End/overflow");
+        government.grab(collateralPoolId, usr, address(this), address(systemAuctionHouse), int256(lot), int256(debtShare));
+        emit Snip(collateralPoolId, id, usr, tab, lot, debtShare);
     }
 
-    function skip(bytes32 ilk, uint256 id) external {
-        require(tag[ilk] != 0, "End/tag-ilk-not-defined");
+    function skim(bytes32 collateralPoolId, address urn) external {
+        require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
+        (, uint256 debtAccumulatedRate,,,) = government.collateralPools(collateralPoolId);
+        (uint256 lockedCollateral, uint256 debtShare) = government.positions(collateralPoolId, urn);
 
-        (address _flip,,) = cat.ilks(ilk);
-        FlipLike flip = FlipLike(_flip);
-        (, uint256 rate,,,) = vat.ilks(ilk);
-        (uint256 bid, uint256 lot,,,, address usr,, uint256 tab) = flip.bids(id);
+        uint256 owe = rmul(rmul(debtShare, debtAccumulatedRate), cagePrice[collateralPoolId]);
+        uint256 wad = min(lockedCollateral, owe);
+        shortfall[collateralPoolId] = add(shortfall[collateralPoolId], sub(owe, wad));
 
-        vat.suck(address(systemAuctionHouse), address(systemAuctionHouse),  tab);
-        vat.suck(address(systemAuctionHouse), address(this), bid);
-        vat.hope(address(flip));
-        flip.yank(id);
-
-        uint256 art = tab / rate;
-        Art[ilk] = add(Art[ilk], art);
-        require(int256(lot) >= 0 && int256(art) >= 0, "End/overflow");
-        vat.grab(ilk, usr, address(this), address(systemAuctionHouse), int256(lot), int256(art));
-        emit Skip(ilk, id, usr, tab, lot, art);
+        require(wad <= 2**255 && debtShare <= 2**255, "End/overflow");
+        government.grab(collateralPoolId, urn, address(this), address(systemAuctionHouse), -int256(wad), -int256(debtShare));
+        emit Skim(collateralPoolId, urn, wad, debtShare);
     }
 
-    function skim(bytes32 ilk, address urn) external {
-        require(tag[ilk] != 0, "End/tag-ilk-not-defined");
-        (, uint256 rate,,,) = vat.ilks(ilk);
-        (uint256 ink, uint256 art) = vat.urns(ilk, urn);
-
-        uint256 owe = rmul(rmul(art, rate), tag[ilk]);
-        uint256 wad = min(ink, owe);
-        gap[ilk] = add(gap[ilk], sub(owe, wad));
-
-        require(wad <= 2**255 && art <= 2**255, "End/overflow");
-        vat.grab(ilk, urn, address(this), address(systemAuctionHouse), -int256(wad), -int256(art));
-        emit Skim(ilk, urn, wad, art);
-    }
-
-    function free(bytes32 ilk) external {
+    function free(bytes32 collateralPoolId) external {
         require(live == 0, "End/still-live");
-        (uint256 ink, uint256 art) = vat.urns(ilk, msg.sender);
-        require(art == 0, "End/art-not-zero");
-        require(ink <= 2**255, "End/overflow");
-        vat.grab(ilk, msg.sender, msg.sender, address(systemAuctionHouse), -int256(ink), 0);
-        emit Free(ilk, msg.sender, ink);
+        (uint256 lockedCollateral, uint256 debtShare) = government.positions(collateralPoolId, msg.sender);
+        require(debtShare == 0, "End/debtShare-not-zero");
+        require(lockedCollateral <= 2**255, "End/overflow");
+        government.grab(collateralPoolId, msg.sender, msg.sender, address(systemAuctionHouse), -int256(lockedCollateral), 0);
+        emit Free(collateralPoolId, msg.sender, lockedCollateral);
     }
 
     function thaw() external {
         require(live == 0, "End/still-live");
         require(debt == 0, "End/debt-not-zero");
-        require(vat.dai(address(systemAuctionHouse)) == 0, "End/surplus-not-zero");
+        require(government.stablecoin(address(systemAuctionHouse)) == 0, "End/surplus-not-zero");
         require(block.timestamp >= add(when, wait), "End/wait-not-finished");
-        debt = vat.debt();
+        debt = government.debt();
         emit Thaw();
     }
-    function flow(bytes32 ilk) external {
+    function flow(bytes32 collateralPoolId) external {
         require(debt != 0, "End/debt-zero");
-        require(fix[ilk] == 0, "End/fix-ilk-already-defined");
+        require(finalCashPrice[collateralPoolId] == 0, "End/finalCashPrice-collateralPoolId-already-defined");
 
-        (, uint256 rate,,,) = vat.ilks(ilk);
-        uint256 wad = rmul(rmul(Art[ilk], rate), tag[ilk]);
-        fix[ilk] = mul(sub(wad, gap[ilk]), RAY) / (debt / RAY);
-        emit Flow(ilk);
+        (, uint256 debtAccumulatedRate,,,) = government.collateralPools(collateralPoolId);
+        uint256 wad = rmul(rmul(totalDebtShare[collateralPoolId], debtAccumulatedRate), cagePrice[collateralPoolId]);
+        finalCashPrice[collateralPoolId] = mul(sub(wad, shortfall[collateralPoolId]), RAY) / (debt / RAY);
+        emit Flow(collateralPoolId);
     }
 
     function pack(uint256 wad) external {
         require(debt != 0, "End/debt-zero");
-        vat.move(msg.sender, address(systemAuctionHouse), mul(wad, RAY));
+        government.move(msg.sender, address(systemAuctionHouse), mul(wad, RAY));
         bag[msg.sender] = add(bag[msg.sender], wad);
         emit Pack(msg.sender, wad);
     }
-    function cash(bytes32 ilk, uint256 wad) external {
-        require(fix[ilk] != 0, "End/fix-ilk-not-defined");
-        vat.flux(ilk, address(this), msg.sender, rmul(wad, fix[ilk]));
-        out[ilk][msg.sender] = add(out[ilk][msg.sender], wad);
-        require(out[ilk][msg.sender] <= bag[msg.sender], "End/insufficient-bag-balance");
-        emit Cash(ilk, msg.sender, wad);
+    function cash(bytes32 collateralPoolId, uint256 wad) external {
+        require(finalCashPrice[collateralPoolId] != 0, "End/finalCashPrice-collateralPoolId-not-defined");
+        government.flux(collateralPoolId, address(this), msg.sender, rmul(wad, finalCashPrice[collateralPoolId]));
+        out[collateralPoolId][msg.sender] = add(out[collateralPoolId][msg.sender], wad);
+        require(out[collateralPoolId][msg.sender] <= bag[msg.sender], "End/insufficient-bag-balance");
+        emit Cash(collateralPoolId, msg.sender, wad);
     }
 }
