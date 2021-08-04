@@ -25,7 +25,7 @@ interface GovernmentLike {
     function file(bytes32, bytes32, uint) external;
 }
 
-interface PipLike {
+interface PriceFeedLike {
     function peek() external returns (bytes32, bool);
 }
 
@@ -41,7 +41,7 @@ contract PriceOracle {
 
     // --- Data ---
     struct CollateralPool {
-        PipLike pip;  // Price Feed
+        PriceFeedLike priceFeed;  // Price Feed
         uint256 liquidationRatio;  // Liquidation ratio [ray]
     }
 
@@ -78,9 +78,9 @@ contract PriceOracle {
     }
 
     // --- Administration ---
-    function file(bytes32 poolId, bytes32 what, address pip_) external auth {
+    function file(bytes32 poolId, bytes32 what, address priceFeed_) external auth {
         require(live == 1, "Spotter/not-live");
-        if (what == "pip") collateralPools[poolId].pip = PipLike(pip_);
+        if (what == "priceFeed") collateralPools[poolId].priceFeed = PriceFeedLike(priceFeed_);
         else revert("Spotter/file-unrecognized-param");
     }
     function file(bytes32 what, uint data) external auth {
@@ -96,7 +96,7 @@ contract PriceOracle {
 
     // --- Update value ---
     function poke(bytes32 poolId) external {
-        (bytes32 val, bool has) = collateralPools[poolId].pip.peek();
+        (bytes32 val, bool has) = collateralPools[poolId].priceFeed.peek();
         uint256 priceWithSafetyMargin = has ? rdiv(rdiv(mul(uint(val), 10 ** 9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio) : 0;
         vat.file(poolId, "priceWithSafetyMargin", priceWithSafetyMargin);
         emit Poke(poolId, val, priceWithSafetyMargin);

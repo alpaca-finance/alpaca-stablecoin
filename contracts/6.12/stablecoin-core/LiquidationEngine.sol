@@ -31,7 +31,7 @@ interface CollateralAuctioneerLike {
 
 interface GovernmentLike {
     function collateralPools(bytes32) external view returns (
-        uint256 Art,  // [wad]
+        uint256 totalDebtShare,  // [wad]
         uint256 debtAccumulatedRate, // [ray]
         uint256 priceWithSafetyMargin, // [ray]
         uint256 line, // [rad]
@@ -88,10 +88,10 @@ contract LiquidationEngine {
 
     event Bark(
       bytes32 indexed collateralPoolId,
-      address indexed urn,
-      uint256 ink,
-      uint256 art,
-      uint256 due,
+      address indexed positionAddress,
+      uint256 collateralAmountToBeLiquidated,
+      uint256 debtShareToBeLiquidated,
+      uint256 debtValueToBeLiquidatedWithoutPenalty,
       address auctioneer,
       uint256 indexed id
     );

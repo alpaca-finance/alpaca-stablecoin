@@ -26,13 +26,13 @@ interface GovernmentLike {
     function suck(address,address,uint256) external;
 }
 
-interface PipLike {
+interface PriceFeedLike {
     function peek() external returns (bytes32, bool);
 }
 
 interface PriceOracleLike {
     function stableCoinReferencePrice() external returns (uint256);
-    function collateralPools(bytes32) external returns (PipLike, uint256);
+    function collateralPools(bytes32) external returns (PriceFeedLike, uint256);
 }
 
 interface LiquidationEngineLike {
@@ -211,8 +211,8 @@ contract CollateralAuctioneer {
     // if mat has changed since the last poke, the resulting value will be
     // incorrect.
     function getFeedPrice() internal returns (uint256 feedPrice) {
-        (PipLike pip, ) = priceOracle.collateralPools(collateralPoolId);
-        (bytes32 val, bool has) = pip.peek();
+        (PriceFeedLike priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
+        (bytes32 val, bool has) = priceFeed.peek();
         require(has, "CollateralAuctioneer/invalid-price");
         feedPrice = rdiv(mul(uint256(val), BLN), priceOracle.stableCoinReferencePrice());
     }

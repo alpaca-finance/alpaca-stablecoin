@@ -96,14 +96,14 @@ interface ClipLike {
     function yank(uint256 id) external;
 }
 
-interface PipLike {
+interface PriceFeedLike {
     function read() external view returns (bytes32);
 }
 
 interface SpotLike {
     function par() external view returns (uint256);
     function ilks(bytes32) external view returns (
-        PipLike pip,
+        PriceFeedLike priceFeed,
         uint256 mat    // [ray]
     );
     function cage() external;
@@ -340,9 +340,9 @@ contract End {
         require(live == 0, "End/still-live");
         require(tag[ilk] == 0, "End/tag-ilk-already-defined");
         (Art[ilk],,,,) = vat.ilks(ilk);
-        (PipLike pip,) = spot.ilks(ilk);
-        // par is a ray, pip returns a wad
-        tag[ilk] = wdiv(spot.par(), uint256(pip.read()));
+        (PriceFeedLike priceFeed,) = spot.ilks(ilk);
+        // par is a ray, priceFeed returns a wad
+        tag[ilk] = wdiv(spot.par(), uint256(priceFeed.read()));
         emit Cage(ilk);
     }
 
