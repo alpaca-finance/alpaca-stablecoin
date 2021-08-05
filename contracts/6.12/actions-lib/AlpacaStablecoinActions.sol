@@ -61,11 +61,6 @@ interface CollateralTokenAdapterLike {
     function withdraw(address, uint) external;
 }
 
-interface GNTJoinLike {
-    function bags(address) external view returns (address);
-    function make(address) external returns (address);
-}
-
 interface StablecoinAdapterLike {
     function government() external returns (GovernmentLike);
     function stablecoin() external returns (CollateralTokenLike);
@@ -106,12 +101,12 @@ contract Common {
 
     // Public functions
 
-    function stablecoinJoin_deposit(address apt, address positionAddress, uint wad) public {
-        // Gets DAI from the user's wallet
+    function stablecoinAdapter_deposit(address apt, address positionAddress, uint wad) public {
+        // Gets Alpaca Stablecoin from the user's wallet
         StablecoinAdapterLike(apt).stablecoin().transferFrom(msg.sender, address(this), wad);
-        // Approves adapter to take the DAI amount
+        // Approves adapter to take the Alpaca Stablecoin amount
         StablecoinAdapterLike(apt).stablecoin().approve(apt, wad);
-        // Joins DAI into the government
+        // Deposits Alpaca Stablecoin into the government
         StablecoinAdapterLike(apt).deposit(positionAddress, wad);
     }
 }
@@ -141,43 +136,43 @@ contract AlpacaStablecoinActions is Common {
         );
     }
 
-    function _getDrawDart(
+    function _getDrawDebtShare(
         address government,
         address stabilityFeeCollector,
         address positionAddress,
         bytes32 collateralPoolId,
         uint wad
-    ) internal returns (int dart) {
+    ) internal returns (int resultDebtShare) {
         // Updates stability fee rate
-        uint rate = StabilityFeeCollectorLike(stabilityFeeCollector).collect(collateralPoolId);
+        uint debtAccumulatedRate = StabilityFeeCollectorLike(stabilityFeeCollector).collect(collateralPoolId);
 
-        // Gets DAI balance of the positionAddress in the government
+        // Gets Alpaca Stablecoin balance of the positionAddress in the government
         uint stablecoin = GovernmentLike(government).stablecoin(positionAddress);
 
-        // If there was already enough DAI in the government balance, just exits it without adding more debt
+        // If there was already enough Alpaca Stablecoin in the government balance, just exits it without adding more debt
         if (stablecoin < mul(wad, RAY)) {
-            // Calculates the needed dart so together with the existing stablecoin in the government is enough to exit wad amount of DAI tokens
-            dart = toInt(sub(mul(wad, RAY), stablecoin) / rate);
-            // This is neeeded due lack of precision. It might need to sum an extra dart wei (for the given DAI wad amount)
-            dart = mul(uint(dart), rate) < mul(wad, RAY) ? dart + 1 : dart;
+            // Calculates the needed resultDebtShare so together with the existing stablecoin in the government is enough to exit wad amount of Alpaca Stablecoin tokens
+            resultDebtShare = toInt(sub(mul(wad, RAY), stablecoin) / debtAccumulatedRate);
+            // This is neeeded due lack of precision. It might need to sum an extra resultDebtShare wei (for the given Alpaca Stablecoin wad amount)
+            resultDebtShare = mul(uint(resultDebtShare), debtAccumulatedRate) < mul(wad, RAY) ? resultDebtShare + 1 : resultDebtShare;
         }
     }
 
-    function _getWipeDart(
+    function _getWipeDebtShare(
         address government,
-        uint stablecoin,
+        uint stablecoinBalance,
         address positionAddress,
         bytes32 collateralPoolId
-    ) internal view returns (int dart) {
+    ) internal view returns (int resultDebtShare) {
         // Gets actual rate from the government
-        (, uint rate,,,) = GovernmentLike(government).collateralPools(collateralPoolId);
-        // Gets actual art value of the positionAddress
-        (, uint art) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+        (, uint debtAccumulatedRate,,,) = GovernmentLike(government).collateralPools(collateralPoolId);
+        // Gets actual debtShare value of the positionAddress
+        (, uint debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
 
         // Uses the whole stablecoin balance in the government to reduce the debt
-        dart = toInt(stablecoin / rate);
-        // Checks the calculated dart is not higher than positionAddress.art (total debt), otherwise uses its value
-        dart = uint(dart) <= art ? - dart : - toInt(art);
+        resultDebtShare = toInt(stablecoinBalance / debtAccumulatedRate);
+        // Checks the calculated resultDebtShare is not higher than positionAddress.art (total debt), otherwise uses its value
+        resultDebtShare = uint(resultDebtShare) <= debtShare ? - resultDebtShare : - toInt(debtShare);
     }
 
     function _getWipeAllWad(
@@ -188,8 +183,8 @@ contract AlpacaStablecoinActions is Common {
     ) internal view returns (uint wad) {
         // Gets actual rate from the government
         (, uint rate,,,) = GovernmentLike(government).collateralPools(collateralPoolId);
-        // Gets actual art value of the positionAddress
-        (, uint art) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+        // Gets actual debtShare value of the positionAddress
+        (, uint debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
         // Gets actual stablecoin amount in the positionAddress
         uint stablecoin = GovernmentLike(government).stablecoin(usr);
 
@@ -211,7 +206,7 @@ contract AlpacaStablecoinActions is Common {
         CollateralTokenAdapterLike(apt).collateralToken().deposit.value(msg.value)();
         // Approves adapter to take the WBNB amount
         CollateralTokenAdapterLike(apt).collateralToken().approve(address(apt), msg.value);
-        // Joins WBNB collateral into the government
+        // Deposits WBNB collateral into the government
         CollateralTokenAdapterLike(apt).deposit(positionAddress, msg.value);
     }
 
@@ -223,7 +218,7 @@ contract AlpacaStablecoinActions is Common {
             // Approves adapter to take the token amount
             CollateralTokenAdapterLike(apt).collateralToken().approve(apt, amt);
         }
-        // Joins token collateral into the government
+        // Deposits token collateral into the government
         CollateralTokenAdapterLike(apt).deposit(positionAddress, amt);
     }
 
@@ -418,7 +413,7 @@ contract AlpacaStablecoinActions is Common {
         adjustPosition(manager, cdp, -toInt(wad), 0);
         // Moves the amount from the CDP positionAddress to proxy's address
         moveCollateral(manager, cdp, address(this), wad);
-        // Exits WBNB amount to proxy address as a token
+        // Withdraws WBNB amount to proxy address as a token
         CollateralTokenAdapterLike(bnbAdapter).withdraw(address(this), wad);
         // Converts WBNB to BNB
         CollateralTokenAdapterLike(bnbAdapter).collateralToken().withdraw(wad);
@@ -437,7 +432,7 @@ contract AlpacaStablecoinActions is Common {
         adjustPosition(manager, cdp, -toInt(wad), 0);
         // Moves the amount from the CDP positionAddress to proxy's address
         moveCollateral(manager, cdp, address(this), wad);
-        // Exits token amount to the user's wallet as a token
+        // Withdraws token amount to the user's wallet as a token
         CollateralTokenAdapterLike(collateralTokenAdapter).withdraw(msg.sender, amt);
     }
 
@@ -450,7 +445,7 @@ contract AlpacaStablecoinActions is Common {
         // Moves the amount from the CDP positionAddress to proxy's address
         moveCollateral(manager, cdp, address(this), wad);
 
-        // Exits WBNB amount to proxy address as a token
+        // Withdraws WBNB amount to proxy address as a token
         CollateralTokenAdapterLike(bnbAdapter).withdraw(address(this), wad);
         // Converts WBNB to BNB
         CollateralTokenAdapterLike(bnbAdapter).collateralToken().withdraw(wad);
@@ -467,14 +462,14 @@ contract AlpacaStablecoinActions is Common {
         // Moves the amount from the CDP positionAddress to proxy's address
         moveCollateral(manager, cdp, address(this), convertTo18(collateralTokenAdapter, amt));
 
-        // Exits token amount to the user's wallet as a token
+        // Withdraws token amount to the user's wallet as a token
         CollateralTokenAdapterLike(collateralTokenAdapter).withdraw(msg.sender, amt);
     }
 
     function draw(
         address manager,
         address stabilityFeeCollector,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         uint cdp,
         uint wad
     ) public {
@@ -482,20 +477,20 @@ contract AlpacaStablecoinActions is Common {
         address government = ManagerLike(manager).government();
         bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
         // Generates debt in the CDP
-        adjustPosition(manager, cdp, 0, _getDrawDart(government, stabilityFeeCollector, positionAddress, collateralPoolId, wad));
-        // Moves the DAI amount (balance in the government in rad) to proxy's address
+        adjustPosition(manager, cdp, 0, _getDrawDebtShare(government, stabilityFeeCollector, positionAddress, collateralPoolId, wad));
+        // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
         moveStablecoin(manager, cdp, address(this), toRad(wad));
-        // Allows adapter to access to proxy's DAI balance in the government
-        if (GovernmentLike(government).can(address(this), address(stablecoinJoin)) == 0) {
-            GovernmentLike(government).hope(stablecoinJoin);
+        // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
+        if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
+            GovernmentLike(government).hope(stablecoinAdapter);
         }
-        // Exits DAI to the user's wallet as a token
-        StablecoinAdapterLike(stablecoinJoin).withdraw(msg.sender, wad);
+        // Withdraws Alpaca Stablecoin to the user's wallet as a token
+        StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wad);
     }
 
     function wipe(
         address manager,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         uint cdp,
         uint wad
     ) public {
@@ -505,13 +500,13 @@ contract AlpacaStablecoinActions is Common {
 
         address own = ManagerLike(manager).owns(cdp);
         if (own == address(this) || ManagerLike(manager).cdpCan(own, cdp, address(this)) == 1) {
-            // Joins DAI amount into the government
-            stablecoinJoin_deposit(stablecoinJoin, positionAddress, wad);
+            // Deposits Alpaca Stablecoin amount into the government
+            stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, wad);
             // Paybacks debt to the CDP
-            adjustPosition(manager, cdp, 0, _getWipeDart(government, GovernmentLike(government).stablecoin(positionAddress), positionAddress, collateralPoolId));
+            adjustPosition(manager, cdp, 0, _getWipeDebtShare(government, GovernmentLike(government).stablecoin(positionAddress), positionAddress, collateralPoolId));
         } else {
-             // Joins DAI amount into the government
-            stablecoinJoin_deposit(stablecoinJoin, address(this), wad);
+             // Deposits Alpaca Stablecoin amount into the government
+            stablecoinAdapter_deposit(stablecoinAdapter, address(this), wad);
             // Paybacks debt to the CDP
             GovernmentLike(government).adjustPosition(
                 collateralPoolId,
@@ -519,41 +514,41 @@ contract AlpacaStablecoinActions is Common {
                 address(this),
                 address(this),
                 0,
-                _getWipeDart(government, wad * RAY, positionAddress, collateralPoolId)
+                _getWipeDebtShare(government, wad * RAY, positionAddress, collateralPoolId)
             );
         }
     }
 
     function safeWipe(
         address manager,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         uint cdp,
         uint wad,
         address owner
     ) public {
         require(ManagerLike(manager).owns(cdp) == owner, "owner-missmatch");
-        wipe(manager, stablecoinJoin, cdp, wad);
+        wipe(manager, stablecoinAdapter, cdp, wad);
     }
 
     function wipeAll(
         address manager,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         uint cdp
     ) public {
         address government = ManagerLike(manager).government();
         address positionAddress = ManagerLike(manager).positions(cdp);
         bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-        (, uint art) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+        (, uint debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
 
         address own = ManagerLike(manager).owns(cdp);
         if (own == address(this) || ManagerLike(manager).cdpCan(own, cdp, address(this)) == 1) {
-            // Joins DAI amount into the government
-            stablecoinJoin_deposit(stablecoinJoin, positionAddress, _getWipeAllWad(government, positionAddress, positionAddress, collateralPoolId));
+            // Deposits Alpaca Stablecoin amount into the government
+            stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, _getWipeAllWad(government, positionAddress, positionAddress, collateralPoolId));
             // Paybacks debt to the CDP
-            adjustPosition(manager, cdp, 0, -int(art));
+            adjustPosition(manager, cdp, 0, -int(debtShare));
         } else {
-            // Joins DAI amount into the government
-            stablecoinJoin_deposit(stablecoinJoin, address(this), _getWipeAllWad(government, address(this), positionAddress, collateralPoolId));
+            // Deposits Alpaca Stablecoin amount into the government
+            stablecoinAdapter_deposit(stablecoinAdapter, address(this), _getWipeAllWad(government, address(this), positionAddress, collateralPoolId));
             // Paybacks debt to the CDP
             GovernmentLike(government).adjustPosition(
                 collateralPoolId,
@@ -561,26 +556,26 @@ contract AlpacaStablecoinActions is Common {
                 address(this),
                 address(this),
                 0,
-                -int(art)
+                -int(debtShare)
             );
         }
     }
 
     function safeWipeAll(
         address manager,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         uint cdp,
         address owner
     ) public {
         require(ManagerLike(manager).owns(cdp) == owner, "owner-missmatch");
-        wipeAll(manager, stablecoinJoin, cdp);
+        wipeAll(manager, stablecoinAdapter, cdp);
     }
 
     function lockBNBAndDraw(
         address manager,
         address stabilityFeeCollector,
         address bnbAdapter,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         uint cdp,
         uint wadD
     ) public payable {
@@ -590,34 +585,34 @@ contract AlpacaStablecoinActions is Common {
         // Receives BNB amount, converts it to WBNB and joins it into the government
         bnbAdapter_deposit(bnbAdapter, positionAddress);
         // Locks WBNB amount into the CDP and generates debt
-        adjustPosition(manager, cdp, toInt(msg.value), _getDrawDart(government, stabilityFeeCollector, positionAddress, collateralPoolId, wadD));
-        // Moves the DAI amount (balance in the government in rad) to proxy's address
+        adjustPosition(manager, cdp, toInt(msg.value), _getDrawDebtShare(government, stabilityFeeCollector, positionAddress, collateralPoolId, wadD));
+        // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
         moveStablecoin(manager, cdp, address(this), toRad(wadD));
-        // Allows adapter to access to proxy's DAI balance in the government
-        if (GovernmentLike(government).can(address(this), address(stablecoinJoin)) == 0) {
-            GovernmentLike(government).hope(stablecoinJoin);
+        // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
+        if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
+            GovernmentLike(government).hope(stablecoinAdapter);
         }
-        // Exits DAI to the user's wallet as a token
-        StablecoinAdapterLike(stablecoinJoin).withdraw(msg.sender, wadD);
+        // Withdraws Alpaca Stablecoin to the user's wallet as a token
+        StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
     }
 
     function openLockBNBAndDraw(
         address manager,
         address stabilityFeeCollector,
         address bnbAdapter,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         bytes32 collateralPoolId,
         uint wadD
     ) public payable returns (uint cdp) {
         cdp = open(manager, collateralPoolId, address(this));
-        lockBNBAndDraw(manager, stabilityFeeCollector, bnbAdapter, stablecoinJoin, cdp, wadD);
+        lockBNBAndDraw(manager, stabilityFeeCollector, bnbAdapter, stablecoinAdapter, cdp, wadD);
     }
 
     function lockTokenAndDraw(
         address manager,
         address stabilityFeeCollector,
         address collateralTokenAdapter,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         uint cdp,
         uint amtC,
         uint wadD,
@@ -629,52 +624,52 @@ contract AlpacaStablecoinActions is Common {
         // Takes token amount from user's wallet and joins into the government
         collateralTokenAdapter_deposit(collateralTokenAdapter, positionAddress, amtC, transferFrom);
         // Locks token amount into the CDP and generates debt
-        adjustPosition(manager, cdp, toInt(convertTo18(collateralTokenAdapter, amtC)), _getDrawDart(government, stabilityFeeCollector, positionAddress, collateralPoolId, wadD));
-        // Moves the DAI amount (balance in the government in rad) to proxy's address
+        adjustPosition(manager, cdp, toInt(convertTo18(collateralTokenAdapter, amtC)), _getDrawDebtShare(government, stabilityFeeCollector, positionAddress, collateralPoolId, wadD));
+        // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
         moveStablecoin(manager, cdp, address(this), toRad(wadD));
-        // Allows adapter to access to proxy's DAI balance in the government
-        if (GovernmentLike(government).can(address(this), address(stablecoinJoin)) == 0) {
-            GovernmentLike(government).hope(stablecoinJoin);
+        // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
+        if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
+            GovernmentLike(government).hope(stablecoinAdapter);
         }
-        // Exits DAI to the user's wallet as a token
-        StablecoinAdapterLike(stablecoinJoin).withdraw(msg.sender, wadD);
+        // Withdraws Alpaca Stablecoin to the user's wallet as a token
+        StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
     }
 
     function openLockTokenAndDraw(
         address manager,
         address stabilityFeeCollector,
         address collateralTokenAdapter,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         bytes32 collateralPoolId,
         uint amtC,
         uint wadD,
         bool transferFrom
     ) public returns (uint cdp) {
         cdp = open(manager, collateralPoolId, address(this));
-        lockTokenAndDraw(manager, stabilityFeeCollector, collateralTokenAdapter, stablecoinJoin, cdp, amtC, wadD, transferFrom);
+        lockTokenAndDraw(manager, stabilityFeeCollector, collateralTokenAdapter, stablecoinAdapter, cdp, amtC, wadD, transferFrom);
     }
 
     function wipeAndFreeBNB(
         address manager,
         address bnbAdapter,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         uint cdp,
         uint wadC,
         uint wadD
     ) public {
         address positionAddress = ManagerLike(manager).positions(cdp);
-        // Joins DAI amount into the government
-        stablecoinJoin_deposit(stablecoinJoin, positionAddress, wadD);
+        // Deposits Alpaca Stablecoin amount into the government
+        stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, wadD);
         // Paybacks debt to the CDP and unlocks WBNB amount from it
         adjustPosition(
             manager,
             cdp,
             -toInt(wadC),
-            _getWipeDart(ManagerLike(manager).government(), GovernmentLike(ManagerLike(manager).government()).stablecoin(positionAddress), positionAddress, ManagerLike(manager).collateralPools(cdp))
+            _getWipeDebtShare(ManagerLike(manager).government(), GovernmentLike(ManagerLike(manager).government()).stablecoin(positionAddress), positionAddress, ManagerLike(manager).collateralPools(cdp))
         );
         // Moves the amount from the CDP positionAddress to proxy's address
         moveCollateral(manager, cdp, address(this), wadC);
-        // Exits WBNB amount to proxy address as a token
+        // Withdraws WBNB amount to proxy address as a token
         CollateralTokenAdapterLike(bnbAdapter).withdraw(address(this), wadC);
         // Converts WBNB to BNB
         CollateralTokenAdapterLike(bnbAdapter).collateralToken().withdraw(wadC);
@@ -685,27 +680,27 @@ contract AlpacaStablecoinActions is Common {
     function wipeAllAndFreeBNB(
         address manager,
         address bnbAdapter,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         uint cdp,
         uint wadC
     ) public {
         address government = ManagerLike(manager).government();
         address positionAddress = ManagerLike(manager).positions(cdp);
         bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-        (, uint art) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+        (, uint debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
 
-        // Joins DAI amount into the government
-        stablecoinJoin_deposit(stablecoinJoin, positionAddress, _getWipeAllWad(government, positionAddress, positionAddress, collateralPoolId));
+        // Deposits Alpaca Stablecoin amount into the government
+        stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, _getWipeAllWad(government, positionAddress, positionAddress, collateralPoolId));
         // Paybacks debt to the CDP and unlocks WBNB amount from it
         adjustPosition(
             manager,
             cdp,
             -toInt(wadC),
-            -int(art)
+            -int(debtShare)
         );
         // Moves the amount from the CDP positionAddress to proxy's address
         moveCollateral(manager, cdp, address(this), wadC);
-        // Exits WBNB amount to proxy address as a token
+        // Withdraws WBNB amount to proxy address as a token
         CollateralTokenAdapterLike(bnbAdapter).withdraw(address(this), wadC);
         // Converts WBNB to BNB
         CollateralTokenAdapterLike(bnbAdapter).collateralToken().withdraw(wadC);
@@ -716,53 +711,53 @@ contract AlpacaStablecoinActions is Common {
     function wipeAndFreeToken(
         address manager,
         address collateralTokenAdapter,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         uint cdp,
         uint amtC,
         uint wadD
     ) public {
         address positionAddress = ManagerLike(manager).positions(cdp);
-        // Joins DAI amount into the government
-        stablecoinJoin_deposit(stablecoinJoin, positionAddress, wadD);
+        // Deposits Alpaca Stablecoin amount into the government
+        stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, wadD);
         uint wadC = convertTo18(collateralTokenAdapter, amtC);
         // Paybacks debt to the CDP and unlocks token amount from it
         adjustPosition(
             manager,
             cdp,
             -toInt(wadC),
-            _getWipeDart(ManagerLike(manager).government(), GovernmentLike(ManagerLike(manager).government()).stablecoin(positionAddress), positionAddress, ManagerLike(manager).collateralPools(cdp))
+            _getWipeDebtShare(ManagerLike(manager).government(), GovernmentLike(ManagerLike(manager).government()).stablecoin(positionAddress), positionAddress, ManagerLike(manager).collateralPools(cdp))
         );
         // Moves the amount from the CDP positionAddress to proxy's address
         moveCollateral(manager, cdp, address(this), wadC);
-        // Exits token amount to the user's wallet as a token
+        // Withdraws token amount to the user's wallet as a token
         CollateralTokenAdapterLike(collateralTokenAdapter).withdraw(msg.sender, amtC);
     }
 
     function wipeAllAndFreeToken(
         address manager,
         address collateralTokenAdapter,
-        address stablecoinJoin,
+        address stablecoinAdapter,
         uint cdp,
         uint amtC
     ) public {
         address government = ManagerLike(manager).government();
         address positionAddress = ManagerLike(manager).positions(cdp);
         bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-        (, uint art) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+        (, uint debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
 
-        // Joins DAI amount into the government
-        stablecoinJoin_deposit(stablecoinJoin, positionAddress, _getWipeAllWad(government, positionAddress, positionAddress, collateralPoolId));
+        // Deposits Alpaca Stablecoin amount into the government
+        stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, _getWipeAllWad(government, positionAddress, positionAddress, collateralPoolId));
         uint wadC = convertTo18(collateralTokenAdapter, amtC);
         // Paybacks debt to the CDP and unlocks token amount from it
         adjustPosition(
             manager,
             cdp,
             -toInt(wadC),
-            -int(art)
+            -int(debtShare)
         );
         // Moves the amount from the CDP positionAddress to proxy's address
         moveCollateral(manager, cdp, address(this), wadC);
-        // Exits token amount to the user's wallet as a token
+        // Withdraws token amount to the user's wallet as a token
         CollateralTokenAdapterLike(collateralTokenAdapter).withdraw(msg.sender, amtC);
     }
 }
