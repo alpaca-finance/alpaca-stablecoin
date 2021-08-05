@@ -38,7 +38,7 @@ contract FarmableCollateralAdapter {
     uint256 live;
 
     GovernmentLike     public immutable government;    // cdp engine
-    bytes32     public immutable collateralPool;    // collateral type
+    bytes32     public immutable collateralPoolId;    // collateral type
     ERC20       public immutable collateralToken;    // collateral token
     uint256     public immutable decimals;    // collateralToken decimals
     ERC20       public immutable rewardToken;  // rewhitelist token
@@ -64,9 +64,9 @@ contract FarmableCollateralAdapter {
         _;
     }
 
-    constructor(address government_, bytes32 collateralPool_, address collateralToken_, address rewardToken_) public {
+    constructor(address government_, bytes32 collateralPoolId_, address collateralToken_, address rewardToken_) public {
         government = GovernmentLike(government_);
-        collateralPool = collateralPool_;
+        collateralPoolId = collateralPoolId_;
         collateralToken = ERC20(collateralToken_);
         uint256 decimals_ = ERC20(collateralToken_).decimals();
         require(decimals_ <= 18);
@@ -146,7 +146,7 @@ contract FarmableCollateralAdapter {
             require(int256(wad) > 0);
 
             require(collateralToken.transferFrom(msg.sender, address(this), val));
-            government.addCollateral(collateralPool, positionAddress, int256(wad));
+            government.addCollateral(collateralPoolId, positionAddress, int256(wad));
 
             totalShare = add(totalShare, wad);
             stake[positionAddress] = add(stake[positionAddress], wad);
@@ -165,7 +165,7 @@ contract FarmableCollateralAdapter {
             require(int256(wad) > 0);
 
             require(collateralToken.transfer(usr, val));
-            government.addCollateral(collateralPool, positionAddress, -int256(wad));
+            government.addCollateral(collateralPoolId, positionAddress, -int256(wad));
 
             totalShare = sub(totalShare, wad);
             stake[positionAddress] = sub(stake[positionAddress], wad);
@@ -175,12 +175,12 @@ contract FarmableCollateralAdapter {
     }
 
     function emergencyWithdraw(address positionAddress, address usr) public auth virtual {
-        uint256 wad = government.collateralToken(collateralPool, positionAddress);
+        uint256 wad = government.collateralToken(collateralPoolId, positionAddress);
         require(wad <= 2 ** 255);
         uint256 val = wmul(wmul(wad, nps()), toCollateralTokenConversionFactor);
 
         require(collateralToken.transfer(usr, val));
-        government.addCollateral(collateralPool, positionAddress, -int256(wad));
+        government.addCollateral(collateralPoolId, positionAddress, -int256(wad));
 
         totalShare = sub(totalShare, wad);
         stake[positionAddress] = sub(stake[positionAddress], wad);
@@ -201,10 +201,10 @@ contract FarmableCollateralAdapter {
         rewards[src] = cs - drewards;
         rewards[dst] = add(rewards[dst], drewards);
 
-        (uint256 lockedCollateral,) = government.positions(collateralPool, src);
-        require(stake[src] >= add(government.collateralToken(collateralPool, src), lockedCollateral));
-        (lockedCollateral,) = government.positions(collateralPool, dst);
-        require(stake[dst] <= add(government.collateralToken(collateralPool, dst), lockedCollateral));
+        (uint256 lockedCollateral,) = government.positions(collateralPoolId, src);
+        require(stake[src] >= add(government.collateralToken(collateralPoolId, src), lockedCollateral));
+        (lockedCollateral,) = government.positions(collateralPoolId, dst);
+        require(stake[dst] <= add(government.collateralToken(collateralPoolId, dst), lockedCollateral));
 
         emit MoveRewards(src, dst, wad);
     }
