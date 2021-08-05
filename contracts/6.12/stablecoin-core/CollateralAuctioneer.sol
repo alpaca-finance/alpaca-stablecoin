@@ -20,8 +20,8 @@
 pragma solidity >=0.6.12;
 
 interface GovernmentLike {
-    function move(address,address,uint256) external;
-    function flux(bytes32,address,address,uint256) external;
+    function moveStablecoin(address,address,uint256) external;
+    function moveCollateral(bytes32,address,address,uint256) external;
     function collateralPools(bytes32) external returns (uint256, uint256, uint256, uint256, uint256);
     function suck(address,address,uint256) external;
 }
@@ -385,7 +385,7 @@ contract CollateralAuctioneer {
             collateralAmount = collateralAmount - slice;
 
             // Send collateral to who
-            government.flux(collateralPoolId, address(this), who, slice);
+            government.moveCollateral(collateralPoolId, address(this), who, slice);
 
             // Do external call (if data is defined) but to be
             // extremely careful we don't allow to do it to the two
@@ -396,7 +396,7 @@ contract CollateralAuctioneer {
             }
 
             // Get DAI from caller
-            government.move(msg.sender, systemAuctionHouse, owe);
+            government.moveStablecoin(msg.sender, systemAuctionHouse, owe);
 
             // Removes Dai out for liquidation from accumulator
             liquidationEngine_.digs(collateralPoolId, collateralAmount == 0 ? debt + owe : owe);
@@ -405,7 +405,7 @@ contract CollateralAuctioneer {
         if (collateralAmount == 0) {
             _remove(id);
         } else if (debt == 0) {
-            government.flux(collateralPoolId, address(this), positionAddress, collateralAmount);
+            government.moveCollateral(collateralPoolId, address(this), positionAddress, collateralAmount);
             _remove(id);
         } else {
             sales[id].debt = debt;
@@ -466,7 +466,7 @@ contract CollateralAuctioneer {
     function yank(uint256 id) external auth lock {
         require(sales[id].positionAddress != address(0), "CollateralAuctioneer/not-running-auction");
         liquidationEngine.digs(collateralPoolId, sales[id].debt);
-        government.flux(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
+        government.moveCollateral(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
         _remove(id);
         emit Yank(id);
     }

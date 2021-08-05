@@ -24,7 +24,7 @@ pragma solidity >=0.5.12;
 // New deployments of this contract will need to include custom events (TO DO).
 
 interface GovernmentLike {
-    function move(address,address,uint) external;
+    function moveStablecoin(address,address,uint) external;
 }
 interface CollateralTokenLike {
     function move(address,address,uint) external;
@@ -114,7 +114,7 @@ contract SurplusAuctioneer {
         bids[id].bidder = msg.sender;  // configurable??
         bids[id].auctionExpiry = add(uint48(now), auctionLength);
 
-        government.move(msg.sender, address(this), lot);
+        government.moveStablecoin(msg.sender, address(this), lot);
 
         emit Kick(id, lot, bid);
     }
@@ -145,14 +145,14 @@ contract SurplusAuctioneer {
     function deal(uint id) external {
         require(live == 1, "SurplusAuctioneer/not-live");
         require(bids[id].bidExpiry != 0 && (bids[id].bidExpiry < now || bids[id].auctionExpiry < now), "SurplusAuctioneer/not-finished");
-        government.move(address(this), bids[id].bidder, bids[id].lot);
+        government.moveStablecoin(address(this), bids[id].bidder, bids[id].lot);
         alpaca.burn(address(this), bids[id].bid);
         delete bids[id];
     }
 
     function cage(uint rad) external auth {
        live = 0;
-       government.move(address(this), msg.sender, rad);
+       government.moveStablecoin(address(this), msg.sender, rad);
     }
     function yank(uint id) external {
         require(live == 0, "SurplusAuctioneer/still-live");

@@ -118,15 +118,15 @@ contract Government {
     }
 
     // --- Fungibility ---
-    function slip(bytes32 collateralPoolId, address usr, int256 wad) external auth {
+    function addCollateral(bytes32 collateralPoolId, address usr, int256 wad) external auth {
         collateralToken[collateralPoolId][usr] = add(collateralToken[collateralPoolId][usr], wad);
     }
-    function flux(bytes32 collateralPoolId, address src, address dst, uint256 wad) external {
+    function moveCollateral(bytes32 collateralPoolId, address src, address dst, uint256 wad) external {
         require(wish(src, msg.sender), "Government/not-allowed");
         collateralToken[collateralPoolId][src] = sub(collateralToken[collateralPoolId][src], wad);
         collateralToken[collateralPoolId][dst] = add(collateralToken[collateralPoolId][dst], wad);
     }
-    function move(address src, address dst, uint256 rad) external {
+    function moveStablecoin(address src, address dst, uint256 rad) external {
         require(wish(src, msg.sender), "Government/not-allowed");
         stablecoin[src] = sub(stablecoin[src], rad);
         stablecoin[dst] = add(stablecoin[dst], rad);

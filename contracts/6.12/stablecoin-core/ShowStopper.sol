@@ -35,9 +35,9 @@ interface GovernmentLike {
         uint256 debtShare    // [wad]
     );
     function debt() external returns (uint256);
-    function move(address src, address dst, uint256 rad) external;
+    function moveStablecoin(address src, address dst, uint256 rad) external;
     function hope(address) external;
-    function flux(bytes32 collateralPoolId, address src, address dst, uint256 rad) external;
+    function moveCollateral(bytes32 collateralPoolId, address src, address dst, uint256 rad) external;
     function grab(bytes32 i, address u, address v, address w, int256 dink, int256 dart) external;
     function suck(address u, address v, uint256 rad) external;
     function cage() external;
@@ -381,13 +381,13 @@ contract ShowStopper {
 
     function pack(uint256 wad) external {
         require(debt != 0, "End/debt-zero");
-        government.move(msg.sender, address(systemAuctionHouse), mul(wad, RAY));
+        government.moveStablecoin(msg.sender, address(systemAuctionHouse), mul(wad, RAY));
         bag[msg.sender] = add(bag[msg.sender], wad);
         emit Pack(msg.sender, wad);
     }
     function cash(bytes32 collateralPoolId, uint256 wad) external {
         require(finalCashPrice[collateralPoolId] != 0, "End/finalCashPrice-collateralPoolId-not-defined");
-        government.flux(collateralPoolId, address(this), msg.sender, rmul(wad, finalCashPrice[collateralPoolId]));
+        government.moveCollateral(collateralPoolId, address(this), msg.sender, rmul(wad, finalCashPrice[collateralPoolId]));
         out[collateralPoolId][msg.sender] = add(out[collateralPoolId][msg.sender], wad);
         require(out[collateralPoolId][msg.sender] <= bag[msg.sender], "End/insufficient-bag-balance");
         emit Cash(collateralPoolId, msg.sender, wad);

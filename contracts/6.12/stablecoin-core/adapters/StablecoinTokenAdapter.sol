@@ -35,8 +35,8 @@ interface StablecoinLike {
 }
 
 interface GovernmentLike {
-    function slip(bytes32,address,int) external;
-    function move(address,address,uint) external;
+    function addCollateral(bytes32,address,int) external;
+    function moveStablecoin(address,address,uint) external;
 }
 
 /*
@@ -91,12 +91,12 @@ contract StablecoinAdapter {
         require(y == 0 || (z = x * y) / y == x);
     }
     function deposit(address usr, uint wad) external {
-        government.move(address(this), usr, mul(ONE, wad));
+        government.moveStablecoin(address(this), usr, mul(ONE, wad));
         stablecoin.burn(msg.sender, wad);
     }
     function withdraw(address usr, uint wad) external {
         require(live == 1, "StablecoinAdapter/not-live");
-        government.move(msg.sender, address(this), mul(ONE, wad));
+        government.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
         stablecoin.mint(usr, wad);
     }
 }

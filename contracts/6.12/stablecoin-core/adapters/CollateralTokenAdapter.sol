@@ -35,8 +35,8 @@ interface StablecoinLike {
 }
 
 interface GovernmentLike {
-    function slip(bytes32,address,int) external;
-    function move(address,address,uint) external;
+    function addCollateral(bytes32,address,int) external;
+    function moveStablecoin(address,address,uint) external;
 }
 
 /*
@@ -93,12 +93,12 @@ contract CollateralTokenAdapter {
     function deposit(address usr, uint wad) external {
         require(live == 1, "CollateralTokenAdapter/not-live");
         require(int(wad) >= 0, "CollateralTokenAdapter/overflow");
-        government.slip(collateralPool, usr, int(wad));
+        government.addCollateral(collateralPool, usr, int(wad));
         require(collateralToken.transferFrom(msg.sender, address(this), wad), "CollateralTokenAdapter/failed-transfer");
     }
     function withdraw(address usr, uint wad) external {
         require(wad <= 2 ** 255, "CollateralTokenAdapter/overflow");
-        government.slip(collateralPool, msg.sender, -int(wad));
+        government.addCollateral(collateralPool, msg.sender, -int(wad));
         require(collateralToken.transfer(usr, wad), "CollateralTokenAdapter/failed-transfer");
     }
 }

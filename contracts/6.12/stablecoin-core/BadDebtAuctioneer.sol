@@ -24,7 +24,7 @@ pragma solidity >=0.5.12;
 // New deployments of this contract will need to include custom events (TO DO).
 
 interface GovernmentLike {
-    function move(address,address,uint) external;
+    function moveStablecoin(address,address,uint) external;
     function suck(address,address,uint) external;
 }
 interface CollateralTokenLike {
@@ -145,7 +145,7 @@ contract BadDebtAuctioneer {
         require(mul(minimumBidIncrease, lot) <= mul(bids[id].lot, ONE), "BadDebtAuctioneer/insufficient-decrease");
 
         if (msg.sender != bids[id].bidder) {
-            government.move(msg.sender, bids[id].bidder, bid);
+            government.moveStablecoin(msg.sender, bids[id].bidder, bid);
 
             // on first dent, clear as much totalBadDebtInAuction as possible
             if (bids[id].bidExpiry == 0) {

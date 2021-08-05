@@ -43,7 +43,7 @@ pragma solidity >=0.5.12;
 */
 
 interface GovernmentLike {
-    function move(address,address,uint256) external;
+    function moveStablecoin(address,address,uint256) external;
     function suck(address,address,uint256) external;
 }
 
@@ -155,12 +155,12 @@ contract StablecoinSavings {
         require(now == lastAccumulationTime, "StablecoinSavings/lastAccumulationTime-not-updated");
         share[msg.sender] = add(share[msg.sender], shareAmount);
         totalShare             = add(totalShare,             shareAmount);
-        government.move(msg.sender, address(this), mul(sharePrice, shareAmount));
+        government.moveStablecoin(msg.sender, address(this), mul(sharePrice, shareAmount));
     }
 
     function exit(uint shareAmount) external {
         share[msg.sender] = sub(share[msg.sender], shareAmount);
         totalShare             = sub(totalShare,             shareAmount);
-        government.move(address(this), msg.sender, mul(sharePrice, shareAmount));
+        government.moveStablecoin(address(this), msg.sender, mul(sharePrice, shareAmount));
     }
 }
