@@ -220,7 +220,7 @@ contract Government {
     }
 
     // --- Settlement ---
-    function settleSystemDebt(uint rad) external {
+    function settleSystemBadDebt(uint rad) external {
         address u = msg.sender;
         systemBadDebt[u] = sub(systemBadDebt[u], rad);
         stablecoin[u] = sub(stablecoin[u], rad);
@@ -235,7 +235,7 @@ contract Government {
     }
 
     // --- Rates ---
-    function accrue(bytes32 collateralPoolId, address u, int debtAccumulatedRate) external auth {
+    function accrueStabilityFee(bytes32 collateralPoolId, address u, int debtAccumulatedRate) external auth {
         require(live == 1, "Government/not-live");
         CollateralPool storage collateralPool = collateralPools[collateralPoolId];
         collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);

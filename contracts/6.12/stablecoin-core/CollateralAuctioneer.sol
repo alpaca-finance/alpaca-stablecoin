@@ -23,7 +23,7 @@ interface GovernmentLike {
     function moveStablecoin(address,address,uint256) external;
     function moveCollateral(bytes32,address,address,uint256) external;
     function collateralPools(bytes32) external returns (uint256, uint256, uint256, uint256, uint256);
-    function suck(address,address,uint256) external;
+    function mintUnbackedStablecoin(address,address,uint256) external;
 }
 
 interface PriceFeedLike {
@@ -259,7 +259,7 @@ contract CollateralAuctioneer {
         uint256 prize;
         if (_liquidatorTip > 0 || _liquidatorBountyRate > 0) {
             prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-            government.suck(systemAuctionHouse, liquidatorAddress, prize);
+            government.mintUnbackedStablecoin(systemAuctionHouse, liquidatorAddress, prize);
         }
 
         emit Kick(id, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize);
@@ -300,7 +300,7 @@ contract CollateralAuctioneer {
             uint256 _minimumRemainingDebt = minimumRemainingDebt;
             if (debt >= _minimumRemainingDebt && mul(collateralAmount, feedPrice) >= _minimumRemainingDebt) {
                 prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-                government.suck(systemAuctionHouse, liquidatorAddress, prize);
+                government.mintUnbackedStablecoin(systemAuctionHouse, liquidatorAddress, prize);
             }
         }
 

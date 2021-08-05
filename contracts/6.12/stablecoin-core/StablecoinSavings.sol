@@ -44,7 +44,7 @@ pragma solidity >=0.5.12;
 
 interface GovernmentLike {
     function moveStablecoin(address,address,uint256) external;
-    function suck(address,address,uint256) external;
+    function mintUnbackedStablecoin(address,address,uint256) external;
 }
 
 contract StablecoinSavings {
@@ -147,7 +147,7 @@ contract StablecoinSavings {
         uint sharePrice_ = sub(tmp, sharePrice);
         sharePrice = tmp;
         lastAccumulationTime = now;
-        government.suck(address(debtEngine), address(this), mul(totalShare, sharePrice_));
+        government.mintUnbackedStablecoin(address(debtEngine), address(this), mul(totalShare, sharePrice_));
     }
 
     // --- Savings Dai Management ---

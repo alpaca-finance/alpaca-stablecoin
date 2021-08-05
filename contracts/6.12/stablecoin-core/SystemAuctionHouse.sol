@@ -38,7 +38,7 @@ interface SurplusAuctioneerLike {
 interface GovernmentLike {
     function dai (address) external view returns (uint);
     function systemBadDebt (address) external view returns (uint);
-    function heal(uint256) external;
+    function settleSystemBadDebt(uint256) external;
     function hope(address) external;
     function nope(address) external;
 }
@@ -125,16 +125,16 @@ contract SystemAuctionHouse {
     }
 
     // Debt settlement
-    function heal(uint rad) external {
+    function settleSystemBadDebt(uint rad) external {
         require(rad <= government.dai(address(this)), "SystemAuctionHouse/insufficient-surplus");
         require(rad <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "SystemAuctionHouse/insufficient-debt");
-        government.heal(rad);
+        government.settleSystemBadDebt(rad);
     }
     function kiss(uint rad) external {
         require(rad <= totalBadDebtInAuction, "SystemAuctionHouse/not-enough-ash");
         require(rad <= government.dai(address(this)), "SystemAuctionHouse/insufficient-surplus");
         totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
-        government.heal(rad);
+        government.settleSystemBadDebt(rad);
     }
 
     // Debt auction
@@ -158,6 +158,6 @@ contract SystemAuctionHouse {
         totalBadDebtInAuction = 0;
         surplusAuctionHouse.cage(government.dai(address(surplusAuctionHouse)));
         badDebtAuctionHouse.cage();
-        government.heal(min(government.dai(address(this)), government.systemBadDebt(address(this))));
+        government.settleSystemBadDebt(min(government.dai(address(this)), government.systemBadDebt(address(this))));
     }
 }

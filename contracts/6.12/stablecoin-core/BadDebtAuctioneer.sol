@@ -25,7 +25,7 @@ pragma solidity >=0.5.12;
 
 interface GovernmentLike {
     function moveStablecoin(address,address,uint) external;
-    function suck(address,address,uint) external;
+    function mintUnbackedStablecoin(address,address,uint) external;
 }
 interface CollateralTokenLike {
     function mint(address,uint) external;
@@ -174,7 +174,7 @@ contract BadDebtAuctioneer {
     function yank(uint id) external {
         require(live == 0, "BadDebtAuctioneer/still-live");
         require(bids[id].bidder != address(0), "BadDebtAuctioneer/bidder-not-set");
-        government.suck(debtEngine, bids[id].bidder, bids[id].bid);
+        government.mintUnbackedStablecoin(debtEngine, bids[id].bidder, bids[id].bid);
         delete bids[id];
     }
 }

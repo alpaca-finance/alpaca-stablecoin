@@ -39,7 +39,7 @@ interface GovernmentLike {
     function hope(address) external;
     function moveCollateral(bytes32 collateralPoolId, address src, address dst, uint256 rad) external;
     function grab(bytes32 i, address u, address v, address w, int256 dink, int256 dart) external;
-    function suck(address u, address v, uint256 rad) external;
+    function mintUnbackedStablecoin(address u, address v, uint256 rad) external;
     function cage() external;
 }
 
@@ -328,7 +328,7 @@ contract ShowStopper {
         (, uint256 debtAccumulatedRate,,,) = government.collateralPools(collateralPoolId);
         (, uint256 tab, uint256 lot, address usr,,) = auctioneer.sales(id);
 
-        government.suck(address(systemAuctionHouse), address(systemAuctionHouse),  tab);
+        government.mintUnbackedStablecoin(address(systemAuctionHouse), address(systemAuctionHouse),  tab);
         auctioneer.yank(id);
 
         uint256 debtShare = tab / debtAccumulatedRate;

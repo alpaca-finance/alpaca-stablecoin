@@ -28,7 +28,7 @@ interface GovernmentLike {
         uint256 Art,   // [wad]
         uint256 rate   // [ray]
     );
-    function fold(bytes32,address,int) external;
+    function accrueStabilityFee(bytes32,address,int) external;
 }
 
 contract StabilityFeeCollector {
@@ -123,7 +123,7 @@ contract StabilityFeeCollector {
         require(now >= collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
         (, uint prev) = government.collateralPools(collateralPool);
         rate = rmul(rpow(add(globalStabilityFeeRate, collateralPools[collateralPool].stabilityFeeRate), now - collateralPools[collateralPool].lastAccumulationTime, ONE), prev);
-        government.fold(collateralPool, debtEngine, diff(rate, prev));
+        government.accrueStabilityFee(collateralPool, debtEngine, diff(rate, prev));
         collateralPools[collateralPool].lastAccumulationTime = now;
     }
 }
