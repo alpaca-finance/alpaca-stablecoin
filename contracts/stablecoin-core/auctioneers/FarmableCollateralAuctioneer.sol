@@ -17,37 +17,37 @@
 
 pragma solidity 0.6.12;
 
-interface VatLike {
-    function suck(address, address, uint256) external;
-    function move(address, address, uint256) external;
-    function flux(bytes32, address, address, uint256) external;
-    function ilks(bytes32) external view returns (uint256, uint256, uint256, uint256, uint256);
+interface GovernmentLike {
+    function moveStablecoin(address,address,uint256) external;
+    function moveCollateral(bytes32,address,address,uint256) external;
+    function collateralPools(bytes32) external returns (uint256, uint256, uint256, uint256, uint256);
+    function mintUnbackedStablecoin(address,address,uint256) external;
 }
 
-interface PipLike {
+interface PriceFeedLike {
     function peek() external returns (bytes32, bool);
 }
 
-interface SpotterLike {
-    function par() external returns (uint256);
-    function ilks(bytes32) external returns (PipLike, uint256);
+interface PriceOracleLike {
+    function stableCoinReferencePrice() external returns (uint256);
+    function collateralPools(bytes32) external returns (PriceFeedLike, uint256);
 }
 
-interface DogLike {
-    function chop(bytes32) external returns (uint256);
+interface LiquidationEngineLike {
+    function liquidationPenalty(bytes32) external returns (uint256);
     function digs(bytes32, uint256) external;
 }
 
-interface ClipperCallee {
-    function clipperCall(address, uint256, uint256, bytes calldata) external;
+interface FlashLendingCallee {
+    function flashLendingCall(address, uint256, uint256, bytes calldata) external;
 }
 
-interface AbacusLike {
+interface CalculatorLike {
     function price(uint256, uint256) external view returns (uint256);
 }
 
-interface GemJoinLike {
-    function ilk() external returns (bytes32);
+interface FarmableCollateralLike {
+    function collateralPool() external returns (bytes32);
 }
 
 interface ProxyManagerLike {
