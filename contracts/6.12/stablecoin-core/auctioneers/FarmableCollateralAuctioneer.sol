@@ -46,7 +46,7 @@ interface CalculatorLike {
     function price(uint256, uint256) external view returns (uint256);
 }
 
-interface FarmableCollateralLike {
+interface FarmableCollateralAdapterLike {
     function collateralPool() external returns (bytes32);
 }
 
@@ -73,14 +73,14 @@ contract ProxyManagerClipper {
 
     // --- Data ---
     bytes32          immutable public ilk;      // Collateral type of this ProxyManagerClipper
-    VatLike          immutable public vat;      // Core CDP Engine
-    GemJoinLike      immutable public gemJoin;  // GemJoin adapter this contract performs liquidations for
+    GovernmentLike          immutable public vat;      // Core CDP Engine
+    FarmableCollateralAdapterLike      immutable public gemJoin;  // GemJoin adapter this contract performs liquidations for
     ProxyManagerLike immutable public proxyMgr; // The proxy manager
 
-    DogLike     public dog;      // Liquidation module
+    LiquidationEngineLike     public dog;      // Liquidation module
     address     public vow;      // Recipient of dai raised in auctions
-    SpotterLike public spotter;  // Collateral price module
-    AbacusLike  public calc;     // Current price calculator
+    PriceOracleLike public spotter;  // Collateral price module
+    CalculatorLike  public calc;     // Current price calculator
 
     uint256 public buf;    // Multiplicative factor to increase starting price                  [ray]
     uint256 public tail;   // Time elapsed before auction reset                                 [seconds]
@@ -150,12 +150,12 @@ contract ProxyManagerClipper {
 
     // --- Init ---
     constructor(address vat_, address spotter_, address dog_, address gemJoin_, address proxyMgr_) public {
-        vat      = VatLike(vat_);
-        spotter  = SpotterLike(spotter_);
-        dog      = DogLike(dog_);
-        gemJoin  = GemJoinLike(gemJoin_);
+        vat      = GovernmentLike(vat_);
+        spotter  = PriceOracleLike(spotter_);
+        dog      = LiquidationEngineLike(dog_);
+        gemJoin  = FarmableCollateralAdapterLike(gemJoin_);
         proxyMgr = ProxyManagerLike(proxyMgr_);
-        ilk      = GemJoinLike(gemJoin_).ilk();
+        ilk      = FarmableCollateralAdapterLike(gemJoin_).ilk();
         buf      = RAY;
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
@@ -186,10 +186,10 @@ contract ProxyManagerClipper {
         emit File(what, data);
     }
     function file(bytes32 what, address data) external auth lock {
-        if (what == "spotter") spotter = SpotterLike(data);
-        else if (what == "dog")    dog = DogLike(data);
+        if (what == "spotter") spotter = PriceOracleLike(data);
+        else if (what == "dog")    dog = LiquidationEngineLike(data);
         else if (what == "vow")    vow = data;
-        else if (what == "calc")  calc = AbacusLike(data);
+        else if (what == "calc")  calc = CalculatorLike(data);
         else revert("ProxyManagerClipper/file-unrecognized-param");
         emit File(what, data);
     }
@@ -228,7 +228,7 @@ contract ProxyManagerClipper {
     // if mat has changed since the last poke, the resulting value will be
     // incorrect.
     function getFeedPrice() internal returns (uint256 feedPrice) {
-        (PipLike pip, ) = spotter.ilks(ilk);
+        (PriceFeedLike pip, ) = spotter.ilks(ilk);
         (bytes32 val, bool has) = pip.peek();
         require(has, "ProxyManagerClipper/invalid-price");
         feedPrice = rdiv(mul(uint256(val), BLN), spotter.par());
@@ -415,9 +415,9 @@ contract ProxyManagerClipper {
             // Do external call (if data is defined) but to be
             // extremely careful we don't allow to do it to the two
             // contracts which the ProxyManagerClipper needs to be authorized
-            DogLike dog_ = dog;
+            LiquidationEngineLike dog_ = dog;
             if (data.length > 0 && who != address(vat) && who != address(dog_)) {
-                ClipperCallee(who).clipperCall(msg.sender, owe, slice, data);
+                FlashLendingCallee(who).flashLendingCall(msg.sender, owe, slice, data);
             }
 
             // Get DAI from caller
@@ -484,7 +484,7 @@ contract ProxyManagerClipper {
 
     // Public function to update the cached dust*chop value.
     function upchost() external {
-        (,,,, uint256 _dust) = VatLike(vat).ilks(ilk);
+        (,,,, uint256 _dust) = GovernmentLike(vat).ilks(ilk);
         chost = wmul(_dust, dog.chop(ilk));
     }
 

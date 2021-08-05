@@ -76,7 +76,7 @@ contract CollateralTokenAdapter {
     GovernmentLike public government;   // CDP Engine
     bytes32 public collateralPool;   // Collateral Type
     CollateralTokenLike public collateralToken;
-    uint    public dec;
+    uint    public decimals;
     uint    public live;  // Active Flag
 
     constructor(address government_, bytes32 collateralPool_, address collateralToken_) public {
@@ -85,7 +85,7 @@ contract CollateralTokenAdapter {
         government = GovernmentLike(government_);
         collateralPool = collateralPool_;
         collateralToken = CollateralTokenLike(collateralToken_);
-        dec = collateralToken.decimals();
+        decimals = collateralToken.decimals();
     }
     function cage() external auth {
         live = 0;
