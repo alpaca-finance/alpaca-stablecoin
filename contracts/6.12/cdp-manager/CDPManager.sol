@@ -19,30 +19,28 @@
 
 pragma solidity >=0.5.12;
 
-import { LibNote } from "dss/lib.sol";
-
-interface VatLike {
-    function urns(bytes32, address) external view returns (uint, uint);
+interface GovernmentLike {
+    function positions(bytes32, address) external view returns (uint, uint);
     function hope(address) external;
-    function flux(bytes32, address, address, uint) external;
-    function move(address, address, uint) external;
-    function frob(bytes32, address, address, address, int, int) external;
-    function fork(bytes32, address, address, int, int) external;
+    function moveCollateral(bytes32, address, address, uint) external;
+    function moveStablecoin(address, address, uint) external;
+    function adjustPosition(bytes32, address, address, address, int, int) external;
+    function movePosition(bytes32, address, address, int, int) external;
 }
 
 contract UrnHandler {
-    constructor(address vat) public {
-        VatLike(vat).hope(msg.sender);
+    constructor(address government) public {
+        GovernmentLike(government).hope(msg.sender);
     }
 }
 
-contract DssCdpManager is LibNote {
-    address                   public vat;
+contract CDPManager {
+    address                   public government;
     uint                      public cdpi;      // Auto incremental
-    mapping (uint => address) public urns;      // CDPId => UrnHandler
+    mapping (uint => address) public positions;      // CDPId => UrnHandler
     mapping (uint => List)    public list;      // CDPId => Prev & Next CDPIds (double linked list)
     mapping (uint => address) public owns;      // CDPId => Owner
-    mapping (uint => bytes32) public ilks;      // CDPId => Ilk
+    mapping (uint => bytes32) public collateralPools;      // CDPId => Ilk
 
     mapping (address => uint) public first;     // Owner => First CDPId
     mapping (address => uint) public last;      // Owner => Last CDPId
@@ -60,7 +58,7 @@ contract DssCdpManager is LibNote {
         address => mapping (
             address => uint
         )
-    ) public urnCan;                            // Urn => Allowed Addr => True/False
+    ) public positionCan;                            // Urn => Allowed Addr => True/False
 
     struct List {
         uint prev;
@@ -76,15 +74,15 @@ contract DssCdpManager is LibNote {
         _;
     }
 
-    modifier urnAllowed(
-        address urn
+    modifier positionAllowed(
+        address positionAddress
     ) {
-        require(msg.sender == urn || urnCan[urn][msg.sender] == 1, "urn-not-allowed");
+        require(msg.sender == positionAddress || positionCan[positionAddress][msg.sender] == 1, "urn-not-allowed");
         _;
     }
 
-    constructor(address vat_) public {
-        vat = vat_;
+    constructor(address government_) public {
+        government = government_;
     }
 
     function add(uint x, uint y) internal pure returns (uint z) {
@@ -114,20 +112,20 @@ contract DssCdpManager is LibNote {
         address usr,
         uint ok
     ) public {
-        urnCan[msg.sender][usr] = ok;
+        positionCan[msg.sender][usr] = ok;
     }
 
     // Open a new cdp for a given usr address.
     function open(
-        bytes32 ilk,
+        bytes32 collateralPoolId,
         address usr
-    ) public note returns (uint) {
+    ) public returns (uint) {
         require(usr != address(0), "usr-address-0");
 
         cdpi = add(cdpi, 1);
-        urns[cdpi] = address(new UrnHandler(vat));
+        positions[cdpi] = address(new UrnHandler(government));
         owns[cdpi] = usr;
-        ilks[cdpi] = ilk;
+        collateralPools[cdpi] = collateralPoolId;
 
         // Add new CDP to double linked list and pointers
         if (first[usr] == 0) {
@@ -148,7 +146,7 @@ contract DssCdpManager is LibNote {
     function give(
         uint cdp,
         address dst
-    ) public note cdpAllowed(cdp) {
+    ) public cdpAllowed(cdp) {
         require(dst != address(0), "dst-address-0");
         require(dst != owns[cdp], "dst-already-owner");
 
@@ -183,40 +181,40 @@ contract DssCdpManager is LibNote {
     }
 
     // Frob the cdp keeping the generated DAI or collateral freed in the cdp urn address.
-    function frob(
+    function adjustPosition(
         uint cdp,
-        int dink,
-        int dart
-    ) public note cdpAllowed(cdp) {
-        address urn = urns[cdp];
-        VatLike(vat).frob(
-            ilks[cdp],
-            urn,
-            urn,
-            urn,
-            dink,
-            dart
+        int collateralValue,
+        int debtShare
+    ) public cdpAllowed(cdp) {
+        address positionAddress = positions[cdp];
+        GovernmentLike(government).adjustPosition(
+            collateralPools[cdp],
+            positionAddress,
+            positionAddress,
+            positionAddress,
+            collateralValue,
+            debtShare
         );
     }
 
     // Transfer wad amount of cdp collateral from the cdp address to a dst address.
-    function flux(
+    function moveCollateral(
         uint cdp,
         address dst,
         uint wad
-    ) public note cdpAllowed(cdp) {
-        VatLike(vat).flux(ilks[cdp], urns[cdp], dst, wad);
+    ) public cdpAllowed(cdp) {
+        GovernmentLike(government).moveCollateral(collateralPools[cdp], positions[cdp], dst, wad);
     }
 
-    // Transfer wad amount of any type of collateral (ilk) from the cdp address to a dst address.
+    // Transfer wad amount of any type of collateral (collateralPoolId) from the cdp address to a dst address.
     // This function has the purpose to take away collateral from the system that doesn't correspond to the cdp but was sent there wrongly.
-    function flux(
-        bytes32 ilk,
+    function moveCollateral(
+        bytes32 collateralPoolId,
         uint cdp,
         address dst,
         uint wad
-    ) public note cdpAllowed(cdp) {
-        VatLike(vat).flux(ilk, urns[cdp], dst, wad);
+    ) public cdpAllowed(cdp) {
+        GovernmentLike(government).moveCollateral(collateralPoolId, positions[cdp], dst, wad);
     }
 
     // Transfer wad amount of DAI from the cdp address to a dst address.
@@ -224,22 +222,22 @@ contract DssCdpManager is LibNote {
         uint cdp,
         address dst,
         uint rad
-    ) public note cdpAllowed(cdp) {
-        VatLike(vat).move(urns[cdp], dst, rad);
+    ) public cdpAllowed(cdp) {
+        GovernmentLike(government).moveStablecoin(positions[cdp], dst, rad);
     }
 
-    // Quit the system, migrating the cdp (ink, art) to a different dst urn
+    // Quit the system, migrating the cdp (ink, art) to a different dst positionAddress
     function quit(
         uint cdp,
         address dst
-    ) public note cdpAllowed(cdp) urnAllowed(dst) {
-        (uint ink, uint art) = VatLike(vat).urns(ilks[cdp], urns[cdp]);
-        VatLike(vat).fork(
-            ilks[cdp],
-            urns[cdp],
+    ) public cdpAllowed(cdp) positionAllowed(dst) {
+        (uint lockedCollateral, uint debtShare) = GovernmentLike(government).positions(collateralPools[cdp], positions[cdp]);
+        GovernmentLike(government).movePosition(
+            collateralPools[cdp],
+            positions[cdp],
             dst,
-            toInt(ink),
-            toInt(art)
+            toInt(lockedCollateral),
+            toInt(debtShare)
         );
     }
 
@@ -247,14 +245,14 @@ contract DssCdpManager is LibNote {
     function enter(
         address src,
         uint cdp
-    ) public note urnAllowed(src) cdpAllowed(cdp) {
-        (uint ink, uint art) = VatLike(vat).urns(ilks[cdp], src);
-        VatLike(vat).fork(
-            ilks[cdp],
+    ) public positionAllowed(src) cdpAllowed(cdp) {
+        (uint lockedCollateral, uint debtShare) = GovernmentLike(government).positions(collateralPools[cdp], src);
+        GovernmentLike(government).movePosition(
+            collateralPools[cdp],
             src,
-            urns[cdp],
-            toInt(ink),
-            toInt(art)
+            positions[cdp],
+            toInt(lockedCollateral),
+            toInt(debtShare)
         );
     }
 
@@ -262,15 +260,15 @@ contract DssCdpManager is LibNote {
     function shift(
         uint cdpSrc,
         uint cdpDst
-    ) public note cdpAllowed(cdpSrc) cdpAllowed(cdpDst) {
-        require(ilks[cdpSrc] == ilks[cdpDst], "non-matching-cdps");
-        (uint ink, uint art) = VatLike(vat).urns(ilks[cdpSrc], urns[cdpSrc]);
-        VatLike(vat).fork(
-            ilks[cdpSrc],
-            urns[cdpSrc],
-            urns[cdpDst],
-            toInt(ink),
-            toInt(art)
+    ) public cdpAllowed(cdpSrc) cdpAllowed(cdpDst) {
+        require(collateralPools[cdpSrc] == collateralPools[cdpDst], "non-matching-cdps");
+        (uint lockedCollateral, uint debtShare) = GovernmentLike(government).positions(collateralPools[cdpSrc], positions[cdpSrc]);
+        GovernmentLike(government).movePosition(
+            collateralPools[cdpSrc],
+            positions[cdpSrc],
+            positions[cdpDst],
+            toInt(lockedCollateral),
+            toInt(debtShare)
         );
     }
 }
