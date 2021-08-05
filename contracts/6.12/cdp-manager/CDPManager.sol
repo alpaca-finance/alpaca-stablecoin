@@ -28,7 +28,7 @@ interface GovernmentLike {
     function movePosition(bytes32, address, address, int, int) external;
 }
 
-contract UrnHandler {
+contract PositionHandler {
     constructor(address government) public {
         GovernmentLike(government).hope(msg.sender);
     }
@@ -37,7 +37,7 @@ contract UrnHandler {
 contract CDPManager {
     address                   public government;
     uint                      public cdpi;      // Auto incremental
-    mapping (uint => address) public positions;      // CDPId => UrnHandler
+    mapping (uint => address) public positions;      // CDPId => PositionHandler
     mapping (uint => List)    public list;      // CDPId => Prev & Next CDPIds (double linked list)
     mapping (uint => address) public owns;      // CDPId => Owner
     mapping (uint => bytes32) public collateralPools;      // CDPId => Ilk
@@ -123,7 +123,7 @@ contract CDPManager {
         require(usr != address(0), "usr-address-0");
 
         cdpi = add(cdpi, 1);
-        positions[cdpi] = address(new UrnHandler(government));
+        positions[cdpi] = address(new PositionHandler(government));
         owns[cdpi] = usr;
         collateralPools[cdpi] = collateralPoolId;
 
