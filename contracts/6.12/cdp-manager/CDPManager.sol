@@ -218,7 +218,7 @@ contract CDPManager {
     }
 
     // Transfer wad amount of DAI from the cdp address to a dst address.
-    function move(
+    function moveStablecoin(
         uint cdp,
         address dst,
         uint rad
