@@ -61,6 +61,13 @@ interface CollateralTokenAdapterLike {
     function withdraw(address, uint) external;
 }
 
+interface FarmableCollateralAdapterLike {
+    function decimals() external returns (uint);
+    function collateralToken() external returns (CollateralTokenLike);
+    function deposit(address, address, uint) external payable;
+    function withdraw(address, address, uint) external;
+}
+
 interface StablecoinAdapterLike {
     function government() external returns (GovernmentLike);
     function stablecoin() external returns (CollateralTokenLike);
@@ -188,7 +195,7 @@ contract AlpacaStablecoinActions is Common {
         // Gets actual stablecoin amount in the positionAddress
         uint stablecoin = GovernmentLike(government).stablecoin(usr);
 
-        uint rad = sub(mul(art, rate), stablecoin);
+        uint rad = sub(mul(debtShare, rate), stablecoin);
         wad = rad / RAY;
 
         // If the rad precision has some dust, it will need to request for 1 extra wad wei
@@ -220,6 +227,18 @@ contract AlpacaStablecoinActions is Common {
         }
         // Deposits token collateral into the government
         CollateralTokenAdapterLike(apt).deposit(positionAddress, amt);
+    }
+
+    function farmableCollateralAdapter_deposit(address apt, address positionAddress, uint amt, bool transferFrom) public {
+        // Only executes for tokens that have approval/transferFrom implementation
+        if (transferFrom) {
+            // Gets token from the user's wallet
+            FarmableCollateralAdapterLike(apt).collateralToken().transferFrom(msg.sender, address(this), amt);
+            // Approves adapter to take the token amount
+            FarmableCollateralAdapterLike(apt).collateralToken().approve(apt, amt);
+        }
+        // Deposits token collateral into the government
+        FarmableCollateralAdapterLike(apt).deposit(positionAddress, msg.sender, amt);
     }
 
     function hope(
@@ -391,6 +410,26 @@ contract AlpacaStablecoinActions is Common {
         );
     }
 
+    function lockFarmableCollateral(
+        address manager,
+        address farmableCollateralAdapter,
+        uint cdp,
+        uint amt,
+        bool transferFrom
+    ) public {
+        // Takes token amount from user's wallet and joins into the government
+        farmableCollateralAdapter_deposit(farmableCollateralAdapter, address(this), amt, transferFrom);
+        // Locks token amount into the CDP
+        GovernmentLike(ManagerLike(manager).government()).adjustPosition(
+            ManagerLike(manager).collateralPools(cdp),
+            ManagerLike(manager).positions(cdp),
+            address(this),
+            address(this),
+            toInt(convertTo18(farmableCollateralAdapter, amt)),
+            0
+        );
+    }
+
     function safeLockToken(
         address manager,
         address collateralTokenAdapter,
@@ -401,6 +440,18 @@ contract AlpacaStablecoinActions is Common {
     ) public {
         require(ManagerLike(manager).owns(cdp) == owner, "owner-missmatch");
         lockToken(manager, collateralTokenAdapter, cdp, amt, transferFrom);
+    }
+
+    function safeLockFarmableCollateral(
+        address manager,
+        address farmableCollateralAdapter,
+        uint cdp,
+        uint amt,
+        bool transferFrom,
+        address owner
+    ) public {
+        require(ManagerLike(manager).owns(cdp) == owner, "owner-missmatch");
+        lockFarmableCollateral(manager, farmableCollateralAdapter, cdp, amt, transferFrom);
     }
 
     function freeBNB(
@@ -436,6 +487,22 @@ contract AlpacaStablecoinActions is Common {
         CollateralTokenAdapterLike(collateralTokenAdapter).withdraw(msg.sender, amt);
     }
 
+    function freeFarmableCollateral(
+        address manager,
+        address farmableCollateralAdapter,
+        uint cdp,
+        uint amt
+    ) public {
+        address positionAddress = ManagerLike(manager).positions(cdp);
+        uint wad = convertTo18(farmableCollateralAdapter, amt);
+        // Unlocks token amount from the CDP
+        adjustPosition(manager, cdp, -toInt(wad), 0);
+        // Moves the amount from the CDP positionAddress to proxy's address
+        moveCollateral(manager, cdp, address(this), wad);
+        // Withdraws token amount to the user's wallet as a token
+        FarmableCollateralAdapterLike(farmableCollateralAdapter).withdraw(positionAddress, msg.sender, amt);
+    }
+
     function exitBNB(
         address manager,
         address bnbAdapter,
@@ -464,6 +531,20 @@ contract AlpacaStablecoinActions is Common {
 
         // Withdraws token amount to the user's wallet as a token
         CollateralTokenAdapterLike(collateralTokenAdapter).withdraw(msg.sender, amt);
+    }
+
+    function exitFarmableCollateral(
+        address manager,
+        address farmableCollateralAdapter,
+        uint cdp,
+        uint amt
+    ) public {
+        address positionAddress = ManagerLike(manager).positions(cdp);
+        // Moves the amount from the CDP positionAddress to proxy's address
+        moveCollateral(manager, cdp, address(this), convertTo18(farmableCollateralAdapter, amt));
+
+        // Withdraws token amount to the user's wallet as a token
+        FarmableCollateralAdapterLike(farmableCollateralAdapter).withdraw(positionAddress, msg.sender, amt);
     }
 
     function draw(
@@ -649,6 +730,47 @@ contract AlpacaStablecoinActions is Common {
         lockTokenAndDraw(manager, stabilityFeeCollector, collateralTokenAdapter, stablecoinAdapter, cdp, amtC, wadD, transferFrom);
     }
 
+    function lockFarmableCollateralAndDraw(
+        address manager,
+        address stabilityFeeCollector,
+        address farmableCollateralAdapter,
+        address stablecoinAdapter,
+        uint cdp,
+        uint amtC,
+        uint wadD,
+        bool transferFrom
+    ) public {
+        address positionAddress = ManagerLike(manager).positions(cdp);
+        address government = ManagerLike(manager).government();
+        bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
+        // Takes token amount from user's wallet and joins into the government
+        farmableCollateralAdapter_deposit(farmableCollateralAdapter, positionAddress, amtC, transferFrom);
+        // Locks token amount into the CDP and generates debt
+        adjustPosition(manager, cdp, toInt(convertTo18(farmableCollateralAdapter, amtC)), _getDrawDebtShare(government, stabilityFeeCollector, positionAddress, collateralPoolId, wadD));
+        // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
+        moveStablecoin(manager, cdp, address(this), toRad(wadD));
+        // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
+        if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
+            GovernmentLike(government).hope(stablecoinAdapter);
+        }
+        // Withdraws Alpaca Stablecoin to the user's wallet as a token
+        StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
+    }
+
+    function openLockFarmableCollateralAndDraw(
+        address manager,
+        address stabilityFeeCollector,
+        address farmableCollateralAdapter,
+        address stablecoinAdapter,
+        bytes32 collateralPoolId,
+        uint amtC,
+        uint wadD,
+        bool transferFrom
+    ) public returns (uint cdp) {
+        cdp = open(manager, collateralPoolId, address(this));
+        lockFarmableCollateralAndDraw(manager, stabilityFeeCollector, farmableCollateralAdapter, stablecoinAdapter, cdp, amtC, wadD, transferFrom);
+    }
+
     function wipeAndFreeBNB(
         address manager,
         address bnbAdapter,
@@ -759,5 +881,58 @@ contract AlpacaStablecoinActions is Common {
         moveCollateral(manager, cdp, address(this), wadC);
         // Withdraws token amount to the user's wallet as a token
         CollateralTokenAdapterLike(collateralTokenAdapter).withdraw(msg.sender, amtC);
+    }
+
+    function wipeAndFreeFarmableCollateral(
+        address manager,
+        address farmableCollateralAdapter,
+        address stablecoinAdapter,
+        uint cdp,
+        uint amtC,
+        uint wadD
+    ) public {
+        address positionAddress = ManagerLike(manager).positions(cdp);
+        // Deposits Alpaca Stablecoin amount into the government
+        stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, wadD);
+        uint wadC = convertTo18(farmableCollateralAdapter, amtC);
+        // Paybacks debt to the CDP and unlocks token amount from it
+        adjustPosition(
+            manager,
+            cdp,
+            -toInt(wadC),
+            _getWipeDebtShare(ManagerLike(manager).government(), GovernmentLike(ManagerLike(manager).government()).stablecoin(positionAddress), positionAddress, ManagerLike(manager).collateralPools(cdp))
+        );
+        // Moves the amount from the CDP positionAddress to proxy's address
+        moveCollateral(manager, cdp, address(this), wadC);
+        // Withdraws token amount to the user's wallet as a token
+        FarmableCollateralAdapterLike(farmableCollateralAdapter).withdraw(positionAddress, msg.sender, amtC);
+    }
+
+    function wipeAllAndFreeFarmableCollateral(
+        address manager,
+        address farmableCollateralAdapter,
+        address stablecoinAdapter,
+        uint cdp,
+        uint amtC
+    ) public {
+        address government = ManagerLike(manager).government();
+        address positionAddress = ManagerLike(manager).positions(cdp);
+        bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
+        (, uint debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+
+        // Deposits Alpaca Stablecoin amount into the government
+        stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, _getWipeAllWad(government, positionAddress, positionAddress, collateralPoolId));
+        uint wadC = convertTo18(farmableCollateralAdapter, amtC);
+        // Paybacks debt to the CDP and unlocks token amount from it
+        adjustPosition(
+            manager,
+            cdp,
+            -toInt(wadC),
+            -int(debtShare)
+        );
+        // Moves the amount from the CDP positionAddress to proxy's address
+        moveCollateral(manager, cdp, address(this), wadC);
+        // Withdraws token amount to the user's wallet as a token
+        FarmableCollateralAdapterLike(farmableCollateralAdapter).withdraw(positionAddress, msg.sender, amtC);
     }
 }
