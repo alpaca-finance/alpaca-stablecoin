@@ -134,7 +134,7 @@ contract FarmableTokenAdapter {
         accRewardBalance = rewardToken.balanceOf(address(this));
     }
 
-    function deposit(address positionAddress, address usr, uint256 val) public auth virtual {
+    function deposit(address positionAddress, address usr, uint256 val) public virtual {
         require(live == 1, "FarmableToken/not-live");
 
         harvest(positionAddress, usr);
@@ -155,7 +155,7 @@ contract FarmableTokenAdapter {
         emit Deposit(val);
     }
 
-    function withdraw(address positionAddress, address usr, uint256 val) public auth virtual {
+    function withdraw(address positionAddress, address usr, uint256 val) public virtual {
         harvest(positionAddress, usr);
         if (val > 0) {
             uint256 wad = wdivup(mul(val, to18ConversionFactor), nps());
@@ -174,7 +174,7 @@ contract FarmableTokenAdapter {
         emit Withdraw(val);
     }
 
-    function emergencyWithdraw(address positionAddress, address usr) public auth virtual {
+    function emergencyWithdraw(address positionAddress, address usr) public virtual {
         uint256 wad = government.collateralToken(collateralPoolId, positionAddress);
         require(wad <= 2 ** 255);
         uint256 val = wmul(wmul(wad, nps()), toTokenConversionFactor);
