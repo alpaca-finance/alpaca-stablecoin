@@ -27,7 +27,7 @@ interface GovernmentLike {
     function moveStablecoin(address,address,uint) external;
     function mintUnbackedStablecoin(address,address,uint) external;
 }
-interface CollateralTokenLike {
+interface TokenLike {
     function mint(address,uint) external;
 }
 interface SystemAuctionHouse {
@@ -68,7 +68,7 @@ contract BadDebtAuctioneer {
     mapping (uint => Bid) public bids;
 
     GovernmentLike  public   government;  // CDP Engine
-    CollateralTokenLike  public   alpaca;
+    TokenLike  public   alpaca;
 
     uint256  constant ONE = 1.00E18;
     uint256  public   minimumBidIncrease = 1.05E18;  // 5% minimum bid increase
@@ -91,7 +91,7 @@ contract BadDebtAuctioneer {
     constructor(address government_, address alpaca_) public {
         whitelist[msg.sender] = 1;
         government = GovernmentLike(government_);
-        alpaca = CollateralTokenLike(alpaca_);
+        alpaca = TokenLike(alpaca_);
         live = 1;
     }
 

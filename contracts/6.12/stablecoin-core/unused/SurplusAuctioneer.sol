@@ -26,7 +26,7 @@ pragma solidity >=0.5.12;
 interface GovernmentLike {
     function moveStablecoin(address,address,uint) external;
 }
-interface CollateralTokenLike {
+interface TokenLike {
     function move(address,address,uint) external;
     function burn(address,uint) external;
 }
@@ -63,7 +63,7 @@ contract SurplusAuctioneer {
     mapping (uint => Bid) public bids;
 
     GovernmentLike  public   government;  // CDP Engine
-    CollateralTokenLike  public   alpaca;
+    TokenLike  public   alpaca;
 
     uint256  constant ONE = 1.00E18;
     uint256  public   minimumBidIncrease = 1.05E18;  // 5% minimum bid increase
@@ -83,7 +83,7 @@ contract SurplusAuctioneer {
     constructor(address government_, address alpaca_) public {
         whitelist[msg.sender] = 1;
         government = GovernmentLike(government_);
-        alpaca = CollateralTokenLike(alpaca_);
+        alpaca = TokenLike(alpaca_);
         live = 1;
     }
 

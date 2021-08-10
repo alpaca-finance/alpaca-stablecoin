@@ -23,7 +23,7 @@ pragma solidity >=0.5.12;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface CollateralTokenLike {
+interface TokenLike {
     function decimals() external view returns (uint);
     function transfer(address,uint) external returns (bool);
     function transferFrom(address,address,uint) external returns (bool);
@@ -44,7 +44,7 @@ interface GovernmentLike {
     token implementations, creating a bounded context for the Government. The
     adapters here are provided as working examples:
 
-      - `CollateralTokenAdapter`: For well behaved ERC20 tokens, with simple transfer
+      - `TokenAdapter`: For well behaved ERC20 tokens, with simple transfer
                    semantics.
 
       - `ETHJoin`: For native Ether.

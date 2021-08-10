@@ -33,7 +33,7 @@ interface ERC20 {
 }
 
 // receives tokens and shares them among holders
-contract FarmableCollateralAdapter {
+contract FarmableTokenAdapter {
     mapping (address => uint256) whitelist;
     uint256 live;
 
@@ -51,7 +51,7 @@ contract FarmableCollateralAdapter {
     mapping (address => uint256) public stake; // collateralTokens per user   [wad]
 
     uint256 immutable internal to18ConversionFactor;
-    uint256 immutable internal toCollateralTokenConversionFactor;
+    uint256 immutable internal toTokenConversionFactor;
 
     // --- Events ---
     event Deposit(uint256 val);
@@ -60,7 +60,7 @@ contract FarmableCollateralAdapter {
     event MoveRewards(address indexed src, address indexed dst, uint256 wad);
 
     modifier auth {
-        require(whitelist[msg.sender] == 1, "FarmableCollateral/not-authed");
+        require(whitelist[msg.sender] == 1, "FarmableToken/not-authed");
         _;
     }
 
@@ -72,7 +72,7 @@ contract FarmableCollateralAdapter {
         require(decimals_ <= 18);
         decimals = decimals_;
         to18ConversionFactor = 10 ** (18 - decimals_);
-        toCollateralTokenConversionFactor = 10 ** decimals_;
+        toTokenConversionFactor = 10 ** decimals_;
         rewardToken = ERC20(rewardToken_);
     }
 
@@ -135,7 +135,7 @@ contract FarmableCollateralAdapter {
     }
 
     function deposit(address positionAddress, address usr, uint256 val) public auth virtual {
-        require(live == 1, "FarmableCollateral/not-live");
+        require(live == 1, "FarmableToken/not-live");
 
         harvest(positionAddress, usr);
         if (val > 0) {
@@ -177,7 +177,7 @@ contract FarmableCollateralAdapter {
     function emergencyWithdraw(address positionAddress, address usr) public auth virtual {
         uint256 wad = government.collateralToken(collateralPoolId, positionAddress);
         require(wad <= 2 ** 255);
-        uint256 val = wmul(wmul(wad, nps()), toCollateralTokenConversionFactor);
+        uint256 val = wmul(wmul(wad, nps()), toTokenConversionFactor);
 
         require(collateralToken.transfer(usr, val));
         government.addCollateral(collateralPoolId, positionAddress, -int256(wad));

@@ -23,7 +23,7 @@ pragma solidity >=0.5.12;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface CollateralTokenLike {
+interface TokenLike {
     function decimals() external view returns (uint);
     function transfer(address,uint) external returns (bool);
     function transferFrom(address,address,uint) external returns (bool);
@@ -44,7 +44,7 @@ interface GovernmentLike {
     token implementations, creating a bounded context for the Government. The
     adapters here are provided as working examples:
 
-      - `CollateralTokenAdapter`: For well behaved ERC20 tokens, with simple transfer
+      - `TokenAdapter`: For well behaved ERC20 tokens, with simple transfer
                    semantics.
 
       - `ETHJoin`: For native Ether.
@@ -63,19 +63,19 @@ interface GovernmentLike {
 
 */
 
-contract CollateralTokenAdapter {
+contract TokenAdapter {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address usr) external auth { wards[usr] = 1; }
     function deny(address usr) external auth { wards[usr] = 0; }
     modifier auth {
-        require(wards[msg.sender] == 1, "CollateralTokenAdapter/not-authorized");
+        require(wards[msg.sender] == 1, "TokenAdapter/not-authorized");
         _;
     }
 
     GovernmentLike public government;   // CDP Engine
     bytes32 public collateralPoolId;   // Collateral Type
-    CollateralTokenLike public collateralToken;
+    TokenLike public collateralToken;
     uint    public decimals;
     uint    public live;  // Active Flag
 
@@ -84,21 +84,21 @@ contract CollateralTokenAdapter {
         live = 1;
         government = GovernmentLike(government_);
         collateralPoolId = collateralPoolId_;
-        collateralToken = CollateralTokenLike(collateralToken_);
+        collateralToken = TokenLike(collateralToken_);
         decimals = collateralToken.decimals();
     }
     function cage() external auth {
         live = 0;
     }
     function deposit(address usr, uint wad) external {
-        require(live == 1, "CollateralTokenAdapter/not-live");
-        require(int(wad) >= 0, "CollateralTokenAdapter/overflow");
+        require(live == 1, "TokenAdapter/not-live");
+        require(int(wad) >= 0, "TokenAdapter/overflow");
         government.addCollateral(collateralPoolId, usr, int(wad));
-        require(collateralToken.transferFrom(msg.sender, address(this), wad), "CollateralTokenAdapter/failed-transfer");
+        require(collateralToken.transferFrom(msg.sender, address(this), wad), "TokenAdapter/failed-transfer");
     }
     function withdraw(address usr, uint wad) external {
-        require(wad <= 2 ** 255, "CollateralTokenAdapter/overflow");
+        require(wad <= 2 ** 255, "TokenAdapter/overflow");
         government.addCollateral(collateralPoolId, msg.sender, -int(wad));
-        require(collateralToken.transfer(usr, wad), "CollateralTokenAdapter/failed-transfer");
+        require(collateralToken.transfer(usr, wad), "TokenAdapter/failed-transfer");
     }
 }
