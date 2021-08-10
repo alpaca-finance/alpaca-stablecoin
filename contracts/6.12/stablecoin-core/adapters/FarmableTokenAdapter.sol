@@ -58,13 +58,28 @@ contract FarmableTokenAdapter {
     event Withdraw(uint256 val);
     event Flee();
     event MoveRewards(address indexed src, address indexed dst, uint256 wad);
+    event Rely(address indexed usr);
+    event Deny(address indexed usr);
 
     modifier auth {
         require(whitelist[msg.sender] == 1, "FarmableToken/not-authed");
         _;
     }
 
+    function rely(address usr) external auth {
+        whitelist[usr] = 1;
+        emit Rely(msg.sender);
+    }
+
+    function deny(address usr) external auth {
+        whitelist[usr] = 0;
+        emit Deny(msg.sender);
+    }
+
     constructor(address government_, bytes32 collateralPoolId_, address collateralToken_, address rewardToken_) public {
+        whitelist[msg.sender] = 1;
+        emit Rely(msg.sender);
+        live = 1;
         government = GovernmentLike(government_);
         collateralPoolId = collateralPoolId_;
         collateralToken = ERC20(collateralToken_);
