@@ -32,7 +32,7 @@ interface TokenLike {
 }
 interface SystemDebtEngine {
     function totalBadDebtInAuction() external returns (uint);
-    function kiss(uint) external;
+    function settleSystemBadDebtByAuction(uint) external;
 }
 
 /*
@@ -150,7 +150,7 @@ contract BadDebtAuctioneer {
             // on first dent, clear as much totalBadDebtInAuction as possible
             if (bids[id].bidExpiry == 0) {
                 uint totalBadDebtInAuction = SystemDebtEngine(bids[id].bidder).totalBadDebtInAuction();
-                SystemDebtEngine(bids[id].bidder).kiss(min(bid, totalBadDebtInAuction));
+                SystemDebtEngine(bids[id].bidder).settleSystemBadDebtByAuction(min(bid, totalBadDebtInAuction));
             }
 
             bids[id].bidder = msg.sender;

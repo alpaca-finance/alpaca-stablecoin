@@ -113,12 +113,12 @@ contract SystemDebtEngine {
     }
 
     // Push to debt-queue
-    function fess(uint tab) external auth {
+    function pushToDebtQueue(uint tab) external auth {
         badDebtQueue[now] = add(badDebtQueue[now], tab);
         totalBadDebtValue = add(totalBadDebtValue, tab);
     }
     // Pop from debt-queue
-    function flog(uint currentTimestamp) external {
+    function popFromDebtQueue(uint currentTimestamp) external {
         require(add(currentTimestamp, badDebtAuctionDelay) <= now, "SystemDebtEngine/badDebtAuctionDelay-not-finished");
         totalBadDebtValue = sub(totalBadDebtValue, badDebtQueue[currentTimestamp]);
         badDebtQueue[currentTimestamp] = 0;
@@ -130,7 +130,7 @@ contract SystemDebtEngine {
         require(rad <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "SystemDebtEngine/insufficient-debt");
         government.settleSystemBadDebt(rad);
     }
-    function kiss(uint rad) external {
+    function settleSystemBadDebtByAuction(uint rad) external {
         require(rad <= totalBadDebtInAuction, "SystemDebtEngine/not-enough-ash");
         require(rad <= government.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
         totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
@@ -138,14 +138,14 @@ contract SystemDebtEngine {
     }
 
     // Debt auction
-    function flop() external returns (uint id) {
+    function startBadDebtAuction() external returns (uint id) {
         require(badDebtFixedBidSize <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "SystemDebtEngine/insufficient-debt");
         require(government.dai(address(this)) == 0, "SystemDebtEngine/surplus-not-zero");
         totalBadDebtInAuction = add(totalBadDebtInAuction, badDebtFixedBidSize);
         id = badDebtAuctionHouse.kick(address(this), alpacaInitialLotSizeForBadDebt, badDebtFixedBidSize);
     }
     // Surplus auction
-    function flap() external returns (uint id) {
+    function startSurplusAuction() external returns (uint id) {
         require(government.dai(address(this)) >= add(add(government.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer), "SystemDebtEngine/insufficient-surplus");
         require(sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction) == 0, "SystemDebtEngine/debt-not-zero");
         id = surplusAuctionHouse.kick(surplusAuctionFixedLotSize, 0);
