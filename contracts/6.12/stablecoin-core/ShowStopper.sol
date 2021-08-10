@@ -57,7 +57,7 @@ interface StablecoinSavingsLike {
     function cage() external;
 }
 
-interface SystemAuctionHouse {
+interface SystemDebtEngine {
     function cage() external;
 }
 
@@ -176,7 +176,7 @@ interface PriceOracleLike {
        - only callable after processing time period elapsed
        - assumption that all under-collateralised CDPs are processed
        - fixes the total outstanding supply of dai
-       - may also require extra CDP processing to cover systemAuctionHouse surplus
+       - may also require extra CDP processing to cover systemDebtEngine surplus
 
     7. `flow(collateralPoolId)`:
         - calculate the `fix`, the cash price for a given collateralPoolId
@@ -214,7 +214,7 @@ contract ShowStopper {
     // --- Data ---
     GovernmentLike  public government;   // CDP Engine
     LiquidationEngineLike  public liquidationEngine;
-    SystemAuctionHouse  public systemAuctionHouse;   // Debt Engine
+    SystemDebtEngine  public systemDebtEngine;   // Debt Engine
     StablecoinSavingsLike  public stablecoinSavings;
     PriceOracleLike public priceOracle;
 
@@ -284,7 +284,7 @@ contract ShowStopper {
         require(live == 1, "End/not-live");
         if (what == "government")  government = GovernmentLike(data);
         else if (what == "liquidationEngine")   liquidationEngine = LiquidationEngineLike(data);
-        else if (what == "systemAuctionHouse")   systemAuctionHouse = SystemAuctionHouse(data);
+        else if (what == "systemDebtEngine")   systemDebtEngine = SystemDebtEngine(data);
         else if (what == "stablecoinSavings")   stablecoinSavings = StablecoinSavingsLike(data);
         else if (what == "priceOracle") priceOracle = PriceOracleLike(data);
         else revert("End/file-unrecognized-param");
@@ -304,7 +304,7 @@ contract ShowStopper {
         when = block.timestamp;
         government.cage();
         liquidationEngine.cage();
-        systemAuctionHouse.cage();
+        systemDebtEngine.cage();
         priceOracle.cage();
         stablecoinSavings.cage();
         emit Cage();
@@ -328,13 +328,13 @@ contract ShowStopper {
         (, uint256 debtAccumulatedRate,,,) = government.collateralPools(collateralPoolId);
         (, uint256 tab, uint256 lot, address usr,,) = auctioneer.sales(id);
 
-        government.mintUnbackedStablecoin(address(systemAuctionHouse), address(systemAuctionHouse),  tab);
+        government.mintUnbackedStablecoin(address(systemDebtEngine), address(systemDebtEngine),  tab);
         auctioneer.yank(id);
 
         uint256 debtShare = tab / debtAccumulatedRate;
         totalDebtShare[collateralPoolId] = add(totalDebtShare[collateralPoolId], debtShare);
         require(int256(lot) >= 0 && int256(debtShare) >= 0, "End/overflow");
-        government.grab(collateralPoolId, usr, address(this), address(systemAuctionHouse), int256(lot), int256(debtShare));
+        government.grab(collateralPoolId, usr, address(this), address(systemDebtEngine), int256(lot), int256(debtShare));
         emit Snip(collateralPoolId, id, usr, tab, lot, debtShare);
     }
 
@@ -348,7 +348,7 @@ contract ShowStopper {
         shortfall[collateralPoolId] = add(shortfall[collateralPoolId], sub(owe, wad));
 
         require(wad <= 2**255 && debtShare <= 2**255, "End/overflow");
-        government.grab(collateralPoolId, urn, address(this), address(systemAuctionHouse), -int256(wad), -int256(debtShare));
+        government.grab(collateralPoolId, urn, address(this), address(systemDebtEngine), -int256(wad), -int256(debtShare));
         emit Skim(collateralPoolId, urn, wad, debtShare);
     }
 
@@ -357,14 +357,14 @@ contract ShowStopper {
         (uint256 lockedCollateral, uint256 debtShare) = government.positions(collateralPoolId, msg.sender);
         require(debtShare == 0, "End/debtShare-not-zero");
         require(lockedCollateral <= 2**255, "End/overflow");
-        government.grab(collateralPoolId, msg.sender, msg.sender, address(systemAuctionHouse), -int256(lockedCollateral), 0);
+        government.grab(collateralPoolId, msg.sender, msg.sender, address(systemDebtEngine), -int256(lockedCollateral), 0);
         emit Free(collateralPoolId, msg.sender, lockedCollateral);
     }
 
     function thaw() external {
         require(live == 0, "End/still-live");
         require(debt == 0, "End/debt-not-zero");
-        require(government.stablecoin(address(systemAuctionHouse)) == 0, "End/surplus-not-zero");
+        require(government.stablecoin(address(systemDebtEngine)) == 0, "End/surplus-not-zero");
         require(block.timestamp >= add(when, wait), "End/wait-not-finished");
         debt = government.debt();
         emit Thaw();
@@ -381,7 +381,7 @@ contract ShowStopper {
 
     function pack(uint256 wad) external {
         require(debt != 0, "End/debt-zero");
-        government.moveStablecoin(msg.sender, address(systemAuctionHouse), mul(wad, RAY));
+        government.moveStablecoin(msg.sender, address(systemDebtEngine), mul(wad, RAY));
         bag[msg.sender] = add(bag[msg.sender], wad);
         emit Pack(msg.sender, wad);
     }

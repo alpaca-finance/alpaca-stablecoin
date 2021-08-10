@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// systemAuctionHouse.sol -- Dai settlement module
+/// systemDebtEngine.sol -- Dai settlement module
 
 // Copyright (C) 2018 Rain <rainbreak@riseup.net>
 //
@@ -43,13 +43,13 @@ interface GovernmentLike {
     function nope(address) external;
 }
 
-contract SystemAuctionHouse {
+contract SystemDebtEngine {
     // --- Auth ---
     mapping (address => uint) public whitelist;
-    function rely(address usr) external auth { require(live == 1, "SystemAuctionHouse/not-live"); whitelist[usr] = 1; }
+    function rely(address usr) external auth { require(live == 1, "SystemDebtEngine/not-live"); whitelist[usr] = 1; }
     function deny(address usr) external auth { whitelist[usr] = 0; }
     modifier auth {
-        require(whitelist[msg.sender] == 1, "SystemAuctionHouse/not-authorized");
+        require(whitelist[msg.sender] == 1, "SystemDebtEngine/not-authorized");
         _;
     }
 
@@ -99,7 +99,7 @@ contract SystemAuctionHouse {
         else if (what == "badDebtFixedBidSize") badDebtFixedBidSize = data;
         else if (what == "alpacaInitialLotSizeForBadDebt") alpacaInitialLotSizeForBadDebt = data;
         else if (what == "surplusBuffer") surplusBuffer = data;
-        else revert("SystemAuctionHouse/file-unrecognized-param");
+        else revert("SystemDebtEngine/file-unrecognized-param");
     }
 
     function file(bytes32 what, address data) external auth {
@@ -109,7 +109,7 @@ contract SystemAuctionHouse {
             government.hope(data);
         }
         else if (what == "badDebtAuctionHouse") badDebtAuctionHouse = BadDebtAuctioneerLike(data);
-        else revert("SystemAuctionHouse/file-unrecognized-param");
+        else revert("SystemDebtEngine/file-unrecognized-param");
     }
 
     // Push to debt-queue
@@ -119,40 +119,40 @@ contract SystemAuctionHouse {
     }
     // Pop from debt-queue
     function flog(uint currentTimestamp) external {
-        require(add(currentTimestamp, badDebtAuctionDelay) <= now, "SystemAuctionHouse/badDebtAuctionDelay-not-finished");
+        require(add(currentTimestamp, badDebtAuctionDelay) <= now, "SystemDebtEngine/badDebtAuctionDelay-not-finished");
         totalBadDebtValue = sub(totalBadDebtValue, badDebtQueue[currentTimestamp]);
         badDebtQueue[currentTimestamp] = 0;
     }
 
     // Debt settlement
     function settleSystemBadDebt(uint rad) external {
-        require(rad <= government.dai(address(this)), "SystemAuctionHouse/insufficient-surplus");
-        require(rad <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "SystemAuctionHouse/insufficient-debt");
+        require(rad <= government.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
+        require(rad <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "SystemDebtEngine/insufficient-debt");
         government.settleSystemBadDebt(rad);
     }
     function kiss(uint rad) external {
-        require(rad <= totalBadDebtInAuction, "SystemAuctionHouse/not-enough-ash");
-        require(rad <= government.dai(address(this)), "SystemAuctionHouse/insufficient-surplus");
+        require(rad <= totalBadDebtInAuction, "SystemDebtEngine/not-enough-ash");
+        require(rad <= government.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
         totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
         government.settleSystemBadDebt(rad);
     }
 
     // Debt auction
     function flop() external returns (uint id) {
-        require(badDebtFixedBidSize <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "SystemAuctionHouse/insufficient-debt");
-        require(government.dai(address(this)) == 0, "SystemAuctionHouse/surplus-not-zero");
+        require(badDebtFixedBidSize <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "SystemDebtEngine/insufficient-debt");
+        require(government.dai(address(this)) == 0, "SystemDebtEngine/surplus-not-zero");
         totalBadDebtInAuction = add(totalBadDebtInAuction, badDebtFixedBidSize);
         id = badDebtAuctionHouse.kick(address(this), alpacaInitialLotSizeForBadDebt, badDebtFixedBidSize);
     }
     // Surplus auction
     function flap() external returns (uint id) {
-        require(government.dai(address(this)) >= add(add(government.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer), "SystemAuctionHouse/insufficient-surplus");
-        require(sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction) == 0, "SystemAuctionHouse/debt-not-zero");
+        require(government.dai(address(this)) >= add(add(government.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer), "SystemDebtEngine/insufficient-surplus");
+        require(sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction) == 0, "SystemDebtEngine/debt-not-zero");
         id = surplusAuctionHouse.kick(surplusAuctionFixedLotSize, 0);
     }
 
     function cage() external auth {
-        require(live == 1, "SystemAuctionHouse/not-live");
+        require(live == 1, "SystemDebtEngine/not-live");
         live = 0;
         totalBadDebtValue = 0;
         totalBadDebtInAuction = 0;

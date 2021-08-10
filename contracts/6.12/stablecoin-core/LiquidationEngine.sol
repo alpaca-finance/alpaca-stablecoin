@@ -46,7 +46,7 @@ interface GovernmentLike {
     function nope(address) external;
 }
 
-interface SystemAuctionHouse {
+interface SystemDebtEngine {
     function fess(uint256) external;
 }
 
@@ -72,7 +72,7 @@ contract LiquidationEngine {
 
     mapping (bytes32 => CollateralPool) public collateralPools;
 
-    SystemAuctionHouse public systemAuctionHouse;   // Debt Engine
+    SystemDebtEngine public systemDebtEngine;   // Debt Engine
     uint256 public live;  // Active Flag
     uint256 public liquidationMaxSize;  // Max DAI needed to cover debt+fees of active auctions [rad]
     uint256 public stablecoinNeededForDebtRepay;  // Amt DAI needed to cover debt+fees of active auctions [rad]
@@ -124,7 +124,7 @@ contract LiquidationEngine {
 
     // --- Administration ---
     function file(bytes32 what, address data) external auth {
-        if (what == "systemAuctionHouse") systemAuctionHouse = SystemAuctionHouse(data);
+        if (what == "systemDebtEngine") systemDebtEngine = SystemDebtEngine(data);
         else revert("LiquidationEngine/file-unrecognized-param");
         emit File(what, data);
     }
@@ -213,11 +213,11 @@ contract LiquidationEngine {
         require(debtShareToBeLiquidated <= 2**255 && collateralAmountToBeLiquidated <= 2**255, "LiquidationEngine/overflow");
 
         government.confiscate(
-            collateralPoolId, positionAddress, mcollateralPool.auctioneer, address(systemAuctionHouse), -int256(collateralAmountToBeLiquidated), -int256(debtShareToBeLiquidated)
+            collateralPoolId, positionAddress, mcollateralPool.auctioneer, address(systemDebtEngine), -int256(collateralAmountToBeLiquidated), -int256(debtShareToBeLiquidated)
         );
 
         uint256 debtValueToBeLiquidatedWithoutPenalty = mul(debtShareToBeLiquidated, debtAccumulatedRate);
-        systemAuctionHouse.fess(debtValueToBeLiquidatedWithoutPenalty);
+        systemDebtEngine.fess(debtValueToBeLiquidatedWithoutPenalty);
 
         {   // Avoid stack too deep
             // This calcuation will overflow if debtShareToBeLiquidated*debtAccumulatedRate exceeds ~10^14

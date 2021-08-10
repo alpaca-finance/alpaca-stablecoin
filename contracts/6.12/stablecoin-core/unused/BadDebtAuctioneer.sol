@@ -30,7 +30,7 @@ interface GovernmentLike {
 interface TokenLike {
     function mint(address,uint) external;
 }
-interface SystemAuctionHouse {
+interface SystemDebtEngine {
     function totalBadDebtInAuction() external returns (uint);
     function kiss(uint) external;
 }
@@ -149,8 +149,8 @@ contract BadDebtAuctioneer {
 
             // on first dent, clear as much totalBadDebtInAuction as possible
             if (bids[id].bidExpiry == 0) {
-                uint totalBadDebtInAuction = SystemAuctionHouse(bids[id].bidder).totalBadDebtInAuction();
-                SystemAuctionHouse(bids[id].bidder).kiss(min(bid, totalBadDebtInAuction));
+                uint totalBadDebtInAuction = SystemDebtEngine(bids[id].bidder).totalBadDebtInAuction();
+                SystemDebtEngine(bids[id].bidder).kiss(min(bid, totalBadDebtInAuction));
             }
 
             bids[id].bidder = msg.sender;

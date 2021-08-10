@@ -63,15 +63,15 @@ contract CollateralAuctioneer {
     GovernmentLike  immutable public government;   // Core CDP Engine
 
     LiquidationEngineLike     public liquidationEngine;      // Liquidation module
-    address     public systemAuctionHouse;      // Recipient of dai raised in auctions
+    address     public systemDebtEngine;      // Recipient of dai raised in auctions
     PriceOracleLike public priceOracle;  // Collateral price module
     CalculatorLike  public calc;     // Current price calculator
 
     uint256 public startingPriceBuffer;    // Multiplicative factor to increase starting price                  [ray]
     uint256 public auctionTimeLimit;   // Time elapsed before auction reset                                 [seconds]
     uint256 public priceDropBeforeReset;   // Percentage drop before auction reset                              [ray]
-    uint64  public liquidatorBountyRate;   // Percentage of tab to suck from systemAuctionHouse to incentivize liquidators         [wad]
-    uint192 public liquidatorTip;    // Flat fee to suck from systemAuctionHouse to incentivize liquidators                  [rad]
+    uint64  public liquidatorBountyRate;   // Percentage of tab to suck from systemDebtEngine to incentivize liquidators         [wad]
+    uint192 public liquidatorTip;    // Flat fee to suck from systemDebtEngine to incentivize liquidators                  [rad]
     uint256 public minimumRemainingDebt;  // Cache the collateralPool debtFloor times the collateralPool liquidationPenalty to prevent excessive SLOADs [rad]
 
     uint256   public kicks;   // Total auctions
@@ -171,7 +171,7 @@ contract CollateralAuctioneer {
     function file(bytes32 what, address data) external auth lock {
         if (what == "priceOracle") priceOracle = PriceOracleLike(data);
         else if (what == "liquidationEngine")    liquidationEngine = LiquidationEngineLike(data);
-        else if (what == "systemAuctionHouse")    systemAuctionHouse = data;
+        else if (what == "systemDebtEngine")    systemDebtEngine = data;
         else if (what == "calc")  calc = CalculatorLike(data);
         else revert("CollateralAuctioneer/file-unrecognized-param");
         emit File(what, data);
@@ -259,7 +259,7 @@ contract CollateralAuctioneer {
         uint256 prize;
         if (_liquidatorTip > 0 || _liquidatorBountyRate > 0) {
             prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-            government.mintUnbackedStablecoin(systemAuctionHouse, liquidatorAddress, prize);
+            government.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
         }
 
         emit Kick(id, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize);
@@ -300,7 +300,7 @@ contract CollateralAuctioneer {
             uint256 _minimumRemainingDebt = minimumRemainingDebt;
             if (debt >= _minimumRemainingDebt && mul(collateralAmount, feedPrice) >= _minimumRemainingDebt) {
                 prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-                government.mintUnbackedStablecoin(systemAuctionHouse, liquidatorAddress, prize);
+                government.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
             }
         }
 
@@ -396,7 +396,7 @@ contract CollateralAuctioneer {
             }
 
             // Get DAI from caller
-            government.moveStablecoin(msg.sender, systemAuctionHouse, owe);
+            government.moveStablecoin(msg.sender, systemDebtEngine, owe);
 
             // Removes Dai out for liquidation from accumulator
             liquidationEngine_.digs(collateralPoolId, collateralAmount == 0 ? debt + owe : owe);
