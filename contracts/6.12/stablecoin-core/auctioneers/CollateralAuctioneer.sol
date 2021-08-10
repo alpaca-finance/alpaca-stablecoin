@@ -91,9 +91,9 @@ contract CollateralAuctioneer {
 
     // Levels for circuit breaker
     // 0: no breaker
-    // 1: no new kick()
-    // 2: no new kick() or redo()
-    // 3: no new kick(), redo(), or take()
+    // 1: no new startAuction()
+    // 2: no new startAuction() or redo()
+    // 3: no new startAuction(), redo(), or take()
     uint256 public stopped = 0;
 
     // --- Events ---
@@ -226,7 +226,7 @@ contract CollateralAuctioneer {
     // Where `val` is the collateral's unitary value in USD, `startingPriceBuffer` is a
     // multiplicative factor to increase the starting price, and `par` is a
     // reference per DAI.
-    function kick(
+    function startAuction(
         uint256 debt,  // Debt                   [rad]
         uint256 collateralAmount,  // Collateral             [wad]
         address positionAddress,  // Address that will receive any leftover collateral

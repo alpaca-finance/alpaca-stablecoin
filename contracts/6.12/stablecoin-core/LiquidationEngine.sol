@@ -21,7 +21,7 @@ pragma solidity >=0.6.12;
 
 interface CollateralAuctioneerLike {
     function collateralPoolId() external view returns (bytes32);
-    function kick(
+    function startAuction(
         uint256 tab,
         uint256 lot,
         address usr,
@@ -86,7 +86,7 @@ contract LiquidationEngine {
     event File(bytes32 indexed collateralPoolId, bytes32 indexed what, uint256 data);
     event File(bytes32 indexed collateralPoolId, bytes32 indexed what, address auctioneer);
 
-    event Bark(
+    event StartLiquidation(
       bytes32 indexed collateralPoolId,
       address indexed positionAddress,
       uint256 collateralAmountToBeLiquidated,
@@ -167,7 +167,7 @@ contract LiquidationEngine {
     // have too little collateral to be interesting to Keepers (debt taken from Vault < collateralPool.debtFloor),
     // in which case the function reverts. Please refer to the code and comments within if
     // more detail is desired.
-    function bark(bytes32 collateralPoolId, address positionAddress, address liquidatorAddress) external returns (uint256 id) {
+    function startLiquidation(bytes32 collateralPoolId, address positionAddress, address liquidatorAddress) external returns (uint256 id) {
         require(live == 1, "LiquidationEngine/not-live");
 
         (uint256 positionLockedCollateral, uint256 positionDebtShare) = government.positions(collateralPoolId, positionAddress);
@@ -225,7 +225,7 @@ contract LiquidationEngine {
             stablecoinNeededForDebtRepay = add(stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
             collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = add(mcollateralPool.stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
 
-            id = CollateralAuctioneerLike(mcollateralPool.auctioneer).kick({
+            id = CollateralAuctioneerLike(mcollateralPool.auctioneer).startAuction({
                 tab: debtValueToBeLiquidatedWithPenalty,
                 lot: collateralAmountToBeLiquidated,
                 usr: positionAddress,
@@ -233,7 +233,7 @@ contract LiquidationEngine {
             });
         }
 
-        emit Bark(collateralPoolId, positionAddress, collateralAmountToBeLiquidated, debtShareToBeLiquidated, debtValueToBeLiquidatedWithoutPenalty, mcollateralPool.auctioneer, id);
+        emit StartLiquidation(collateralPoolId, positionAddress, collateralAmountToBeLiquidated, debtShareToBeLiquidated, debtValueToBeLiquidatedWithoutPenalty, mcollateralPool.auctioneer, id);
     }
 
     function digs(bytes32 collateralPoolId, uint256 rad) external auth {

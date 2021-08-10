@@ -116,7 +116,7 @@ contract BadDebtAuctioneer {
     }
 
     // --- Auction ---
-    function kick(address recipient, uint lot, uint bid) external auth returns (uint id) {
+    function startAuction(address recipient, uint lot, uint bid) external auth returns (uint id) {
         require(live == 1, "BadDebtAuctioneer/not-live");
         require(kicks < uint(-1), "BadDebtAuctioneer/overflow");
         id = ++kicks;

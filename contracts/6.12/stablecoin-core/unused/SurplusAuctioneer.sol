@@ -104,7 +104,7 @@ contract SurplusAuctioneer {
     }
 
     // --- Auction ---
-    function kick(uint lot, uint bid) external auth returns (uint id) {
+    function startAuction(uint lot, uint bid) external auth returns (uint id) {
         require(live == 1, "SurplusAuctioneer/not-live");
         require(kicks < uint(-1), "SurplusAuctioneer/overflow");
         id = ++kicks;

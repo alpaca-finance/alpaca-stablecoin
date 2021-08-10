@@ -24,13 +24,13 @@ pragma solidity >=0.5.12;
 // New deployments of this contract will need to include custom events (TO DO).
 
 interface BadDebtAuctioneerLike {
-    function kick(address gal, uint lot, uint bid) external returns (uint);
+    function startAuction(address gal, uint lot, uint bid) external returns (uint);
     function cage() external;
     function live() external returns (uint);
 }
 
 interface SurplusAuctioneerLike {
-    function kick(uint lot, uint bid) external returns (uint);
+    function startAuction(uint lot, uint bid) external returns (uint);
     function cage(uint) external;
     function live() external returns (uint);
 }
@@ -142,13 +142,13 @@ contract SystemDebtEngine {
         require(badDebtFixedBidSize <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction), "SystemDebtEngine/insufficient-debt");
         require(government.dai(address(this)) == 0, "SystemDebtEngine/surplus-not-zero");
         totalBadDebtInAuction = add(totalBadDebtInAuction, badDebtFixedBidSize);
-        id = badDebtAuctionHouse.kick(address(this), alpacaInitialLotSizeForBadDebt, badDebtFixedBidSize);
+        id = badDebtAuctionHouse.startAuction(address(this), alpacaInitialLotSizeForBadDebt, badDebtFixedBidSize);
     }
     // Surplus auction
     function startSurplusAuction() external returns (uint id) {
         require(government.dai(address(this)) >= add(add(government.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer), "SystemDebtEngine/insufficient-surplus");
         require(sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction) == 0, "SystemDebtEngine/debt-not-zero");
-        id = surplusAuctionHouse.kick(surplusAuctionFixedLotSize, 0);
+        id = surplusAuctionHouse.startAuction(surplusAuctionFixedLotSize, 0);
     }
 
     function cage() external auth {
