@@ -118,7 +118,7 @@ contract Common {
     }
 }
 
-contract AlpacaStablecoinActions is Common {
+contract AlpacaStablecoinProxyActions is Common {
     // Internal functions
 
     function sub(uint x, uint y) internal pure returns (uint z) {
