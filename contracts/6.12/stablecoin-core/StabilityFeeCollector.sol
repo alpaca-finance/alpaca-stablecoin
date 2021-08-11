@@ -49,7 +49,7 @@ contract StabilityFeeCollector {
 
     mapping (bytes32 => CollateralPool) public collateralPools;
     GovernmentLike                  public government;   // CDP Engine
-    address                  public debtEngine;   // Debt Engine
+    address                  public systemDebtEngine;   // Debt Engine
     uint256                  public globalStabilityFeeRate;  // Global, per-second stability fee contribution [ray]
 
     // --- Init ---
@@ -114,7 +114,7 @@ contract StabilityFeeCollector {
         else revert("StabilityFeeCollector/file-unrecognized-param");
     }
     function file(bytes32 what, address data) external auth {
-        if (what == "debtEngine") debtEngine = data;
+        if (what == "systemDebtEngine") systemDebtEngine = data;
         else revert("StabilityFeeCollector/file-unrecognized-param");
     }
 
@@ -123,7 +123,7 @@ contract StabilityFeeCollector {
         require(now >= collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
         (, uint prev) = government.collateralPools(collateralPool);
         rate = rmul(rpow(add(globalStabilityFeeRate, collateralPools[collateralPool].stabilityFeeRate), now - collateralPools[collateralPool].lastAccumulationTime, ONE), prev);
-        government.accrueStabilityFee(collateralPool, debtEngine, diff(rate, prev));
+        government.accrueStabilityFee(collateralPool, systemDebtEngine, diff(rate, prev));
         collateralPools[collateralPool].lastAccumulationTime = now;
     }
 }

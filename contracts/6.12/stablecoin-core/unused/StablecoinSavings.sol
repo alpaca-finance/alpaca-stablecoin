@@ -65,7 +65,7 @@ contract StablecoinSavings {
     uint256 public sharePrice;   // The Rate Accumulator          [ray]
 
     GovernmentLike public government;   // CDP Engine
-    address public debtEngine;   // Debt Engine
+    address public systemDebtEngine;   // Debt Engine
     uint256 public lastAccumulationTime;   // Time of last drip     [unix epoch time]
 
     uint256 public live;  // Active Flag
@@ -131,7 +131,7 @@ contract StablecoinSavings {
     }
 
     function file(bytes32 what, address addr) external auth {
-        if (what == "debtEngine") debtEngine = addr;
+        if (what == "systemDebtEngine") systemDebtEngine = addr;
         else revert("StablecoinSavings/file-unrecognized-param");
     }
 
@@ -147,7 +147,7 @@ contract StablecoinSavings {
         uint sharePrice_ = sub(tmp, sharePrice);
         sharePrice = tmp;
         lastAccumulationTime = now;
-        government.mintUnbackedStablecoin(address(debtEngine), address(this), mul(totalShare, sharePrice_));
+        government.mintUnbackedStablecoin(address(systemDebtEngine), address(this), mul(totalShare, sharePrice_));
     }
 
     // --- Savings Dai Management ---

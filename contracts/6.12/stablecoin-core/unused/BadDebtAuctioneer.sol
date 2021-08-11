@@ -77,7 +77,7 @@ contract BadDebtAuctioneer {
     uint48   public   auctionLength = 2 days;   // 2 days total auction length  [seconds]
     uint256  public kicks = 0;
     uint256  public live;             // Active Flag
-    address  public debtEngine;              // not used until shutdown
+    address  public systemDebtEngine;              // not used until shutdown
 
     // --- Events ---
     event Kick(
@@ -169,12 +169,12 @@ contract BadDebtAuctioneer {
     // --- Shutdown ---
     function cage() external auth {
        live = 0;
-       debtEngine = msg.sender;
+       systemDebtEngine = msg.sender;
     }
     function yank(uint id) external {
         require(live == 0, "BadDebtAuctioneer/still-live");
         require(bids[id].bidder != address(0), "BadDebtAuctioneer/bidder-not-set");
-        government.mintUnbackedStablecoin(debtEngine, bids[id].bidder, bids[id].bid);
+        government.mintUnbackedStablecoin(systemDebtEngine, bids[id].bidder, bids[id].bid);
         delete bids[id];
     }
 }
