@@ -47,7 +47,7 @@ interface GovernmentLike {
 }
 
 interface SystemDebtEngine {
-    function pushToDebtQueue(uint256) external;
+    function pushToBadDebtQueue(uint256) external;
 }
 
 contract LiquidationEngine {
@@ -217,7 +217,7 @@ contract LiquidationEngine {
         );
 
         uint256 debtValueToBeLiquidatedWithoutPenalty = mul(debtShareToBeLiquidated, debtAccumulatedRate);
-        systemDebtEngine.pushToDebtQueue(debtValueToBeLiquidatedWithoutPenalty);
+        systemDebtEngine.pushToBadDebtQueue(debtValueToBeLiquidatedWithoutPenalty);
 
         {   // Avoid stack too deep
             // This calcuation will overflow if debtShareToBeLiquidated*debtAccumulatedRate exceeds ~10^14

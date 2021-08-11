@@ -113,12 +113,12 @@ contract SystemDebtEngine {
     }
 
     // Push to debt-queue
-    function pushToDebtQueue(uint tab) external auth {
+    function pushToBadDebtQueue(uint tab) external auth {
         badDebtQueue[now] = add(badDebtQueue[now], tab);
         totalBadDebtValue = add(totalBadDebtValue, tab);
     }
     // Pop from debt-queue
-    function popFromDebtQueue(uint currentTimestamp) external {
+    function popFromBadDebtQueue(uint currentTimestamp) external {
         require(add(currentTimestamp, badDebtAuctionDelay) <= now, "SystemDebtEngine/badDebtAuctionDelay-not-finished");
         totalBadDebtValue = sub(totalBadDebtValue, badDebtQueue[currentTimestamp]);
         badDebtQueue[currentTimestamp] = 0;
