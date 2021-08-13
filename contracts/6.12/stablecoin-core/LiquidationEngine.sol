@@ -22,10 +22,10 @@ pragma solidity >=0.6.12;
 interface CollateralAuctioneerLike {
     function collateralPoolId() external view returns (bytes32);
     function startAuction(
-        uint256 tab,
-        uint256 lot,
-        address usr,
-        address kpr
+        uint256 debt,
+        uint256 collateralAmount,
+        address positionAddress,
+        address liquidatorAddress
     ) external returns (uint256);
 }
 
@@ -226,10 +226,10 @@ contract LiquidationEngine {
             collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = add(mcollateralPool.stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
 
             id = CollateralAuctioneerLike(mcollateralPool.auctioneer).startAuction({
-                tab: debtValueToBeLiquidatedWithPenalty,
-                lot: collateralAmountToBeLiquidated,
-                usr: positionAddress,
-                kpr: liquidatorAddress
+                debt: debtValueToBeLiquidatedWithPenalty,
+                collateralAmount: collateralAmountToBeLiquidated,
+                positionAddress: positionAddress,
+                liquidatorAddress: liquidatorAddress
             });
         }
 
