@@ -328,7 +328,7 @@ contract CollateralAuctioneer {
         uint256 id,           // Auction id
         uint256 collateralAmountToBuy,          // Upper limit on amount of collateral to buy  [wad]
         uint256 maxPrice,          // Maximum acceptable price (DAI / collateral) [ray]
-        address who,          // Receiver of collateral and external call address
+        address collateralRecipient,          // Receiver of collateral and external call address
         bytes calldata data   // Data to pass in external call; if length 0, no call is done
     ) external lock isStopped(3) {
 
@@ -384,15 +384,15 @@ contract CollateralAuctioneer {
             // Calculate remaining collateralAmount after operation
             collateralAmount = collateralAmount - slice;
 
-            // Send collateral to who
-            government.moveCollateral(collateralPoolId, address(this), who, slice);
+            // Send collateral to collateralRecipient
+            government.moveCollateral(collateralPoolId, address(this), collateralRecipient, slice);
 
             // Do external call (if data is defined) but to be
             // extremely careful we don't allow to do it to the two
             // contracts which the CollateralAuctioneer needs to be authorized
             LiquidationEngineLike liquidationEngine_ = liquidationEngine;
-            if (data.length > 0 && who != address(government) && who != address(liquidationEngine_)) {
-                FlashLendingCallee(who).flashLendingCall(msg.sender, owe, slice, data);
+            if (data.length > 0 && collateralRecipient != address(government) && collateralRecipient != address(liquidationEngine_)) {
+                FlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
             }
 
             // Get DAI from caller
