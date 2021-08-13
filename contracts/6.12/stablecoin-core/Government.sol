@@ -204,7 +204,7 @@ contract Government {
         require(either(vtab >= i.debtFloor, v.debtShare == 0), "Government/debtFloor-dst");
     }
     // --- CDP Confiscation ---
-    function confiscatePosition(bytes32 collateralPoolId, address positionAddress, address collateralOwner, address stablecoinDebtor, int collateralValue, int debtShare) external auth {
+    function confiscatePosition(bytes32 collateralPoolId, address positionAddress, address collateralCreditor, address stablecoinDebtor, int collateralValue, int debtShare) external auth {
         Position storage position = positions[collateralPoolId][positionAddress];
         CollateralPool storage collateralPool = collateralPools[collateralPoolId];
 
@@ -214,7 +214,7 @@ contract Government {
 
         int debtValue = mul(collateralPool.debtAccumulatedRate, debtShare);
 
-        collateralToken[collateralPoolId][collateralOwner] = sub(collateralToken[collateralPoolId][collateralOwner], collateralValue);
+        collateralToken[collateralPoolId][collateralCreditor] = sub(collateralToken[collateralPoolId][collateralCreditor], collateralValue);
         systemBadDebt[stablecoinDebtor]    = sub(systemBadDebt[stablecoinDebtor],    debtValue);
         totalUnbackedStablecoin      = sub(totalUnbackedStablecoin,      debtValue);
     }
