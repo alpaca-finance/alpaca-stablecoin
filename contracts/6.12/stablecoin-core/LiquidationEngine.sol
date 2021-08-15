@@ -62,7 +62,7 @@ contract LiquidationEngine {
 
     // --- Data ---
     struct CollateralPool {
-        address auctioneer;  // Liquidator
+        address auctioneer;  // Auctioneer contract
         uint256 liquidationPenalty;  // Liquidation Penalty                                          [wad]
         uint256 liquidationMaxSize;  // Max DAI needed to cover debt+fees of active auctions per collateralPool [rad]
         uint256 stablecoinNeededForDebtRepay;  // Amt DAI needed to cover debt+fees of active auctions per collateralPool [rad]
