@@ -29,7 +29,10 @@ interface GovernmentLike {
 }
 
 contract PositionHandler {
+    address immutable public owner;
+
     constructor(address government) public {
+        owner = msg.sender;
         GovernmentLike(government).hope(msg.sender);
     }
 }
