@@ -37,7 +37,7 @@ interface PriceOracleLike {
 
 interface LiquidationEngineLike {
     function liquidationPenalty(bytes32) external returns (uint256);
-    function digs(bytes32, uint256) external;
+    function removeRepaidDebtFromAuction(bytes32, uint256) external;
 }
 
 interface FlashLendingCallee {
@@ -399,7 +399,7 @@ contract CollateralAuctioneer {
             government.moveStablecoin(msg.sender, systemDebtEngine, owe);
 
             // Removes Dai out for liquidation from accumulator
-            liquidationEngine_.digs(collateralPoolId, collateralAmount == 0 ? debt + owe : owe);
+            liquidationEngine_.removeRepaidDebtFromAuction(collateralPoolId, collateralAmount == 0 ? debt + owe : owe);
         }
 
         if (collateralAmount == 0) {
@@ -465,7 +465,7 @@ contract CollateralAuctioneer {
     // Cancel an auction during Emergency Shutdown or via governance action.
     function yank(uint256 id) external auth lock {
         require(sales[id].positionAddress != address(0), "CollateralAuctioneer/not-running-auction");
-        liquidationEngine.digs(collateralPoolId, sales[id].debt);
+        liquidationEngine.removeRepaidDebtFromAuction(collateralPoolId, sales[id].debt);
         government.moveCollateral(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
         _remove(id);
         emit Yank(id);

@@ -236,7 +236,7 @@ contract LiquidationEngine {
         emit StartLiquidation(collateralPoolId, positionAddress, collateralAmountToBeLiquidated, debtShareToBeLiquidated, debtValueToBeLiquidatedWithoutPenalty, mcollateralPool.auctioneer, id);
     }
 
-    function digs(bytes32 collateralPoolId, uint256 rad) external auth {
+    function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external auth {
         stablecoinNeededForDebtRepay = sub(stablecoinNeededForDebtRepay, rad);
         collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = sub(collateralPools[collateralPoolId].stablecoinNeededForDebtRepay, rad);
         emit Digs(collateralPoolId, rad);
