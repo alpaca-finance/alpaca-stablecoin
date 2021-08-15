@@ -48,6 +48,16 @@ interface CalculatorLike {
     function price(uint256, uint256) external view returns (uint256);
 }
 
+interface FarmableTokenAdapterLike {
+    function deposit(address, address, uint256) external;
+    function moveRewards(address, address, uint256) external;
+    function collateralPoolId() external view returns (bytes32);
+}
+
+interface PositionHandlerLike {
+    function owner() external view returns (address);
+}
+
 contract FarmableTokenAuctioneer {
     // --- Auth ---
     mapping (address => uint256) public wards;
@@ -61,6 +71,7 @@ contract FarmableTokenAuctioneer {
     // --- Data ---
     bytes32  immutable public collateralPoolId;   // Collateral type of this CollateralAuctioneer
     GovernmentLike  immutable public government;   // Core CDP Engine
+    FarmableTokenAdapterLike immutable public farmableTokenAdapter;
 
     LiquidationEngineLike     public liquidationEngine;      // Liquidation module
     address     public systemDebtEngine;      // Recipient of dai raised in auctions
@@ -134,11 +145,12 @@ contract FarmableTokenAuctioneer {
     event Yank(uint256 id);
 
     // --- Init ---
-    constructor(address government_, address priceOracle_, address liquidationEngine_, bytes32 collateralPoolId_) public {
+    constructor(address government_, address priceOracle_, address liquidationEngine_, address farmableTokenAdapter_) public {
         government     = GovernmentLike(government_);
         priceOracle = PriceOracleLike(priceOracle_);
         liquidationEngine     = LiquidationEngineLike(liquidationEngine_);
-        collateralPoolId     = collateralPoolId_;
+        farmableTokenAdapter = FarmableTokenAdapterLike(farmableTokenAdapter_);
+        collateralPoolId     = FarmableTokenAdapterLike(farmableTokenAdapter_).collateralPoolId();
         startingPriceBuffer     = RAY;
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
@@ -261,6 +273,12 @@ contract FarmableTokenAuctioneer {
             prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
             government.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
         }
+
+        // Handle Farmable Token upon liquidation
+        // 1. Harvest the rewards of this CDP owner and distribute to the CDP Owner
+        farmableTokenAdapter.deposit(positionAddress, PositionHandlerLike(positionAddress).owner(), 0);
+        // 2. Confiscate and move the rewards and the staked collateral to this address, they will be distributed to the bidder later
+        farmableTokenAdapter.moveRewards(positionAddress, address(this), collateralAmount);
 
         emit Kick(id, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize);
     }
@@ -386,6 +404,9 @@ contract FarmableTokenAuctioneer {
 
             // Send collateral to collateralRecipient
             government.moveCollateral(collateralPoolId, address(this), collateralRecipient, slice);
+            // Handle Farmable Token
+            // Distribute the confisacted rewards and staked collateral to the bidder
+            farmableTokenAdapter.moveRewards(address(this), collateralRecipient, slice);
 
             // Do external call (if data is defined) but to be
             // extremely careful we don't allow to do it to the two
@@ -406,6 +427,8 @@ contract FarmableTokenAuctioneer {
             _remove(id);
         } else if (debt == 0) {
             government.moveCollateral(collateralPoolId, address(this), positionAddress, collateralAmount);
+            // Return the remaining confiscated rewards and staked collateral to the original position
+            farmableTokenAdapter.moveRewards(address(this), positionAddress, collateralAmount);
             _remove(id);
         } else {
             sales[id].debt = debt;
