@@ -118,10 +118,10 @@ contract SystemDebtEngine {
         totalBadDebtValue = add(totalBadDebtValue, tab);
     }
     // Pop from debt-queue
-    function popFromBadDebtQueue(uint currentTimestamp) external {
-        require(add(currentTimestamp, badDebtAuctionDelay) <= now, "SystemDebtEngine/badDebtAuctionDelay-not-finished");
-        totalBadDebtValue = sub(totalBadDebtValue, badDebtQueue[currentTimestamp]);
-        badDebtQueue[currentTimestamp] = 0;
+    function popFromBadDebtQueue(uint timestamp) external {
+        require(add(timestamp, badDebtAuctionDelay) <= now, "SystemDebtEngine/badDebtAuctionDelay-not-finished");
+        totalBadDebtValue = sub(totalBadDebtValue, badDebtQueue[timestamp]);
+        badDebtQueue[timestamp] = 0;
     }
 
     // Debt settlement
