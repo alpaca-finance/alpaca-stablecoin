@@ -58,6 +58,10 @@ interface PositionHandlerLike {
     function owner() external view returns (address);
 }
 
+interface ProxyLike {
+    function owner() external view returns (address);
+}
+
 contract FarmableTokenAuctioneer {
     // --- Auth ---
     mapping (address => uint256) public wards;
@@ -276,7 +280,8 @@ contract FarmableTokenAuctioneer {
 
         // Handle Farmable Token upon liquidation
         // 1. Harvest the rewards of this CDP owner and distribute to the CDP Owner
-        farmableTokenAdapter.deposit(positionAddress, PositionHandlerLike(positionAddress).owner(), 0);
+        address positionOwner = PositionHandlerLike(positionAddress).owner();
+        farmableTokenAdapter.deposit(positionAddress, positionOwner, 0);
         // 2. Confiscate and move the rewards and the staked collateral to this address, they will be distributed to the bidder later
         farmableTokenAdapter.moveRewards(positionAddress, address(this), collateralAmount);
 
