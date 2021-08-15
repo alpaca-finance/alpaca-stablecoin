@@ -217,7 +217,10 @@ contract LiquidationEngine {
         );
 
         uint256 debtValueToBeLiquidatedWithoutPenalty = mul(debtShareToBeLiquidated, debtAccumulatedRate);
-        systemDebtEngine.pushToBadDebtQueue(debtValueToBeLiquidatedWithoutPenalty);
+
+        // This line is omitted, because there will be no Bad Debt Auction.
+        // Thus, having Bad Debt Queue does not make sense and would prevent settling of Bad Debt to be done with efficient gas.
+        //systemDebtEngine.pushToBadDebtQueue(debtValueToBeLiquidatedWithoutPenalty);
 
         {   // Avoid stack too deep
             // This calcuation will overflow if debtShareToBeLiquidated*debtAccumulatedRate exceeds ~10^14
