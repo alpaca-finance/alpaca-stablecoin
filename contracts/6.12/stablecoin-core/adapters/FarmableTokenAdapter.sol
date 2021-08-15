@@ -47,7 +47,7 @@ contract FarmableTokenAdapter {
     uint256     public totalShare;  // total collateralTokens       [wad]
     uint256     public accRewardBalance;  // crop balance     [wad]
 
-    mapping (address => uint256) public rewards; // rewards per user  [wad]
+    mapping (address => uint256) public rewardDebts; // rewardDebt per user  [wad]
     mapping (address => uint256) public stake; // collateralTokens per user   [wad]
 
     uint256 immutable internal to18ConversionFactor;
@@ -143,7 +143,7 @@ contract FarmableTokenAdapter {
     function harvest(address from, address to) internal {
         if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(harvestedRewards(), totalShare));
 
-        uint256 last = rewards[from];
+        uint256 last = rewardDebts[from];
         uint256 curr = rmul(stake[from], accRewardPerShare);
         if (curr > last) require(rewardToken.transfer(to, curr - last));
         accRewardBalance = rewardToken.balanceOf(address(this));
@@ -166,7 +166,7 @@ contract FarmableTokenAdapter {
             totalShare = add(totalShare, wad);
             stake[positionAddress] = add(stake[positionAddress], wad);
         }
-        rewards[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
+        rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
         emit Deposit(val);
     }
 
@@ -185,7 +185,7 @@ contract FarmableTokenAdapter {
             totalShare = sub(totalShare, wad);
             stake[positionAddress] = sub(stake[positionAddress], wad);
         }
-        rewards[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
+        rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
         emit Withdraw(val);
     }
 
@@ -199,7 +199,7 @@ contract FarmableTokenAdapter {
 
         totalShare = sub(totalShare, wad);
         stake[positionAddress] = sub(stake[positionAddress], wad);
-        rewards[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
+        rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
 
         emit Flee();
     }
@@ -209,12 +209,12 @@ contract FarmableTokenAdapter {
         stake[src] = sub(ss, wad);
         stake[dst] = add(stake[dst], wad);
 
-        uint256 cs     = rewards[src];
-        uint256 drewards = mul(cs, wad) / ss;
+        uint256 cs     = rewardDebts[src];
+        uint256 drewardDebt = mul(cs, wad) / ss;
 
-        // safe since drewards <= rewards[src]
-        rewards[src] = cs - drewards;
-        rewards[dst] = add(rewards[dst], drewards);
+        // safe since drewardDebts <= rewardDebts[src]
+        rewardDebts[src] = cs - drewardDebt;
+        rewardDebts[dst] = add(rewardDebts[dst], drewardDebt);
 
         (uint256 lockedCollateral,) = government.positions(collateralPoolId, src);
         require(stake[src] >= add(government.collateralToken(collateralPoolId, src), lockedCollateral));
