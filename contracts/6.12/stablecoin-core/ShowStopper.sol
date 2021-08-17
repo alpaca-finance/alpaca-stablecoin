@@ -322,7 +322,10 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   event Cash(bytes32 indexed collateralPoolId, address indexed usr, uint256 wad);
 
   // --- Init ---
-  function initialize() external {
+  function initialize() external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
     wards[msg.sender] = 1;
     live = 1;
     emit Rely(msg.sender);
