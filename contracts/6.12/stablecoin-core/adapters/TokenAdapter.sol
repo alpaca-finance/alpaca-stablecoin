@@ -26,7 +26,7 @@ import "@openzeppelin/contracts-ethereum-package/contracts/Initializable.sol";
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface TokenLike is OwnableUpgradeSafe {
+interface TokenLike {
   function decimals() external view returns (uint256);
 
   function transfer(address, uint256) external returns (bool);
@@ -82,7 +82,7 @@ interface GovernmentLike {
 
 */
 
-contract TokenAdapter {
+contract TokenAdapter is OwnableUpgradeSafe {
   // --- Auth ---
   mapping(address => uint256) public wards;
 
