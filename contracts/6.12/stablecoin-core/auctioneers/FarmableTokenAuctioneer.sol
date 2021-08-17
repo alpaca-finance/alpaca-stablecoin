@@ -253,6 +253,7 @@ contract FarmableTokenAuctioneer {
     else if (what == "liquidationEngine") liquidationEngine = LiquidationEngineLike(data);
     else if (what == "systemDebtEngine") systemDebtEngine = data;
     else if (what == "calc") calc = CalculatorLike(data);
+    else if (what == "cdpManager") cdpManager = CDPManagerLike(data);
     else revert("CollateralAuctioneer/file-unrecognized-param");
     emit File(what, data);
   }
