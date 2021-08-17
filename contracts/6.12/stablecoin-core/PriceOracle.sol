@@ -22,87 +22,112 @@ pragma solidity >=0.5.12;
 // New deployments of this contract will need to include custom events (TO DO).
 
 interface GovernmentLike {
-    function file(bytes32, bytes32, uint) external;
+  function file(
+    bytes32,
+    bytes32,
+    uint256
+  ) external;
 }
 
 interface PriceFeedLike {
-    function peek() external returns (bytes32, bool);
+  function peek() external returns (bytes32, bool);
 }
 
 contract PriceOracle {
-    // --- Auth ---
-    mapping (address => uint) public wards;
-    function rely(address guy) external auth { wards[guy] = 1;  }
-    function deny(address guy) external auth { wards[guy] = 0; }
-    modifier auth {
-        require(wards[msg.sender] == 1, "Spotter/not-authorized");
-        _;
-    }
+  // --- Auth ---
+  mapping(address => uint256) public wards;
 
-    // --- Data ---
-    struct CollateralPool {
-        PriceFeedLike priceFeed;  // Price Feed
-        uint256 liquidationRatio;  // Liquidation ratio [ray]
-    }
+  function rely(address guy) external auth {
+    wards[guy] = 1;
+  }
 
-    mapping (bytes32 => CollateralPool) public collateralPools;
+  function deny(address guy) external auth {
+    wards[guy] = 0;
+  }
 
-    GovernmentLike public vat;  // CDP Engine
-    uint256 public stableCoinReferencePrice;  // ref per dai [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
+  modifier auth {
+    require(wards[msg.sender] == 1, "Spotter/not-authorized");
+    _;
+  }
 
-    uint256 public live;
+  // --- Data ---
+  struct CollateralPool {
+    PriceFeedLike priceFeed; // Price Feed
+    uint256 liquidationRatio; // Liquidation ratio [ray]
+  }
 
-    // --- Events ---
-    event Poke(
-      bytes32 poolId,
-      bytes32 val,  // [wad]
-      uint256 spot  // [ray]
-    );
+  mapping(bytes32 => CollateralPool) public collateralPools;
 
-    // --- Init ---
-    constructor(address vat_) public {
-        wards[msg.sender] = 1;
-        vat = GovernmentLike(vat_);
-        stableCoinReferencePrice = ONE;
-        live = 1;
-    }
+  GovernmentLike public vat; // CDP Engine
+  uint256 public stableCoinReferencePrice; // ref per dai [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
 
-    // --- Math ---
-    uint constant ONE = 10 ** 27;
+  uint256 public live;
 
-    function mul(uint x, uint y) internal pure returns (uint z) {
-        require(y == 0 || (z = x * y) / y == x);
-    }
-    function rdiv(uint x, uint y) internal pure returns (uint z) {
-        z = mul(x, ONE) / y;
-    }
+  // --- Events ---
+  event Poke(
+    bytes32 poolId,
+    bytes32 val, // [wad]
+    uint256 spot // [ray]
+  );
 
-    // --- Administration ---
-    function file(bytes32 poolId, bytes32 what, address priceFeed_) external auth {
-        require(live == 1, "Spotter/not-live");
-        if (what == "priceFeed") collateralPools[poolId].priceFeed = PriceFeedLike(priceFeed_);
-        else revert("Spotter/file-unrecognized-param");
-    }
-    function file(bytes32 what, uint data) external auth {
-        require(live == 1, "Spotter/not-live");
-        if (what == "stableCoinReferencePrice") stableCoinReferencePrice = data;
-        else revert("Spotter/file-unrecognized-param");
-    }
-    function file(bytes32 poolId, bytes32 what, uint data) external auth {
-        require(live == 1, "Spotter/not-live");
-        if (what == "liquidationRatio") collateralPools[poolId].liquidationRatio = data;
-        else revert("Spotter/file-unrecognized-param");
-    }
+  // --- Init ---
+  constructor(address vat_) public {
+    wards[msg.sender] = 1;
+    vat = GovernmentLike(vat_);
+    stableCoinReferencePrice = ONE;
+    live = 1;
+  }
 
-    // --- Update value ---
-    function poke(bytes32 poolId) external {
-        (bytes32 val, bool has) = collateralPools[poolId].priceFeed.peek();
-        uint256 priceWithSafetyMargin = has ? rdiv(rdiv(mul(uint(val), 10 ** 9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio) : 0;
-        vat.file(poolId, "priceWithSafetyMargin", priceWithSafetyMargin);
-        emit Poke(poolId, val, priceWithSafetyMargin);
-    }
+  // --- Math ---
+  uint256 constant ONE = 10**27;
 
-    function cage() external auth {
-        live = 0;
-    }
+  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    require(y == 0 || (z = x * y) / y == x);
+  }
+
+  function rdiv(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    z = mul(x, ONE) / y;
+  }
+
+  // --- Administration ---
+  function file(
+    bytes32 poolId,
+    bytes32 what,
+    address priceFeed_
+  ) external auth {
+    require(live == 1, "Spotter/not-live");
+    if (what == "priceFeed") collateralPools[poolId].priceFeed = PriceFeedLike(priceFeed_);
+    else revert("Spotter/file-unrecognized-param");
+  }
+
+  function file(bytes32 what, uint256 data) external auth {
+    require(live == 1, "Spotter/not-live");
+    if (what == "stableCoinReferencePrice") stableCoinReferencePrice = data;
+    else revert("Spotter/file-unrecognized-param");
+  }
+
+  function file(
+    bytes32 poolId,
+    bytes32 what,
+    uint256 data
+  ) external auth {
+    require(live == 1, "Spotter/not-live");
+    if (what == "liquidationRatio") collateralPools[poolId].liquidationRatio = data;
+    else revert("Spotter/file-unrecognized-param");
+  }
+
+  // --- Update value ---
+  function poke(bytes32 poolId) external {
+    (bytes32 val, bool has) = collateralPools[poolId].priceFeed.peek();
+    uint256 priceWithSafetyMargin =
+      has
+        ? rdiv(rdiv(mul(uint256(val), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
+        : 0;
+    vat.file(poolId, "priceWithSafetyMargin", priceWithSafetyMargin);
+    emit Poke(poolId, val, priceWithSafetyMargin);
+  }
+
+  function cage() external auth {
+    live = 0;
+  }
 }

@@ -22,37 +22,53 @@ pragma solidity >=0.5.12;
 import "./CDPManager.sol";
 
 contract GetCDPs {
-    function getCdpsAsc(address manager, address guy) external view returns (uint[] memory ids, address[] memory positions, bytes32[] memory collateralPools) {
-        uint count = CDPManager(manager).count(guy);
-        ids = new uint[](count);
-        positions = new address[](count);
-        collateralPools = new bytes32[](count);
-        uint i = 0;
-        uint id = CDPManager(manager).first(guy);
+  function getCdpsAsc(address manager, address guy)
+    external
+    view
+    returns (
+      uint256[] memory ids,
+      address[] memory positions,
+      bytes32[] memory collateralPools
+    )
+  {
+    uint256 count = CDPManager(manager).count(guy);
+    ids = new uint256[](count);
+    positions = new address[](count);
+    collateralPools = new bytes32[](count);
+    uint256 i = 0;
+    uint256 id = CDPManager(manager).first(guy);
 
-        while (id > 0) {
-            ids[i] = id;
-            positions[i] = CDPManager(manager).positions(id);
-            collateralPools[i] = CDPManager(manager).collateralPools(id);
-            (,id) = CDPManager(manager).list(id);
-            i++;
-        }
+    while (id > 0) {
+      ids[i] = id;
+      positions[i] = CDPManager(manager).positions(id);
+      collateralPools[i] = CDPManager(manager).collateralPools(id);
+      (, id) = CDPManager(manager).list(id);
+      i++;
     }
+  }
 
-    function getCdpsDesc(address manager, address guy) external view returns (uint[] memory ids, address[] memory positions, bytes32[] memory collateralPools) {
-        uint count = CDPManager(manager).count(guy);
-        ids = new uint[](count);
-        positions = new address[](count);
-        collateralPools = new bytes32[](count);
-        uint i = 0;
-        uint id = CDPManager(manager).last(guy);
+  function getCdpsDesc(address manager, address guy)
+    external
+    view
+    returns (
+      uint256[] memory ids,
+      address[] memory positions,
+      bytes32[] memory collateralPools
+    )
+  {
+    uint256 count = CDPManager(manager).count(guy);
+    ids = new uint256[](count);
+    positions = new address[](count);
+    collateralPools = new bytes32[](count);
+    uint256 i = 0;
+    uint256 id = CDPManager(manager).last(guy);
 
-        while (id > 0) {
-            ids[i] = id;
-            positions[i] = CDPManager(manager).positions(id);
-            collateralPools[i] = CDPManager(manager).collateralPools(id);
-            (id,) = CDPManager(manager).list(id);
-            i++;
-        }
+    while (id > 0) {
+      ids[i] = id;
+      positions[i] = CDPManager(manager).positions(id);
+      collateralPools[i] = CDPManager(manager).collateralPools(id);
+      (id, ) = CDPManager(manager).list(id);
+      i++;
     }
+  }
 }

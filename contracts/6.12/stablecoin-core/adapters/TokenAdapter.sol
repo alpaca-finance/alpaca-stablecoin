@@ -24,19 +24,35 @@ pragma solidity >=0.5.12;
 // New deployments of this contract will need to include custom events (TO DO).
 
 interface TokenLike {
-    function decimals() external view returns (uint);
-    function transfer(address,uint) external returns (bool);
-    function transferFrom(address,address,uint) external returns (bool);
+  function decimals() external view returns (uint256);
+
+  function transfer(address, uint256) external returns (bool);
+
+  function transferFrom(
+    address,
+    address,
+    uint256
+  ) external returns (bool);
 }
 
 interface StablecoinLike {
-    function mint(address,uint) external;
-    function burn(address,uint) external;
+  function mint(address, uint256) external;
+
+  function burn(address, uint256) external;
 }
 
 interface GovernmentLike {
-    function addCollateral(bytes32,address,int) external;
-    function moveStablecoin(address,address,uint) external;
+  function addCollateral(
+    bytes32,
+    address,
+    int256
+  ) external;
+
+  function moveStablecoin(
+    address,
+    address,
+    uint256
+  ) external;
 }
 
 /*
@@ -64,41 +80,55 @@ interface GovernmentLike {
 */
 
 contract TokenAdapter {
-    // --- Auth ---
-    mapping (address => uint) public wards;
-    function rely(address usr) external auth { wards[usr] = 1; }
-    function deny(address usr) external auth { wards[usr] = 0; }
-    modifier auth {
-        require(wards[msg.sender] == 1, "TokenAdapter/not-authorized");
-        _;
-    }
+  // --- Auth ---
+  mapping(address => uint256) public wards;
 
-    GovernmentLike public government;   // CDP Engine
-    bytes32 public collateralPoolId;   // Collateral Type
-    TokenLike public collateralToken;
-    uint    public decimals;
-    uint    public live;  // Active Flag
+  function rely(address usr) external auth {
+    wards[usr] = 1;
+  }
 
-    constructor(address government_, bytes32 collateralPoolId_, address collateralToken_) public {
-        wards[msg.sender] = 1;
-        live = 1;
-        government = GovernmentLike(government_);
-        collateralPoolId = collateralPoolId_;
-        collateralToken = TokenLike(collateralToken_);
-        decimals = collateralToken.decimals();
-    }
-    function cage() external auth {
-        live = 0;
-    }
-    function deposit(address usr, uint wad) external {
-        require(live == 1, "TokenAdapter/not-live");
-        require(int(wad) >= 0, "TokenAdapter/overflow");
-        government.addCollateral(collateralPoolId, usr, int(wad));
-        require(collateralToken.transferFrom(msg.sender, address(this), wad), "TokenAdapter/failed-transfer");
-    }
-    function withdraw(address usr, uint wad) external {
-        require(wad <= 2 ** 255, "TokenAdapter/overflow");
-        government.addCollateral(collateralPoolId, msg.sender, -int(wad));
-        require(collateralToken.transfer(usr, wad), "TokenAdapter/failed-transfer");
-    }
+  function deny(address usr) external auth {
+    wards[usr] = 0;
+  }
+
+  modifier auth {
+    require(wards[msg.sender] == 1, "TokenAdapter/not-authorized");
+    _;
+  }
+
+  GovernmentLike public government; // CDP Engine
+  bytes32 public collateralPoolId; // Collateral Type
+  TokenLike public collateralToken;
+  uint256 public decimals;
+  uint256 public live; // Active Flag
+
+  constructor(
+    address government_,
+    bytes32 collateralPoolId_,
+    address collateralToken_
+  ) public {
+    wards[msg.sender] = 1;
+    live = 1;
+    government = GovernmentLike(government_);
+    collateralPoolId = collateralPoolId_;
+    collateralToken = TokenLike(collateralToken_);
+    decimals = collateralToken.decimals();
+  }
+
+  function cage() external auth {
+    live = 0;
+  }
+
+  function deposit(address usr, uint256 wad) external {
+    require(live == 1, "TokenAdapter/not-live");
+    require(int256(wad) >= 0, "TokenAdapter/overflow");
+    government.addCollateral(collateralPoolId, usr, int256(wad));
+    require(collateralToken.transferFrom(msg.sender, address(this), wad), "TokenAdapter/failed-transfer");
+  }
+
+  function withdraw(address usr, uint256 wad) external {
+    require(wad <= 2**255, "TokenAdapter/overflow");
+    government.addCollateral(collateralPoolId, msg.sender, -int256(wad));
+    require(collateralToken.transfer(usr, wad), "TokenAdapter/failed-transfer");
+  }
 }

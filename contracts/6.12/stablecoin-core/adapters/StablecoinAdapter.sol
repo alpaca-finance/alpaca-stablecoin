@@ -24,19 +24,35 @@ pragma solidity >=0.5.12;
 // New deployments of this contract will need to include custom events (TO DO).
 
 interface TokenLike {
-    function decimals() external view returns (uint);
-    function transfer(address,uint) external returns (bool);
-    function transferFrom(address,address,uint) external returns (bool);
+  function decimals() external view returns (uint256);
+
+  function transfer(address, uint256) external returns (bool);
+
+  function transferFrom(
+    address,
+    address,
+    uint256
+  ) external returns (bool);
 }
 
 interface StablecoinLike {
-    function mint(address,uint) external;
-    function burn(address,uint) external;
+  function mint(address, uint256) external;
+
+  function burn(address, uint256) external;
 }
 
 interface GovernmentLike {
-    function addCollateral(bytes32,address,int) external;
-    function moveStablecoin(address,address,uint) external;
+  function addCollateral(
+    bytes32,
+    address,
+    int256
+  ) external;
+
+  function moveStablecoin(
+    address,
+    address,
+    uint256
+  ) external;
 }
 
 /*
@@ -64,39 +80,51 @@ interface GovernmentLike {
 */
 
 contract StablecoinAdapter {
-    // --- Auth ---
-    mapping (address => uint) public wards;
-    function rely(address usr) external auth { wards[usr] = 1; }
-    function deny(address usr) external auth { wards[usr] = 0; }
-    modifier auth {
-        require(wards[msg.sender] == 1, "StablecoinAdapter/not-authorized");
-        _;
-    }
+  // --- Auth ---
+  mapping(address => uint256) public wards;
 
-    GovernmentLike public government;      // CDP Engine
-    StablecoinLike public stablecoin;  // Stablecoin Token
-    uint    public live;     // Active Flag
+  function rely(address usr) external auth {
+    wards[usr] = 1;
+  }
 
-    constructor(address government_, address stablecoin_) public {
-        wards[msg.sender] = 1;
-        live = 1;
-        government = GovernmentLike(government_);
-        stablecoin = StablecoinLike(stablecoin_);
-    }
-    function cage() external auth {
-        live = 0;
-    }
-    uint constant ONE = 10 ** 27;
-    function mul(uint x, uint y) internal pure returns (uint z) {
-        require(y == 0 || (z = x * y) / y == x);
-    }
-    function deposit(address usr, uint wad) external {
-        government.moveStablecoin(address(this), usr, mul(ONE, wad));
-        stablecoin.burn(msg.sender, wad);
-    }
-    function withdraw(address usr, uint wad) external {
-        require(live == 1, "StablecoinAdapter/not-live");
-        government.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
-        stablecoin.mint(usr, wad);
-    }
+  function deny(address usr) external auth {
+    wards[usr] = 0;
+  }
+
+  modifier auth {
+    require(wards[msg.sender] == 1, "StablecoinAdapter/not-authorized");
+    _;
+  }
+
+  GovernmentLike public government; // CDP Engine
+  StablecoinLike public stablecoin; // Stablecoin Token
+  uint256 public live; // Active Flag
+
+  constructor(address government_, address stablecoin_) public {
+    wards[msg.sender] = 1;
+    live = 1;
+    government = GovernmentLike(government_);
+    stablecoin = StablecoinLike(stablecoin_);
+  }
+
+  function cage() external auth {
+    live = 0;
+  }
+
+  uint256 constant ONE = 10**27;
+
+  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    require(y == 0 || (z = x * y) / y == x);
+  }
+
+  function deposit(address usr, uint256 wad) external {
+    government.moveStablecoin(address(this), usr, mul(ONE, wad));
+    stablecoin.burn(msg.sender, wad);
+  }
+
+  function withdraw(address usr, uint256 wad) external {
+    require(live == 1, "StablecoinAdapter/not-live");
+    government.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
+    stablecoin.mint(usr, wad);
+  }
 }
