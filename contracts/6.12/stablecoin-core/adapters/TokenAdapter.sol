@@ -19,6 +19,10 @@
 
 pragma solidity >=0.5.12;
 
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
@@ -79,7 +83,7 @@ interface GovernmentLike {
 
 */
 
-contract TokenAdapter {
+contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -102,11 +106,11 @@ contract TokenAdapter {
   uint256 public decimals;
   uint256 public live; // Active Flag
 
-  constructor(
+  function initialize(
     address government_,
     bytes32 collateralPoolId_,
     address collateralToken_
-  ) public {
+  ) external initializer {
     wards[msg.sender] = 1;
     live = 1;
     government = GovernmentLike(government_);
