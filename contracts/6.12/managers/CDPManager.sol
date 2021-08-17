@@ -56,10 +56,7 @@ interface GovernmentLike {
 }
 
 contract PositionHandler {
-  address public immutable owner;
-
   constructor(address government) public {
-    owner = msg.sender;
     GovernmentLike(government).hope(msg.sender);
   }
 }
@@ -70,6 +67,7 @@ contract CDPManager {
   mapping(uint256 => address) public positions; // CDPId => PositionHandler
   mapping(uint256 => List) public list; // CDPId => Prev & Next CDPIds (double linked list)
   mapping(uint256 => address) public owns; // CDPId => Owner
+  mapping(address => address) public ownerMapByPositionHandler; // PositionHandler => Owner
   mapping(uint256 => bytes32) public collateralPools; // CDPId => Ilk
 
   mapping(address => uint256) public first; // Owner => First CDPId
@@ -135,6 +133,7 @@ contract CDPManager {
     cdpi = add(cdpi, 1);
     positions[cdpi] = address(new PositionHandler(government));
     owns[cdpi] = usr;
+    ownerMapByPositionHandler[positions[cdpi]] = usr;
     collateralPools[cdpi] = collateralPoolId;
 
     // Add new CDP to double linked list and pointers
@@ -176,6 +175,7 @@ contract CDPManager {
 
     // Transfer ownership
     owns[cdp] = dst;
+    ownerMapByPositionHandler[positions[cdp]] = dst;
 
     // Add transferred CDP to double linked list of destiny user and pointers
     list[cdp].prev = last[dst];

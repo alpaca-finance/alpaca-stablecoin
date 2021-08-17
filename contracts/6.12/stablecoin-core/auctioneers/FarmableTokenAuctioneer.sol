@@ -99,8 +99,8 @@ interface PositionHandlerLike {
   function owner() external view returns (address);
 }
 
-interface ProxyLike {
-  function owner() external view returns (address);
+interface CDPManagerLike {
+  function ownerMapByPositionHandler(address) external view returns (address);
 }
 
 contract FarmableTokenAuctioneer {
@@ -131,6 +131,7 @@ contract FarmableTokenAuctioneer {
   address public systemDebtEngine; // Recipient of dai raised in auctions
   PriceOracleLike public priceOracle; // Collateral price module
   CalculatorLike public calc; // Current price calculator
+  CDPManagerLike public cdpManager; // CDP Manager which interacts with the protocol
 
   uint256 public startingPriceBuffer; // Multiplicative factor to increase starting price                  [ray]
   uint256 public auctionTimeLimit; // Time elapsed before auction reset                                 [seconds]
@@ -203,13 +204,15 @@ contract FarmableTokenAuctioneer {
     address government_,
     address priceOracle_,
     address liquidationEngine_,
-    address farmableTokenAdapter_
+    address farmableTokenAdapter_,
+    address cdpManager_
   ) public {
     government = GovernmentLike(government_);
     priceOracle = PriceOracleLike(priceOracle_);
     liquidationEngine = LiquidationEngineLike(liquidationEngine_);
     farmableTokenAdapter = FarmableTokenAdapterLike(farmableTokenAdapter_);
     collateralPoolId = FarmableTokenAdapterLike(farmableTokenAdapter_).collateralPoolId();
+    cdpManager = CDPManagerLike(cdpManager_);
     startingPriceBuffer = RAY;
     wards[msg.sender] = 1;
     emit Rely(msg.sender);
@@ -347,7 +350,8 @@ contract FarmableTokenAuctioneer {
 
     // Handle Farmable Token upon liquidation
     // 1. Harvest the rewards of this CDP owner and distribute to the CDP Owner
-    address positionOwner = PositionHandlerLike(positionAddress).owner();
+    address positionOwner = cdpManager.ownerMapByPositionHandler(positionAddress);
+    if(positionOwner == address(0)) positionOwner = positionAddress; // If CDP Owner is not foudn from CDP Manager, this means the positionAddress is actually the EOA address
     farmableTokenAdapter.deposit(positionAddress, positionOwner, 0);
     // 2. Confiscate and move the rewards and the staked collateral to this address, they will be distributed to the bidder later
     farmableTokenAdapter.moveRewards(positionAddress, address(this), collateralAmount);
