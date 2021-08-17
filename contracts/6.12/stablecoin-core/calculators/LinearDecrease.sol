@@ -18,70 +18,81 @@
 pragma solidity >=0.6.12;
 
 interface Calculator {
-    // 1st arg: initial price               [ray]
-    // 2nd arg: seconds since auction start [seconds]
-    // returns: current auction price       [ray]
-    function price(uint256, uint256) external view returns (uint256);
+  // 1st arg: initial price               [ray]
+  // 2nd arg: seconds since auction start [seconds]
+  // returns: current auction price       [ray]
+  function price(uint256, uint256) external view returns (uint256);
 }
 
 contract LinearDecrease is Calculator {
+  // --- Auth ---
+  mapping(address => uint256) public wards;
 
-    // --- Auth ---
-    mapping (address => uint256) public wards;
-    function rely(address usr) external auth { wards[usr] = 1; emit Rely(usr); }
-    function deny(address usr) external auth { wards[usr] = 0; emit Deny(usr); }
-    modifier auth {
-        require(wards[msg.sender] == 1, "LinearDecrease/not-authorized");
-        _;
-    }
+  function rely(address usr) external auth {
+    wards[usr] = 1;
+    emit Rely(usr);
+  }
 
-    // --- Data ---
-    uint256 public tau;  // Seconds after auction start when the price reaches zero [seconds]
+  function deny(address usr) external auth {
+    wards[usr] = 0;
+    emit Deny(usr);
+  }
 
-    // --- Events ---
-    event Rely(address indexed usr);
-    event Deny(address indexed usr);
+  modifier auth {
+    require(wards[msg.sender] == 1, "LinearDecrease/not-authorized");
+    _;
+  }
 
-    event File(bytes32 indexed what, uint256 data);
+  // --- Data ---
+  uint256 public tau; // Seconds after auction start when the price reaches zero [seconds]
 
-    // --- Init ---
-    constructor() public {
-        wards[msg.sender] = 1;
-        emit Rely(msg.sender);
-    }
+  // --- Events ---
+  event Rely(address indexed usr);
+  event Deny(address indexed usr);
 
-    // --- Administration ---
-    function file(bytes32 what, uint256 data) external auth {
-        if (what ==  "tau") tau = data;
-        else revert("LinearDecrease/file-unrecognized-param");
-        emit File(what, data);
-    }
+  event File(bytes32 indexed what, uint256 data);
 
-    // --- Math ---
-    uint256 constant RAY = 10 ** 27;
-    function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require((z = x + y) >= x);
-    }
-    function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require(y == 0 || (z = x * y) / y == x);
-    }
-    function rmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        z = x * y;
-        require(y == 0 || z / y == x);
-        z = z / RAY;
-    }
+  // --- Init ---
+  constructor() public {
+    wards[msg.sender] = 1;
+    emit Rely(msg.sender);
+  }
 
-    // Price calculation when price is decreased linearly in proportion to time:
-    // tau: The number of seconds after the start of the auction where the price will hit 0
-    // top: Initial price
-    // dur: current seconds since the start of the auction
-    //
-    // Returns y = top * ((tau - dur) / tau)
-    //
-    // Note the internal call to mul multiples by RAY, thereby ensuring that the rmul calculation
-    // which utilizes top and tau (RAY values) is also a RAY value.
-    function price(uint256 top, uint256 dur) override external view returns (uint256) {
-        if (dur >= tau) return 0;
-        return rmul(top, mul(tau - dur, RAY) / tau);
-    }
+  // --- Administration ---
+  function file(bytes32 what, uint256 data) external auth {
+    if (what == "tau") tau = data;
+    else revert("LinearDecrease/file-unrecognized-param");
+    emit File(what, data);
+  }
+
+  // --- Math ---
+  uint256 constant RAY = 10**27;
+
+  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    require((z = x + y) >= x);
+  }
+
+  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    require(y == 0 || (z = x * y) / y == x);
+  }
+
+  function rmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    z = x * y;
+    require(y == 0 || z / y == x);
+    z = z / RAY;
+  }
+
+  // Price calculation when price is decreased linearly in proportion to time:
+  // tau: The number of seconds after the start of the auction where the price will hit 0
+  // top: Initial price
+  // dur: current seconds since the start of the auction
+  //
+  // Returns y = top * ((tau - dur) / tau)
+  //
+  // Note the internal call to mul multiples by RAY, thereby ensuring that the rmul calculation
+  // which utilizes top and tau (RAY values) is also a RAY value.
+  function price(uint256 top, uint256 dur) external view override returns (uint256) {
+    if (dur >= tau) return 0;
+    return rmul(top, mul(tau - dur, RAY) / tau);
+  }
 }

@@ -24,11 +24,21 @@ pragma solidity >=0.5.12;
 // New deployments of this contract will need to include custom events (TO DO).
 
 interface GovernmentLike {
-    function moveStablecoin(address,address,uint) external;
+  function moveStablecoin(
+    address,
+    address,
+    uint256
+  ) external;
 }
+
 interface TokenLike {
-    function move(address,address,uint) external;
-    function burn(address,uint) external;
+  function move(
+    address,
+    address,
+    uint256
+  ) external;
+
+  function burn(address, uint256) external;
 }
 
 /*
@@ -42,122 +52,137 @@ interface TokenLike {
 */
 
 contract SurplusAuctioneer {
-    // --- Auth ---
-    mapping (address => uint) public whitelist;
-    function rely(address usr) external auth { whitelist[usr] = 1; }
-    function deny(address usr) external auth { whitelist[usr] = 0; }
-    modifier auth {
-        require(whitelist[msg.sender] == 1, "SurplusAuctioneer/not-authorized");
-        _;
+  // --- Auth ---
+  mapping(address => uint256) public whitelist;
+
+  function rely(address usr) external auth {
+    whitelist[usr] = 1;
+  }
+
+  function deny(address usr) external auth {
+    whitelist[usr] = 0;
+  }
+
+  modifier auth {
+    require(whitelist[msg.sender] == 1, "SurplusAuctioneer/not-authorized");
+    _;
+  }
+
+  // --- Data ---
+  struct Bid {
+    uint256 bid; // alpacas paid               [wad]
+    uint256 lot; // dai in return for bid   [rad]
+    address bidder; // high bidder
+    uint48 bidExpiry; // bid expiry time         [unix epoch time]
+    uint48 auctionExpiry; // auction expiry time     [unix epoch time]
+  }
+
+  mapping(uint256 => Bid) public bids;
+
+  GovernmentLike public government; // CDP Engine
+  TokenLike public alpaca;
+
+  uint256 constant ONE = 1.00E18;
+  uint256 public minimumBidIncrease = 1.05E18; // 5% minimum bid increase
+  uint48 public bidLifetime = 3 hours; // 3 hours bid duration         [seconds]
+  uint48 public auctionLength = 2 days; // 2 days total auction length  [seconds]
+  uint256 public kicks = 0;
+  uint256 public live; // Active Flag
+
+  // --- Events ---
+  event Kick(uint256 id, uint256 lot, uint256 bid);
+
+  // --- Init ---
+  constructor(address government_, address alpaca_) public {
+    whitelist[msg.sender] = 1;
+    government = GovernmentLike(government_);
+    alpaca = TokenLike(alpaca_);
+    live = 1;
+  }
+
+  // --- Math ---
+  function add(uint48 x, uint48 y) internal pure returns (uint48 z) {
+    require((z = x + y) >= x);
+  }
+
+  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    require(y == 0 || (z = x * y) / y == x);
+  }
+
+  // --- Admin ---
+  function file(bytes32 what, uint256 data) external auth {
+    if (what == "minimumBidIncrease") minimumBidIncrease = data;
+    else if (what == "bidLifetime") bidLifetime = uint48(data);
+    else if (what == "auctionLength") auctionLength = uint48(data);
+    else revert("SurplusAuctioneer/file-unrecognized-param");
+  }
+
+  // --- Auction ---
+  function startAuction(uint256 lot, uint256 bid) external auth returns (uint256 id) {
+    require(live == 1, "SurplusAuctioneer/not-live");
+    require(kicks < uint256(-1), "SurplusAuctioneer/overflow");
+    id = ++kicks;
+
+    bids[id].bid = bid;
+    bids[id].lot = lot;
+    bids[id].bidder = msg.sender; // configurable??
+    bids[id].auctionExpiry = add(uint48(now), auctionLength);
+
+    government.moveStablecoin(msg.sender, address(this), lot);
+
+    emit Kick(id, lot, bid);
+  }
+
+  function tick(uint256 id) external {
+    require(bids[id].auctionExpiry < now, "SurplusAuctioneer/not-finished");
+    require(bids[id].bidExpiry == 0, "SurplusAuctioneer/bid-already-placed");
+    bids[id].auctionExpiry = add(uint48(now), auctionLength);
+  }
+
+  function tend(
+    uint256 id,
+    uint256 lot,
+    uint256 bid
+  ) external {
+    require(live == 1, "SurplusAuctioneer/not-live");
+    require(bids[id].bidder != address(0), "SurplusAuctioneer/bidder-not-set");
+    require(bids[id].bidExpiry > now || bids[id].bidExpiry == 0, "SurplusAuctioneer/already-finished-bidExpiry");
+    require(bids[id].auctionExpiry > now, "SurplusAuctioneer/already-finished-auctionExpiry");
+
+    require(lot == bids[id].lot, "SurplusAuctioneer/lot-not-matching");
+    require(bid > bids[id].bid, "SurplusAuctioneer/bid-not-higher");
+    require(mul(bid, ONE) >= mul(minimumBidIncrease, bids[id].bid), "SurplusAuctioneer/insufficient-increase");
+
+    if (msg.sender != bids[id].bidder) {
+      alpaca.move(msg.sender, bids[id].bidder, bids[id].bid);
+      bids[id].bidder = msg.sender;
     }
+    alpaca.move(msg.sender, address(this), bid - bids[id].bid);
 
-    // --- Data ---
-    struct Bid {
-        uint256 bid;  // alpacas paid               [wad]
-        uint256 lot;  // dai in return for bid   [rad]
-        address bidder;  // high bidder
-        uint48  bidExpiry;  // bid expiry time         [unix epoch time]
-        uint48  auctionExpiry;  // auction expiry time     [unix epoch time]
-    }
+    bids[id].bid = bid;
+    bids[id].bidExpiry = add(uint48(now), bidLifetime);
+  }
 
-    mapping (uint => Bid) public bids;
-
-    GovernmentLike  public   government;  // CDP Engine
-    TokenLike  public   alpaca;
-
-    uint256  constant ONE = 1.00E18;
-    uint256  public   minimumBidIncrease = 1.05E18;  // 5% minimum bid increase
-    uint48   public   bidLifetime = 3 hours;  // 3 hours bid duration         [seconds]
-    uint48   public   auctionLength = 2 days;   // 2 days total auction length  [seconds]
-    uint256  public kicks = 0;
-    uint256  public live;  // Active Flag
-
-    // --- Events ---
-    event Kick(
-      uint256 id,
-      uint256 lot,
-      uint256 bid
+  function deal(uint256 id) external {
+    require(live == 1, "SurplusAuctioneer/not-live");
+    require(
+      bids[id].bidExpiry != 0 && (bids[id].bidExpiry < now || bids[id].auctionExpiry < now),
+      "SurplusAuctioneer/not-finished"
     );
+    government.moveStablecoin(address(this), bids[id].bidder, bids[id].lot);
+    alpaca.burn(address(this), bids[id].bid);
+    delete bids[id];
+  }
 
-    // --- Init ---
-    constructor(address government_, address alpaca_) public {
-        whitelist[msg.sender] = 1;
-        government = GovernmentLike(government_);
-        alpaca = TokenLike(alpaca_);
-        live = 1;
-    }
+  function cage(uint256 rad) external auth {
+    live = 0;
+    government.moveStablecoin(address(this), msg.sender, rad);
+  }
 
-    // --- Math ---
-    function add(uint48 x, uint48 y) internal pure returns (uint48 z) {
-        require((z = x + y) >= x);
-    }
-    function mul(uint x, uint y) internal pure returns (uint z) {
-        require(y == 0 || (z = x * y) / y == x);
-    }
-
-    // --- Admin ---
-    function file(bytes32 what, uint data) external auth {
-        if (what == "minimumBidIncrease") minimumBidIncrease = data;
-        else if (what == "bidLifetime") bidLifetime = uint48(data);
-        else if (what == "auctionLength") auctionLength = uint48(data);
-        else revert("SurplusAuctioneer/file-unrecognized-param");
-    }
-
-    // --- Auction ---
-    function startAuction(uint lot, uint bid) external auth returns (uint id) {
-        require(live == 1, "SurplusAuctioneer/not-live");
-        require(kicks < uint(-1), "SurplusAuctioneer/overflow");
-        id = ++kicks;
-
-        bids[id].bid = bid;
-        bids[id].lot = lot;
-        bids[id].bidder = msg.sender;  // configurable??
-        bids[id].auctionExpiry = add(uint48(now), auctionLength);
-
-        government.moveStablecoin(msg.sender, address(this), lot);
-
-        emit Kick(id, lot, bid);
-    }
-    function tick(uint id) external {
-        require(bids[id].auctionExpiry < now, "SurplusAuctioneer/not-finished");
-        require(bids[id].bidExpiry == 0, "SurplusAuctioneer/bid-already-placed");
-        bids[id].auctionExpiry = add(uint48(now), auctionLength);
-    }
-    function tend(uint id, uint lot, uint bid) external {
-        require(live == 1, "SurplusAuctioneer/not-live");
-        require(bids[id].bidder != address(0), "SurplusAuctioneer/bidder-not-set");
-        require(bids[id].bidExpiry > now || bids[id].bidExpiry == 0, "SurplusAuctioneer/already-finished-bidExpiry");
-        require(bids[id].auctionExpiry > now, "SurplusAuctioneer/already-finished-auctionExpiry");
-
-        require(lot == bids[id].lot, "SurplusAuctioneer/lot-not-matching");
-        require(bid >  bids[id].bid, "SurplusAuctioneer/bid-not-higher");
-        require(mul(bid, ONE) >= mul(minimumBidIncrease, bids[id].bid), "SurplusAuctioneer/insufficient-increase");
-
-        if (msg.sender != bids[id].bidder) {
-            alpaca.move(msg.sender, bids[id].bidder, bids[id].bid);
-            bids[id].bidder = msg.sender;
-        }
-        alpaca.move(msg.sender, address(this), bid - bids[id].bid);
-
-        bids[id].bid = bid;
-        bids[id].bidExpiry = add(uint48(now), bidLifetime);
-    }
-    function deal(uint id) external {
-        require(live == 1, "SurplusAuctioneer/not-live");
-        require(bids[id].bidExpiry != 0 && (bids[id].bidExpiry < now || bids[id].auctionExpiry < now), "SurplusAuctioneer/not-finished");
-        government.moveStablecoin(address(this), bids[id].bidder, bids[id].lot);
-        alpaca.burn(address(this), bids[id].bid);
-        delete bids[id];
-    }
-
-    function cage(uint rad) external auth {
-       live = 0;
-       government.moveStablecoin(address(this), msg.sender, rad);
-    }
-    function yank(uint id) external {
-        require(live == 0, "SurplusAuctioneer/still-live");
-        require(bids[id].bidder != address(0), "SurplusAuctioneer/bidder-not-set");
-        alpaca.move(address(this), bids[id].bidder, bids[id].bid);
-        delete bids[id];
-    }
+  function yank(uint256 id) external {
+    require(live == 0, "SurplusAuctioneer/still-live");
+    require(bids[id].bidder != address(0), "SurplusAuctioneer/bidder-not-set");
+    alpaca.move(address(this), bids[id].bidder, bids[id].bid);
+    delete bids[id];
+  }
 }

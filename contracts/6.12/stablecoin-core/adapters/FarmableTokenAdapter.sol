@@ -17,214 +17,258 @@
 pragma solidity 0.6.12;
 
 interface GovernmentLike {
-    function positions(bytes32, address) external view returns (uint256, uint256);
-    function stablecoin(address) external view returns (uint256);
-    function collateralToken(bytes32, address) external view returns (uint256);
-    function addCollateral(bytes32, address, int256) external;
+  function positions(bytes32, address) external view returns (uint256, uint256);
+
+  function stablecoin(address) external view returns (uint256);
+
+  function collateralToken(bytes32, address) external view returns (uint256);
+
+  function addCollateral(
+    bytes32,
+    address,
+    int256
+  ) external;
 }
 
 interface ERC20 {
-    function balanceOf(address owner) external view returns (uint256);
-    function transfer(address dst, uint256 amount) external returns (bool);
-    function transferFrom(address src, address dst, uint256 amount) external returns (bool);
-    function approve(address spender, uint256 amount) external returns (bool);
-    function allowance(address owner, address spender) external view returns (uint256);
-    function decimals() external returns (uint8);
+  function balanceOf(address owner) external view returns (uint256);
+
+  function transfer(address dst, uint256 amount) external returns (bool);
+
+  function transferFrom(
+    address src,
+    address dst,
+    uint256 amount
+  ) external returns (bool);
+
+  function approve(address spender, uint256 amount) external returns (bool);
+
+  function allowance(address owner, address spender) external view returns (uint256);
+
+  function decimals() external returns (uint8);
 }
 
 // receives tokens and shares them among holders
 contract FarmableTokenAdapter {
-    mapping (address => uint256) whitelist;
-    uint256 live;
+  mapping(address => uint256) whitelist;
+  uint256 live;
 
-    GovernmentLike     public immutable government;    // cdp engine
-    bytes32     public immutable collateralPoolId;    // collateral type
-    ERC20       public immutable collateralToken;    // collateral token
-    uint256     public immutable decimals;    // collateralToken decimals
-    ERC20       public immutable rewardToken;  // rewhitelist token
+  GovernmentLike public immutable government; // cdp engine
+  bytes32 public immutable collateralPoolId; // collateral type
+  ERC20 public immutable collateralToken; // collateral token
+  uint256 public immutable decimals; // collateralToken decimals
+  ERC20 public immutable rewardToken; // rewhitelist token
 
-    uint256     public accRewardPerShare;  // rewards per collateralToken    [ray]
-    uint256     public totalShare;  // total collateralTokens       [wad]
-    uint256     public accRewardBalance;  // crop balance     [wad]
+  uint256 public accRewardPerShare; // rewards per collateralToken    [ray]
+  uint256 public totalShare; // total collateralTokens       [wad]
+  uint256 public accRewardBalance; // crop balance     [wad]
 
-    mapping (address => uint256) public rewardDebts; // rewardDebt per user  [wad]
-    mapping (address => uint256) public stake; // collateralTokens per user   [wad]
+  mapping(address => uint256) public rewardDebts; // rewardDebt per user  [wad]
+  mapping(address => uint256) public stake; // collateralTokens per user   [wad]
 
-    uint256 immutable internal to18ConversionFactor;
-    uint256 immutable internal toTokenConversionFactor;
+  uint256 internal immutable to18ConversionFactor;
+  uint256 internal immutable toTokenConversionFactor;
 
-    // --- Events ---
-    event Deposit(uint256 val);
-    event Withdraw(uint256 val);
-    event Flee();
-    event MoveRewards(address indexed src, address indexed dst, uint256 wad);
-    event Rely(address indexed usr);
-    event Deny(address indexed usr);
+  // --- Events ---
+  event Deposit(uint256 val);
+  event Withdraw(uint256 val);
+  event Flee();
+  event MoveRewards(address indexed src, address indexed dst, uint256 wad);
+  event Rely(address indexed usr);
+  event Deny(address indexed usr);
 
-    modifier auth {
-        require(whitelist[msg.sender] == 1, "FarmableToken/not-authed");
-        _;
+  modifier auth {
+    require(whitelist[msg.sender] == 1, "FarmableToken/not-authed");
+    _;
+  }
+
+  function rely(address usr) external auth {
+    whitelist[usr] = 1;
+    emit Rely(msg.sender);
+  }
+
+  function deny(address usr) external auth {
+    whitelist[usr] = 0;
+    emit Deny(msg.sender);
+  }
+
+  constructor(
+    address government_,
+    bytes32 collateralPoolId_,
+    address collateralToken_,
+    address rewardToken_
+  ) public {
+    whitelist[msg.sender] = 1;
+    emit Rely(msg.sender);
+    live = 1;
+    government = GovernmentLike(government_);
+    collateralPoolId = collateralPoolId_;
+    collateralToken = ERC20(collateralToken_);
+    uint256 decimals_ = ERC20(collateralToken_).decimals();
+    require(decimals_ <= 18);
+    decimals = decimals_;
+    to18ConversionFactor = 10**(18 - decimals_);
+    toTokenConversionFactor = 10**decimals_;
+    rewardToken = ERC20(rewardToken_);
+  }
+
+  function add(uint256 x, uint256 y) public pure returns (uint256 z) {
+    require((z = x + y) >= x, "ds-math-add-overflow");
+  }
+
+  function sub(uint256 x, uint256 y) public pure returns (uint256 z) {
+    require((z = x - y) <= x, "ds-math-sub-underflow");
+  }
+
+  function mul(uint256 x, uint256 y) public pure returns (uint256 z) {
+    require(y == 0 || (z = x * y) / y == x, "ds-math-mul-overflow");
+  }
+
+  function divup(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    z = add(x, sub(y, 1)) / y;
+  }
+
+  uint256 constant WAD = 10**18;
+
+  function wmul(uint256 x, uint256 y) public pure returns (uint256 z) {
+    z = mul(x, y) / WAD;
+  }
+
+  function wdiv(uint256 x, uint256 y) public pure returns (uint256 z) {
+    z = mul(x, WAD) / y;
+  }
+
+  function wdivup(uint256 x, uint256 y) public pure returns (uint256 z) {
+    z = divup(mul(x, WAD), y);
+  }
+
+  uint256 constant RAY = 10**27;
+
+  function rmul(uint256 x, uint256 y) public pure returns (uint256 z) {
+    z = mul(x, y) / RAY;
+  }
+
+  function rmulup(uint256 x, uint256 y) public pure returns (uint256 z) {
+    z = divup(mul(x, y), RAY);
+  }
+
+  function rdiv(uint256 x, uint256 y) public pure returns (uint256 z) {
+    z = mul(x, RAY) / y;
+  }
+
+  // Net Asset Valuation [wad]
+  function nav() public view virtual returns (uint256) {
+    uint256 _nav = collateralToken.balanceOf(address(this));
+    return mul(_nav, to18ConversionFactor);
+  }
+
+  // Net Assets per Share [wad]
+  function nps() public view returns (uint256) {
+    if (totalShare == 0) return WAD;
+    else return wdiv(nav(), totalShare);
+  }
+
+  function harvestedRewards() internal virtual returns (uint256) {
+    return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
+  }
+
+  function harvest(address from, address to) internal {
+    if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(harvestedRewards(), totalShare));
+
+    uint256 last = rewardDebts[from];
+    uint256 curr = rmul(stake[from], accRewardPerShare);
+    if (curr > last) require(rewardToken.transfer(to, curr - last));
+    accRewardBalance = rewardToken.balanceOf(address(this));
+  }
+
+  function deposit(
+    address positionAddress,
+    address usr,
+    uint256 val
+  ) public virtual {
+    require(live == 1, "FarmableToken/not-live");
+
+    harvest(positionAddress, usr);
+    if (val > 0) {
+      uint256 wad = wdiv(mul(val, to18ConversionFactor), nps());
+
+      // Overflow check for int256(wad) cast below
+      // Also enforces a non-zero wad
+      require(int256(wad) > 0);
+
+      require(collateralToken.transferFrom(msg.sender, address(this), val));
+      government.addCollateral(collateralPoolId, positionAddress, int256(wad));
+
+      totalShare = add(totalShare, wad);
+      stake[positionAddress] = add(stake[positionAddress], wad);
     }
+    rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
+    emit Deposit(val);
+  }
 
-    function rely(address usr) external auth {
-        whitelist[usr] = 1;
-        emit Rely(msg.sender);
+  function withdraw(
+    address positionAddress,
+    address usr,
+    uint256 val
+  ) public virtual {
+    harvest(positionAddress, usr);
+    if (val > 0) {
+      uint256 wad = wdivup(mul(val, to18ConversionFactor), nps());
+
+      // Overflow check for int256(wad) cast below
+      // Also enforces a non-zero wad
+      require(int256(wad) > 0);
+
+      require(collateralToken.transfer(usr, val));
+      government.addCollateral(collateralPoolId, positionAddress, -int256(wad));
+
+      totalShare = sub(totalShare, wad);
+      stake[positionAddress] = sub(stake[positionAddress], wad);
     }
+    rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
+    emit Withdraw(val);
+  }
 
-    function deny(address usr) external auth {
-        whitelist[usr] = 0;
-        emit Deny(msg.sender);
-    }
+  function emergencyWithdraw(address positionAddress, address usr) public virtual {
+    uint256 wad = government.collateralToken(collateralPoolId, positionAddress);
+    require(wad <= 2**255);
+    uint256 val = wmul(wmul(wad, nps()), toTokenConversionFactor);
 
-    constructor(address government_, bytes32 collateralPoolId_, address collateralToken_, address rewardToken_) public {
-        whitelist[msg.sender] = 1;
-        emit Rely(msg.sender);
-        live = 1;
-        government = GovernmentLike(government_);
-        collateralPoolId = collateralPoolId_;
-        collateralToken = ERC20(collateralToken_);
-        uint256 decimals_ = ERC20(collateralToken_).decimals();
-        require(decimals_ <= 18);
-        decimals = decimals_;
-        to18ConversionFactor = 10 ** (18 - decimals_);
-        toTokenConversionFactor = 10 ** decimals_;
-        rewardToken = ERC20(rewardToken_);
-    }
+    require(collateralToken.transfer(usr, val));
+    government.addCollateral(collateralPoolId, positionAddress, -int256(wad));
 
-    function add(uint256 x, uint256 y) public pure returns (uint256 z) {
-        require((z = x + y) >= x, "ds-math-add-overflow");
-    }
-    function sub(uint256 x, uint256 y) public pure returns (uint256 z) {
-        require((z = x - y) <= x, "ds-math-sub-underflow");
-    }
-    function mul(uint256 x, uint256 y) public pure returns (uint256 z) {
-        require(y == 0 || (z = x * y) / y == x, "ds-math-mul-overflow");
-    }
-    function divup(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        z = add(x, sub(y, 1)) / y;
-    }
-    uint256 constant WAD  = 10 ** 18;
-    function wmul(uint256 x, uint256 y) public pure returns (uint256 z) {
-        z = mul(x, y) / WAD;
-    }
-    function wdiv(uint256 x, uint256 y) public pure returns (uint256 z) {
-        z = mul(x, WAD) / y;
-    }
-    function wdivup(uint256 x, uint256 y) public pure returns (uint256 z) {
-        z = divup(mul(x, WAD), y);
-    }
-    uint256 constant RAY  = 10 ** 27;
-    function rmul(uint256 x, uint256 y) public pure returns (uint256 z) {
-        z = mul(x, y) / RAY;
-    }
-    function rmulup(uint256 x, uint256 y) public pure returns (uint256 z) {
-        z = divup(mul(x, y), RAY);
-    }
-    function rdiv(uint256 x, uint256 y) public pure returns (uint256 z) {
-        z = mul(x, RAY) / y;
-    }
+    totalShare = sub(totalShare, wad);
+    stake[positionAddress] = sub(stake[positionAddress], wad);
+    rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
 
-    // Net Asset Valuation [wad]
-    function nav() public virtual view returns (uint256) {
-        uint256 _nav = collateralToken.balanceOf(address(this));
-        return mul(_nav, to18ConversionFactor);
-    }
+    emit Flee();
+  }
 
-    // Net Assets per Share [wad]
-    function nps() public view returns (uint256) {
-        if (totalShare == 0) return WAD;
-        else return wdiv(nav(), totalShare);
-    }
+  function moveRewards(
+    address src,
+    address dst,
+    uint256 wad
+  ) public {
+    uint256 ss = stake[src];
+    stake[src] = sub(ss, wad);
+    stake[dst] = add(stake[dst], wad);
 
-    function harvestedRewards() internal virtual returns (uint256) {
-        return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
-    }
+    uint256 cs = rewardDebts[src];
+    uint256 drewardDebt = mul(cs, wad) / ss;
 
-    function harvest(address from, address to) internal {
-        if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(harvestedRewards(), totalShare));
+    // safe since drewardDebts <= rewardDebts[src]
+    rewardDebts[src] = cs - drewardDebt;
+    rewardDebts[dst] = add(rewardDebts[dst], drewardDebt);
 
-        uint256 last = rewardDebts[from];
-        uint256 curr = rmul(stake[from], accRewardPerShare);
-        if (curr > last) require(rewardToken.transfer(to, curr - last));
-        accRewardBalance = rewardToken.balanceOf(address(this));
-    }
+    (uint256 lockedCollateral, ) = government.positions(collateralPoolId, src);
+    require(stake[src] >= add(government.collateralToken(collateralPoolId, src), lockedCollateral));
+    (lockedCollateral, ) = government.positions(collateralPoolId, dst);
+    require(stake[dst] <= add(government.collateralToken(collateralPoolId, dst), lockedCollateral));
 
-    function deposit(address positionAddress, address usr, uint256 val) public virtual {
-        require(live == 1, "FarmableToken/not-live");
+    emit MoveRewards(src, dst, wad);
+  }
 
-        harvest(positionAddress, usr);
-        if (val > 0) {
-            uint256 wad = wdiv(mul(val, to18ConversionFactor), nps());
-
-            // Overflow check for int256(wad) cast below
-            // Also enforces a non-zero wad
-            require(int256(wad) > 0);
-
-            require(collateralToken.transferFrom(msg.sender, address(this), val));
-            government.addCollateral(collateralPoolId, positionAddress, int256(wad));
-
-            totalShare = add(totalShare, wad);
-            stake[positionAddress] = add(stake[positionAddress], wad);
-        }
-        rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
-        emit Deposit(val);
-    }
-
-    function withdraw(address positionAddress, address usr, uint256 val) public virtual {
-        harvest(positionAddress, usr);
-        if (val > 0) {
-            uint256 wad = wdivup(mul(val, to18ConversionFactor), nps());
-
-            // Overflow check for int256(wad) cast below
-            // Also enforces a non-zero wad
-            require(int256(wad) > 0);
-
-            require(collateralToken.transfer(usr, val));
-            government.addCollateral(collateralPoolId, positionAddress, -int256(wad));
-
-            totalShare = sub(totalShare, wad);
-            stake[positionAddress] = sub(stake[positionAddress], wad);
-        }
-        rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
-        emit Withdraw(val);
-    }
-
-    function emergencyWithdraw(address positionAddress, address usr) public virtual {
-        uint256 wad = government.collateralToken(collateralPoolId, positionAddress);
-        require(wad <= 2 ** 255);
-        uint256 val = wmul(wmul(wad, nps()), toTokenConversionFactor);
-
-        require(collateralToken.transfer(usr, val));
-        government.addCollateral(collateralPoolId, positionAddress, -int256(wad));
-
-        totalShare = sub(totalShare, wad);
-        stake[positionAddress] = sub(stake[positionAddress], wad);
-        rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
-
-        emit Flee();
-    }
-
-    function moveRewards(address src, address dst, uint256 wad) public {
-        uint256 ss = stake[src];
-        stake[src] = sub(ss, wad);
-        stake[dst] = add(stake[dst], wad);
-
-        uint256 cs     = rewardDebts[src];
-        uint256 drewardDebt = mul(cs, wad) / ss;
-
-        // safe since drewardDebts <= rewardDebts[src]
-        rewardDebts[src] = cs - drewardDebt;
-        rewardDebts[dst] = add(rewardDebts[dst], drewardDebt);
-
-        (uint256 lockedCollateral,) = government.positions(collateralPoolId, src);
-        require(stake[src] >= add(government.collateralToken(collateralPoolId, src), lockedCollateral));
-        (lockedCollateral,) = government.positions(collateralPoolId, dst);
-        require(stake[dst] <= add(government.collateralToken(collateralPoolId, dst), lockedCollateral));
-
-        emit MoveRewards(src, dst, wad);
-    }
-
-    function cage() public auth virtual {
-        live = 0;
-    }
+  function cage() public virtual auth {
+    live = 0;
+  }
 }

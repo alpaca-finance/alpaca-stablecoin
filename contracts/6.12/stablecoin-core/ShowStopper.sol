@@ -22,68 +22,113 @@
 pragma solidity >=0.6.12;
 
 interface GovernmentLike {
-    function stablecoin(address) external view returns (uint256);
-    function collateralPools(bytes32 collateralPoolId) external returns (
-        uint256 totalDebtShare,   // [wad]
-        uint256 debtAccumulatedRate,  // [ray]
-        uint256 priceWithSafetyMargin,  // [ray]
-        uint256 debtCeiling,  // [rad]
-        uint256 debtFloor   // [rad]
+  function stablecoin(address) external view returns (uint256);
+
+  function collateralPools(bytes32 collateralPoolId)
+    external
+    returns (
+      uint256 totalDebtShare, // [wad]
+      uint256 debtAccumulatedRate, // [ray]
+      uint256 priceWithSafetyMargin, // [ray]
+      uint256 debtCeiling, // [rad]
+      uint256 debtFloor // [rad]
     );
-    function positions(bytes32 collateralPoolId, address urn) external returns (
-        uint256 lockedCollateral,   // [wad]
-        uint256 debtShare    // [wad]
+
+  function positions(bytes32 collateralPoolId, address urn)
+    external
+    returns (
+      uint256 lockedCollateral, // [wad]
+      uint256 debtShare // [wad]
     );
-    function debt() external returns (uint256);
-    function moveStablecoin(address src, address dst, uint256 rad) external;
-    function hope(address) external;
-    function moveCollateral(bytes32 collateralPoolId, address src, address dst, uint256 rad) external;
-    function grab(bytes32 i, address u, address v, address w, int256 dink, int256 dart) external;
-    function mintUnbackedStablecoin(address u, address v, uint256 rad) external;
-    function cage() external;
+
+  function debt() external returns (uint256);
+
+  function moveStablecoin(
+    address src,
+    address dst,
+    uint256 rad
+  ) external;
+
+  function hope(address) external;
+
+  function moveCollateral(
+    bytes32 collateralPoolId,
+    address src,
+    address dst,
+    uint256 rad
+  ) external;
+
+  function grab(
+    bytes32 i,
+    address u,
+    address v,
+    address w,
+    int256 dink,
+    int256 dart
+  ) external;
+
+  function mintUnbackedStablecoin(
+    address u,
+    address v,
+    uint256 rad
+  ) external;
+
+  function cage() external;
 }
 
 interface LiquidationEngineLike {
-    function collateralPools(bytes32) external returns (
-        address auctioneer,
-        uint256 liquidationPenalty,
-        uint256 liquidationMaxSize,
-        uint256 stablecoinNeededForDebtRepay
+  function collateralPools(bytes32)
+    external
+    returns (
+      address auctioneer,
+      uint256 liquidationPenalty,
+      uint256 liquidationMaxSize,
+      uint256 stablecoinNeededForDebtRepay
     );
-    function cage() external;
+
+  function cage() external;
 }
 
 interface StablecoinSavingsLike {
-    function cage() external;
+  function cage() external;
 }
 
 interface SystemDebtEngine {
-    function cage() external;
+  function cage() external;
 }
 
 interface CollateralAuctioneerLike {
-    function sales(uint256 id) external view returns (
-        uint256 pos,
-        uint256 debt,
-        uint256 collateralAmount,
-        address positionAddress,
-        uint96  auctionStartBlock,
-        uint256 startingPrice
+  function sales(uint256 id)
+    external
+    view
+    returns (
+      uint256 pos,
+      uint256 debt,
+      uint256 collateralAmount,
+      address positionAddress,
+      uint96 auctionStartBlock,
+      uint256 startingPrice
     );
-    function yank(uint256 id) external;
+
+  function yank(uint256 id) external;
 }
 
 interface PriceFeedLike {
-    function read() external view returns (bytes32);
+  function read() external view returns (bytes32);
 }
 
 interface PriceOracleLike {
-    function par() external view returns (uint256);
-    function collateralPools(bytes32) external view returns (
-        PriceFeedLike priceFeed,
-        uint256 liquidationRatio    // [ray]
+  function par() external view returns (uint256);
+
+  function collateralPools(bytes32)
+    external
+    view
+    returns (
+      PriceFeedLike priceFeed,
+      uint256 liquidationRatio // [ray]
     );
-    function cage() external;
+
+  function cage() external;
 }
 
 /*
@@ -202,194 +247,226 @@ interface PriceOracleLike {
 */
 
 contract ShowStopper {
-    // --- Auth ---
-    mapping (address => uint256) public wards;
-    function rely(address usr) external auth { wards[usr] = 1; emit Rely(usr); }
-    function deny(address usr) external auth { wards[usr] = 0; emit Deny(usr); }
-    modifier auth {
-        require(wards[msg.sender] == 1, "End/not-authorized");
-        _;
-    }
+  // --- Auth ---
+  mapping(address => uint256) public wards;
 
-    // --- Data ---
-    GovernmentLike  public government;   // CDP Engine
-    LiquidationEngineLike  public liquidationEngine;
-    SystemDebtEngine  public systemDebtEngine;   // Debt Engine
-    StablecoinSavingsLike  public stablecoinSavings;
-    PriceOracleLike public priceOracle;
+  function rely(address usr) external auth {
+    wards[usr] = 1;
+    emit Rely(usr);
+  }
 
-    uint256  public live;  // Active Flag
-    uint256  public when;  // Time of cage                   [unix epoch time]
-    uint256  public wait;  // Processing Cooldown Length             [seconds]
-    uint256  public debt;  // Total outstanding dai following processing [rad]
+  function deny(address usr) external auth {
+    wards[usr] = 0;
+    emit Deny(usr);
+  }
 
-    mapping (bytes32 => uint256) public cagePrice;  // Cage price              [ray]
-    mapping (bytes32 => uint256) public shortfall;  // Collateral shortfall    [wad]
-    mapping (bytes32 => uint256) public totalDebtShare;  // Total debt per collateralPoolId      [wad]
-    mapping (bytes32 => uint256) public finalCashPrice;  // Final cash price        [ray]
+  modifier auth {
+    require(wards[msg.sender] == 1, "End/not-authorized");
+    _;
+  }
 
-    mapping (address => uint256)                      public bag;  //    [wad]
-    mapping (bytes32 => mapping (address => uint256)) public out;  //    [wad]
+  // --- Data ---
+  GovernmentLike public government; // CDP Engine
+  LiquidationEngineLike public liquidationEngine;
+  SystemDebtEngine public systemDebtEngine; // Debt Engine
+  StablecoinSavingsLike public stablecoinSavings;
+  PriceOracleLike public priceOracle;
 
-    // --- Events ---
-    event Rely(address indexed usr);
-    event Deny(address indexed usr);
+  uint256 public live; // Active Flag
+  uint256 public when; // Time of cage                   [unix epoch time]
+  uint256 public wait; // Processing Cooldown Length             [seconds]
+  uint256 public debt; // Total outstanding dai following processing [rad]
 
-    event File(bytes32 indexed what, uint256 data);
-    event File(bytes32 indexed what, address data);
+  mapping(bytes32 => uint256) public cagePrice; // Cage price              [ray]
+  mapping(bytes32 => uint256) public shortfall; // Collateral shortfall    [wad]
+  mapping(bytes32 => uint256) public totalDebtShare; // Total debt per collateralPoolId      [wad]
+  mapping(bytes32 => uint256) public finalCashPrice; // Final cash price        [ray]
 
-    event Cage();
-    event Cage(bytes32 indexed collateralPoolId);
-    event Snip(bytes32 indexed collateralPoolId, uint256 indexed id, address indexed usr, uint256 tab, uint256 lot, uint256 art);
-    event Skip(bytes32 indexed collateralPoolId, uint256 indexed id, address indexed usr, uint256 tab, uint256 lot, uint256 art);
-    event Skim(bytes32 indexed collateralPoolId, address indexed urn, uint256 wad, uint256 art);
-    event Free(bytes32 indexed collateralPoolId, address indexed usr, uint256 ink);
-    event Thaw();
-    event Flow(bytes32 indexed collateralPoolId);
-    event Pack(address indexed usr, uint256 wad);
-    event Cash(bytes32 indexed collateralPoolId, address indexed usr, uint256 wad);
+  mapping(address => uint256) public bag; //    [wad]
+  mapping(bytes32 => mapping(address => uint256)) public out; //    [wad]
 
-    // --- Init ---
-    constructor() public {
-        wards[msg.sender] = 1;
-        live = 1;
-        emit Rely(msg.sender);
-    }
+  // --- Events ---
+  event Rely(address indexed usr);
+  event Deny(address indexed usr);
 
-    // --- Math ---
-    uint256 constant WAD = 10 ** 18;
-    uint256 constant RAY = 10 ** 27;
-    function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        z = x + y;
-        require(z >= x);
-    }
-    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require((z = x - y) <= x);
-    }
-    function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require(y == 0 || (z = x * y) / y == x);
-    }
-    function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        return x <= y ? x : y;
-    }
-    function rmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        z = mul(x, y) / RAY;
-    }
-    function wdiv(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        z = mul(x, WAD) / y;
-    }
+  event File(bytes32 indexed what, uint256 data);
+  event File(bytes32 indexed what, address data);
 
-    // --- Administration ---
-    function file(bytes32 what, address data) external auth {
-        require(live == 1, "End/not-live");
-        if (what == "government")  government = GovernmentLike(data);
-        else if (what == "liquidationEngine")   liquidationEngine = LiquidationEngineLike(data);
-        else if (what == "systemDebtEngine")   systemDebtEngine = SystemDebtEngine(data);
-        else if (what == "stablecoinSavings")   stablecoinSavings = StablecoinSavingsLike(data);
-        else if (what == "priceOracle") priceOracle = PriceOracleLike(data);
-        else revert("End/file-unrecognized-param");
-        emit File(what, data);
-    }
-    function file(bytes32 what, uint256 data) external auth {
-        require(live == 1, "End/not-live");
-        if (what == "wait") wait = data;
-        else revert("End/file-unrecognized-param");
-        emit File(what, data);
-    }
+  event Cage();
+  event Cage(bytes32 indexed collateralPoolId);
+  event Snip(
+    bytes32 indexed collateralPoolId,
+    uint256 indexed id,
+    address indexed usr,
+    uint256 tab,
+    uint256 lot,
+    uint256 art
+  );
+  event Skip(
+    bytes32 indexed collateralPoolId,
+    uint256 indexed id,
+    address indexed usr,
+    uint256 tab,
+    uint256 lot,
+    uint256 art
+  );
+  event Skim(bytes32 indexed collateralPoolId, address indexed urn, uint256 wad, uint256 art);
+  event Free(bytes32 indexed collateralPoolId, address indexed usr, uint256 ink);
+  event Thaw();
+  event Flow(bytes32 indexed collateralPoolId);
+  event Pack(address indexed usr, uint256 wad);
+  event Cash(bytes32 indexed collateralPoolId, address indexed usr, uint256 wad);
 
-    // --- Settlement ---
-    function cage() external auth {
-        require(live == 1, "End/not-live");
-        live = 0;
-        when = block.timestamp;
-        government.cage();
-        liquidationEngine.cage();
-        systemDebtEngine.cage();
-        priceOracle.cage();
-        stablecoinSavings.cage();
-        emit Cage();
-    }
+  // --- Init ---
+  constructor() public {
+    wards[msg.sender] = 1;
+    live = 1;
+    emit Rely(msg.sender);
+  }
 
-    function cage(bytes32 collateralPoolId) external {
-        require(live == 0, "End/still-live");
-        require(cagePrice[collateralPoolId] == 0, "End/cagePrice-collateralPoolId-already-defined");
-        (totalDebtShare[collateralPoolId],,,,) = government.collateralPools(collateralPoolId);
-        (PriceFeedLike priceFeed,) = priceOracle.collateralPools(collateralPoolId);
-        // par is a ray, priceFeed returns a wad
-        cagePrice[collateralPoolId] = wdiv(priceOracle.par(), uint256(priceFeed.read()));
-        emit Cage(collateralPoolId);
-    }
+  // --- Math ---
+  uint256 constant WAD = 10**18;
+  uint256 constant RAY = 10**27;
 
-    function snip(bytes32 collateralPoolId, uint256 id) external {
-        require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
+  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    z = x + y;
+    require(z >= x);
+  }
 
-        (address _auctioneer,,,) = liquidationEngine.collateralPools(collateralPoolId);
-        CollateralAuctioneerLike auctioneer = CollateralAuctioneerLike(_auctioneer);
-        (, uint256 debtAccumulatedRate,,,) = government.collateralPools(collateralPoolId);
-        (, uint256 tab, uint256 lot, address usr,,) = auctioneer.sales(id);
+  function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    require((z = x - y) <= x);
+  }
 
-        government.mintUnbackedStablecoin(address(systemDebtEngine), address(systemDebtEngine),  tab);
-        auctioneer.yank(id);
+  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    require(y == 0 || (z = x * y) / y == x);
+  }
 
-        uint256 debtShare = tab / debtAccumulatedRate;
-        totalDebtShare[collateralPoolId] = add(totalDebtShare[collateralPoolId], debtShare);
-        require(int256(lot) >= 0 && int256(debtShare) >= 0, "End/overflow");
-        government.grab(collateralPoolId, usr, address(this), address(systemDebtEngine), int256(lot), int256(debtShare));
-        emit Snip(collateralPoolId, id, usr, tab, lot, debtShare);
-    }
+  function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    return x <= y ? x : y;
+  }
 
-    function skim(bytes32 collateralPoolId, address urn) external {
-        require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
-        (, uint256 debtAccumulatedRate,,,) = government.collateralPools(collateralPoolId);
-        (uint256 lockedCollateral, uint256 debtShare) = government.positions(collateralPoolId, urn);
+  function rmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    z = mul(x, y) / RAY;
+  }
 
-        uint256 owe = rmul(rmul(debtShare, debtAccumulatedRate), cagePrice[collateralPoolId]);
-        uint256 wad = min(lockedCollateral, owe);
-        shortfall[collateralPoolId] = add(shortfall[collateralPoolId], sub(owe, wad));
+  function wdiv(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    z = mul(x, WAD) / y;
+  }
 
-        require(wad <= 2**255 && debtShare <= 2**255, "End/overflow");
-        government.grab(collateralPoolId, urn, address(this), address(systemDebtEngine), -int256(wad), -int256(debtShare));
-        emit Skim(collateralPoolId, urn, wad, debtShare);
-    }
+  // --- Administration ---
+  function file(bytes32 what, address data) external auth {
+    require(live == 1, "End/not-live");
+    if (what == "government") government = GovernmentLike(data);
+    else if (what == "liquidationEngine") liquidationEngine = LiquidationEngineLike(data);
+    else if (what == "systemDebtEngine") systemDebtEngine = SystemDebtEngine(data);
+    else if (what == "stablecoinSavings") stablecoinSavings = StablecoinSavingsLike(data);
+    else if (what == "priceOracle") priceOracle = PriceOracleLike(data);
+    else revert("End/file-unrecognized-param");
+    emit File(what, data);
+  }
 
-    function free(bytes32 collateralPoolId) external {
-        require(live == 0, "End/still-live");
-        (uint256 lockedCollateral, uint256 debtShare) = government.positions(collateralPoolId, msg.sender);
-        require(debtShare == 0, "End/debtShare-not-zero");
-        require(lockedCollateral <= 2**255, "End/overflow");
-        government.grab(collateralPoolId, msg.sender, msg.sender, address(systemDebtEngine), -int256(lockedCollateral), 0);
-        emit Free(collateralPoolId, msg.sender, lockedCollateral);
-    }
+  function file(bytes32 what, uint256 data) external auth {
+    require(live == 1, "End/not-live");
+    if (what == "wait") wait = data;
+    else revert("End/file-unrecognized-param");
+    emit File(what, data);
+  }
 
-    function thaw() external {
-        require(live == 0, "End/still-live");
-        require(debt == 0, "End/debt-not-zero");
-        require(government.stablecoin(address(systemDebtEngine)) == 0, "End/surplus-not-zero");
-        require(block.timestamp >= add(when, wait), "End/wait-not-finished");
-        debt = government.debt();
-        emit Thaw();
-    }
-    function flow(bytes32 collateralPoolId) external {
-        require(debt != 0, "End/debt-zero");
-        require(finalCashPrice[collateralPoolId] == 0, "End/finalCashPrice-collateralPoolId-already-defined");
+  // --- Settlement ---
+  function cage() external auth {
+    require(live == 1, "End/not-live");
+    live = 0;
+    when = block.timestamp;
+    government.cage();
+    liquidationEngine.cage();
+    systemDebtEngine.cage();
+    priceOracle.cage();
+    stablecoinSavings.cage();
+    emit Cage();
+  }
 
-        (, uint256 debtAccumulatedRate,,,) = government.collateralPools(collateralPoolId);
-        uint256 wad = rmul(rmul(totalDebtShare[collateralPoolId], debtAccumulatedRate), cagePrice[collateralPoolId]);
-        finalCashPrice[collateralPoolId] = mul(sub(wad, shortfall[collateralPoolId]), RAY) / (debt / RAY);
-        emit Flow(collateralPoolId);
-    }
+  function cage(bytes32 collateralPoolId) external {
+    require(live == 0, "End/still-live");
+    require(cagePrice[collateralPoolId] == 0, "End/cagePrice-collateralPoolId-already-defined");
+    (totalDebtShare[collateralPoolId], , , , ) = government.collateralPools(collateralPoolId);
+    (PriceFeedLike priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
+    // par is a ray, priceFeed returns a wad
+    cagePrice[collateralPoolId] = wdiv(priceOracle.par(), uint256(priceFeed.read()));
+    emit Cage(collateralPoolId);
+  }
 
-    function pack(uint256 wad) external {
-        require(debt != 0, "End/debt-zero");
-        government.moveStablecoin(msg.sender, address(systemDebtEngine), mul(wad, RAY));
-        bag[msg.sender] = add(bag[msg.sender], wad);
-        emit Pack(msg.sender, wad);
-    }
-    function cash(bytes32 collateralPoolId, uint256 wad) external {
-        require(finalCashPrice[collateralPoolId] != 0, "End/finalCashPrice-collateralPoolId-not-defined");
-        government.moveCollateral(collateralPoolId, address(this), msg.sender, rmul(wad, finalCashPrice[collateralPoolId]));
-        out[collateralPoolId][msg.sender] = add(out[collateralPoolId][msg.sender], wad);
-        require(out[collateralPoolId][msg.sender] <= bag[msg.sender], "End/insufficient-bag-balance");
-        emit Cash(collateralPoolId, msg.sender, wad);
-    }
+  function snip(bytes32 collateralPoolId, uint256 id) external {
+    require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
+
+    (address _auctioneer, , , ) = liquidationEngine.collateralPools(collateralPoolId);
+    CollateralAuctioneerLike auctioneer = CollateralAuctioneerLike(_auctioneer);
+    (, uint256 debtAccumulatedRate, , , ) = government.collateralPools(collateralPoolId);
+    (, uint256 tab, uint256 lot, address usr, , ) = auctioneer.sales(id);
+
+    government.mintUnbackedStablecoin(address(systemDebtEngine), address(systemDebtEngine), tab);
+    auctioneer.yank(id);
+
+    uint256 debtShare = tab / debtAccumulatedRate;
+    totalDebtShare[collateralPoolId] = add(totalDebtShare[collateralPoolId], debtShare);
+    require(int256(lot) >= 0 && int256(debtShare) >= 0, "End/overflow");
+    government.grab(collateralPoolId, usr, address(this), address(systemDebtEngine), int256(lot), int256(debtShare));
+    emit Snip(collateralPoolId, id, usr, tab, lot, debtShare);
+  }
+
+  function skim(bytes32 collateralPoolId, address urn) external {
+    require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
+    (, uint256 debtAccumulatedRate, , , ) = government.collateralPools(collateralPoolId);
+    (uint256 lockedCollateral, uint256 debtShare) = government.positions(collateralPoolId, urn);
+
+    uint256 owe = rmul(rmul(debtShare, debtAccumulatedRate), cagePrice[collateralPoolId]);
+    uint256 wad = min(lockedCollateral, owe);
+    shortfall[collateralPoolId] = add(shortfall[collateralPoolId], sub(owe, wad));
+
+    require(wad <= 2**255 && debtShare <= 2**255, "End/overflow");
+    government.grab(collateralPoolId, urn, address(this), address(systemDebtEngine), -int256(wad), -int256(debtShare));
+    emit Skim(collateralPoolId, urn, wad, debtShare);
+  }
+
+  function free(bytes32 collateralPoolId) external {
+    require(live == 0, "End/still-live");
+    (uint256 lockedCollateral, uint256 debtShare) = government.positions(collateralPoolId, msg.sender);
+    require(debtShare == 0, "End/debtShare-not-zero");
+    require(lockedCollateral <= 2**255, "End/overflow");
+    government.grab(collateralPoolId, msg.sender, msg.sender, address(systemDebtEngine), -int256(lockedCollateral), 0);
+    emit Free(collateralPoolId, msg.sender, lockedCollateral);
+  }
+
+  function thaw() external {
+    require(live == 0, "End/still-live");
+    require(debt == 0, "End/debt-not-zero");
+    require(government.stablecoin(address(systemDebtEngine)) == 0, "End/surplus-not-zero");
+    require(block.timestamp >= add(when, wait), "End/wait-not-finished");
+    debt = government.debt();
+    emit Thaw();
+  }
+
+  function flow(bytes32 collateralPoolId) external {
+    require(debt != 0, "End/debt-zero");
+    require(finalCashPrice[collateralPoolId] == 0, "End/finalCashPrice-collateralPoolId-already-defined");
+
+    (, uint256 debtAccumulatedRate, , , ) = government.collateralPools(collateralPoolId);
+    uint256 wad = rmul(rmul(totalDebtShare[collateralPoolId], debtAccumulatedRate), cagePrice[collateralPoolId]);
+    finalCashPrice[collateralPoolId] = mul(sub(wad, shortfall[collateralPoolId]), RAY) / (debt / RAY);
+    emit Flow(collateralPoolId);
+  }
+
+  function pack(uint256 wad) external {
+    require(debt != 0, "End/debt-zero");
+    government.moveStablecoin(msg.sender, address(systemDebtEngine), mul(wad, RAY));
+    bag[msg.sender] = add(bag[msg.sender], wad);
+    emit Pack(msg.sender, wad);
+  }
+
+  function cash(bytes32 collateralPoolId, uint256 wad) external {
+    require(finalCashPrice[collateralPoolId] != 0, "End/finalCashPrice-collateralPoolId-not-defined");
+    government.moveCollateral(collateralPoolId, address(this), msg.sender, rmul(wad, finalCashPrice[collateralPoolId]));
+    out[collateralPoolId][msg.sender] = add(out[collateralPoolId][msg.sender], wad);
+    require(out[collateralPoolId][msg.sender] <= bag[msg.sender], "End/insufficient-bag-balance");
+    emit Cash(collateralPoolId, msg.sender, wad);
+  }
 }
