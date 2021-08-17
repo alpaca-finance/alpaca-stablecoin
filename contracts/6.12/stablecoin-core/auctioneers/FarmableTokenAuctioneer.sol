@@ -209,6 +209,10 @@ contract FarmableTokenAuctioneer is OwnableUpgradeable, PausableUpgradeable, Acc
     address liquidationEngine_,
     address farmableTokenAdapter_
   ) external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+
     government = GovernmentLike(government_);
     priceOracle = PriceOracleLike(priceOracle_);
     liquidationEngine = LiquidationEngineLike(liquidationEngine_);

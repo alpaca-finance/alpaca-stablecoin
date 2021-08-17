@@ -105,6 +105,10 @@ contract StablecoinAdapter is OwnableUpgradeable, PausableUpgradeable, AccessCon
   uint256 public live; // Active Flag
 
   function initialize(address government_, address stablecoin_) external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+
     wards[msg.sender] = 1;
     live = 1;
     government = GovernmentLike(government_);

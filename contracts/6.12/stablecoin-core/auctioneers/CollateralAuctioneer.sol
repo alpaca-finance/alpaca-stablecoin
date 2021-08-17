@@ -184,6 +184,10 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
     address liquidationEngine_,
     bytes32 collateralPoolId_
   ) external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+
     government = GovernmentLike(government_);
     priceOracle = PriceOracleLike(priceOracle_);
     liquidationEngine = LiquidationEngineLike(liquidationEngine_);

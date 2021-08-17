@@ -111,6 +111,10 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     bytes32 collateralPoolId_,
     address collateralToken_
   ) external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+
     wards[msg.sender] = 1;
     live = 1;
     government = GovernmentLike(government_);
