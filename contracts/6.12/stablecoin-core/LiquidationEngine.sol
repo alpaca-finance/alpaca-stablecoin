@@ -19,6 +19,10 @@
 
 pragma solidity >=0.6.12;
 
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+
 interface CollateralAuctioneerLike {
   function collateralPoolId() external view returns (bytes32);
 
@@ -68,7 +72,7 @@ interface SystemDebtEngine {
   function pushToBadDebtQueue(uint256) external;
 }
 
-contract LiquidationEngine {
+contract LiquidationEngine is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
@@ -95,7 +99,7 @@ contract LiquidationEngine {
     uint256 stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions per collateralPool [rad]
   }
 
-  GovernmentLike public immutable government; // CDP Engine
+  GovernmentLike public government; // CDP Engine
 
   mapping(bytes32 => CollateralPool) public collateralPools;
 
@@ -126,7 +130,11 @@ contract LiquidationEngine {
   event Cage();
 
   // --- Init ---
-  constructor(address government_) public {
+  function initialize(address government_) external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+
     government = GovernmentLike(government_);
     live = 1;
     whitelist[msg.sender] = 1;
