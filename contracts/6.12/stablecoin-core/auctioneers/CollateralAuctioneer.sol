@@ -19,6 +19,9 @@
 
 pragma solidity >=0.6.12;
 
+import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/Initializable.sol";
+
 interface GovernmentLike {
   function moveStablecoin(
     address,
@@ -79,7 +82,7 @@ interface CalculatorLike {
   function price(uint256, uint256) external view returns (uint256);
 }
 
-contract CollateralAuctioneer {
+contract CollateralAuctioneer is OwnableUpgradeSafe {
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -99,8 +102,8 @@ contract CollateralAuctioneer {
   }
 
   // --- Data ---
-  bytes32 public immutable collateralPoolId; // Collateral type of this CollateralAuctioneer
-  GovernmentLike public immutable government; // Core CDP Engine
+  bytes32 public collateralPoolId; // Collateral type of this CollateralAuctioneer
+  GovernmentLike public government; // Core CDP Engine
 
   LiquidationEngineLike public liquidationEngine; // Liquidation module
   address public systemDebtEngine; // Recipient of dai raised in auctions
@@ -174,12 +177,12 @@ contract CollateralAuctioneer {
   event Yank(uint256 id);
 
   // --- Init ---
-  constructor(
+  function initialize(
     address government_,
     address priceOracle_,
     address liquidationEngine_,
     bytes32 collateralPoolId_
-  ) public {
+  ) external initializer {
     government = GovernmentLike(government_);
     priceOracle = PriceOracleLike(priceOracle_);
     liquidationEngine = LiquidationEngineLike(liquidationEngine_);
