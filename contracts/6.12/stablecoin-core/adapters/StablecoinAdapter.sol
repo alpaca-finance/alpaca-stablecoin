@@ -19,6 +19,9 @@
 
 pragma solidity >=0.5.12;
 
+import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/Initializable.sol";
+
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
@@ -79,7 +82,7 @@ interface GovernmentLike {
 
 */
 
-contract StablecoinAdapter {
+contract StablecoinAdapter is OwnableUpgradeSafe {
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -100,7 +103,7 @@ contract StablecoinAdapter {
   StablecoinLike public stablecoin; // Stablecoin Token
   uint256 public live; // Active Flag
 
-  constructor(address government_, address stablecoin_) public {
+  function initialize(address government_, address stablecoin_) external initializer {
     wards[msg.sender] = 1;
     live = 1;
     government = GovernmentLike(government_);
