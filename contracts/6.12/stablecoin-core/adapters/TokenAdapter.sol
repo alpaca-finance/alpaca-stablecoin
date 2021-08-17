@@ -19,11 +19,14 @@
 
 pragma solidity >=0.5.12;
 
+import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/Initializable.sol";
+
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface TokenLike {
+interface TokenLike is OwnableUpgradeSafe {
   function decimals() external view returns (uint256);
 
   function transfer(address, uint256) external returns (bool);
@@ -102,11 +105,11 @@ contract TokenAdapter {
   uint256 public decimals;
   uint256 public live; // Active Flag
 
-  constructor(
+  function initialize(
     address government_,
     bytes32 collateralPoolId_,
     address collateralToken_
-  ) public {
+  ) external initializer {
     wards[msg.sender] = 1;
     live = 1;
     government = GovernmentLike(government_);
