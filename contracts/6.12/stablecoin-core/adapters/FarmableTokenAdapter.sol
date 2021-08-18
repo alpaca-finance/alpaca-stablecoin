@@ -16,6 +16,8 @@
 
 pragma solidity 0.6.12;
 
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+
 interface GovernmentLike {
   function positions(bytes32, address) external view returns (uint256, uint256);
 
@@ -49,15 +51,15 @@ interface ERC20 {
 }
 
 // receives tokens and shares them among holders
-contract FarmableTokenAdapter {
+contract FarmableTokenAdapter is Initializable {
   mapping(address => uint256) whitelist;
   uint256 live;
 
-  GovernmentLike public immutable government; // cdp engine
-  bytes32 public immutable collateralPoolId; // collateral type
-  ERC20 public immutable collateralToken; // collateral token
-  uint256 public immutable decimals; // collateralToken decimals
-  ERC20 public immutable rewardToken; // rewhitelist token
+  GovernmentLike public government; // cdp engine
+  bytes32 public collateralPoolId; // collateral type
+  ERC20 public collateralToken; // collateral token
+  uint256 public decimals; // collateralToken decimals
+  ERC20 public rewardToken; // rewhitelist token
 
   uint256 public accRewardPerShare; // rewards per collateralToken    [ray]
   uint256 public totalShare; // total collateralTokens       [wad]
@@ -66,8 +68,8 @@ contract FarmableTokenAdapter {
   mapping(address => uint256) public rewardDebts; // rewardDebt per user  [wad]
   mapping(address => uint256) public stake; // collateralTokens per user   [wad]
 
-  uint256 internal immutable to18ConversionFactor;
-  uint256 internal immutable toTokenConversionFactor;
+  uint256 internal to18ConversionFactor;
+  uint256 internal toTokenConversionFactor;
 
   // --- Events ---
   event Deposit(uint256 val);
@@ -92,12 +94,21 @@ contract FarmableTokenAdapter {
     emit Deny(msg.sender);
   }
 
-  constructor(
+  function __FarmableTokenAdapter_init(
     address government_,
     bytes32 collateralPoolId_,
     address collateralToken_,
     address rewardToken_
-  ) public {
+  ) internal initializer {
+    __FarmableTokenAdapter_init_unchained(government_, collateralPoolId_, collateralToken_, rewardToken_);
+  }
+
+  function __FarmableTokenAdapter_init_unchained(
+    address government_,
+    bytes32 collateralPoolId_,
+    address collateralToken_,
+    address rewardToken_
+  ) internal initializer {
     whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
     live = 1;
