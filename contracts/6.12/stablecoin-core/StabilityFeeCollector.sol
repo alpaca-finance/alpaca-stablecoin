@@ -22,25 +22,11 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "../interfaces/IGovernment.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
-
-interface GovernmentLike {
-  function collateralPools(bytes32)
-    external
-    returns (
-      uint256 Art, // [wad]
-      uint256 rate // [ray]
-    );
-
-  function accrueStabilityFee(
-    bytes32,
-    address,
-    int256
-  ) external;
-}
 
 contract StabilityFeeCollector is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
@@ -66,7 +52,7 @@ contract StabilityFeeCollector is OwnableUpgradeable, PausableUpgradeable, Acces
   }
 
   mapping(bytes32 => CollateralPool) public collateralPools;
-  GovernmentLike public government; // CDP Engine
+  IGovernment public government; // CDP Engine
   address public systemDebtEngine; // Debt Engine
   uint256 public globalStabilityFeeRate; // Global, per-second stability fee contribution [ray]
 
@@ -76,7 +62,7 @@ contract StabilityFeeCollector is OwnableUpgradeable, PausableUpgradeable, Acces
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     whitelist[msg.sender] = 1;
-    government = GovernmentLike(government_);
+    government = IGovernment(government_);
   }
 
   // --- Math ---
@@ -187,7 +173,7 @@ contract StabilityFeeCollector is OwnableUpgradeable, PausableUpgradeable, Acces
   // --- Stability Fee Collection ---
   function collect(bytes32 collateralPool) external returns (uint256 rate) {
     require(now >= collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
-    (, uint256 prev) = government.collateralPools(collateralPool);
+    (, uint256 prev, , , ) = government.collateralPools(collateralPool);
     rate = rmul(
       rpow(
         add(globalStabilityFeeRate, collateralPools[collateralPool].stabilityFeeRate),
