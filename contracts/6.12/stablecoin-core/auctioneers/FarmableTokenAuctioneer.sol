@@ -23,37 +23,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "../../interfaces/IPositionHandler.sol";
-
-interface GovernmentLike {
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-
-  function moveCollateral(
-    bytes32,
-    address,
-    address,
-    uint256
-  ) external;
-
-  function collateralPools(bytes32)
-    external
-    returns (
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    );
-
-  function mintUnbackedStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-}
+import "../../interfaces/IGovernment.sol";
 
 interface PriceFeedLike {
   function peek() external returns (bytes32, bool);
@@ -125,7 +95,7 @@ contract FarmableTokenAuctioneer is OwnableUpgradeable, PausableUpgradeable, Acc
 
   // --- Data ---
   bytes32 public collateralPoolId; // Collateral type of this CollateralAuctioneer
-  GovernmentLike public government; // Core CDP Engine
+  IGovernment public government; // Core CDP Engine
   FarmableTokenAdapterLike public farmableTokenAdapter;
 
   LiquidationEngineLike public liquidationEngine; // Liquidation module
@@ -210,7 +180,7 @@ contract FarmableTokenAuctioneer is OwnableUpgradeable, PausableUpgradeable, Acc
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
-    government = GovernmentLike(government_);
+    government = IGovernment(government_);
     priceOracle = PriceOracleLike(priceOracle_);
     liquidationEngine = LiquidationEngineLike(liquidationEngine_);
     farmableTokenAdapter = FarmableTokenAdapterLike(farmableTokenAdapter_);
@@ -572,7 +542,7 @@ contract FarmableTokenAuctioneer is OwnableUpgradeable, PausableUpgradeable, Acc
 
   // Public function to update the cached debtFloor*liquidationPenalty value.
   function updateMinimumRemainingDebt() external {
-    (, , , , uint256 _debtFloor) = GovernmentLike(government).collateralPools(collateralPoolId);
+    (, , , , uint256 _debtFloor) = IGovernment(government).collateralPools(collateralPoolId);
     minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPoolId));
   }
 
