@@ -22,51 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-
-interface GovernmentLike {
-  function positions(bytes32, address) external view returns (uint256, uint256);
-
-  function hope(address) external;
-
-  function moveCollateral(
-    bytes32,
-    address,
-    address,
-    uint256
-  ) external;
-
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-
-  function adjustPosition(
-    bytes32,
-    address,
-    address,
-    address,
-    int256,
-    int256
-  ) external;
-
-  function movePosition(
-    bytes32,
-    address,
-    address,
-    int256,
-    int256
-  ) external;
-}
-
-contract PositionHandler {
-  address public immutable owner;
-
-  constructor(address government) public {
-    owner = msg.sender;
-    GovernmentLike(government).hope(msg.sender);
-  }
-}
+import "./PositionHandler.sol";
 
 contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   address public government;
