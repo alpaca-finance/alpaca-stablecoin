@@ -363,7 +363,7 @@ contract FarmableTokenAuctioneer is
 
     // Handle Farmable Token upon liquidation
     // 1. Harvest the rewards of this CDP owner and distribute to the CDP Owner
-    address positionOwner = cdpManager.ownerMapByPositionHandler(positionAddress);
+    address positionOwner = cdpManager.mapPositionHandlerToOwner(positionAddress);
     if(positionOwner == address(0)) positionOwner = positionAddress; // If CDP Owner is not foudn from CDP Manager, this means the positionAddress is actually the EOA address
     farmableTokenAdapter.deposit(positionAddress, positionOwner, 0);
     // 2. Confiscate and move the rewards and the staked collateral to this address, they will be distributed to the bidder later

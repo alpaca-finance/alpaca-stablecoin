@@ -30,7 +30,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
   mapping(uint256 => address) public positions; // CDPId => PositionHandler
   mapping(uint256 => List) public list; // CDPId => Prev & Next CDPIds (double linked list)
   mapping(uint256 => address) public owns; // CDPId => Owner
-  mapping(address => address) public ownerMapByPositionHandler; // PositionHandler => Owner
+  mapping(address => address) public mapPositionHandlerToOwner; // PositionHandler => Owner
   mapping(uint256 => bytes32) public collateralPools; // CDPId => Ilk
 
   mapping(address => uint256) public first; // Owner => First CDPId
