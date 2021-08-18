@@ -22,7 +22,6 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 interface TokenLike {
   function approve(address, uint256) external;
@@ -215,7 +214,7 @@ contract Common {
     uint256 wad
   ) public {
     // Gets Alpaca Stablecoin from the user's wallet
-    IERC721(apt).safeTransferFrom(msg.sender, address(this), wad);
+    IERC20Upgradeable(apt).safeTransferFrom(msg.sender, address(this), wad);
     // Approves adapter to take the Alpaca Stablecoin amount
     SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(apt), apt, wad);
     // Deposits Alpaca Stablecoin into the government
@@ -343,7 +342,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Only executes for tokens that have approval/transferFrom implementation
     if (transferFrom) {
       // Gets token from the user's wallet
-      IERC721(apt).safeTransferFrom(msg.sender, address(this), amt);
+      IERC20Upgradeable(apt).safeTransferFrom(msg.sender, address(this), amt);
       // Approves adapter to take the token amount
       SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(apt), apt, amt);
     }
@@ -360,7 +359,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Only executes for tokens that have approval/transferFrom implementation
     if (transferFrom) {
       // Gets token from the user's wallet
-      IERC721(apt).safeTransferFrom(msg.sender, address(this), amt);
+      IERC20Upgradeable(apt).safeTransferFrom(msg.sender, address(this), amt);
       // Approves adapter to take the token amount
       SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(apt), apt, amt);
     }
