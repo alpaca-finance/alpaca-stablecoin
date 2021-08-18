@@ -79,7 +79,7 @@ contract SurplusAuctioneer {
 
   mapping(uint256 => Bid) public bids;
 
-  GovernmentLike public government; // CDP Engine
+  GovernmentLike public bookKeeper; // CDP Engine
   TokenLike public alpaca;
 
   uint256 constant ONE = 1.00E18;
@@ -93,9 +93,9 @@ contract SurplusAuctioneer {
   event Kick(uint256 id, uint256 lot, uint256 bid);
 
   // --- Init ---
-  constructor(address government_, address alpaca_) public {
+  constructor(address bookKeeper_, address alpaca_) public {
     whitelist[msg.sender] = 1;
-    government = GovernmentLike(government_);
+    bookKeeper = GovernmentLike(bookKeeper_);
     alpaca = TokenLike(alpaca_);
     live = 1;
   }
@@ -128,7 +128,7 @@ contract SurplusAuctioneer {
     bids[id].bidder = msg.sender; // configurable??
     bids[id].auctionExpiry = add(uint48(now), auctionLength);
 
-    government.moveStablecoin(msg.sender, address(this), lot);
+    bookKeeper.moveStablecoin(msg.sender, address(this), lot);
 
     emit Kick(id, lot, bid);
   }
@@ -169,14 +169,14 @@ contract SurplusAuctioneer {
       bids[id].bidExpiry != 0 && (bids[id].bidExpiry < now || bids[id].auctionExpiry < now),
       "SurplusAuctioneer/not-finished"
     );
-    government.moveStablecoin(address(this), bids[id].bidder, bids[id].lot);
+    bookKeeper.moveStablecoin(address(this), bids[id].bidder, bids[id].lot);
     alpaca.burn(address(this), bids[id].bid);
     delete bids[id];
   }
 
   function cage(uint256 rad) external auth {
     live = 0;
-    government.moveStablecoin(address(this), msg.sender, rad);
+    bookKeeper.moveStablecoin(address(this), msg.sender, rad);
   }
 
   function yank(uint256 id) external {

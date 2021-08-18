@@ -1,6 +1,6 @@
 pragma solidity 0.6.12;
 
-interface IGovernment {
+interface IBookKeeper {
   function collateralToken(bytes32, address) external view returns (uint256);
 
   function addCollateral(

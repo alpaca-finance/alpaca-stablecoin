@@ -86,7 +86,7 @@ contract BadDebtAuctioneer {
 
   mapping(uint256 => Bid) public bids;
 
-  GovernmentLike public government; // CDP Engine
+  GovernmentLike public bookKeeper; // CDP Engine
   TokenLike public alpaca;
 
   uint256 constant ONE = 1.00E18;
@@ -102,9 +102,9 @@ contract BadDebtAuctioneer {
   event Kick(uint256 id, uint256 lot, uint256 bid, address indexed recipient);
 
   // --- Init ---
-  constructor(address government_, address alpaca_) public {
+  constructor(address bookKeeper_, address alpaca_) public {
     whitelist[msg.sender] = 1;
-    government = GovernmentLike(government_);
+    bookKeeper = GovernmentLike(bookKeeper_);
     alpaca = TokenLike(alpaca_);
     live = 1;
   }
@@ -175,7 +175,7 @@ contract BadDebtAuctioneer {
     require(mul(minimumBidIncrease, lot) <= mul(bids[id].lot, ONE), "BadDebtAuctioneer/insufficient-decrease");
 
     if (msg.sender != bids[id].bidder) {
-      government.moveStablecoin(msg.sender, bids[id].bidder, bid);
+      bookKeeper.moveStablecoin(msg.sender, bids[id].bidder, bid);
 
       // on first dent, clear as much totalBadDebtInAuction as possible
       if (bids[id].bidExpiry == 0) {
@@ -209,7 +209,7 @@ contract BadDebtAuctioneer {
   function yank(uint256 id) external {
     require(live == 0, "BadDebtAuctioneer/still-live");
     require(bids[id].bidder != address(0), "BadDebtAuctioneer/bidder-not-set");
-    government.mintUnbackedStablecoin(systemDebtEngine, bids[id].bidder, bids[id].bid);
+    bookKeeper.mintUnbackedStablecoin(systemDebtEngine, bids[id].bidder, bids[id].bid);
     delete bids[id];
   }
 }

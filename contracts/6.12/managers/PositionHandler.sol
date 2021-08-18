@@ -19,13 +19,13 @@
 
 pragma solidity 0.6.12;
 
-import "../interfaces/IGovernment.sol";
+import "../interfaces/IBookKeeper.sol";
 
 contract PositionHandler {
   address public immutable owner;
 
-  constructor(address government) public {
+  constructor(address bookKeeper) public {
     owner = msg.sender;
-    IGovernment(government).hope(msg.sender);
+    IBookKeeper(bookKeeper).hope(msg.sender);
   }
 }

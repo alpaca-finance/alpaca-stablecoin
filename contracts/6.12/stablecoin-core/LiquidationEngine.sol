@@ -22,7 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "../interfaces/IGovernment.sol";
+import "../interfaces/IBookKeeper.sol";
 
 interface CollateralAuctioneerLike {
   function collateralPoolId() external view returns (bytes32);
@@ -66,7 +66,7 @@ contract LiquidationEngine is OwnableUpgradeable, PausableUpgradeable, AccessCon
     uint256 stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions per collateralPool [rad]
   }
 
-  IGovernment public government; // CDP Engine
+  IBookKeeper public bookKeeper; // CDP Engine
 
   mapping(bytes32 => CollateralPool) public collateralPools;
 
@@ -97,12 +97,12 @@ contract LiquidationEngine is OwnableUpgradeable, PausableUpgradeable, AccessCon
   event Cage();
 
   // --- Init ---
-  function initialize(address government_) external initializer {
+  function initialize(address bookKeeper_) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
-    government = IGovernment(government_);
+    bookKeeper = IBookKeeper(bookKeeper_);
     live = 1;
     whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
@@ -194,14 +194,14 @@ contract LiquidationEngine is OwnableUpgradeable, PausableUpgradeable, AccessCon
     require(live == 1, "LiquidationEngine/not-live");
 
     (uint256 positionLockedCollateral, uint256 positionDebtShare) =
-      government.positions(collateralPoolId, positionAddress);
+      bookKeeper.positions(collateralPoolId, positionAddress);
     CollateralPool memory mcollateralPool = collateralPools[collateralPoolId];
     uint256 debtShareToBeLiquidated;
     uint256 debtAccumulatedRate;
     uint256 debtFloor;
     {
       uint256 priceWithSafetyMargin;
-      (, debtAccumulatedRate, priceWithSafetyMargin, , debtFloor) = government.collateralPools(collateralPoolId);
+      (, debtAccumulatedRate, priceWithSafetyMargin, , debtFloor) = bookKeeper.collateralPools(collateralPoolId);
       require(
         priceWithSafetyMargin > 0 &&
           mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate),
@@ -255,7 +255,7 @@ contract LiquidationEngine is OwnableUpgradeable, PausableUpgradeable, AccessCon
       "LiquidationEngine/overflow"
     );
 
-    government.confiscate(
+    bookKeeper.confiscate(
       collateralPoolId,
       positionAddress,
       mcollateralPool.auctioneer,

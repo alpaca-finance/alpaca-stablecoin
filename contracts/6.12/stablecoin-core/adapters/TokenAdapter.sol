@@ -22,7 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "../../interfaces/IGovernment.sol";
+import "../../interfaces/IBookKeeper.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -81,14 +81,14 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     _;
   }
 
-  IGovernment public government; // CDP Engine
+  IBookKeeper public bookKeeper; // CDP Engine
   bytes32 public collateralPoolId; // Collateral Type
   TokenLike public collateralToken;
   uint256 public decimals;
   uint256 public live; // Active Flag
 
   function initialize(
-    address government_,
+    address bookKeeper_,
     bytes32 collateralPoolId_,
     address collateralToken_
   ) external initializer {
@@ -98,7 +98,7 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
 
     wards[msg.sender] = 1;
     live = 1;
-    government = IGovernment(government_);
+    bookKeeper = IBookKeeper(bookKeeper_);
     collateralPoolId = collateralPoolId_;
     collateralToken = TokenLike(collateralToken_);
     decimals = collateralToken.decimals();
@@ -111,13 +111,13 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
   function deposit(address usr, uint256 wad) external {
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
-    government.addCollateral(collateralPoolId, usr, int256(wad));
+    bookKeeper.addCollateral(collateralPoolId, usr, int256(wad));
     require(collateralToken.transferFrom(msg.sender, address(this), wad), "TokenAdapter/failed-transfer");
   }
 
   function withdraw(address usr, uint256 wad) external {
     require(wad <= 2**255, "TokenAdapter/overflow");
-    government.addCollateral(collateralPoolId, msg.sender, -int256(wad));
+    bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
     require(collateralToken.transfer(usr, wad), "TokenAdapter/failed-transfer");
   }
 }

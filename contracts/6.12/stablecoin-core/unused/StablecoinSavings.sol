@@ -80,16 +80,16 @@ contract StablecoinSavings {
   uint256 public savingsRate; // The Dai Savings Rate          [ray]
   uint256 public sharePrice; // The Rate Accumulator          [ray]
 
-  GovernmentLike public government; // CDP Engine
+  GovernmentLike public bookKeeper; // CDP Engine
   address public systemDebtEngine; // Debt Engine
   uint256 public lastAccumulationTime; // Time of last drip     [unix epoch time]
 
   uint256 public live; // Active Flag
 
   // --- Init ---
-  constructor(address government_) public {
+  constructor(address bookKeeper_) public {
     wards[msg.sender] = 1;
-    government = GovernmentLike(government_);
+    bookKeeper = GovernmentLike(bookKeeper_);
     savingsRate = ONE;
     sharePrice = ONE;
     lastAccumulationTime = now;
@@ -195,7 +195,7 @@ contract StablecoinSavings {
     uint256 sharePrice_ = sub(tmp, sharePrice);
     sharePrice = tmp;
     lastAccumulationTime = now;
-    government.mintUnbackedStablecoin(address(systemDebtEngine), address(this), mul(totalShare, sharePrice_));
+    bookKeeper.mintUnbackedStablecoin(address(systemDebtEngine), address(this), mul(totalShare, sharePrice_));
   }
 
   // --- Savings Dai Management ---
@@ -203,12 +203,12 @@ contract StablecoinSavings {
     require(now == lastAccumulationTime, "StablecoinSavings/lastAccumulationTime-not-updated");
     share[msg.sender] = add(share[msg.sender], shareAmount);
     totalShare = add(totalShare, shareAmount);
-    government.moveStablecoin(msg.sender, address(this), mul(sharePrice, shareAmount));
+    bookKeeper.moveStablecoin(msg.sender, address(this), mul(sharePrice, shareAmount));
   }
 
   function exit(uint256 shareAmount) external {
     share[msg.sender] = sub(share[msg.sender], shareAmount);
     totalShare = sub(totalShare, shareAmount);
-    government.moveStablecoin(address(this), msg.sender, mul(sharePrice, shareAmount));
+    bookKeeper.moveStablecoin(address(this), msg.sender, mul(sharePrice, shareAmount));
   }
 }

@@ -20,7 +20,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "../interfaces/IGovernment.sol";
+import "../interfaces/IBookKeeper.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -55,7 +55,7 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
 
   mapping(bytes32 => CollateralPool) public collateralPools;
 
-  IGovernment public vat; // CDP Engine
+  IBookKeeper public vat; // CDP Engine
   uint256 public stableCoinReferencePrice; // ref per dai [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
 
   uint256 public live;
@@ -74,7 +74,7 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     AccessControlUpgradeable.__AccessControl_init();
 
     wards[msg.sender] = 1;
-    vat = IGovernment(vat_);
+    vat = IBookKeeper(vat_);
     stableCoinReferencePrice = ONE;
     live = 1;
   }

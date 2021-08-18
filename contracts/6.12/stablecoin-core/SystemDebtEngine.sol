@@ -22,7 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "../interfaces/IGovernment.sol";
+import "../interfaces/IBookKeeper.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -67,7 +67,7 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
   }
 
   // --- Data ---
-  IGovernment public government; // CDP Engine
+  IBookKeeper public bookKeeper; // CDP Engine
   SurplusAuctioneerLike public surplusAuctionHouse; // Surplus Auction House
   BadDebtAuctioneerLike public badDebtAuctionHouse; // Debt Auction House
 
@@ -86,7 +86,7 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
 
   // --- Init ---
   function initialize(
-    address government_,
+    address bookKeeper_,
     address surplusAuctionHouse_,
     address badDebtAuctionHouse_
   ) external initializer {
@@ -94,10 +94,10 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     whitelist[msg.sender] = 1;
-    government = IGovernment(government_);
+    bookKeeper = IBookKeeper(bookKeeper_);
     surplusAuctionHouse = SurplusAuctioneerLike(surplusAuctionHouse_);
     badDebtAuctionHouse = BadDebtAuctioneerLike(badDebtAuctionHouse_);
-    government.hope(surplusAuctionHouse_);
+    bookKeeper.hope(surplusAuctionHouse_);
     live = 1;
   }
 
@@ -126,9 +126,9 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
 
   function file(bytes32 what, address data) external auth {
     if (what == "surplusAuctionHouse") {
-      government.nope(address(surplusAuctionHouse));
+      bookKeeper.nope(address(surplusAuctionHouse));
       surplusAuctionHouse = SurplusAuctioneerLike(data);
-      government.hope(data);
+      bookKeeper.hope(data);
     } else if (what == "badDebtAuctionHouse") badDebtAuctionHouse = BadDebtAuctioneerLike(data);
     else revert("SystemDebtEngine/file-unrecognized-param");
   }
@@ -148,29 +148,29 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
 
   // Debt settlement
   function settleSystemBadDebt(uint256 rad) external {
-    require(rad <= government.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
+    require(rad <= bookKeeper.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
     require(
-      rad <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
+      rad <= sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
       "SystemDebtEngine/insufficient-debt"
     );
-    government.settleSystemBadDebt(rad);
+    bookKeeper.settleSystemBadDebt(rad);
   }
 
   function settleSystemBadDebtByAuction(uint256 rad) external {
     require(rad <= totalBadDebtInAuction, "SystemDebtEngine/not-enough-ash");
-    require(rad <= government.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
+    require(rad <= bookKeeper.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
     totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
-    government.settleSystemBadDebt(rad);
+    bookKeeper.settleSystemBadDebt(rad);
   }
 
   // Debt auction
   function startBadDebtAuction() external returns (uint256 id) {
     require(
       badDebtFixedBidSize <=
-        sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
+        sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
       "SystemDebtEngine/insufficient-debt"
     );
-    require(government.dai(address(this)) == 0, "SystemDebtEngine/surplus-not-zero");
+    require(bookKeeper.dai(address(this)) == 0, "SystemDebtEngine/surplus-not-zero");
     totalBadDebtInAuction = add(totalBadDebtInAuction, badDebtFixedBidSize);
     id = badDebtAuctionHouse.startAuction(address(this), alpacaInitialLotSizeForBadDebt, badDebtFixedBidSize);
   }
@@ -178,12 +178,12 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
   // Surplus auction
   function startSurplusAuction() external returns (uint256 id) {
     require(
-      government.dai(address(this)) >=
-        add(add(government.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer),
+      bookKeeper.dai(address(this)) >=
+        add(add(bookKeeper.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer),
       "SystemDebtEngine/insufficient-surplus"
     );
     require(
-      sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction) == 0,
+      sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction) == 0,
       "SystemDebtEngine/debt-not-zero"
     );
     id = surplusAuctionHouse.startAuction(surplusAuctionFixedLotSize, 0);
@@ -194,8 +194,8 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
     live = 0;
     totalBadDebtValue = 0;
     totalBadDebtInAuction = 0;
-    surplusAuctionHouse.cage(government.dai(address(surplusAuctionHouse)));
+    surplusAuctionHouse.cage(bookKeeper.dai(address(surplusAuctionHouse)));
     badDebtAuctionHouse.cage();
-    government.settleSystemBadDebt(min(government.dai(address(this)), government.systemBadDebt(address(this))));
+    bookKeeper.settleSystemBadDebt(min(bookKeeper.dai(address(this)), bookKeeper.systemBadDebt(address(this))));
   }
 }

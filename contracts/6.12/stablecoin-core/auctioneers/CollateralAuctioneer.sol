@@ -22,7 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "../../interfaces/IGovernment.sol";
+import "../../interfaces/IBookKeeper.sol";
 
 interface PriceFeedLike {
   function peek() external returns (bytes32, bool);
@@ -74,7 +74,7 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
 
   // --- Data ---
   bytes32 public collateralPoolId; // Collateral type of this CollateralAuctioneer
-  IGovernment public government; // Core CDP Engine
+  IBookKeeper public bookKeeper; // Core CDP Engine
 
   LiquidationEngineLike public liquidationEngine; // Liquidation module
   address public systemDebtEngine; // Recipient of dai raised in auctions
@@ -149,7 +149,7 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
 
   // --- Init ---
   function initialize(
-    address government_,
+    address bookKeeper_,
     address priceOracle_,
     address liquidationEngine_,
     bytes32 collateralPoolId_
@@ -158,7 +158,7 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
-    government = IGovernment(government_);
+    bookKeeper = IBookKeeper(bookKeeper_);
     priceOracle = PriceOracleLike(priceOracle_);
     liquidationEngine = LiquidationEngineLike(liquidationEngine_);
     collateralPoolId = collateralPoolId_;
@@ -294,7 +294,7 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
     uint256 prize;
     if (_liquidatorTip > 0 || _liquidatorBountyRate > 0) {
       prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-      government.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
+      bookKeeper.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
     }
 
     emit Kick(id, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize);
@@ -335,7 +335,7 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
       uint256 _minimumRemainingDebt = minimumRemainingDebt;
       if (debt >= _minimumRemainingDebt && mul(collateralAmount, feedPrice) >= _minimumRemainingDebt) {
         prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-        government.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
+        bookKeeper.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
       }
     }
 
@@ -420,7 +420,7 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
       collateralAmount = collateralAmount - slice;
 
       // Send collateral to collateralRecipient
-      government.moveCollateral(collateralPoolId, address(this), collateralRecipient, slice);
+      bookKeeper.moveCollateral(collateralPoolId, address(this), collateralRecipient, slice);
 
       // Do external call (if data is defined) but to be
       // extremely careful we don't allow to do it to the two
@@ -428,14 +428,14 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
       LiquidationEngineLike liquidationEngine_ = liquidationEngine;
       if (
         data.length > 0 &&
-        collateralRecipient != address(government) &&
+        collateralRecipient != address(bookKeeper) &&
         collateralRecipient != address(liquidationEngine_)
       ) {
         FlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
       }
 
       // Get DAI from caller
-      government.moveStablecoin(msg.sender, systemDebtEngine, owe);
+      bookKeeper.moveStablecoin(msg.sender, systemDebtEngine, owe);
 
       // Removes Dai out for liquidation from accumulator
       liquidationEngine_.removeRepaidDebtFromAuction(collateralPoolId, collateralAmount == 0 ? debt + owe : owe);
@@ -444,7 +444,7 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
     if (collateralAmount == 0) {
       _remove(id);
     } else if (debt == 0) {
-      government.moveCollateral(collateralPoolId, address(this), positionAddress, collateralAmount);
+      bookKeeper.moveCollateral(collateralPoolId, address(this), positionAddress, collateralAmount);
       _remove(id);
     } else {
       sales[id].debt = debt;
@@ -507,7 +507,7 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
 
   // Public function to update the cached debtFloor*liquidationPenalty value.
   function updateMinimumRemainingDebt() external {
-    (, , , , uint256 _debtFloor) = IGovernment(government).collateralPools(collateralPoolId);
+    (, , , , uint256 _debtFloor) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId);
     minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPoolId));
   }
 
@@ -515,7 +515,7 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
   function yank(uint256 id) external auth lock {
     require(sales[id].positionAddress != address(0), "CollateralAuctioneer/not-running-auction");
     liquidationEngine.removeRepaidDebtFromAuction(collateralPoolId, sales[id].debt);
-    government.moveCollateral(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
+    bookKeeper.moveCollateral(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
     _remove(id);
     emit Yank(id);
   }

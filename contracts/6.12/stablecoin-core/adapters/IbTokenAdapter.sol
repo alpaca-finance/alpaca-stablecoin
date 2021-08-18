@@ -92,7 +92,7 @@ contract IbTokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessContro
   event File(bytes32 indexed what, address data);
 
   /**
-        @param government_                 MCD_VAT DSS core accounting module
+        @param bookKeeper_                 MCD_VAT DSS core accounting module
         @param collateralPoolId_                 Collateral type
         @param collateralToken_                 The collateral LP token address
         @param rewardToken_               The SUSHI token contract address.
@@ -102,7 +102,7 @@ contract IbTokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessContro
         @param timelock_            The expected value of the owner field. Also needs to be an instance of Timelock.
     */
   function initialize(
-    address government_,
+    address bookKeeper_,
     bytes32 collateralPoolId_,
     address collateralToken_,
     address rewardToken_,
@@ -114,7 +114,7 @@ contract IbTokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessContro
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
-    FarmableTokenAdapter.__FarmableTokenAdapter_init(government_, collateralPoolId_, collateralToken_, rewardToken_);
+    FarmableTokenAdapter.__FarmableTokenAdapter_init(bookKeeper_, collateralPoolId_, collateralToken_, rewardToken_);
     // Sanity checks
     (address lpToken, uint256 allocPoint, , , ) = FairlaunchLike(fairlaunch_).poolInfo(pid_);
     require(lpToken == collateralToken_, "IbTokenAdapter/pid-does-not-match-collateralToken");
@@ -168,7 +168,7 @@ contract IbTokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessContro
 
   function emergencyWithdraw(address urn, address usr) public override {
     if (live == 1) {
-      uint256 val = government.collateralToken(collateralPoolId, urn);
+      uint256 val = bookKeeper.collateralToken(collateralPoolId, urn);
       fairlaunch.withdraw(address(this), pid, val);
     }
     super.emergencyWithdraw(urn, usr);

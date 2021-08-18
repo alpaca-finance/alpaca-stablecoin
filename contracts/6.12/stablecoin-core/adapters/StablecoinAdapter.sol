@@ -23,7 +23,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "../../interfaces/IStablecoin.sol";
-import "../../interfaces/IGovernment.sol";
+import "../../interfaces/IBookKeeper.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -82,18 +82,18 @@ contract StablecoinAdapter is OwnableUpgradeable, PausableUpgradeable, AccessCon
     _;
   }
 
-  IGovernment public government; // CDP Engine
+  IBookKeeper public bookKeeper; // CDP Engine
   IStablecoin public stablecoin; // Stablecoin Token
   uint256 public live; // Active Flag
 
-  function initialize(address government_, address stablecoin_) external initializer {
+  function initialize(address bookKeeper_, address stablecoin_) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
     wards[msg.sender] = 1;
     live = 1;
-    government = IGovernment(government_);
+    bookKeeper = IBookKeeper(bookKeeper_);
     stablecoin = IStablecoin(stablecoin_);
   }
 
@@ -108,13 +108,13 @@ contract StablecoinAdapter is OwnableUpgradeable, PausableUpgradeable, AccessCon
   }
 
   function deposit(address usr, uint256 wad) external {
-    government.moveStablecoin(address(this), usr, mul(ONE, wad));
+    bookKeeper.moveStablecoin(address(this), usr, mul(ONE, wad));
     stablecoin.burn(msg.sender, wad);
   }
 
   function withdraw(address usr, uint256 wad) external {
     require(live == 1, "StablecoinAdapter/not-live");
-    government.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
+    bookKeeper.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
     stablecoin.mint(usr, wad);
   }
 }

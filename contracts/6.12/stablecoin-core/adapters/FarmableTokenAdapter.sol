@@ -17,7 +17,7 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
-import "../../interfaces/IGovernment.sol";
+import "../../interfaces/IBookKeeper.sol";
 
 interface ERC20 {
   function balanceOf(address owner) external view returns (uint256);
@@ -42,7 +42,7 @@ contract FarmableTokenAdapter is Initializable {
   mapping(address => uint256) whitelist;
   uint256 live;
 
-  IGovernment public government; // cdp engine
+  IBookKeeper public bookKeeper; // cdp engine
   bytes32 public collateralPoolId; // collateral type
   ERC20 public collateralToken; // collateral token
   uint256 public decimals; // collateralToken decimals
@@ -82,16 +82,16 @@ contract FarmableTokenAdapter is Initializable {
   }
 
   function __FarmableTokenAdapter_init(
-    address government_,
+    address bookKeeper_,
     bytes32 collateralPoolId_,
     address collateralToken_,
     address rewardToken_
   ) internal initializer {
-    __FarmableTokenAdapter_init_unchained(government_, collateralPoolId_, collateralToken_, rewardToken_);
+    __FarmableTokenAdapter_init_unchained(bookKeeper_, collateralPoolId_, collateralToken_, rewardToken_);
   }
 
   function __FarmableTokenAdapter_init_unchained(
-    address government_,
+    address bookKeeper_,
     bytes32 collateralPoolId_,
     address collateralToken_,
     address rewardToken_
@@ -99,7 +99,7 @@ contract FarmableTokenAdapter is Initializable {
     whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
     live = 1;
-    government = IGovernment(government_);
+    bookKeeper = IBookKeeper(bookKeeper_);
     collateralPoolId = collateralPoolId_;
     collateralToken = ERC20(collateralToken_);
     uint256 decimals_ = ERC20(collateralToken_).decimals();
@@ -195,7 +195,7 @@ contract FarmableTokenAdapter is Initializable {
       require(int256(wad) > 0);
 
       require(collateralToken.transferFrom(msg.sender, address(this), val));
-      government.addCollateral(collateralPoolId, positionAddress, int256(wad));
+      bookKeeper.addCollateral(collateralPoolId, positionAddress, int256(wad));
 
       totalShare = add(totalShare, wad);
       stake[positionAddress] = add(stake[positionAddress], wad);
@@ -218,7 +218,7 @@ contract FarmableTokenAdapter is Initializable {
       require(int256(wad) > 0);
 
       require(collateralToken.transfer(usr, val));
-      government.addCollateral(collateralPoolId, positionAddress, -int256(wad));
+      bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(wad));
 
       totalShare = sub(totalShare, wad);
       stake[positionAddress] = sub(stake[positionAddress], wad);
@@ -228,12 +228,12 @@ contract FarmableTokenAdapter is Initializable {
   }
 
   function emergencyWithdraw(address positionAddress, address usr) public virtual {
-    uint256 wad = government.collateralToken(collateralPoolId, positionAddress);
+    uint256 wad = bookKeeper.collateralToken(collateralPoolId, positionAddress);
     require(wad <= 2**255);
     uint256 val = wmul(wmul(wad, nps()), toTokenConversionFactor);
 
     require(collateralToken.transfer(usr, val));
-    government.addCollateral(collateralPoolId, positionAddress, -int256(wad));
+    bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(wad));
 
     totalShare = sub(totalShare, wad);
     stake[positionAddress] = sub(stake[positionAddress], wad);
@@ -258,10 +258,10 @@ contract FarmableTokenAdapter is Initializable {
     rewardDebts[src] = cs - drewardDebt;
     rewardDebts[dst] = add(rewardDebts[dst], drewardDebt);
 
-    (uint256 lockedCollateral, ) = government.positions(collateralPoolId, src);
-    require(stake[src] >= add(government.collateralToken(collateralPoolId, src), lockedCollateral));
-    (lockedCollateral, ) = government.positions(collateralPoolId, dst);
-    require(stake[dst] <= add(government.collateralToken(collateralPoolId, dst), lockedCollateral));
+    (uint256 lockedCollateral, ) = bookKeeper.positions(collateralPoolId, src);
+    require(stake[src] >= add(bookKeeper.collateralToken(collateralPoolId, src), lockedCollateral));
+    (lockedCollateral, ) = bookKeeper.positions(collateralPoolId, dst);
+    require(stake[dst] <= add(bookKeeper.collateralToken(collateralPoolId, dst), lockedCollateral));
 
     emit MoveRewards(src, dst, wad);
   }
