@@ -24,61 +24,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-
-interface GovernmentLike {
-  function stablecoin(address) external view returns (uint256);
-
-  function collateralPools(bytes32 collateralPoolId)
-    external
-    returns (
-      uint256 totalDebtShare, // [wad]
-      uint256 debtAccumulatedRate, // [ray]
-      uint256 priceWithSafetyMargin, // [ray]
-      uint256 debtCeiling, // [rad]
-      uint256 debtFloor // [rad]
-    );
-
-  function positions(bytes32 collateralPoolId, address urn)
-    external
-    returns (
-      uint256 lockedCollateral, // [wad]
-      uint256 debtShare // [wad]
-    );
-
-  function debt() external returns (uint256);
-
-  function moveStablecoin(
-    address src,
-    address dst,
-    uint256 rad
-  ) external;
-
-  function hope(address) external;
-
-  function moveCollateral(
-    bytes32 collateralPoolId,
-    address src,
-    address dst,
-    uint256 rad
-  ) external;
-
-  function grab(
-    bytes32 i,
-    address u,
-    address v,
-    address w,
-    int256 dink,
-    int256 dart
-  ) external;
-
-  function mintUnbackedStablecoin(
-    address u,
-    address v,
-    uint256 rad
-  ) external;
-
-  function cage() external;
-}
+import "../interfaces/IGovernment.sol";
 
 interface LiquidationEngineLike {
   function collateralPools(bytes32)
@@ -270,7 +216,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   }
 
   // --- Data ---
-  GovernmentLike public government; // CDP Engine
+  IGovernment public government; // CDP Engine
   LiquidationEngineLike public liquidationEngine;
   SystemDebtEngine public systemDebtEngine; // Debt Engine
   StablecoinSavingsLike public stablecoinSavings;
@@ -363,7 +309,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   // --- Administration ---
   function file(bytes32 what, address data) external auth {
     require(live == 1, "End/not-live");
-    if (what == "government") government = GovernmentLike(data);
+    if (what == "government") government = IGovernment(data);
     else if (what == "liquidationEngine") liquidationEngine = LiquidationEngineLike(data);
     else if (what == "systemDebtEngine") systemDebtEngine = SystemDebtEngine(data);
     else if (what == "stablecoinSavings") stablecoinSavings = StablecoinSavingsLike(data);
