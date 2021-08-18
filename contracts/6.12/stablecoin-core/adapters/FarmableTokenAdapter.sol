@@ -17,20 +17,7 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
-
-interface GovernmentLike {
-  function positions(bytes32, address) external view returns (uint256, uint256);
-
-  function stablecoin(address) external view returns (uint256);
-
-  function collateralToken(bytes32, address) external view returns (uint256);
-
-  function addCollateral(
-    bytes32,
-    address,
-    int256
-  ) external;
-}
+import "../../interfaces/IGovernment.sol";
 
 interface ERC20 {
   function balanceOf(address owner) external view returns (uint256);
@@ -55,7 +42,7 @@ contract FarmableTokenAdapter is Initializable {
   mapping(address => uint256) whitelist;
   uint256 live;
 
-  GovernmentLike public government; // cdp engine
+  IGovernment public government; // cdp engine
   bytes32 public collateralPoolId; // collateral type
   ERC20 public collateralToken; // collateral token
   uint256 public decimals; // collateralToken decimals
@@ -112,7 +99,7 @@ contract FarmableTokenAdapter is Initializable {
     whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
     live = 1;
-    government = GovernmentLike(government_);
+    government = IGovernment(government_);
     collateralPoolId = collateralPoolId_;
     collateralToken = ERC20(collateralToken_);
     uint256 decimals_ = ERC20(collateralToken_).decimals();
