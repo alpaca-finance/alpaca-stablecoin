@@ -22,12 +22,9 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-<<<<<<< HEAD
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-=======
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
->>>>>>> 88541bf76077d92f2178413b09354180fe1282f7
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -89,13 +86,9 @@ interface GovernmentLike {
 
 */
 
-<<<<<<< HEAD
-contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
   using SafeERC20Upgradeable for address;
 
-=======
-contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
->>>>>>> 88541bf76077d92f2178413b09354180fe1282f7
   // --- Auth ---
   mapping(address => uint256) public wards;
 
