@@ -17,7 +17,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.5.12;
+pragma solidity 0.6.12;
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -79,7 +84,7 @@ interface GovernmentLike {
 
 */
 
-contract TokenAdapter {
+contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -102,11 +107,16 @@ contract TokenAdapter {
   uint256 public decimals;
   uint256 public live; // Active Flag
 
-  constructor(
+  function initialize(
     address government_,
     bytes32 collateralPoolId_,
     address collateralToken_
-  ) public {
+  ) external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
+
     wards[msg.sender] = 1;
     live = 1;
     government = GovernmentLike(government_);
@@ -119,14 +129,14 @@ contract TokenAdapter {
     live = 0;
   }
 
-  function deposit(address usr, uint256 wad) external {
+  function deposit(address usr, uint256 wad) external nonReentrant {
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
     government.addCollateral(collateralPoolId, usr, int256(wad));
     require(collateralToken.transferFrom(msg.sender, address(this), wad), "TokenAdapter/failed-transfer");
   }
 
-  function withdraw(address usr, uint256 wad) external {
+  function withdraw(address usr, uint256 wad) external nonReentrant {
     require(wad <= 2**255, "TokenAdapter/overflow");
     government.addCollateral(collateralPoolId, msg.sender, -int256(wad));
     require(collateralToken.transfer(usr, wad), "TokenAdapter/failed-transfer");

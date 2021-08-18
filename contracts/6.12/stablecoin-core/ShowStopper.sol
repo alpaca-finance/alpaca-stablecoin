@@ -19,7 +19,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.6.12;
+pragma solidity 0.6.12;
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 interface GovernmentLike {
   function stablecoin(address) external view returns (uint256);
@@ -246,7 +250,7 @@ interface PriceOracleLike {
         - the number of gems is limited by how big your bag is
 */
 
-contract ShowStopper {
+contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -318,7 +322,10 @@ contract ShowStopper {
   event Cash(bytes32 indexed collateralPoolId, address indexed usr, uint256 wad);
 
   // --- Init ---
-  constructor() public {
+  function initialize() external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
     wards[msg.sender] = 1;
     live = 1;
     emit Rely(msg.sender);

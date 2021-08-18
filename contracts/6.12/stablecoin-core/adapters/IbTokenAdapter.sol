@@ -16,6 +16,11 @@
 
 pragma solidity 0.6.12;
 
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
 import "./FarmableTokenAdapter.sol";
 
 interface FairlaunchLike {
@@ -78,11 +83,17 @@ interface ShieldLike {
 }
 
 // IbTokenAdapter for Fairlaunch V1
-contract IbTokenAdapter is FarmableTokenAdapter {
-  FairlaunchLike public immutable fairlaunch;
-  ShieldLike public immutable shield;
-  TimelockLike public immutable timelock;
-  uint256 public immutable pid;
+contract IbTokenAdapter is
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable,
+  FarmableTokenAdapter
+{
+  FairlaunchLike public fairlaunch;
+  ShieldLike public shield;
+  TimelockLike public timelock;
+  uint256 public pid;
 
   // --- Events ---
   event File(bytes32 indexed what, address data);
@@ -97,7 +108,7 @@ contract IbTokenAdapter is FarmableTokenAdapter {
         @param shield_            The expected value of the migration field.
         @param timelock_            The expected value of the owner field. Also needs to be an instance of Timelock.
     */
-  constructor(
+  function initialize(
     address government_,
     bytes32 collateralPoolId_,
     address collateralToken_,
@@ -106,7 +117,13 @@ contract IbTokenAdapter is FarmableTokenAdapter {
     uint256 pid_,
     address shield_,
     address timelock_
-  ) public FarmableTokenAdapter(government_, collateralPoolId_, collateralToken_, rewardToken_) {
+  ) external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
+    FarmableTokenAdapter.__FarmableTokenAdapter_init(government_, collateralPoolId_, collateralToken_, rewardToken_);
+
     // Sanity checks
     (address lpToken, uint256 allocPoint, , , ) = FairlaunchLike(fairlaunch_).poolInfo(pid_);
     require(lpToken == collateralToken_, "IbTokenAdapter/pid-does-not-match-collateralToken");
@@ -142,7 +159,7 @@ contract IbTokenAdapter is FarmableTokenAdapter {
     address positionAddress,
     address usr,
     uint256 val
-  ) public override {
+  ) public override nonReentrant {
     super.deposit(positionAddress, usr, val);
     fairlaunch.deposit(address(this), pid, val);
   }
@@ -151,14 +168,14 @@ contract IbTokenAdapter is FarmableTokenAdapter {
     address urn,
     address usr,
     uint256 val
-  ) public override {
+  ) public override nonReentrant {
     if (live == 1) {
       fairlaunch.withdraw(address(this), pid, val);
     }
     super.withdraw(urn, usr, val);
   }
 
-  function emergencyWithdraw(address urn, address usr) public override {
+  function emergencyWithdraw(address urn, address usr) public override nonReentrant {
     if (live == 1) {
       uint256 val = government.collateralToken(collateralPoolId, urn);
       fairlaunch.withdraw(address(this), pid, val);
@@ -166,7 +183,7 @@ contract IbTokenAdapter is FarmableTokenAdapter {
     super.emergencyWithdraw(urn, usr);
   }
 
-  function cage() public override {
+  function cage() public override nonReentrant {
     require(live == 1, "IbTokenAdapter/not-live");
 
     // Allow caging if any assumptions change

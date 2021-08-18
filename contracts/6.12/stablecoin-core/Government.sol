@@ -17,13 +17,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.5.12;
+pragma solidity 0.6.12;
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract Government {
+contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
@@ -81,7 +85,11 @@ contract Government {
   uint256 public live; // Active Flag
 
   // --- Init ---
-  constructor() public {
+  function initialize() external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+
     whitelist[msg.sender] = 1;
     live = 1;
   }
