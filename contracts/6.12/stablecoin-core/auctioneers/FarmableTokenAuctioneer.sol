@@ -22,6 +22,8 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
 import "../../interfaces/IPositionHandler.sol";
 
 interface GovernmentLike {
@@ -104,7 +106,12 @@ interface ProxyLike {
   function owner() external view returns (address);
 }
 
-contract FarmableTokenAuctioneer is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract FarmableTokenAuctioneer is
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable
+{
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -209,6 +216,7 @@ contract FarmableTokenAuctioneer is OwnableUpgradeable, PausableUpgradeable, Acc
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     government = GovernmentLike(government_);
     priceOracle = PriceOracleLike(priceOracle_);
@@ -571,7 +579,7 @@ contract FarmableTokenAuctioneer is OwnableUpgradeable, PausableUpgradeable, Acc
   }
 
   // Public function to update the cached debtFloor*liquidationPenalty value.
-  function updateMinimumRemainingDebt() external {
+  function updateMinimumRemainingDebt() external nonReentrant {
     (, , , , uint256 _debtFloor) = GovernmentLike(government).collateralPools(collateralPoolId);
     minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPoolId));
   }

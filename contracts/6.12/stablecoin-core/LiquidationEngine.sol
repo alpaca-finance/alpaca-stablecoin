@@ -22,6 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 interface CollateralAuctioneerLike {
   function collateralPoolId() external view returns (bytes32);
@@ -72,7 +73,12 @@ interface SystemDebtEngine {
   function pushToBadDebtQueue(uint256) external;
 }
 
-contract LiquidationEngine is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract LiquidationEngine is
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable
+{
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
@@ -134,6 +140,7 @@ contract LiquidationEngine is OwnableUpgradeable, PausableUpgradeable, AccessCon
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     government = GovernmentLike(government_);
     live = 1;
@@ -223,7 +230,7 @@ contract LiquidationEngine is OwnableUpgradeable, PausableUpgradeable, AccessCon
     bytes32 collateralPoolId,
     address positionAddress,
     address liquidatorAddress
-  ) external returns (uint256 id) {
+  ) external nonReentrant returns (uint256 id) {
     require(live == 1, "LiquidationEngine/not-live");
 
     (uint256 positionLockedCollateral, uint256 positionDebtShare) =
