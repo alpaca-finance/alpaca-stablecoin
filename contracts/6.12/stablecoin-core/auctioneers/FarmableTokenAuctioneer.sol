@@ -22,6 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "../../interfaces/IPositionHandler.sol";
 
 interface GovernmentLike {
   function moveStablecoin(
@@ -97,10 +98,6 @@ interface FarmableTokenAdapterLike {
   ) external;
 
   function collateralPoolId() external view returns (bytes32);
-}
-
-interface PositionHandlerLike {
-  function owner() external view returns (address);
 }
 
 interface ProxyLike {
@@ -355,7 +352,7 @@ contract FarmableTokenAuctioneer is OwnableUpgradeable, PausableUpgradeable, Acc
 
     // Handle Farmable Token upon liquidation
     // 1. Harvest the rewards of this CDP owner and distribute to the CDP Owner
-    address positionOwner = PositionHandlerLike(positionAddress).owner();
+    address positionOwner = IPositionHandler(positionAddress).owner();
     farmableTokenAdapter.deposit(positionAddress, positionOwner, 0);
     // 2. Confiscate and move the rewards and the staked collateral to this address, they will be distributed to the bidder later
     farmableTokenAdapter.moveRewards(positionAddress, address(this), collateralAmount);
