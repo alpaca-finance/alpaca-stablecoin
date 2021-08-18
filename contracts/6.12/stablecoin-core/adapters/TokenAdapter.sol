@@ -22,6 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "../../interfaces/IGovernment.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -37,20 +38,6 @@ interface TokenLike {
     address,
     uint256
   ) external returns (bool);
-}
-
-interface GovernmentLike {
-  function addCollateral(
-    bytes32,
-    address,
-    int256
-  ) external;
-
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
 }
 
 /*
@@ -94,7 +81,7 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     _;
   }
 
-  GovernmentLike public government; // CDP Engine
+  IGovernment public government; // CDP Engine
   bytes32 public collateralPoolId; // Collateral Type
   TokenLike public collateralToken;
   uint256 public decimals;
@@ -111,7 +98,7 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
 
     wards[msg.sender] = 1;
     live = 1;
-    government = GovernmentLike(government_);
+    government = IGovernment(government_);
     collateralPoolId = collateralPoolId_;
     collateralToken = TokenLike(collateralToken_);
     decimals = collateralToken.decimals();
