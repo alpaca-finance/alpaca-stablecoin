@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// systemDebtEngine.sol -- Dai settlement module
+/// systemDebtEngine.sol -- stablecoin settlement module
 
 // Copyright (C) 2018 Rain <rainbreak@riseup.net>
 //
@@ -148,7 +148,7 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
 
   // Debt settlement
   function settleSystemBadDebt(uint256 rad) external {
-    require(rad <= bookKeeper.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
+    require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
     require(
       rad <= sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
       "SystemDebtEngine/insufficient-debt"
@@ -158,7 +158,7 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
 
   function settleSystemBadDebtByAuction(uint256 rad) external {
     require(rad <= totalBadDebtInAuction, "SystemDebtEngine/not-enough-ash");
-    require(rad <= bookKeeper.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
+    require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
     totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
     bookKeeper.settleSystemBadDebt(rad);
   }
@@ -170,7 +170,7 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
         sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
       "SystemDebtEngine/insufficient-debt"
     );
-    require(bookKeeper.dai(address(this)) == 0, "SystemDebtEngine/surplus-not-zero");
+    require(bookKeeper.stablecoin(address(this)) == 0, "SystemDebtEngine/surplus-not-zero");
     totalBadDebtInAuction = add(totalBadDebtInAuction, badDebtFixedBidSize);
     id = badDebtAuctionHouse.startAuction(address(this), alpacaInitialLotSizeForBadDebt, badDebtFixedBidSize);
   }
@@ -178,7 +178,7 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
   // Surplus auction
   function startSurplusAuction() external returns (uint256 id) {
     require(
-      bookKeeper.dai(address(this)) >=
+      bookKeeper.stablecoin(address(this)) >=
         add(add(bookKeeper.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer),
       "SystemDebtEngine/insufficient-surplus"
     );
@@ -194,8 +194,8 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
     live = 0;
     totalBadDebtValue = 0;
     totalBadDebtInAuction = 0;
-    surplusAuctionHouse.cage(bookKeeper.dai(address(surplusAuctionHouse)));
+    surplusAuctionHouse.cage(bookKeeper.stablecoin(address(surplusAuctionHouse)));
     badDebtAuctionHouse.cage();
-    bookKeeper.settleSystemBadDebt(min(bookKeeper.dai(address(this)), bookKeeper.systemBadDebt(address(this))));
+    bookKeeper.settleSystemBadDebt(min(bookKeeper.stablecoin(address(this)), bookKeeper.systemBadDebt(address(this))));
   }
 }

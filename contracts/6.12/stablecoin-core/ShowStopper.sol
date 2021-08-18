@@ -362,7 +362,14 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     uint256 debtShare = tab / debtAccumulatedRate;
     totalDebtShare[collateralPoolId] = add(totalDebtShare[collateralPoolId], debtShare);
     require(int256(lot) >= 0 && int256(debtShare) >= 0, "End/overflow");
-    bookKeeper.grab(collateralPoolId, usr, address(this), address(systemDebtEngine), int256(lot), int256(debtShare));
+    bookKeeper.confiscatePosition(
+      collateralPoolId,
+      usr,
+      address(this),
+      address(systemDebtEngine),
+      int256(lot),
+      int256(debtShare)
+    );
     emit Snip(collateralPoolId, id, usr, tab, lot, debtShare);
   }
 
@@ -376,7 +383,14 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     shortfall[collateralPoolId] = add(shortfall[collateralPoolId], sub(owe, wad));
 
     require(wad <= 2**255 && debtShare <= 2**255, "End/overflow");
-    bookKeeper.grab(collateralPoolId, urn, address(this), address(systemDebtEngine), -int256(wad), -int256(debtShare));
+    bookKeeper.confiscatePosition(
+      collateralPoolId,
+      urn,
+      address(this),
+      address(systemDebtEngine),
+      -int256(wad),
+      -int256(debtShare)
+    );
     emit Skim(collateralPoolId, urn, wad, debtShare);
   }
 
@@ -385,7 +399,14 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     (uint256 lockedCollateral, uint256 debtShare) = bookKeeper.positions(collateralPoolId, msg.sender);
     require(debtShare == 0, "End/debtShare-not-zero");
     require(lockedCollateral <= 2**255, "End/overflow");
-    bookKeeper.grab(collateralPoolId, msg.sender, msg.sender, address(systemDebtEngine), -int256(lockedCollateral), 0);
+    bookKeeper.confiscatePosition(
+      collateralPoolId,
+      msg.sender,
+      msg.sender,
+      address(systemDebtEngine),
+      -int256(lockedCollateral),
+      0
+    );
     emit Free(collateralPoolId, msg.sender, lockedCollateral);
   }
 
@@ -394,7 +415,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     require(debt == 0, "End/debt-not-zero");
     require(bookKeeper.stablecoin(address(systemDebtEngine)) == 0, "End/surplus-not-zero");
     require(block.timestamp >= add(when, wait), "End/wait-not-finished");
-    debt = bookKeeper.debt();
+    debt = bookKeeper.totalStablecoinIssued();
     emit Thaw();
   }
 

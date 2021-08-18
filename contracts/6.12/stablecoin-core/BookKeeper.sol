@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// vat.sol -- Dai CDP database
+/// BookKeeper.sol -- stable coin CDP database
 
 // Copyright (C) 2018 Rain <rainbreak@riseup.net>
 //
@@ -22,12 +22,13 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "../interfaces/IBookKeeper.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
@@ -46,13 +47,13 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     _;
   }
 
-  mapping(address => mapping(address => uint256)) public can;
+  mapping(address => mapping(address => uint256)) public override can;
 
-  function hope(address usr) external {
+  function hope(address usr) external override {
     can[msg.sender][usr] = 1;
   }
 
-  function nope(address usr) external {
+  function nope(address usr) external override {
     can[msg.sender][usr] = 0;
   }
 
@@ -73,14 +74,14 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     uint256 debtShare; // Normalised Debt    [wad]
   }
 
-  mapping(bytes32 => CollateralPool) public collateralPools;
-  mapping(bytes32 => mapping(address => Position)) public positions;
-  mapping(bytes32 => mapping(address => uint256)) public collateralToken; // [wad]
-  mapping(address => uint256) public stablecoin; // [rad]
-  mapping(address => uint256) public systemBadDebt; // [rad]
+  mapping(bytes32 => CollateralPool) public override collateralPools;
+  mapping(bytes32 => mapping(address => Position)) public override positions;
+  mapping(bytes32 => mapping(address => uint256)) public override collateralToken; // [wad]
+  mapping(address => uint256) public override stablecoin; // [rad]
+  mapping(address => uint256) public override systemBadDebt; // [rad]
 
-  uint256 public totalStablecoinIssued; // Total Dai Issued    [rad]
-  uint256 public totalUnbackedStablecoin; // Total Unbacked Dai  [rad]
+  uint256 public override totalStablecoinIssued; // Total stable coin Issued    [rad]
+  uint256 public totalUnbackedStablecoin; // Total Unbacked stable coin  [rad]
   uint256 public totalDebtCeiling; // Total Debt Ceiling  [rad]
   uint256 public live; // Active Flag
 
@@ -131,7 +132,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     collateralPools[collateralPoolId].debtAccumulatedRate = 10**27;
   }
 
-  function file(bytes32 what, uint256 data) external auth {
+  function file(bytes32 what, uint256 data) external override auth {
     require(live == 1, "BookKeeper/not-live");
     if (what == "totalDebtCeiling") totalDebtCeiling = data;
     else revert("BookKeeper/file-unrecognized-param");
@@ -141,7 +142,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     bytes32 collateralPoolId,
     bytes32 what,
     uint256 data
-  ) external auth {
+  ) external override auth {
     require(live == 1, "BookKeeper/not-live");
     if (what == "priceWithSafetyMargin") collateralPools[collateralPoolId].priceWithSafetyMargin = data;
     else if (what == "debtCeiling") collateralPools[collateralPoolId].debtCeiling = data;
@@ -149,7 +150,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     else revert("BookKeeper/file-unrecognized-param");
   }
 
-  function cage() external auth {
+  function cage() external override auth {
     live = 0;
   }
 
@@ -158,7 +159,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     bytes32 collateralPoolId,
     address usr,
     int256 wad
-  ) external auth {
+  ) external override auth {
     collateralToken[collateralPoolId][usr] = add(collateralToken[collateralPoolId][usr], wad);
   }
 
@@ -167,7 +168,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address src,
     address dst,
     uint256 wad
-  ) external {
+  ) external override {
     require(wish(src, msg.sender), "BookKeeper/not-allowed");
     collateralToken[collateralPoolId][src] = sub(collateralToken[collateralPoolId][src], wad);
     collateralToken[collateralPoolId][dst] = add(collateralToken[collateralPoolId][dst], wad);
@@ -177,7 +178,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address src,
     address dst,
     uint256 rad
-  ) external {
+  ) external override {
     require(wish(src, msg.sender), "BookKeeper/not-allowed");
     stablecoin[src] = sub(stablecoin[src], rad);
     stablecoin[dst] = add(stablecoin[dst], rad);
@@ -203,7 +204,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address stablecoinOwner,
     int256 collateralValue,
     int256 debtShare
-  ) external {
+  ) external override {
     // system is live
     require(live == 1, "BookKeeper/not-live");
 
@@ -270,7 +271,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address dst,
     int256 collateralValue,
     int256 debtShare
-  ) external {
+  ) external override {
     Position storage u = positions[collateralPoolId][src];
     Position storage v = positions[collateralPoolId][dst];
     CollateralPool storage i = collateralPools[collateralPoolId];
@@ -303,7 +304,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address stablecoinDebtor,
     int256 collateralValue,
     int256 debtShare
-  ) external auth {
+  ) external override auth {
     Position storage position = positions[collateralPoolId][positionAddress];
     CollateralPool storage collateralPool = collateralPools[collateralPoolId];
 
@@ -322,7 +323,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
   }
 
   // --- Settlement ---
-  function settleSystemBadDebt(uint256 rad) external {
+  function settleSystemBadDebt(uint256 rad) external override {
     address u = msg.sender;
     systemBadDebt[u] = sub(systemBadDebt[u], rad);
     stablecoin[u] = sub(stablecoin[u], rad);
@@ -334,7 +335,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address from,
     address to,
     uint256 rad
-  ) external auth {
+  ) external override auth {
     systemBadDebt[from] = add(systemBadDebt[from], rad);
     stablecoin[to] = add(stablecoin[to], rad);
     totalUnbackedStablecoin = add(totalUnbackedStablecoin, rad);
@@ -346,7 +347,7 @@ contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     bytes32 collateralPoolId,
     address u,
     int256 debtAccumulatedRate
-  ) external auth {
+  ) external override auth {
     require(live == 1, "BookKeeper/not-live");
     CollateralPool storage collateralPool = collateralPools[collateralPoolId];
     collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);

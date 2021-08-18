@@ -255,7 +255,7 @@ contract LiquidationEngine is OwnableUpgradeable, PausableUpgradeable, AccessCon
       "LiquidationEngine/overflow"
     );
 
-    bookKeeper.confiscate(
+    bookKeeper.confiscatePosition(
       collateralPoolId,
       positionAddress,
       mcollateralPool.auctioneer,
