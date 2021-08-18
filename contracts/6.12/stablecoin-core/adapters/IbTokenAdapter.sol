@@ -159,7 +159,7 @@ contract IbTokenAdapter is
     address positionAddress,
     address usr,
     uint256 val
-  ) public override {
+  ) public override nonReentrant {
     super.deposit(positionAddress, usr, val);
     fairlaunch.deposit(address(this), pid, val);
   }
@@ -168,14 +168,14 @@ contract IbTokenAdapter is
     address urn,
     address usr,
     uint256 val
-  ) public override {
+  ) public override nonReentrant {
     if (live == 1) {
       fairlaunch.withdraw(address(this), pid, val);
     }
     super.withdraw(urn, usr, val);
   }
 
-  function emergencyWithdraw(address urn, address usr) public override {
+  function emergencyWithdraw(address urn, address usr) public override nonReentrant {
     if (live == 1) {
       uint256 val = government.collateralToken(collateralPoolId, urn);
       fairlaunch.withdraw(address(this), pid, val);
@@ -183,7 +183,7 @@ contract IbTokenAdapter is
     super.emergencyWithdraw(urn, usr);
   }
 
-  function cage() public override {
+  function cage() public override nonReentrant {
     require(live == 1, "IbTokenAdapter/not-live");
 
     // Allow caging if any assumptions change

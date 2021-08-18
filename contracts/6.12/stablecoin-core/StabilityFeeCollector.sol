@@ -193,7 +193,7 @@ contract StabilityFeeCollector is
   }
 
   // --- Stability Fee Collection ---
-  function collect(bytes32 collateralPool) external returns (uint256 rate) {
+  function collect(bytes32 collateralPool) external nonReentrant returns (uint256 rate) {
     require(now >= collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
     (, uint256 prev) = government.collateralPools(collateralPool);
     rate = rmul(

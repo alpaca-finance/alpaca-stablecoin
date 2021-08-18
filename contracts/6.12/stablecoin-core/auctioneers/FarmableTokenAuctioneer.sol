@@ -579,7 +579,7 @@ contract FarmableTokenAuctioneer is
   }
 
   // Public function to update the cached debtFloor*liquidationPenalty value.
-  function updateMinimumRemainingDebt() external {
+  function updateMinimumRemainingDebt() external nonReentrant {
     (, , , , uint256 _debtFloor) = GovernmentLike(government).collateralPools(collateralPoolId);
     minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPoolId));
   }

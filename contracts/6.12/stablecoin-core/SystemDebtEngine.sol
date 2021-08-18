@@ -159,14 +159,14 @@ contract SystemDebtEngine is
   }
 
   // Pop from debt-queue
-  function popFromBadDebtQueue(uint256 timestamp) external {
+  function popFromBadDebtQueue(uint256 timestamp) external nonReentrant {
     require(add(timestamp, badDebtAuctionDelay) <= now, "SystemDebtEngine/badDebtAuctionDelay-not-finished");
     totalBadDebtValue = sub(totalBadDebtValue, badDebtQueue[timestamp]);
     badDebtQueue[timestamp] = 0;
   }
 
   // Debt settlement
-  function settleSystemBadDebt(uint256 rad) external {
+  function settleSystemBadDebt(uint256 rad) external nonReentrant {
     require(rad <= government.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
     require(
       rad <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
@@ -175,7 +175,7 @@ contract SystemDebtEngine is
     government.settleSystemBadDebt(rad);
   }
 
-  function settleSystemBadDebtByAuction(uint256 rad) external {
+  function settleSystemBadDebtByAuction(uint256 rad) external nonReentrant {
     require(rad <= totalBadDebtInAuction, "SystemDebtEngine/not-enough-ash");
     require(rad <= government.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
     totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
@@ -183,7 +183,7 @@ contract SystemDebtEngine is
   }
 
   // Debt auction
-  function startBadDebtAuction() external returns (uint256 id) {
+  function startBadDebtAuction() external nonReentrant returns (uint256 id) {
     require(
       badDebtFixedBidSize <=
         sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
@@ -195,7 +195,7 @@ contract SystemDebtEngine is
   }
 
   // Surplus auction
-  function startSurplusAuction() external returns (uint256 id) {
+  function startSurplusAuction() external nonReentrant returns (uint256 id) {
     require(
       government.dai(address(this)) >=
         add(add(government.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer),

@@ -132,12 +132,12 @@ contract StablecoinAdapter is
     require(y == 0 || (z = x * y) / y == x);
   }
 
-  function deposit(address usr, uint256 wad) external {
+  function deposit(address usr, uint256 wad) external nonReentrant {
     government.moveStablecoin(address(this), usr, mul(ONE, wad));
     stablecoin.burn(msg.sender, wad);
   }
 
-  function withdraw(address usr, uint256 wad) external {
+  function withdraw(address usr, uint256 wad) external nonReentrant {
     require(live == 1, "StablecoinAdapter/not-live");
     government.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
     stablecoin.mint(usr, wad);

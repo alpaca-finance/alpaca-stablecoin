@@ -230,7 +230,7 @@ contract LiquidationEngine is
     bytes32 collateralPoolId,
     address positionAddress,
     address liquidatorAddress
-  ) external returns (uint256 id) {
+  ) external nonReentrant returns (uint256 id) {
     require(live == 1, "LiquidationEngine/not-live");
 
     (uint256 positionLockedCollateral, uint256 positionDebtShare) =

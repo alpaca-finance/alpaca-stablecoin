@@ -129,14 +129,14 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     live = 0;
   }
 
-  function deposit(address usr, uint256 wad) external {
+  function deposit(address usr, uint256 wad) external nonReentrant {
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
     government.addCollateral(collateralPoolId, usr, int256(wad));
     require(collateralToken.transferFrom(msg.sender, address(this), wad), "TokenAdapter/failed-transfer");
   }
 
-  function withdraw(address usr, uint256 wad) external {
+  function withdraw(address usr, uint256 wad) external nonReentrant {
     require(wad <= 2**255, "TokenAdapter/overflow");
     government.addCollateral(collateralPoolId, msg.sender, -int256(wad));
     require(collateralToken.transfer(usr, wad), "TokenAdapter/failed-transfer");
