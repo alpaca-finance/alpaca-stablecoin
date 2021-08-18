@@ -15,7 +15,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.5.12;
+pragma solidity 0.6.12;
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 interface TokenLike {
   function approve(address, uint256) external;
@@ -215,7 +219,14 @@ contract Common {
   }
 }
 
-contract AlpacaStablecoinProxyActions is Common {
+contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, Common {
+  // --- Init ---
+  function initialize() external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+  }
+
   // Internal functions
 
   function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
