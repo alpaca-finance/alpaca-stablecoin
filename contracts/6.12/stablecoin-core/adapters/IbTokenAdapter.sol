@@ -16,6 +16,10 @@
 
 pragma solidity 0.6.12;
 
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+
 import "./FarmableTokenAdapter.sol";
 
 interface FairlaunchLike {
@@ -78,11 +82,11 @@ interface ShieldLike {
 }
 
 // IbTokenAdapter for Fairlaunch V1
-contract IbTokenAdapter is FarmableTokenAdapter {
-  FairlaunchLike public immutable fairlaunch;
-  ShieldLike public immutable shield;
-  TimelockLike public immutable timelock;
-  uint256 public immutable pid;
+contract IbTokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, FarmableTokenAdapter {
+  FairlaunchLike public fairlaunch;
+  ShieldLike public shield;
+  TimelockLike public timelock;
+  uint256 public pid;
 
   // --- Events ---
   event File(bytes32 indexed what, address data);
@@ -97,7 +101,7 @@ contract IbTokenAdapter is FarmableTokenAdapter {
         @param shield_            The expected value of the migration field.
         @param timelock_            The expected value of the owner field. Also needs to be an instance of Timelock.
     */
-  constructor(
+  function initialize(
     address government_,
     bytes32 collateralPoolId_,
     address collateralToken_,
@@ -106,7 +110,11 @@ contract IbTokenAdapter is FarmableTokenAdapter {
     uint256 pid_,
     address shield_,
     address timelock_
-  ) public FarmableTokenAdapter(government_, collateralPoolId_, collateralToken_, rewardToken_) {
+  ) external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+    FarmableTokenAdapter.__FarmableTokenAdapter_init(government_, collateralPoolId_, collateralToken_, rewardToken_);
     // Sanity checks
     (address lpToken, uint256 allocPoint, , , ) = FairlaunchLike(fairlaunch_).poolInfo(pid_);
     require(lpToken == collateralToken_, "IbTokenAdapter/pid-does-not-match-collateralToken");

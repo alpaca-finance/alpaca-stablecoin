@@ -17,7 +17,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.5.12;
+pragma solidity 0.6.12;
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -55,7 +59,7 @@ interface GovernmentLike {
   function nope(address) external;
 }
 
-contract SystemDebtEngine {
+contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
@@ -92,11 +96,14 @@ contract SystemDebtEngine {
   uint256 public live; // Active Flag
 
   // --- Init ---
-  constructor(
+  function initialize(
     address government_,
     address surplusAuctionHouse_,
     address badDebtAuctionHouse_
-  ) public {
+  ) external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
     whitelist[msg.sender] = 1;
     government = GovernmentLike(government_);
     surplusAuctionHouse = SurplusAuctioneerLike(surplusAuctionHouse_);
