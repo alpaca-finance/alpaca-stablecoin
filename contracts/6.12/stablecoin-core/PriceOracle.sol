@@ -20,18 +20,11 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "../interfaces/IGovernment.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
-
-interface GovernmentLike {
-  function file(
-    bytes32,
-    bytes32,
-    uint256
-  ) external;
-}
 
 interface PriceFeedLike {
   function peek() external returns (bytes32, bool);
@@ -62,7 +55,7 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
 
   mapping(bytes32 => CollateralPool) public collateralPools;
 
-  GovernmentLike public vat; // CDP Engine
+  IGovernment public vat; // CDP Engine
   uint256 public stableCoinReferencePrice; // ref per dai [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
 
   uint256 public live;
@@ -81,7 +74,7 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     AccessControlUpgradeable.__AccessControl_init();
 
     wards[msg.sender] = 1;
-    vat = GovernmentLike(vat_);
+    vat = IGovernment(vat_);
     stableCoinReferencePrice = ONE;
     live = 1;
   }
