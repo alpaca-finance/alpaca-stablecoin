@@ -22,6 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "../interfaces/IGovernment.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -47,18 +48,6 @@ interface SurplusAuctioneerLike {
   function live() external returns (uint256);
 }
 
-interface GovernmentLike {
-  function dai(address) external view returns (uint256);
-
-  function systemBadDebt(address) external view returns (uint256);
-
-  function settleSystemBadDebt(uint256) external;
-
-  function hope(address) external;
-
-  function nope(address) external;
-}
-
 contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
@@ -78,7 +67,7 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
   }
 
   // --- Data ---
-  GovernmentLike public government; // CDP Engine
+  IGovernment public government; // CDP Engine
   SurplusAuctioneerLike public surplusAuctionHouse; // Surplus Auction House
   BadDebtAuctioneerLike public badDebtAuctionHouse; // Debt Auction House
 
@@ -105,7 +94,7 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     whitelist[msg.sender] = 1;
-    government = GovernmentLike(government_);
+    government = IGovernment(government_);
     surplusAuctionHouse = SurplusAuctioneerLike(surplusAuctionHouse_);
     badDebtAuctionHouse = BadDebtAuctioneerLike(badDebtAuctionHouse_);
     government.hope(surplusAuctionHouse_);
