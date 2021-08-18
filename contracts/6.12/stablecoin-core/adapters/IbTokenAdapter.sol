@@ -19,6 +19,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "./FarmableTokenAdapter.sol";
 
@@ -82,7 +83,13 @@ interface ShieldLike {
 }
 
 // IbTokenAdapter for Fairlaunch V1
-contract IbTokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, FarmableTokenAdapter {
+contract IbTokenAdapter is
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable,
+  FarmableTokenAdapter
+{
   FairlaunchLike public fairlaunch;
   ShieldLike public shield;
   TimelockLike public timelock;
@@ -114,7 +121,9 @@ contract IbTokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessContro
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
     FarmableTokenAdapter.__FarmableTokenAdapter_init(government_, collateralPoolId_, collateralToken_, rewardToken_);
+
     // Sanity checks
     (address lpToken, uint256 allocPoint, , , ) = FairlaunchLike(fairlaunch_).poolInfo(pid_);
     require(lpToken == collateralToken_, "IbTokenAdapter/pid-does-not-match-collateralToken");
