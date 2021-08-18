@@ -20,6 +20,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "../interfaces/IGovernment.sol";
 
 interface TokenLike {
   function approve(address, uint256) external;
@@ -161,7 +162,7 @@ interface FarmableTokenAdapterLike {
 }
 
 interface StablecoinAdapterLike {
-  function government() external returns (GovernmentLike);
+  function government() external returns (IGovernment);
 
   function stablecoin() external returns (TokenLike);
 
@@ -259,7 +260,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 debtAccumulatedRate = StabilityFeeCollectorLike(stabilityFeeCollector).collect(collateralPoolId);
 
     // Gets Alpaca Stablecoin balance of the positionAddress in the government
-    uint256 stablecoin = GovernmentLike(government).stablecoin(positionAddress);
+    uint256 stablecoin = IGovernment(government).stablecoin(positionAddress);
 
     // If there was already enough Alpaca Stablecoin in the government balance, just exits it without adding more debt
     if (stablecoin < mul(wad, RAY)) {
@@ -279,9 +280,9 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     bytes32 collateralPoolId
   ) internal view returns (int256 resultDebtShare) {
     // Gets actual rate from the government
-    (, uint256 debtAccumulatedRate, , , ) = GovernmentLike(government).collateralPools(collateralPoolId);
+    (, uint256 debtAccumulatedRate, , , ) = IGovernment(government).collateralPools(collateralPoolId);
     // Gets actual debtShare value of the positionAddress
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IGovernment(government).positions(collateralPoolId, positionAddress);
 
     // Uses the whole stablecoin balance in the government to reduce the debt
     resultDebtShare = toInt(stablecoinBalance / debtAccumulatedRate);
@@ -296,11 +297,11 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     bytes32 collateralPoolId
   ) internal view returns (uint256 wad) {
     // Gets actual rate from the government
-    (, uint256 rate, , , ) = GovernmentLike(government).collateralPools(collateralPoolId);
+    (, uint256 rate, , , ) = IGovernment(government).collateralPools(collateralPoolId);
     // Gets actual debtShare value of the positionAddress
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IGovernment(government).positions(collateralPoolId, positionAddress);
     // Gets actual stablecoin amount in the positionAddress
-    uint256 stablecoin = GovernmentLike(government).stablecoin(usr);
+    uint256 stablecoin = IGovernment(government).stablecoin(usr);
 
     uint256 rad = sub(mul(debtShare, rate), stablecoin);
     wad = rad / RAY;
@@ -485,7 +486,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Receives BNB amount, converts it to WBNB and joins it into the government
     bnbAdapter_deposit(bnbAdapter, address(this));
     // Locks WBNB amount into the CDP
-    GovernmentLike(ManagerLike(manager).government()).adjustPosition(
+    IGovernment(ManagerLike(manager).government()).adjustPosition(
       ManagerLike(manager).collateralPools(cdp),
       ManagerLike(manager).positions(cdp),
       address(this),
@@ -515,7 +516,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Takes token amount from user's wallet and joins into the government
     tokenAdapter_deposit(tokenAdapter, address(this), amt, transferFrom);
     // Locks token amount into the CDP
-    GovernmentLike(ManagerLike(manager).government()).adjustPosition(
+    IGovernment(ManagerLike(manager).government()).adjustPosition(
       ManagerLike(manager).collateralPools(cdp),
       ManagerLike(manager).positions(cdp),
       address(this),
@@ -535,7 +536,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Takes token amount from user's wallet and joins into the government
     farmableTokenAdapter_deposit(farmableTokenAdapter, address(this), amt, transferFrom);
     // Locks token amount into the CDP
-    GovernmentLike(ManagerLike(manager).government()).adjustPosition(
+    IGovernment(ManagerLike(manager).government()).adjustPosition(
       ManagerLike(manager).collateralPools(cdp),
       ManagerLike(manager).positions(cdp),
       address(this),
@@ -682,8 +683,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
     moveStablecoin(manager, cdp, address(this), toRad(wad));
     // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
-    if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
-      GovernmentLike(government).hope(stablecoinAdapter);
+    if (IGovernment(government).can(address(this), address(stablecoinAdapter)) == 0) {
+      IGovernment(government).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wad);
@@ -710,7 +711,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
         0,
         _getWipeDebtShare(
           government,
-          GovernmentLike(government).stablecoin(positionAddress),
+          IGovernment(government).stablecoin(positionAddress),
           positionAddress,
           collateralPoolId
         )
@@ -719,7 +720,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       // Deposits Alpaca Stablecoin amount into the government
       stablecoinAdapter_deposit(stablecoinAdapter, address(this), wad);
       // Paybacks debt to the CDP
-      GovernmentLike(government).adjustPosition(
+      IGovernment(government).adjustPosition(
         collateralPoolId,
         positionAddress,
         address(this),
@@ -749,7 +750,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address government = ManagerLike(manager).government();
     address positionAddress = ManagerLike(manager).positions(cdp);
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IGovernment(government).positions(collateralPoolId, positionAddress);
 
     address own = ManagerLike(manager).owns(cdp);
     if (own == address(this) || ManagerLike(manager).cdpCan(own, cdp, address(this)) == 1) {
@@ -769,7 +770,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
         _getWipeAllWad(government, address(this), positionAddress, collateralPoolId)
       );
       // Paybacks debt to the CDP
-      GovernmentLike(government).adjustPosition(
+      IGovernment(government).adjustPosition(
         collateralPoolId,
         positionAddress,
         address(this),
@@ -813,8 +814,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
     moveStablecoin(manager, cdp, address(this), toRad(wadD));
     // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
-    if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
-      GovernmentLike(government).hope(stablecoinAdapter);
+    if (IGovernment(government).can(address(this), address(stablecoinAdapter)) == 0) {
+      IGovernment(government).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
@@ -857,8 +858,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
     moveStablecoin(manager, cdp, address(this), toRad(wadD));
     // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
-    if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
-      GovernmentLike(government).hope(stablecoinAdapter);
+    if (IGovernment(government).can(address(this), address(stablecoinAdapter)) == 0) {
+      IGovernment(government).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
@@ -903,8 +904,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
     moveStablecoin(manager, cdp, address(this), toRad(wadD));
     // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
-    if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
-      GovernmentLike(government).hope(stablecoinAdapter);
+    if (IGovernment(government).can(address(this), address(stablecoinAdapter)) == 0) {
+      IGovernment(government).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
@@ -951,7 +952,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       -toInt(wadC),
       _getWipeDebtShare(
         ManagerLike(manager).government(),
-        GovernmentLike(ManagerLike(manager).government()).stablecoin(positionAddress),
+        IGovernment(ManagerLike(manager).government()).stablecoin(positionAddress),
         positionAddress,
         ManagerLike(manager).collateralPools(cdp)
       )
@@ -976,7 +977,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address government = ManagerLike(manager).government();
     address positionAddress = ManagerLike(manager).positions(cdp);
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IGovernment(government).positions(collateralPoolId, positionAddress);
 
     // Deposits Alpaca Stablecoin amount into the government
     stablecoinAdapter_deposit(
@@ -1015,7 +1016,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       -toInt(wadC),
       _getWipeDebtShare(
         ManagerLike(manager).government(),
-        GovernmentLike(ManagerLike(manager).government()).stablecoin(positionAddress),
+        IGovernment(ManagerLike(manager).government()).stablecoin(positionAddress),
         positionAddress,
         ManagerLike(manager).collateralPools(cdp)
       )
@@ -1036,7 +1037,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address government = ManagerLike(manager).government();
     address positionAddress = ManagerLike(manager).positions(cdp);
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IGovernment(government).positions(collateralPoolId, positionAddress);
 
     // Deposits Alpaca Stablecoin amount into the government
     stablecoinAdapter_deposit(
@@ -1072,7 +1073,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       -toInt(wadC),
       _getWipeDebtShare(
         ManagerLike(manager).government(),
-        GovernmentLike(ManagerLike(manager).government()).stablecoin(positionAddress),
+        IGovernment(ManagerLike(manager).government()).stablecoin(positionAddress),
         positionAddress,
         ManagerLike(manager).collateralPools(cdp)
       )
@@ -1093,7 +1094,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address government = ManagerLike(manager).government();
     address positionAddress = ManagerLike(manager).positions(cdp);
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IGovernment(government).positions(collateralPoolId, positionAddress);
 
     // Deposits Alpaca Stablecoin amount into the government
     stablecoinAdapter_deposit(
