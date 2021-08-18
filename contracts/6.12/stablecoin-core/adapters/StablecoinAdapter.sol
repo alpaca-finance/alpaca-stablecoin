@@ -22,6 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "../../interfaces/IStablecoin.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -37,12 +38,6 @@ interface TokenLike {
     address,
     uint256
   ) external returns (bool);
-}
-
-interface StablecoinLike {
-  function mint(address, uint256) external;
-
-  function burn(address, uint256) external;
 }
 
 interface GovernmentLike {
@@ -101,7 +96,7 @@ contract StablecoinAdapter is OwnableUpgradeable, PausableUpgradeable, AccessCon
   }
 
   GovernmentLike public government; // CDP Engine
-  StablecoinLike public stablecoin; // Stablecoin Token
+  IStablecoin public stablecoin; // Stablecoin Token
   uint256 public live; // Active Flag
 
   function initialize(address government_, address stablecoin_) external initializer {
@@ -112,7 +107,7 @@ contract StablecoinAdapter is OwnableUpgradeable, PausableUpgradeable, AccessCon
     wards[msg.sender] = 1;
     live = 1;
     government = GovernmentLike(government_);
-    stablecoin = StablecoinLike(stablecoin_);
+    stablecoin = IStablecoin(stablecoin_);
   }
 
   function cage() external auth {

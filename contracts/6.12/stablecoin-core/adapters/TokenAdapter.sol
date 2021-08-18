@@ -39,12 +39,6 @@ interface TokenLike {
   ) external returns (bool);
 }
 
-interface StablecoinLike {
-  function mint(address, uint256) external;
-
-  function burn(address, uint256) external;
-}
-
 interface GovernmentLike {
   function addCollateral(
     bytes32,
