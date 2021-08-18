@@ -22,6 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -59,7 +60,12 @@ interface GovernmentLike {
   function nope(address) external;
 }
 
-contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract SystemDebtEngine is
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable
+{
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
@@ -104,6 +110,8 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
+
     whitelist[msg.sender] = 1;
     government = GovernmentLike(government_);
     surplusAuctionHouse = SurplusAuctioneerLike(surplusAuctionHouse_);
