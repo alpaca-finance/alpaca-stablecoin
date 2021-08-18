@@ -22,6 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 interface GovernmentLike {
   function moveStablecoin(
@@ -83,7 +84,12 @@ interface CalculatorLike {
   function price(uint256, uint256) external view returns (uint256);
 }
 
-contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract CollateralAuctioneer is
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable
+{
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -187,6 +193,7 @@ contract CollateralAuctioneer is OwnableUpgradeable, PausableUpgradeable, Access
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     government = GovernmentLike(government_);
     priceOracle = PriceOracleLike(priceOracle_);
