@@ -17,7 +17,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.5.12;
+pragma solidity 0.6.12;
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 interface GovernmentLike {
   function positions(bytes32, address) external view returns (uint256, uint256);
@@ -64,7 +68,7 @@ contract PositionHandler {
   }
 }
 
-contract CDPManager {
+contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   address public government;
   uint256 public cdpi; // Auto incremental
   mapping(uint256 => address) public positions; // CDPId => PositionHandler
@@ -97,7 +101,11 @@ contract CDPManager {
     _;
   }
 
-  constructor(address government_) public {
+  function initialize(address government_) external initializer {
+    OwnableUpgradeable.__Ownable_init();
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+
     government = government_;
   }
 
