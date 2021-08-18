@@ -41,8 +41,8 @@ interface TokenLike {
 }
 
 /*
-    Here we provide *adapters* to connect the Government to arbitrary external
-    token implementations, creating a bounded context for the Government. The
+    Here we provide *adapters* to connect the BookKeeper to arbitrary external
+    token implementations, creating a bounded context for the BookKeeper. The
     adapters here are provided as working examples:
 
       - `TokenAdapter`: For well behaved ERC20 tokens, with simple transfer

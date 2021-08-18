@@ -23,7 +23,7 @@ pragma solidity >=0.5.12;
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface GovernmentLike {
+interface BookKeeperLike {
   function moveStablecoin(
     address,
     address,
@@ -79,7 +79,7 @@ contract SurplusAuctioneer {
 
   mapping(uint256 => Bid) public bids;
 
-  GovernmentLike public bookKeeper; // CDP Engine
+  BookKeeperLike public bookKeeper; // CDP Engine
   TokenLike public alpaca;
 
   uint256 constant ONE = 1.00E18;
@@ -95,7 +95,7 @@ contract SurplusAuctioneer {
   // --- Init ---
   constructor(address bookKeeper_, address alpaca_) public {
     whitelist[msg.sender] = 1;
-    bookKeeper = GovernmentLike(bookKeeper_);
+    bookKeeper = BookKeeperLike(bookKeeper_);
     alpaca = TokenLike(alpaca_);
     live = 1;
   }

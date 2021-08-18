@@ -42,7 +42,7 @@ pragma solidity >=0.5.12;
 
 */
 
-interface GovernmentLike {
+interface BookKeeperLike {
   function moveStablecoin(
     address,
     address,
@@ -80,7 +80,7 @@ contract StablecoinSavings {
   uint256 public savingsRate; // The Dai Savings Rate          [ray]
   uint256 public sharePrice; // The Rate Accumulator          [ray]
 
-  GovernmentLike public bookKeeper; // CDP Engine
+  BookKeeperLike public bookKeeper; // CDP Engine
   address public systemDebtEngine; // Debt Engine
   uint256 public lastAccumulationTime; // Time of last drip     [unix epoch time]
 
@@ -89,7 +89,7 @@ contract StablecoinSavings {
   // --- Init ---
   constructor(address bookKeeper_) public {
     wards[msg.sender] = 1;
-    bookKeeper = GovernmentLike(bookKeeper_);
+    bookKeeper = BookKeeperLike(bookKeeper_);
     savingsRate = ONE;
     sharePrice = ONE;
     lastAccumulationTime = now;

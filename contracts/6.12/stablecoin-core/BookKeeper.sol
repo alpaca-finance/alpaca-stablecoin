@@ -27,22 +27,22 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract BookKeeper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
   function rely(address usr) external auth {
-    require(live == 1, "Government/not-live");
+    require(live == 1, "BookKeeper/not-live");
     whitelist[usr] = 1;
   }
 
   function deny(address usr) external auth {
-    require(live == 1, "Government/not-live");
+    require(live == 1, "BookKeeper/not-live");
     whitelist[usr] = 0;
   }
 
   modifier auth {
-    require(whitelist[msg.sender] == 1, "Government/not-authorized");
+    require(whitelist[msg.sender] == 1, "BookKeeper/not-authorized");
     _;
   }
 
@@ -127,14 +127,14 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
 
   // --- Administration ---
   function init(bytes32 collateralPoolId) external auth {
-    require(collateralPools[collateralPoolId].debtAccumulatedRate == 0, "Government/collateral-pool-already-init");
+    require(collateralPools[collateralPoolId].debtAccumulatedRate == 0, "BookKeeper/collateral-pool-already-init");
     collateralPools[collateralPoolId].debtAccumulatedRate = 10**27;
   }
 
   function file(bytes32 what, uint256 data) external auth {
-    require(live == 1, "Government/not-live");
+    require(live == 1, "BookKeeper/not-live");
     if (what == "totalDebtCeiling") totalDebtCeiling = data;
-    else revert("Government/file-unrecognized-param");
+    else revert("BookKeeper/file-unrecognized-param");
   }
 
   function file(
@@ -142,11 +142,11 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     bytes32 what,
     uint256 data
   ) external auth {
-    require(live == 1, "Government/not-live");
+    require(live == 1, "BookKeeper/not-live");
     if (what == "priceWithSafetyMargin") collateralPools[collateralPoolId].priceWithSafetyMargin = data;
     else if (what == "debtCeiling") collateralPools[collateralPoolId].debtCeiling = data;
     else if (what == "debtFloor") collateralPools[collateralPoolId].debtFloor = data;
-    else revert("Government/file-unrecognized-param");
+    else revert("BookKeeper/file-unrecognized-param");
   }
 
   function cage() external auth {
@@ -168,7 +168,7 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address dst,
     uint256 wad
   ) external {
-    require(wish(src, msg.sender), "Government/not-allowed");
+    require(wish(src, msg.sender), "BookKeeper/not-allowed");
     collateralToken[collateralPoolId][src] = sub(collateralToken[collateralPoolId][src], wad);
     collateralToken[collateralPoolId][dst] = add(collateralToken[collateralPoolId][dst], wad);
   }
@@ -178,7 +178,7 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address dst,
     uint256 rad
   ) external {
-    require(wish(src, msg.sender), "Government/not-allowed");
+    require(wish(src, msg.sender), "BookKeeper/not-allowed");
     stablecoin[src] = sub(stablecoin[src], rad);
     stablecoin[dst] = add(stablecoin[dst], rad);
   }
@@ -205,12 +205,12 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     int256 debtShare
   ) external {
     // system is live
-    require(live == 1, "Government/not-live");
+    require(live == 1, "BookKeeper/not-live");
 
     Position memory position = positions[collateralPoolId][positionAddress];
     CollateralPool memory collateralPool = collateralPools[collateralPoolId];
     // collateralPool has been initialised
-    require(collateralPool.debtAccumulatedRate != 0, "Government/collateralPool-not-init");
+    require(collateralPool.debtAccumulatedRate != 0, "BookKeeper/collateralPool-not-init");
 
     position.lockedCollateral = add(position.lockedCollateral, collateralValue);
     position.debtShare = add(position.debtShare, debtShare);
@@ -229,7 +229,7 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
           totalStablecoinIssued <= totalDebtCeiling
         )
       ),
-      "Government/ceiling-exceeded"
+      "BookKeeper/ceiling-exceeded"
     );
     // position is either less risky than before, or it is safe :: check work factor
     require(
@@ -237,21 +237,21 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
         both(debtShare <= 0, collateralValue >= 0),
         positionDebtValue <= mul(position.lockedCollateral, collateralPool.priceWithSafetyMargin)
       ),
-      "Government/not-safe"
+      "BookKeeper/not-safe"
     );
 
     // position is either more safe, or the owner consents
     require(
       either(both(debtShare <= 0, collateralValue >= 0), wish(positionAddress, msg.sender)),
-      "Government/not-allowed-u"
+      "BookKeeper/not-allowed-u"
     );
     // collateral src consents
-    require(either(collateralValue <= 0, wish(collateralOwner, msg.sender)), "Government/not-allowed-v");
+    require(either(collateralValue <= 0, wish(collateralOwner, msg.sender)), "BookKeeper/not-allowed-v");
     // debt dst consents
-    require(either(debtShare >= 0, wish(stablecoinOwner, msg.sender)), "Government/not-allowed-w");
+    require(either(debtShare >= 0, wish(stablecoinOwner, msg.sender)), "BookKeeper/not-allowed-w");
 
     // position has no debt, or a non-debtFloory amount
-    require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "Government/debtFloor");
+    require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "BookKeeper/debtFloor");
 
     collateralToken[collateralPoolId][collateralOwner] = sub(
       collateralToken[collateralPoolId][collateralOwner],
@@ -284,15 +284,15 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     uint256 vtab = mul(v.debtShare, i.debtAccumulatedRate);
 
     // both sides consent
-    require(both(wish(src, msg.sender), wish(dst, msg.sender)), "Government/not-allowed");
+    require(both(wish(src, msg.sender), wish(dst, msg.sender)), "BookKeeper/not-allowed");
 
     // both sides safe
-    require(utab <= mul(u.lockedCollateral, i.priceWithSafetyMargin), "Government/not-safe-src");
-    require(vtab <= mul(v.lockedCollateral, i.priceWithSafetyMargin), "Government/not-safe-dst");
+    require(utab <= mul(u.lockedCollateral, i.priceWithSafetyMargin), "BookKeeper/not-safe-src");
+    require(vtab <= mul(v.lockedCollateral, i.priceWithSafetyMargin), "BookKeeper/not-safe-dst");
 
     // both sides non-debtFloory
-    require(either(utab >= i.debtFloor, u.debtShare == 0), "Government/debtFloor-src");
-    require(either(vtab >= i.debtFloor, v.debtShare == 0), "Government/debtFloor-dst");
+    require(either(utab >= i.debtFloor, u.debtShare == 0), "BookKeeper/debtFloor-src");
+    require(either(vtab >= i.debtFloor, v.debtShare == 0), "BookKeeper/debtFloor-dst");
   }
 
   // --- CDP Confiscation ---
@@ -347,7 +347,7 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address u,
     int256 debtAccumulatedRate
   ) external auth {
-    require(live == 1, "Government/not-live");
+    require(live == 1, "BookKeeper/not-live");
     CollateralPool storage collateralPool = collateralPools[collateralPoolId];
     collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);
     int256 rad = mul(collateralPool.totalDebtShare, debtAccumulatedRate);

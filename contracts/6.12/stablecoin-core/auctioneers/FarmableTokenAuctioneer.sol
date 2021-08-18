@@ -265,7 +265,7 @@ contract FarmableTokenAuctioneer is OwnableUpgradeable, PausableUpgradeable, Acc
   // --- Auction ---
 
   // get the price directly from the OSM
-  // Could get this from rmul(Government.collateralPools(collateralPoolId).spot, Spotter.mat()) instead, but
+  // Could get this from rmul(BookKeeper.collateralPools(collateralPoolId).spot, Spotter.mat()) instead, but
   // if mat has changed since the last poke, the resulting value will be
   // incorrect.
   function getFeedPrice() internal returns (uint256 feedPrice) {
@@ -381,7 +381,7 @@ contract FarmableTokenAuctioneer is OwnableUpgradeable, PausableUpgradeable, Acc
   // To avoid partial purchases resulting in very small leftover auctions that will
   // never be cleared, any partial purchase must leave at least `CollateralAuctioneer.minimumRemainingDebt`
   // remaining DAI target. `minimumRemainingDebt` is an asynchronously updated value equal to
-  // (Government.debtFloor * Dog.liquidationPenalty(collateralPoolId) / WAD) where the values are understood to be determined
+  // (BookKeeper.debtFloor * Dog.liquidationPenalty(collateralPoolId) / WAD) where the values are understood to be determined
   // by whatever they were when CollateralAuctioneer.updateMinimumRemainingDebt() was last called. Purchase amounts
   // will be minimally decreased when necessary to respect this limit; i.e., if the
   // specified `collateralAmountToBuy` would leave `debt < minimumRemainingDebt` but `debt > 0`, the amount actually
