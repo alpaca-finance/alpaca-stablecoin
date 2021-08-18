@@ -68,7 +68,7 @@ interface IBookKeeper {
     uint256 rad
   ) external;
 
-  function grab(
+  function confiscatePosition(
     bytes32 i,
     address u,
     address v,
