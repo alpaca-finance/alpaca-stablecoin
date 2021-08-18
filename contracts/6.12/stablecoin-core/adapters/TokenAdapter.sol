@@ -22,6 +22,9 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -84,6 +87,8 @@ interface GovernmentLike {
 */
 
 contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+  using SafeERC20Upgradeable for IERC20Upgradeable;
+
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -131,12 +136,12 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
     government.addCollateral(collateralPoolId, usr, int256(wad));
-    require(collateralToken.transferFrom(msg.sender, address(this), wad), "TokenAdapter/failed-transfer");
+    IERC721(usr).safeTransferFrom(msg.sender, address(this), wad);
   }
 
   function withdraw(address usr, uint256 wad) external {
     require(wad <= 2**255, "TokenAdapter/overflow");
     government.addCollateral(collateralPoolId, msg.sender, -int256(wad));
-    require(collateralToken.transfer(usr, wad), "TokenAdapter/failed-transfer");
+    SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(usr), usr, wad);
   }
 }

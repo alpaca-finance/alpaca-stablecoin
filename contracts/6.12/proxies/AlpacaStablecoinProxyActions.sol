@@ -20,6 +20,9 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 interface TokenLike {
   function approve(address, uint256) external;
@@ -195,6 +198,7 @@ interface ProxyLike {
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 contract Common {
+  using SafeERC20Upgradeable for IERC20Upgradeable;
   uint256 constant RAY = 10**27;
 
   // Internal functions
@@ -211,15 +215,17 @@ contract Common {
     uint256 wad
   ) public {
     // Gets Alpaca Stablecoin from the user's wallet
-    StablecoinAdapterLike(apt).stablecoin().transferFrom(msg.sender, address(this), wad);
+    IERC721(apt).safeTransferFrom(msg.sender, address(this), wad);
     // Approves adapter to take the Alpaca Stablecoin amount
-    StablecoinAdapterLike(apt).stablecoin().approve(apt, wad);
+    SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(apt), apt, wad);
     // Deposits Alpaca Stablecoin into the government
     StablecoinAdapterLike(apt).deposit(positionAddress, wad);
   }
 }
 
 contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, Common {
+  using SafeERC20Upgradeable for IERC20Upgradeable;
+
   // --- Init ---
   function initialize() external initializer {
     OwnableUpgradeable.__Ownable_init();
@@ -316,14 +322,14 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address dst,
     uint256 amt
   ) public {
-    TokenLike(collateralToken).transfer(dst, amt);
+    SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(collateralToken), dst, amt);
   }
 
   function bnbAdapter_deposit(address apt, address positionAddress) public payable {
     // Wraps BNB in WBNB
     TokenAdapterLike(apt).collateralToken().deposit.value(msg.value)();
     // Approves adapter to take the WBNB amount
-    TokenAdapterLike(apt).collateralToken().approve(address(apt), msg.value);
+    SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(apt), address(apt), msg.value);
     // Deposits WBNB collateral into the government
     TokenAdapterLike(apt).deposit(positionAddress, msg.value);
   }
@@ -337,9 +343,9 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Only executes for tokens that have approval/transferFrom implementation
     if (transferFrom) {
       // Gets token from the user's wallet
-      TokenAdapterLike(apt).collateralToken().transferFrom(msg.sender, address(this), amt);
+      IERC721(apt).safeTransferFrom(msg.sender, address(this), amt);
       // Approves adapter to take the token amount
-      TokenAdapterLike(apt).collateralToken().approve(apt, amt);
+      SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(apt), apt, amt);
     }
     // Deposits token collateral into the government
     TokenAdapterLike(apt).deposit(positionAddress, amt);
@@ -354,9 +360,9 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Only executes for tokens that have approval/transferFrom implementation
     if (transferFrom) {
       // Gets token from the user's wallet
-      FarmableTokenAdapterLike(apt).collateralToken().transferFrom(msg.sender, address(this), amt);
+      IERC721(apt).safeTransferFrom(msg.sender, address(this), amt);
       // Approves adapter to take the token amount
-      FarmableTokenAdapterLike(apt).collateralToken().approve(apt, amt);
+      SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(apt), apt, amt);
     }
     // Deposits token collateral into the government
     FarmableTokenAdapterLike(apt).deposit(positionAddress, msg.sender, amt);
