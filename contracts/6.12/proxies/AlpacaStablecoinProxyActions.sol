@@ -97,42 +97,6 @@ interface ManagerLike {
   function shift(uint256, uint256) external;
 }
 
-interface GovernmentLike {
-  function can(address, address) external view returns (uint256);
-
-  function collateralPools(bytes32)
-    external
-    view
-    returns (
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    );
-
-  function stablecoin(address) external view returns (uint256);
-
-  function positions(bytes32, address) external view returns (uint256, uint256);
-
-  function adjustPosition(
-    bytes32,
-    address,
-    address,
-    address,
-    int256,
-    int256
-  ) external;
-
-  function hope(address) external;
-
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-}
-
 interface TokenAdapterLike {
   function decimals() external returns (uint256);
 
