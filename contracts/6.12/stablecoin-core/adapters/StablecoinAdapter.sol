@@ -22,6 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "../../interfaces/IStablecoin.sol";
 import "../../interfaces/IBookKeeper.sol";
 
@@ -65,7 +66,12 @@ interface TokenLike {
 
 */
 
-contract StablecoinAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract StablecoinAdapter is
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable
+{
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -90,6 +96,7 @@ contract StablecoinAdapter is OwnableUpgradeable, PausableUpgradeable, AccessCon
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     wards[msg.sender] = 1;
     live = 1;
@@ -107,12 +114,12 @@ contract StablecoinAdapter is OwnableUpgradeable, PausableUpgradeable, AccessCon
     require(y == 0 || (z = x * y) / y == x);
   }
 
-  function deposit(address usr, uint256 wad) external {
+  function deposit(address usr, uint256 wad) external nonReentrant {
     bookKeeper.moveStablecoin(address(this), usr, mul(ONE, wad));
     stablecoin.burn(msg.sender, wad);
   }
 
-  function withdraw(address usr, uint256 wad) external {
+  function withdraw(address usr, uint256 wad) external nonReentrant {
     require(live == 1, "StablecoinAdapter/not-live");
     bookKeeper.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
     stablecoin.mint(usr, wad);

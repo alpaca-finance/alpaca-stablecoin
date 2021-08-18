@@ -22,6 +22,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
 
 // FIXME: This contract was altered compared to the production version.
@@ -48,7 +49,12 @@ interface SurplusAuctioneerLike {
   function live() external returns (uint256);
 }
 
-contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract SystemDebtEngine is
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable
+{
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
@@ -93,6 +99,8 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
+
     whitelist[msg.sender] = 1;
     bookKeeper = IBookKeeper(bookKeeper_);
     surplusAuctionHouse = SurplusAuctioneerLike(surplusAuctionHouse_);
@@ -140,14 +148,14 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
   }
 
   // Pop from debt-queue
-  function popFromBadDebtQueue(uint256 timestamp) external {
+  function popFromBadDebtQueue(uint256 timestamp) external nonReentrant {
     require(add(timestamp, badDebtAuctionDelay) <= now, "SystemDebtEngine/badDebtAuctionDelay-not-finished");
     totalBadDebtValue = sub(totalBadDebtValue, badDebtQueue[timestamp]);
     badDebtQueue[timestamp] = 0;
   }
 
   // Debt settlement
-  function settleSystemBadDebt(uint256 rad) external {
+  function settleSystemBadDebt(uint256 rad) external nonReentrant {
     require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
     require(
       rad <= sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
@@ -156,7 +164,7 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
     bookKeeper.settleSystemBadDebt(rad);
   }
 
-  function settleSystemBadDebtByAuction(uint256 rad) external {
+  function settleSystemBadDebtByAuction(uint256 rad) external nonReentrant {
     require(rad <= totalBadDebtInAuction, "SystemDebtEngine/not-enough-ash");
     require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
     totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
@@ -164,7 +172,7 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
   }
 
   // Debt auction
-  function startBadDebtAuction() external returns (uint256 id) {
+  function startBadDebtAuction() external nonReentrant returns (uint256 id) {
     require(
       badDebtFixedBidSize <=
         sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
@@ -176,7 +184,7 @@ contract SystemDebtEngine is OwnableUpgradeable, PausableUpgradeable, AccessCont
   }
 
   // Surplus auction
-  function startSurplusAuction() external returns (uint256 id) {
+  function startSurplusAuction() external nonReentrant returns (uint256 id) {
     require(
       bookKeeper.stablecoin(address(this)) >=
         add(add(bookKeeper.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer),
