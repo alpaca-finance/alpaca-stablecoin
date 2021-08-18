@@ -197,7 +197,7 @@ interface ProxyLike {
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 contract Common {
-  using SafeERC20Upgradeable for IERC20Upgradeable;
+  using SafeERC20Upgradeable for address;
   uint256 constant RAY = 10**27;
 
   // Internal functions
@@ -214,7 +214,7 @@ contract Common {
     uint256 wad
   ) public {
     // Gets Alpaca Stablecoin from the user's wallet
-    IERC20Upgradeable(apt).safeTransferFrom(msg.sender, address(this), wad);
+    IERC20Upgradeable(apt).transferFrom(msg.sender, address(this), wad);
     // Approves adapter to take the Alpaca Stablecoin amount
     SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(apt), apt, wad);
     // Deposits Alpaca Stablecoin into the government
@@ -342,7 +342,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Only executes for tokens that have approval/transferFrom implementation
     if (transferFrom) {
       // Gets token from the user's wallet
-      IERC20Upgradeable(apt).safeTransferFrom(msg.sender, address(this), amt);
+      IERC20Upgradeable(apt).transferFrom(msg.sender, address(this), amt);
       // Approves adapter to take the token amount
       SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(apt), apt, amt);
     }
@@ -359,7 +359,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Only executes for tokens that have approval/transferFrom implementation
     if (transferFrom) {
       // Gets token from the user's wallet
-      IERC20Upgradeable(apt).safeTransferFrom(msg.sender, address(this), amt);
+      IERC20Upgradeable(apt).transferFrom(msg.sender, address(this), amt);
       // Approves adapter to take the token amount
       SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(apt), apt, amt);
     }
