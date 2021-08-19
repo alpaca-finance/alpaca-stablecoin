@@ -23,7 +23,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
 import "../../interfaces/IBookKeeper.sol";
+import "../../interfaces/IPriceFeed.sol";
 
 interface GovernmentLike {
   function moveStablecoin(
@@ -56,14 +58,10 @@ interface GovernmentLike {
   ) external;
 }
 
-interface PriceFeedLike {
-  function peek() external returns (bytes32, bool);
-}
-
 interface PriceOracleLike {
   function stableCoinReferencePrice() external returns (uint256);
 
-  function collateralPools(bytes32) external returns (PriceFeedLike, uint256);
+  function collateralPools(bytes32) external returns (IPriceFeed, uint256);
 }
 
 interface LiquidationEngineLike {
@@ -284,7 +282,7 @@ contract CollateralAuctioneer is
   // if mat has changed since the last poke, the resulting value will be
   // incorrect.
   function getFeedPrice() internal returns (uint256 feedPrice) {
-    (PriceFeedLike priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
+    (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
     (bytes32 val, bool has) = priceFeed.peek();
     require(has, "CollateralAuctioneer/invalid-price");
     feedPrice = rdiv(mul(uint256(val), BLN), priceOracle.stableCoinReferencePrice());
