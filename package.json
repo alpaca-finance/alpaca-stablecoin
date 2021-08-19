@@ -2,7 +2,6 @@
   "name": "@alpaca-finance/alpaca-stablecoin",
   "version": "0.0.1",
   "scripts": {
-    "compile6.12": "hardhat typechain",
     "compile": "hardhat typechain",
     "mainnet": "hardhat console --no-compile --network mainnet",
     "test:case": "mocha --require hardhat/register --extension ts -g",
