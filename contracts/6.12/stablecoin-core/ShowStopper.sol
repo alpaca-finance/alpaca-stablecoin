@@ -27,19 +27,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IAuctioneer.sol";
-
-interface LiquidationEngineLike {
-  function collateralPools(bytes32)
-    external
-    returns (
-      address auctioneer,
-      uint256 liquidationPenalty,
-      uint256 liquidationMaxSize,
-      uint256 stablecoinNeededForDebtRepay
-    );
-
-  function cage() external;
-}
+import "../interfaces/ILiquidationEngine.sol";
 
 interface StablecoinSavingsLike {
   function cage() external;
@@ -203,7 +191,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
 
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
-  LiquidationEngineLike public liquidationEngine;
+  ILiquidationEngine public liquidationEngine;
   SystemDebtEngine public systemDebtEngine; // Debt Engine
   StablecoinSavingsLike public stablecoinSavings;
   PriceOracleLike public priceOracle;
@@ -296,7 +284,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   function file(bytes32 what, address data) external auth {
     require(live == 1, "End/not-live");
     if (what == "bookKeeper") bookKeeper = IBookKeeper(data);
-    else if (what == "liquidationEngine") liquidationEngine = LiquidationEngineLike(data);
+    else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
     else if (what == "systemDebtEngine") systemDebtEngine = SystemDebtEngine(data);
     else if (what == "stablecoinSavings") stablecoinSavings = StablecoinSavingsLike(data);
     else if (what == "priceOracle") priceOracle = PriceOracleLike(data);
