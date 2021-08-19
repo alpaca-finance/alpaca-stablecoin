@@ -27,12 +27,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../../interfaces/IPositionHandler.sol";
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IPriceFeed.sol";
-
-interface PriceOracleLike {
-  function stableCoinReferencePrice() external returns (uint256);
-
-  function collateralPools(bytes32) external returns (IPriceFeed, uint256);
-}
+import "../../interfaces/IPriceOracle.sol";
 
 interface LiquidationEngineLike {
   function liquidationPenalty(bytes32) external returns (uint256);
@@ -104,7 +99,7 @@ contract FarmableTokenAuctioneer is
 
   LiquidationEngineLike public liquidationEngine; // Liquidation module
   address public systemDebtEngine; // Recipient of dai raised in auctions
-  PriceOracleLike public priceOracle; // Collateral price module
+  IPriceOracle public priceOracle; // Collateral price module
   CalculatorLike public calc; // Current price calculator
 
   uint256 public startingPriceBuffer; // Multiplicative factor to increase starting price                  [ray]
@@ -186,7 +181,7 @@ contract FarmableTokenAuctioneer is
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
-    priceOracle = PriceOracleLike(priceOracle_);
+    priceOracle = IPriceOracle(priceOracle_);
     liquidationEngine = LiquidationEngineLike(liquidationEngine_);
     farmableTokenAdapter = FarmableTokenAdapterLike(farmableTokenAdapter_);
     collateralPoolId = FarmableTokenAdapterLike(farmableTokenAdapter_).collateralPoolId();
@@ -226,7 +221,7 @@ contract FarmableTokenAuctioneer is
   }
 
   function file(bytes32 what, address data) external auth lock {
-    if (what == "priceOracle") priceOracle = PriceOracleLike(data);
+    if (what == "priceOracle") priceOracle = IPriceOracle(data);
     else if (what == "liquidationEngine") liquidationEngine = LiquidationEngineLike(data);
     else if (what == "systemDebtEngine") systemDebtEngine = data;
     else if (what == "calc") calc = CalculatorLike(data);
