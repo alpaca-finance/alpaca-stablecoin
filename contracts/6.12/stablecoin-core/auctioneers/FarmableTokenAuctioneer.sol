@@ -26,6 +26,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 
 import "../../interfaces/IPositionHandler.sol";
 import "../../interfaces/IBookKeeper.sol";
+import "../../interfaces/IAuctioneer.sol";
 import "../../interfaces/IPriceFeed.sol";
 import "../../interfaces/IPriceOracle.sol";
 
@@ -72,7 +73,8 @@ contract FarmableTokenAuctioneer is
   OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  IAuctioneer
 {
   // --- Auth ---
   mapping(address => uint256) public wards;
@@ -93,7 +95,7 @@ contract FarmableTokenAuctioneer is
   }
 
   // --- Data ---
-  bytes32 public collateralPoolId; // Collateral type of this CollateralAuctioneer
+  bytes32 public override collateralPoolId; // Collateral type of this CollateralAuctioneer
   IBookKeeper public bookKeeper; // Core CDP Engine
   FarmableTokenAdapterLike public farmableTokenAdapter;
 
@@ -120,7 +122,7 @@ contract FarmableTokenAuctioneer is
     uint96 auctionStartBlock; // Auction start time
     uint256 startingPrice; // Starting price     [ray]
   }
-  mapping(uint256 => Sale) public sales;
+  mapping(uint256 => Sale) public override sales;
 
   uint256 internal locked;
 
@@ -289,7 +291,7 @@ contract FarmableTokenAuctioneer is
     uint256 collateralAmount, // Collateral             [wad]
     address positionAddress, // Address that will receive any leftover collateral
     address liquidatorAddress // Address that will receive incentives
-  ) external auth lock isStopped(1) returns (uint256 id) {
+  ) external override auth lock isStopped(1) returns (uint256 id) {
     // Input validation
     require(debt > 0, "CollateralAuctioneer/zero-debt");
     require(collateralAmount > 0, "CollateralAuctioneer/zero-collateralAmount");
@@ -547,7 +549,7 @@ contract FarmableTokenAuctioneer is
   }
 
   // Cancel an auction during Emergency Shutdown or via governance action.
-  function yank(uint256 id) external auth lock {
+  function yank(uint256 id) external override auth lock {
     require(sales[id].positionAddress != address(0), "CollateralAuctioneer/not-running-auction");
     liquidationEngine.removeRepaidDebtFromAuction(collateralPoolId, sales[id].debt);
     bookKeeper.moveCollateral(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
