@@ -23,25 +23,11 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "../interfaces/IBookKeeper.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
-
-interface GovernmentLike {
-  function collateralPools(bytes32)
-    external
-    returns (
-      uint256 Art, // [wad]
-      uint256 rate // [ray]
-    );
-
-  function accrueStabilityFee(
-    bytes32,
-    address,
-    int256
-  ) external;
-}
 
 contract StabilityFeeCollector is
   OwnableUpgradeable,
@@ -72,19 +58,19 @@ contract StabilityFeeCollector is
   }
 
   mapping(bytes32 => CollateralPool) public collateralPools;
-  GovernmentLike public government; // CDP Engine
+  IBookKeeper public bookKeeper; // CDP Engine
   address public systemDebtEngine; // Debt Engine
   uint256 public globalStabilityFeeRate; // Global, per-second stability fee contribution [ray]
 
   // --- Init ---
-  function initialize(address government_) external initializer {
+  function initialize(address _bookKeeper) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     whitelist[msg.sender] = 1;
-    government = GovernmentLike(government_);
+    bookKeeper = IBookKeeper(_bookKeeper);
   }
 
   // --- Math ---
@@ -195,7 +181,7 @@ contract StabilityFeeCollector is
   // --- Stability Fee Collection ---
   function collect(bytes32 collateralPool) external nonReentrant returns (uint256 rate) {
     require(now >= collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
-    (, uint256 prev) = government.collateralPools(collateralPool);
+    (, uint256 prev, , , ) = bookKeeper.collateralPools(collateralPool);
     rate = rmul(
       rpow(
         add(globalStabilityFeeRate, collateralPools[collateralPool].stabilityFeeRate),
@@ -204,7 +190,7 @@ contract StabilityFeeCollector is
       ),
       prev
     );
-    government.accrueStabilityFee(collateralPool, systemDebtEngine, diff(rate, prev));
+    bookKeeper.accrueStabilityFee(collateralPool, systemDebtEngine, diff(rate, prev));
     collateralPools[collateralPool].lastAccumulationTime = now;
   }
 }

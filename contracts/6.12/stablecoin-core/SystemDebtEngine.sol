@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// systemDebtEngine.sol -- Dai settlement module
+/// systemDebtEngine.sol -- stablecoin settlement module
 
 // Copyright (C) 2018 Rain <rainbreak@riseup.net>
 //
@@ -23,6 +23,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "../interfaces/IBookKeeper.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -46,18 +47,6 @@ interface SurplusAuctioneerLike {
   function cage(uint256) external;
 
   function live() external returns (uint256);
-}
-
-interface GovernmentLike {
-  function dai(address) external view returns (uint256);
-
-  function systemBadDebt(address) external view returns (uint256);
-
-  function settleSystemBadDebt(uint256) external;
-
-  function hope(address) external;
-
-  function nope(address) external;
 }
 
 contract SystemDebtEngine is
@@ -84,7 +73,7 @@ contract SystemDebtEngine is
   }
 
   // --- Data ---
-  GovernmentLike public government; // CDP Engine
+  IBookKeeper public bookKeeper; // CDP Engine
   SurplusAuctioneerLike public surplusAuctionHouse; // Surplus Auction House
   BadDebtAuctioneerLike public badDebtAuctionHouse; // Debt Auction House
 
@@ -103,7 +92,7 @@ contract SystemDebtEngine is
 
   // --- Init ---
   function initialize(
-    address government_,
+    address _bookKeeper,
     address surplusAuctionHouse_,
     address badDebtAuctionHouse_
   ) external initializer {
@@ -113,10 +102,10 @@ contract SystemDebtEngine is
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     whitelist[msg.sender] = 1;
-    government = GovernmentLike(government_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     surplusAuctionHouse = SurplusAuctioneerLike(surplusAuctionHouse_);
     badDebtAuctionHouse = BadDebtAuctioneerLike(badDebtAuctionHouse_);
-    government.hope(surplusAuctionHouse_);
+    bookKeeper.hope(surplusAuctionHouse_);
     live = 1;
   }
 
@@ -145,9 +134,9 @@ contract SystemDebtEngine is
 
   function file(bytes32 what, address data) external auth {
     if (what == "surplusAuctionHouse") {
-      government.nope(address(surplusAuctionHouse));
+      bookKeeper.nope(address(surplusAuctionHouse));
       surplusAuctionHouse = SurplusAuctioneerLike(data);
-      government.hope(data);
+      bookKeeper.hope(data);
     } else if (what == "badDebtAuctionHouse") badDebtAuctionHouse = BadDebtAuctioneerLike(data);
     else revert("SystemDebtEngine/file-unrecognized-param");
   }
@@ -167,29 +156,29 @@ contract SystemDebtEngine is
 
   // Debt settlement
   function settleSystemBadDebt(uint256 rad) external nonReentrant {
-    require(rad <= government.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
+    require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
     require(
-      rad <= sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
+      rad <= sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
       "SystemDebtEngine/insufficient-debt"
     );
-    government.settleSystemBadDebt(rad);
+    bookKeeper.settleSystemBadDebt(rad);
   }
 
   function settleSystemBadDebtByAuction(uint256 rad) external nonReentrant {
     require(rad <= totalBadDebtInAuction, "SystemDebtEngine/not-enough-ash");
-    require(rad <= government.dai(address(this)), "SystemDebtEngine/insufficient-surplus");
+    require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
     totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
-    government.settleSystemBadDebt(rad);
+    bookKeeper.settleSystemBadDebt(rad);
   }
 
   // Debt auction
   function startBadDebtAuction() external nonReentrant returns (uint256 id) {
     require(
       badDebtFixedBidSize <=
-        sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
+        sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
       "SystemDebtEngine/insufficient-debt"
     );
-    require(government.dai(address(this)) == 0, "SystemDebtEngine/surplus-not-zero");
+    require(bookKeeper.stablecoin(address(this)) == 0, "SystemDebtEngine/surplus-not-zero");
     totalBadDebtInAuction = add(totalBadDebtInAuction, badDebtFixedBidSize);
     id = badDebtAuctionHouse.startAuction(address(this), alpacaInitialLotSizeForBadDebt, badDebtFixedBidSize);
   }
@@ -197,12 +186,12 @@ contract SystemDebtEngine is
   // Surplus auction
   function startSurplusAuction() external nonReentrant returns (uint256 id) {
     require(
-      government.dai(address(this)) >=
-        add(add(government.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer),
+      bookKeeper.stablecoin(address(this)) >=
+        add(add(bookKeeper.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer),
       "SystemDebtEngine/insufficient-surplus"
     );
     require(
-      sub(sub(government.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction) == 0,
+      sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction) == 0,
       "SystemDebtEngine/debt-not-zero"
     );
     id = surplusAuctionHouse.startAuction(surplusAuctionFixedLotSize, 0);
@@ -213,8 +202,8 @@ contract SystemDebtEngine is
     live = 0;
     totalBadDebtValue = 0;
     totalBadDebtInAuction = 0;
-    surplusAuctionHouse.cage(government.dai(address(surplusAuctionHouse)));
+    surplusAuctionHouse.cage(bookKeeper.stablecoin(address(surplusAuctionHouse)));
     badDebtAuctionHouse.cage();
-    government.settleSystemBadDebt(min(government.dai(address(this)), government.systemBadDebt(address(this))));
+    bookKeeper.settleSystemBadDebt(min(bookKeeper.stablecoin(address(this)), bookKeeper.systemBadDebt(address(this))));
   }
 }

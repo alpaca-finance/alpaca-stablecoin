@@ -20,6 +20,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "../interfaces/IBookKeeper.sol";
 
 interface TokenLike {
   function approve(address, uint256) external;
@@ -50,7 +51,7 @@ interface ManagerLike {
 
   function positions(uint256) external view returns (address);
 
-  function government() external view returns (address);
+  function bookKeeper() external view returns (address);
 
   function open(bytes32, address) external returns (uint256);
 
@@ -96,42 +97,6 @@ interface ManagerLike {
   function shift(uint256, uint256) external;
 }
 
-interface GovernmentLike {
-  function can(address, address) external view returns (uint256);
-
-  function collateralPools(bytes32)
-    external
-    view
-    returns (
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    );
-
-  function stablecoin(address) external view returns (uint256);
-
-  function positions(bytes32, address) external view returns (uint256, uint256);
-
-  function adjustPosition(
-    bytes32,
-    address,
-    address,
-    address,
-    int256,
-    int256
-  ) external;
-
-  function hope(address) external;
-
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-}
-
 interface TokenAdapterLike {
   function decimals() external returns (uint256);
 
@@ -161,7 +126,7 @@ interface FarmableTokenAdapterLike {
 }
 
 interface StablecoinAdapterLike {
-  function government() external returns (GovernmentLike);
+  function bookKeeper() external returns (IBookKeeper);
 
   function stablecoin() external returns (TokenLike);
 
@@ -214,7 +179,7 @@ contract Common {
     StablecoinAdapterLike(apt).stablecoin().transferFrom(msg.sender, address(this), wad);
     // Approves adapter to take the Alpaca Stablecoin amount
     StablecoinAdapterLike(apt).stablecoin().approve(apt, wad);
-    // Deposits Alpaca Stablecoin into the government
+    // Deposits Alpaca Stablecoin into the bookKeeper
     StablecoinAdapterLike(apt).deposit(positionAddress, wad);
   }
 }
@@ -249,7 +214,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
   }
 
   function _getDrawDebtShare(
-    address government,
+    address bookKeeper,
     address stabilityFeeCollector,
     address positionAddress,
     bytes32 collateralPoolId,
@@ -258,12 +223,12 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Updates stability fee rate
     uint256 debtAccumulatedRate = StabilityFeeCollectorLike(stabilityFeeCollector).collect(collateralPoolId);
 
-    // Gets Alpaca Stablecoin balance of the positionAddress in the government
-    uint256 stablecoin = GovernmentLike(government).stablecoin(positionAddress);
+    // Gets Alpaca Stablecoin balance of the positionAddress in the bookKeeper
+    uint256 stablecoin = IBookKeeper(bookKeeper).stablecoin(positionAddress);
 
-    // If there was already enough Alpaca Stablecoin in the government balance, just exits it without adding more debt
+    // If there was already enough Alpaca Stablecoin in the bookKeeper balance, just exits it without adding more debt
     if (stablecoin < mul(wad, RAY)) {
-      // Calculates the needed resultDebtShare so together with the existing stablecoin in the government is enough to exit wad amount of Alpaca Stablecoin tokens
+      // Calculates the needed resultDebtShare so together with the existing stablecoin in the bookKeeper is enough to exit wad amount of Alpaca Stablecoin tokens
       resultDebtShare = toInt(sub(mul(wad, RAY), stablecoin) / debtAccumulatedRate);
       // This is neeeded due lack of precision. It might need to sum an extra resultDebtShare wei (for the given Alpaca Stablecoin wad amount)
       resultDebtShare = mul(uint256(resultDebtShare), debtAccumulatedRate) < mul(wad, RAY)
@@ -273,34 +238,34 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
   }
 
   function _getWipeDebtShare(
-    address government,
+    address bookKeeper,
     uint256 stablecoinBalance,
     address positionAddress,
     bytes32 collateralPoolId
   ) internal view returns (int256 resultDebtShare) {
-    // Gets actual rate from the government
-    (, uint256 debtAccumulatedRate, , , ) = GovernmentLike(government).collateralPools(collateralPoolId);
+    // Gets actual rate from the bookKeeper
+    (, uint256 debtAccumulatedRate, , , ) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId);
     // Gets actual debtShare value of the positionAddress
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress);
 
-    // Uses the whole stablecoin balance in the government to reduce the debt
+    // Uses the whole stablecoin balance in the bookKeeper to reduce the debt
     resultDebtShare = toInt(stablecoinBalance / debtAccumulatedRate);
     // Checks the calculated resultDebtShare is not higher than positionAddress.art (total debt), otherwise uses its value
     resultDebtShare = uint256(resultDebtShare) <= debtShare ? -resultDebtShare : -toInt(debtShare);
   }
 
   function _getWipeAllWad(
-    address government,
+    address bookKeeper,
     address usr,
     address positionAddress,
     bytes32 collateralPoolId
   ) internal view returns (uint256 wad) {
-    // Gets actual rate from the government
-    (, uint256 rate, , , ) = GovernmentLike(government).collateralPools(collateralPoolId);
+    // Gets actual rate from the bookKeeper
+    (, uint256 rate, , , ) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId);
     // Gets actual debtShare value of the positionAddress
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress);
     // Gets actual stablecoin amount in the positionAddress
-    uint256 stablecoin = GovernmentLike(government).stablecoin(usr);
+    uint256 stablecoin = IBookKeeper(bookKeeper).stablecoin(usr);
 
     uint256 rad = sub(mul(debtShare, rate), stablecoin);
     wad = rad / RAY;
@@ -324,7 +289,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     TokenAdapterLike(apt).collateralToken().deposit.value(msg.value)();
     // Approves adapter to take the WBNB amount
     TokenAdapterLike(apt).collateralToken().approve(address(apt), msg.value);
-    // Deposits WBNB collateral into the government
+    // Deposits WBNB collateral into the bookKeeper
     TokenAdapterLike(apt).deposit(positionAddress, msg.value);
   }
 
@@ -341,7 +306,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       // Approves adapter to take the token amount
       TokenAdapterLike(apt).collateralToken().approve(apt, amt);
     }
-    // Deposits token collateral into the government
+    // Deposits token collateral into the bookKeeper
     TokenAdapterLike(apt).deposit(positionAddress, amt);
   }
 
@@ -358,7 +323,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       // Approves adapter to take the token amount
       FarmableTokenAdapterLike(apt).collateralToken().approve(apt, amt);
     }
-    // Deposits token collateral into the government
+    // Deposits token collateral into the bookKeeper
     FarmableTokenAdapterLike(apt).deposit(positionAddress, msg.sender, amt);
   }
 
@@ -482,10 +447,10 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address bnbAdapter,
     uint256 cdp
   ) public payable {
-    // Receives BNB amount, converts it to WBNB and joins it into the government
+    // Receives BNB amount, converts it to WBNB and joins it into the bookKeeper
     bnbAdapter_deposit(bnbAdapter, address(this));
     // Locks WBNB amount into the CDP
-    GovernmentLike(ManagerLike(manager).government()).adjustPosition(
+    IBookKeeper(ManagerLike(manager).bookKeeper()).adjustPosition(
       ManagerLike(manager).collateralPools(cdp),
       ManagerLike(manager).positions(cdp),
       address(this),
@@ -512,10 +477,10 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 amt,
     bool transferFrom
   ) public {
-    // Takes token amount from user's wallet and joins into the government
+    // Takes token amount from user's wallet and joins into the bookKeeper
     tokenAdapter_deposit(tokenAdapter, address(this), amt, transferFrom);
     // Locks token amount into the CDP
-    GovernmentLike(ManagerLike(manager).government()).adjustPosition(
+    IBookKeeper(ManagerLike(manager).bookKeeper()).adjustPosition(
       ManagerLike(manager).collateralPools(cdp),
       ManagerLike(manager).positions(cdp),
       address(this),
@@ -532,10 +497,10 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 amt,
     bool transferFrom
   ) public {
-    // Takes token amount from user's wallet and joins into the government
+    // Takes token amount from user's wallet and joins into the bookKeeper
     farmableTokenAdapter_deposit(farmableTokenAdapter, address(this), amt, transferFrom);
     // Locks token amount into the CDP
-    GovernmentLike(ManagerLike(manager).government()).adjustPosition(
+    IBookKeeper(ManagerLike(manager).bookKeeper()).adjustPosition(
       ManagerLike(manager).collateralPools(cdp),
       ManagerLike(manager).positions(cdp),
       address(this),
@@ -670,20 +635,20 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 wad
   ) public {
     address positionAddress = ManagerLike(manager).positions(cdp);
-    address government = ManagerLike(manager).government();
+    address bookKeeper = ManagerLike(manager).bookKeeper();
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
     // Generates debt in the CDP
     adjustPosition(
       manager,
       cdp,
       0,
-      _getDrawDebtShare(government, stabilityFeeCollector, positionAddress, collateralPoolId, wad)
+      _getDrawDebtShare(bookKeeper, stabilityFeeCollector, positionAddress, collateralPoolId, wad)
     );
-    // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
+    // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
     moveStablecoin(manager, cdp, address(this), toRad(wad));
-    // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
-    if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
-      GovernmentLike(government).hope(stablecoinAdapter);
+    // Allows adapter to access to proxy's Alpaca Stablecoin balance in the bookKeeper
+    if (IBookKeeper(bookKeeper).can(address(this), address(stablecoinAdapter)) == 0) {
+      IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wad);
@@ -695,13 +660,13 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 cdp,
     uint256 wad
   ) public {
-    address government = ManagerLike(manager).government();
+    address bookKeeper = ManagerLike(manager).bookKeeper();
     address positionAddress = ManagerLike(manager).positions(cdp);
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
 
     address own = ManagerLike(manager).owns(cdp);
     if (own == address(this) || ManagerLike(manager).cdpCan(own, cdp, address(this)) == 1) {
-      // Deposits Alpaca Stablecoin amount into the government
+      // Deposits Alpaca Stablecoin amount into the bookKeeper
       stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, wad);
       // Paybacks debt to the CDP
       adjustPosition(
@@ -709,23 +674,23 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
         cdp,
         0,
         _getWipeDebtShare(
-          government,
-          GovernmentLike(government).stablecoin(positionAddress),
+          bookKeeper,
+          IBookKeeper(bookKeeper).stablecoin(positionAddress),
           positionAddress,
           collateralPoolId
         )
       );
     } else {
-      // Deposits Alpaca Stablecoin amount into the government
+      // Deposits Alpaca Stablecoin amount into the bookKeeper
       stablecoinAdapter_deposit(stablecoinAdapter, address(this), wad);
       // Paybacks debt to the CDP
-      GovernmentLike(government).adjustPosition(
+      IBookKeeper(bookKeeper).adjustPosition(
         collateralPoolId,
         positionAddress,
         address(this),
         address(this),
         0,
-        _getWipeDebtShare(government, wad * RAY, positionAddress, collateralPoolId)
+        _getWipeDebtShare(bookKeeper, wad * RAY, positionAddress, collateralPoolId)
       );
     }
   }
@@ -746,30 +711,30 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address stablecoinAdapter,
     uint256 cdp
   ) public {
-    address government = ManagerLike(manager).government();
+    address bookKeeper = ManagerLike(manager).bookKeeper();
     address positionAddress = ManagerLike(manager).positions(cdp);
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress);
 
     address own = ManagerLike(manager).owns(cdp);
     if (own == address(this) || ManagerLike(manager).cdpCan(own, cdp, address(this)) == 1) {
-      // Deposits Alpaca Stablecoin amount into the government
+      // Deposits Alpaca Stablecoin amount into the bookKeeper
       stablecoinAdapter_deposit(
         stablecoinAdapter,
         positionAddress,
-        _getWipeAllWad(government, positionAddress, positionAddress, collateralPoolId)
+        _getWipeAllWad(bookKeeper, positionAddress, positionAddress, collateralPoolId)
       );
       // Paybacks debt to the CDP
       adjustPosition(manager, cdp, 0, -int256(debtShare));
     } else {
-      // Deposits Alpaca Stablecoin amount into the government
+      // Deposits Alpaca Stablecoin amount into the bookKeeper
       stablecoinAdapter_deposit(
         stablecoinAdapter,
         address(this),
-        _getWipeAllWad(government, address(this), positionAddress, collateralPoolId)
+        _getWipeAllWad(bookKeeper, address(this), positionAddress, collateralPoolId)
       );
       // Paybacks debt to the CDP
-      GovernmentLike(government).adjustPosition(
+      IBookKeeper(bookKeeper).adjustPosition(
         collateralPoolId,
         positionAddress,
         address(this),
@@ -799,22 +764,22 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 wadD
   ) public payable {
     address positionAddress = ManagerLike(manager).positions(cdp);
-    address government = ManagerLike(manager).government();
+    address bookKeeper = ManagerLike(manager).bookKeeper();
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-    // Receives BNB amount, converts it to WBNB and joins it into the government
+    // Receives BNB amount, converts it to WBNB and joins it into the bookKeeper
     bnbAdapter_deposit(bnbAdapter, positionAddress);
     // Locks WBNB amount into the CDP and generates debt
     adjustPosition(
       manager,
       cdp,
       toInt(msg.value),
-      _getDrawDebtShare(government, stabilityFeeCollector, positionAddress, collateralPoolId, wadD)
+      _getDrawDebtShare(bookKeeper, stabilityFeeCollector, positionAddress, collateralPoolId, wadD)
     );
-    // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
+    // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
     moveStablecoin(manager, cdp, address(this), toRad(wadD));
-    // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
-    if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
-      GovernmentLike(government).hope(stablecoinAdapter);
+    // Allows adapter to access to proxy's Alpaca Stablecoin balance in the bookKeeper
+    if (IBookKeeper(bookKeeper).can(address(this), address(stablecoinAdapter)) == 0) {
+      IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
@@ -843,22 +808,22 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     bool transferFrom
   ) public {
     address positionAddress = ManagerLike(manager).positions(cdp);
-    address government = ManagerLike(manager).government();
+    address bookKeeper = ManagerLike(manager).bookKeeper();
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-    // Takes token amount from user's wallet and joins into the government
+    // Takes token amount from user's wallet and joins into the bookKeeper
     tokenAdapter_deposit(tokenAdapter, positionAddress, amtC, transferFrom);
     // Locks token amount into the CDP and generates debt
     adjustPosition(
       manager,
       cdp,
       toInt(convertTo18(tokenAdapter, amtC)),
-      _getDrawDebtShare(government, stabilityFeeCollector, positionAddress, collateralPoolId, wadD)
+      _getDrawDebtShare(bookKeeper, stabilityFeeCollector, positionAddress, collateralPoolId, wadD)
     );
-    // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
+    // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
     moveStablecoin(manager, cdp, address(this), toRad(wadD));
-    // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
-    if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
-      GovernmentLike(government).hope(stablecoinAdapter);
+    // Allows adapter to access to proxy's Alpaca Stablecoin balance in the bookKeeper
+    if (IBookKeeper(bookKeeper).can(address(this), address(stablecoinAdapter)) == 0) {
+      IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
@@ -889,22 +854,22 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     bool transferFrom
   ) public {
     address positionAddress = ManagerLike(manager).positions(cdp);
-    address government = ManagerLike(manager).government();
+    address bookKeeper = ManagerLike(manager).bookKeeper();
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-    // Takes token amount from user's wallet and joins into the government
+    // Takes token amount from user's wallet and joins into the bookKeeper
     farmableTokenAdapter_deposit(farmableTokenAdapter, positionAddress, amtC, transferFrom);
     // Locks token amount into the CDP and generates debt
     adjustPosition(
       manager,
       cdp,
       toInt(convertTo18(farmableTokenAdapter, amtC)),
-      _getDrawDebtShare(government, stabilityFeeCollector, positionAddress, collateralPoolId, wadD)
+      _getDrawDebtShare(bookKeeper, stabilityFeeCollector, positionAddress, collateralPoolId, wadD)
     );
-    // Moves the Alpaca Stablecoin amount (balance in the government in rad) to proxy's address
+    // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
     moveStablecoin(manager, cdp, address(this), toRad(wadD));
-    // Allows adapter to access to proxy's Alpaca Stablecoin balance in the government
-    if (GovernmentLike(government).can(address(this), address(stablecoinAdapter)) == 0) {
-      GovernmentLike(government).hope(stablecoinAdapter);
+    // Allows adapter to access to proxy's Alpaca Stablecoin balance in the bookKeeper
+    if (IBookKeeper(bookKeeper).can(address(this), address(stablecoinAdapter)) == 0) {
+      IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
@@ -942,7 +907,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 wadD
   ) public {
     address positionAddress = ManagerLike(manager).positions(cdp);
-    // Deposits Alpaca Stablecoin amount into the government
+    // Deposits Alpaca Stablecoin amount into the bookKeeper
     stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, wadD);
     // Paybacks debt to the CDP and unlocks WBNB amount from it
     adjustPosition(
@@ -950,8 +915,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       cdp,
       -toInt(wadC),
       _getWipeDebtShare(
-        ManagerLike(manager).government(),
-        GovernmentLike(ManagerLike(manager).government()).stablecoin(positionAddress),
+        ManagerLike(manager).bookKeeper(),
+        IBookKeeper(ManagerLike(manager).bookKeeper()).stablecoin(positionAddress),
         positionAddress,
         ManagerLike(manager).collateralPools(cdp)
       )
@@ -973,16 +938,16 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 cdp,
     uint256 wadC
   ) public {
-    address government = ManagerLike(manager).government();
+    address bookKeeper = ManagerLike(manager).bookKeeper();
     address positionAddress = ManagerLike(manager).positions(cdp);
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress);
 
-    // Deposits Alpaca Stablecoin amount into the government
+    // Deposits Alpaca Stablecoin amount into the bookKeeper
     stablecoinAdapter_deposit(
       stablecoinAdapter,
       positionAddress,
-      _getWipeAllWad(government, positionAddress, positionAddress, collateralPoolId)
+      _getWipeAllWad(bookKeeper, positionAddress, positionAddress, collateralPoolId)
     );
     // Paybacks debt to the CDP and unlocks WBNB amount from it
     adjustPosition(manager, cdp, -toInt(wadC), -int256(debtShare));
@@ -1005,7 +970,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 wadD
   ) public {
     address positionAddress = ManagerLike(manager).positions(cdp);
-    // Deposits Alpaca Stablecoin amount into the government
+    // Deposits Alpaca Stablecoin amount into the bookKeeper
     stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, wadD);
     uint256 wadC = convertTo18(tokenAdapter, amtC);
     // Paybacks debt to the CDP and unlocks token amount from it
@@ -1014,8 +979,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       cdp,
       -toInt(wadC),
       _getWipeDebtShare(
-        ManagerLike(manager).government(),
-        GovernmentLike(ManagerLike(manager).government()).stablecoin(positionAddress),
+        ManagerLike(manager).bookKeeper(),
+        IBookKeeper(ManagerLike(manager).bookKeeper()).stablecoin(positionAddress),
         positionAddress,
         ManagerLike(manager).collateralPools(cdp)
       )
@@ -1033,16 +998,16 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 cdp,
     uint256 amtC
   ) public {
-    address government = ManagerLike(manager).government();
+    address bookKeeper = ManagerLike(manager).bookKeeper();
     address positionAddress = ManagerLike(manager).positions(cdp);
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress);
 
-    // Deposits Alpaca Stablecoin amount into the government
+    // Deposits Alpaca Stablecoin amount into the bookKeeper
     stablecoinAdapter_deposit(
       stablecoinAdapter,
       positionAddress,
-      _getWipeAllWad(government, positionAddress, positionAddress, collateralPoolId)
+      _getWipeAllWad(bookKeeper, positionAddress, positionAddress, collateralPoolId)
     );
     uint256 wadC = convertTo18(tokenAdapter, amtC);
     // Paybacks debt to the CDP and unlocks token amount from it
@@ -1062,7 +1027,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 wadD
   ) public {
     address positionAddress = ManagerLike(manager).positions(cdp);
-    // Deposits Alpaca Stablecoin amount into the government
+    // Deposits Alpaca Stablecoin amount into the bookKeeper
     stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, wadD);
     uint256 wadC = convertTo18(farmableTokenAdapter, amtC);
     // Paybacks debt to the CDP and unlocks token amount from it
@@ -1071,8 +1036,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       cdp,
       -toInt(wadC),
       _getWipeDebtShare(
-        ManagerLike(manager).government(),
-        GovernmentLike(ManagerLike(manager).government()).stablecoin(positionAddress),
+        ManagerLike(manager).bookKeeper(),
+        IBookKeeper(ManagerLike(manager).bookKeeper()).stablecoin(positionAddress),
         positionAddress,
         ManagerLike(manager).collateralPools(cdp)
       )
@@ -1090,16 +1055,16 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 cdp,
     uint256 amtC
   ) public {
-    address government = ManagerLike(manager).government();
+    address bookKeeper = ManagerLike(manager).bookKeeper();
     address positionAddress = ManagerLike(manager).positions(cdp);
     bytes32 collateralPoolId = ManagerLike(manager).collateralPools(cdp);
-    (, uint256 debtShare) = GovernmentLike(government).positions(collateralPoolId, positionAddress);
+    (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress);
 
-    // Deposits Alpaca Stablecoin amount into the government
+    // Deposits Alpaca Stablecoin amount into the bookKeeper
     stablecoinAdapter_deposit(
       stablecoinAdapter,
       positionAddress,
-      _getWipeAllWad(government, positionAddress, positionAddress, collateralPoolId)
+      _getWipeAllWad(bookKeeper, positionAddress, positionAddress, collateralPoolId)
     );
     uint256 wadC = convertTo18(farmableTokenAdapter, amtC);
     // Paybacks debt to the CDP and unlocks token amount from it

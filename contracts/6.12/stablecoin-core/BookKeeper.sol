@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// vat.sol -- Dai CDP database
+/// BookKeeper.sol -- stable coin CDP database
 
 // Copyright (C) 2018 Rain <rainbreak@riseup.net>
 //
@@ -22,37 +22,38 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "../interfaces/IBookKeeper.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
   function rely(address usr) external auth {
-    require(live == 1, "Government/not-live");
+    require(live == 1, "BookKeeper/not-live");
     whitelist[usr] = 1;
   }
 
   function deny(address usr) external auth {
-    require(live == 1, "Government/not-live");
+    require(live == 1, "BookKeeper/not-live");
     whitelist[usr] = 0;
   }
 
   modifier auth {
-    require(whitelist[msg.sender] == 1, "Government/not-authorized");
+    require(whitelist[msg.sender] == 1, "BookKeeper/not-authorized");
     _;
   }
 
-  mapping(address => mapping(address => uint256)) public can;
+  mapping(address => mapping(address => uint256)) public override can;
 
-  function hope(address usr) external {
+  function hope(address usr) external override {
     can[msg.sender][usr] = 1;
   }
 
-  function nope(address usr) external {
+  function nope(address usr) external override {
     can[msg.sender][usr] = 0;
   }
 
@@ -73,14 +74,14 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     uint256 debtShare; // Normalised Debt    [wad]
   }
 
-  mapping(bytes32 => CollateralPool) public collateralPools;
-  mapping(bytes32 => mapping(address => Position)) public positions;
-  mapping(bytes32 => mapping(address => uint256)) public collateralToken; // [wad]
-  mapping(address => uint256) public stablecoin; // [rad]
-  mapping(address => uint256) public systemBadDebt; // [rad]
+  mapping(bytes32 => CollateralPool) public override collateralPools;
+  mapping(bytes32 => mapping(address => Position)) public override positions;
+  mapping(bytes32 => mapping(address => uint256)) public override collateralToken; // [wad]
+  mapping(address => uint256) public override stablecoin; // [rad]
+  mapping(address => uint256) public override systemBadDebt; // [rad]
 
-  uint256 public totalStablecoinIssued; // Total Dai Issued    [rad]
-  uint256 public totalUnbackedStablecoin; // Total Unbacked Dai  [rad]
+  uint256 public override totalStablecoinIssued; // Total stable coin Issued    [rad]
+  uint256 public totalUnbackedStablecoin; // Total Unbacked stable coin  [rad]
   uint256 public totalDebtCeiling; // Total Debt Ceiling  [rad]
   uint256 public live; // Active Flag
 
@@ -127,29 +128,29 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
 
   // --- Administration ---
   function init(bytes32 collateralPoolId) external auth {
-    require(collateralPools[collateralPoolId].debtAccumulatedRate == 0, "Government/collateral-pool-already-init");
+    require(collateralPools[collateralPoolId].debtAccumulatedRate == 0, "BookKeeper/collateral-pool-already-init");
     collateralPools[collateralPoolId].debtAccumulatedRate = 10**27;
   }
 
-  function file(bytes32 what, uint256 data) external auth {
-    require(live == 1, "Government/not-live");
+  function file(bytes32 what, uint256 data) external override auth {
+    require(live == 1, "BookKeeper/not-live");
     if (what == "totalDebtCeiling") totalDebtCeiling = data;
-    else revert("Government/file-unrecognized-param");
+    else revert("BookKeeper/file-unrecognized-param");
   }
 
   function file(
     bytes32 collateralPoolId,
     bytes32 what,
     uint256 data
-  ) external auth {
-    require(live == 1, "Government/not-live");
+  ) external override auth {
+    require(live == 1, "BookKeeper/not-live");
     if (what == "priceWithSafetyMargin") collateralPools[collateralPoolId].priceWithSafetyMargin = data;
     else if (what == "debtCeiling") collateralPools[collateralPoolId].debtCeiling = data;
     else if (what == "debtFloor") collateralPools[collateralPoolId].debtFloor = data;
-    else revert("Government/file-unrecognized-param");
+    else revert("BookKeeper/file-unrecognized-param");
   }
 
-  function cage() external auth {
+  function cage() external override auth {
     live = 0;
   }
 
@@ -158,7 +159,7 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     bytes32 collateralPoolId,
     address usr,
     int256 wad
-  ) external auth {
+  ) external override auth {
     collateralToken[collateralPoolId][usr] = add(collateralToken[collateralPoolId][usr], wad);
   }
 
@@ -167,8 +168,8 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address src,
     address dst,
     uint256 wad
-  ) external {
-    require(wish(src, msg.sender), "Government/not-allowed");
+  ) external override {
+    require(wish(src, msg.sender), "BookKeeper/not-allowed");
     collateralToken[collateralPoolId][src] = sub(collateralToken[collateralPoolId][src], wad);
     collateralToken[collateralPoolId][dst] = add(collateralToken[collateralPoolId][dst], wad);
   }
@@ -177,8 +178,8 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address src,
     address dst,
     uint256 rad
-  ) external {
-    require(wish(src, msg.sender), "Government/not-allowed");
+  ) external override {
+    require(wish(src, msg.sender), "BookKeeper/not-allowed");
     stablecoin[src] = sub(stablecoin[src], rad);
     stablecoin[dst] = add(stablecoin[dst], rad);
   }
@@ -203,14 +204,14 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address stablecoinOwner,
     int256 collateralValue,
     int256 debtShare
-  ) external {
+  ) external override {
     // system is live
-    require(live == 1, "Government/not-live");
+    require(live == 1, "BookKeeper/not-live");
 
     Position memory position = positions[collateralPoolId][positionAddress];
     CollateralPool memory collateralPool = collateralPools[collateralPoolId];
     // collateralPool has been initialised
-    require(collateralPool.debtAccumulatedRate != 0, "Government/collateralPool-not-init");
+    require(collateralPool.debtAccumulatedRate != 0, "BookKeeper/collateralPool-not-init");
 
     position.lockedCollateral = add(position.lockedCollateral, collateralValue);
     position.debtShare = add(position.debtShare, debtShare);
@@ -229,7 +230,7 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
           totalStablecoinIssued <= totalDebtCeiling
         )
       ),
-      "Government/ceiling-exceeded"
+      "BookKeeper/ceiling-exceeded"
     );
     // position is either less risky than before, or it is safe :: check work factor
     require(
@@ -237,21 +238,21 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
         both(debtShare <= 0, collateralValue >= 0),
         positionDebtValue <= mul(position.lockedCollateral, collateralPool.priceWithSafetyMargin)
       ),
-      "Government/not-safe"
+      "BookKeeper/not-safe"
     );
 
     // position is either more safe, or the owner consents
     require(
       either(both(debtShare <= 0, collateralValue >= 0), wish(positionAddress, msg.sender)),
-      "Government/not-allowed-u"
+      "BookKeeper/not-allowed-u"
     );
     // collateral src consents
-    require(either(collateralValue <= 0, wish(collateralOwner, msg.sender)), "Government/not-allowed-v");
+    require(either(collateralValue <= 0, wish(collateralOwner, msg.sender)), "BookKeeper/not-allowed-v");
     // debt dst consents
-    require(either(debtShare >= 0, wish(stablecoinOwner, msg.sender)), "Government/not-allowed-w");
+    require(either(debtShare >= 0, wish(stablecoinOwner, msg.sender)), "BookKeeper/not-allowed-w");
 
     // position has no debt, or a non-debtFloory amount
-    require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "Government/debtFloor");
+    require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "BookKeeper/debtFloor");
 
     collateralToken[collateralPoolId][collateralOwner] = sub(
       collateralToken[collateralPoolId][collateralOwner],
@@ -270,7 +271,7 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address dst,
     int256 collateralValue,
     int256 debtShare
-  ) external {
+  ) external override {
     Position storage u = positions[collateralPoolId][src];
     Position storage v = positions[collateralPoolId][dst];
     CollateralPool storage i = collateralPools[collateralPoolId];
@@ -284,15 +285,15 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     uint256 vtab = mul(v.debtShare, i.debtAccumulatedRate);
 
     // both sides consent
-    require(both(wish(src, msg.sender), wish(dst, msg.sender)), "Government/not-allowed");
+    require(both(wish(src, msg.sender), wish(dst, msg.sender)), "BookKeeper/not-allowed");
 
     // both sides safe
-    require(utab <= mul(u.lockedCollateral, i.priceWithSafetyMargin), "Government/not-safe-src");
-    require(vtab <= mul(v.lockedCollateral, i.priceWithSafetyMargin), "Government/not-safe-dst");
+    require(utab <= mul(u.lockedCollateral, i.priceWithSafetyMargin), "BookKeeper/not-safe-src");
+    require(vtab <= mul(v.lockedCollateral, i.priceWithSafetyMargin), "BookKeeper/not-safe-dst");
 
     // both sides non-debtFloory
-    require(either(utab >= i.debtFloor, u.debtShare == 0), "Government/debtFloor-src");
-    require(either(vtab >= i.debtFloor, v.debtShare == 0), "Government/debtFloor-dst");
+    require(either(utab >= i.debtFloor, u.debtShare == 0), "BookKeeper/debtFloor-src");
+    require(either(vtab >= i.debtFloor, v.debtShare == 0), "BookKeeper/debtFloor-dst");
   }
 
   // --- CDP Confiscation ---
@@ -303,7 +304,7 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address stablecoinDebtor,
     int256 collateralValue,
     int256 debtShare
-  ) external auth {
+  ) external override auth {
     Position storage position = positions[collateralPoolId][positionAddress];
     CollateralPool storage collateralPool = collateralPools[collateralPoolId];
 
@@ -322,7 +323,7 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
   }
 
   // --- Settlement ---
-  function settleSystemBadDebt(uint256 rad) external {
+  function settleSystemBadDebt(uint256 rad) external override {
     address u = msg.sender;
     systemBadDebt[u] = sub(systemBadDebt[u], rad);
     stablecoin[u] = sub(stablecoin[u], rad);
@@ -334,7 +335,7 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     address from,
     address to,
     uint256 rad
-  ) external auth {
+  ) external override auth {
     systemBadDebt[from] = add(systemBadDebt[from], rad);
     stablecoin[to] = add(stablecoin[to], rad);
     totalUnbackedStablecoin = add(totalUnbackedStablecoin, rad);
@@ -346,8 +347,8 @@ contract Government is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     bytes32 collateralPoolId,
     address u,
     int256 debtAccumulatedRate
-  ) external auth {
-    require(live == 1, "Government/not-live");
+  ) external override auth {
+    require(live == 1, "BookKeeper/not-live");
     CollateralPool storage collateralPool = collateralPools[collateralPoolId];
     collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);
     int256 rad = mul(collateralPool.totalDebtShare, debtAccumulatedRate);
