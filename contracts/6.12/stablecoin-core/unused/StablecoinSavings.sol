@@ -87,9 +87,9 @@ contract StablecoinSavings {
   uint256 public live; // Active Flag
 
   // --- Init ---
-  constructor(address bookKeeper_) public {
+  constructor(address _bookKeeper) public {
     wards[msg.sender] = 1;
-    bookKeeper = BookKeeperLike(bookKeeper_);
+    bookKeeper = BookKeeperLike(_bookKeeper);
     savingsRate = ONE;
     sharePrice = ONE;
     lastAccumulationTime = now;

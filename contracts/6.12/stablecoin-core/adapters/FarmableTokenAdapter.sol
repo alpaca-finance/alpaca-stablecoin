@@ -82,16 +82,16 @@ contract FarmableTokenAdapter is Initializable {
   }
 
   function __FarmableTokenAdapter_init(
-    address bookKeeper_,
+    address _bookKeeper,
     bytes32 collateralPoolId_,
     address collateralToken_,
     address rewardToken_
   ) internal initializer {
-    __FarmableTokenAdapter_init_unchained(bookKeeper_, collateralPoolId_, collateralToken_, rewardToken_);
+    __FarmableTokenAdapter_init_unchained(_bookKeeper, collateralPoolId_, collateralToken_, rewardToken_);
   }
 
   function __FarmableTokenAdapter_init_unchained(
-    address bookKeeper_,
+    address _bookKeeper,
     bytes32 collateralPoolId_,
     address collateralToken_,
     address rewardToken_
@@ -99,7 +99,7 @@ contract FarmableTokenAdapter is Initializable {
     whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
     live = 1;
-    bookKeeper = IBookKeeper(bookKeeper_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
     collateralToken = ERC20(collateralToken_);
     uint256 decimals_ = ERC20(collateralToken_).decimals();

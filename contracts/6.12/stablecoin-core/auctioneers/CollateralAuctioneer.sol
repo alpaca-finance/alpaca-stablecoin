@@ -186,7 +186,7 @@ contract CollateralAuctioneer is
 
   // --- Init ---
   function initialize(
-    address bookKeeper_,
+    address _bookKeeper,
     address priceOracle_,
     address liquidationEngine_,
     bytes32 collateralPoolId_
@@ -196,7 +196,7 @@ contract CollateralAuctioneer is
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    bookKeeper = IBookKeeper(bookKeeper_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     priceOracle = PriceOracleLike(priceOracle_);
     liquidationEngine = LiquidationEngineLike(liquidationEngine_);
     collateralPoolId = collateralPoolId_;

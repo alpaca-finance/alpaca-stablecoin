@@ -58,12 +58,12 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     _;
   }
 
-  function initialize(address bookKeeper_) external initializer {
+  function initialize(address _bookKeeper) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
-    bookKeeper = bookKeeper_;
+    bookKeeper = _bookKeeper;
   }
 
   function add(uint256 x, uint256 y) internal pure returns (uint256 z) {

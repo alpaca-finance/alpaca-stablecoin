@@ -92,7 +92,7 @@ contract StablecoinAdapter is
   IStablecoin public stablecoin; // Stablecoin Token
   uint256 public live; // Active Flag
 
-  function initialize(address bookKeeper_, address stablecoin_) external initializer {
+  function initialize(address _bookKeeper, address stablecoin_) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
@@ -100,7 +100,7 @@ contract StablecoinAdapter is
 
     wards[msg.sender] = 1;
     live = 1;
-    bookKeeper = IBookKeeper(bookKeeper_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     stablecoin = IStablecoin(stablecoin_);
   }
 

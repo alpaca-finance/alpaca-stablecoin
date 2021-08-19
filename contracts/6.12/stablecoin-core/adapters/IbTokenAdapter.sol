@@ -99,7 +99,7 @@ contract IbTokenAdapter is
   event File(bytes32 indexed what, address data);
 
   /**
-        @param bookKeeper_                 MCD_VAT DSS core accounting module
+        @param _bookKeeper                 MCD_VAT DSS core accounting module
         @param collateralPoolId_                 Collateral type
         @param collateralToken_                 The collateral LP token address
         @param rewardToken_               The SUSHI token contract address.
@@ -109,7 +109,7 @@ contract IbTokenAdapter is
         @param timelock_            The expected value of the owner field. Also needs to be an instance of Timelock.
     */
   function initialize(
-    address bookKeeper_,
+    address _bookKeeper,
     bytes32 collateralPoolId_,
     address collateralToken_,
     address rewardToken_,
@@ -122,7 +122,7 @@ contract IbTokenAdapter is
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
-    FarmableTokenAdapter.__FarmableTokenAdapter_init(bookKeeper_, collateralPoolId_, collateralToken_, rewardToken_);
+    FarmableTokenAdapter.__FarmableTokenAdapter_init(_bookKeeper, collateralPoolId_, collateralToken_, rewardToken_);
 
     // Sanity checks
     (address lpToken, uint256 allocPoint, , , ) = FairlaunchLike(fairlaunch_).poolInfo(pid_);

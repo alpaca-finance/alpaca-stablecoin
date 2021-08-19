@@ -63,14 +63,14 @@ contract StabilityFeeCollector is
   uint256 public globalStabilityFeeRate; // Global, per-second stability fee contribution [ray]
 
   // --- Init ---
-  function initialize(address bookKeeper_) external initializer {
+  function initialize(address _bookKeeper) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     whitelist[msg.sender] = 1;
-    bookKeeper = IBookKeeper(bookKeeper_);
+    bookKeeper = IBookKeeper(_bookKeeper);
   }
 
   // --- Math ---

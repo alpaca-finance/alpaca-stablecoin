@@ -92,7 +92,7 @@ contract SystemDebtEngine is
 
   // --- Init ---
   function initialize(
-    address bookKeeper_,
+    address _bookKeeper,
     address surplusAuctionHouse_,
     address badDebtAuctionHouse_
   ) external initializer {
@@ -102,7 +102,7 @@ contract SystemDebtEngine is
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     whitelist[msg.sender] = 1;
-    bookKeeper = IBookKeeper(bookKeeper_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     surplusAuctionHouse = SurplusAuctioneerLike(surplusAuctionHouse_);
     badDebtAuctionHouse = BadDebtAuctioneerLike(badDebtAuctionHouse_);
     bookKeeper.hope(surplusAuctionHouse_);

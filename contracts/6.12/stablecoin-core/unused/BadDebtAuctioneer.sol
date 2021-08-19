@@ -102,9 +102,9 @@ contract BadDebtAuctioneer {
   event Kick(uint256 id, uint256 lot, uint256 bid, address indexed recipient);
 
   // --- Init ---
-  constructor(address bookKeeper_, address alpaca_) public {
+  constructor(address _bookKeeper, address alpaca_) public {
     whitelist[msg.sender] = 1;
-    bookKeeper = BookKeeperLike(bookKeeper_);
+    bookKeeper = BookKeeperLike(_bookKeeper);
     alpaca = TokenLike(alpaca_);
     live = 1;
   }

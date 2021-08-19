@@ -178,7 +178,7 @@ contract FarmableTokenAuctioneer is
 
   // --- Init ---
   function initialize(
-    address bookKeeper_,
+    address _bookKeeper,
     address priceOracle_,
     address liquidationEngine_,
     address farmableTokenAdapter_
@@ -188,7 +188,7 @@ contract FarmableTokenAuctioneer is
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    bookKeeper = IBookKeeper(bookKeeper_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     priceOracle = PriceOracleLike(priceOracle_);
     liquidationEngine = LiquidationEngineLike(liquidationEngine_);
     farmableTokenAdapter = FarmableTokenAdapterLike(farmableTokenAdapter_);

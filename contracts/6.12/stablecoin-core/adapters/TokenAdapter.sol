@@ -89,7 +89,7 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
   uint256 public live; // Active Flag
 
   function initialize(
-    address bookKeeper_,
+    address _bookKeeper,
     bytes32 collateralPoolId_,
     address collateralToken_
   ) external initializer {
@@ -100,7 +100,7 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
 
     wards[msg.sender] = 1;
     live = 1;
-    bookKeeper = IBookKeeper(bookKeeper_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
     collateralToken = TokenLike(collateralToken_);
     decimals = collateralToken.decimals();

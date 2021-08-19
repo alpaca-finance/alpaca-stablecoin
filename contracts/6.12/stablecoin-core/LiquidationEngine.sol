@@ -103,13 +103,13 @@ contract LiquidationEngine is
   event Cage();
 
   // --- Init ---
-  function initialize(address bookKeeper_) external initializer {
+  function initialize(address _bookKeeper) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    bookKeeper = IBookKeeper(bookKeeper_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     live = 1;
     whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
