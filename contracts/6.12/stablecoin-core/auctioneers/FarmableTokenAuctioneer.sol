@@ -25,37 +25,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "../../interfaces/IPositionHandler.sol";
-
-interface GovernmentLike {
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-
-  function moveCollateral(
-    bytes32,
-    address,
-    address,
-    uint256
-  ) external;
-
-  function collateralPools(bytes32)
-    external
-    returns (
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    );
-
-  function mintUnbackedStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-}
+import "../../interfaces/IBookKeeper.sol";
 
 interface PriceFeedLike {
   function peek() external returns (bytes32, bool);
@@ -132,7 +102,7 @@ contract FarmableTokenAuctioneer is
 
   // --- Data ---
   bytes32 public collateralPoolId; // Collateral type of this CollateralAuctioneer
-  GovernmentLike public government; // Core CDP Engine
+  IBookKeeper public bookKeeper; // Core CDP Engine
   FarmableTokenAdapterLike public farmableTokenAdapter;
 
   LiquidationEngineLike public liquidationEngine; // Liquidation module
@@ -208,7 +178,7 @@ contract FarmableTokenAuctioneer is
 
   // --- Init ---
   function initialize(
-    address government_,
+    address _bookKeeper,
     address priceOracle_,
     address liquidationEngine_,
     address farmableTokenAdapter_
@@ -218,7 +188,7 @@ contract FarmableTokenAuctioneer is
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    government = GovernmentLike(government_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     priceOracle = PriceOracleLike(priceOracle_);
     liquidationEngine = LiquidationEngineLike(liquidationEngine_);
     farmableTokenAdapter = FarmableTokenAdapterLike(farmableTokenAdapter_);
@@ -303,7 +273,7 @@ contract FarmableTokenAuctioneer is
   // --- Auction ---
 
   // get the price directly from the OSM
-  // Could get this from rmul(Government.collateralPools(collateralPoolId).spot, Spotter.mat()) instead, but
+  // Could get this from rmul(BookKeeper.collateralPools(collateralPoolId).spot, Spotter.mat()) instead, but
   // if mat has changed since the last poke, the resulting value will be
   // incorrect.
   function getFeedPrice() internal returns (uint256 feedPrice) {
@@ -355,7 +325,7 @@ contract FarmableTokenAuctioneer is
     uint256 prize;
     if (_liquidatorTip > 0 || _liquidatorBountyRate > 0) {
       prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-      government.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
+      bookKeeper.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
     }
 
     // Handle Farmable Token upon liquidation
@@ -403,7 +373,7 @@ contract FarmableTokenAuctioneer is
       uint256 _minimumRemainingDebt = minimumRemainingDebt;
       if (debt >= _minimumRemainingDebt && mul(collateralAmount, feedPrice) >= _minimumRemainingDebt) {
         prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-        government.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
+        bookKeeper.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
       }
     }
 
@@ -419,7 +389,7 @@ contract FarmableTokenAuctioneer is
   // To avoid partial purchases resulting in very small leftover auctions that will
   // never be cleared, any partial purchase must leave at least `CollateralAuctioneer.minimumRemainingDebt`
   // remaining DAI target. `minimumRemainingDebt` is an asynchronously updated value equal to
-  // (Government.debtFloor * Dog.liquidationPenalty(collateralPoolId) / WAD) where the values are understood to be determined
+  // (BookKeeper.debtFloor * Dog.liquidationPenalty(collateralPoolId) / WAD) where the values are understood to be determined
   // by whatever they were when CollateralAuctioneer.updateMinimumRemainingDebt() was last called. Purchase amounts
   // will be minimally decreased when necessary to respect this limit; i.e., if the
   // specified `collateralAmountToBuy` would leave `debt < minimumRemainingDebt` but `debt > 0`, the amount actually
@@ -488,7 +458,7 @@ contract FarmableTokenAuctioneer is
       collateralAmount = collateralAmount - slice;
 
       // Send collateral to collateralRecipient
-      government.moveCollateral(collateralPoolId, address(this), collateralRecipient, slice);
+      bookKeeper.moveCollateral(collateralPoolId, address(this), collateralRecipient, slice);
       // Handle Farmable Token
       // Distribute the confisacted rewards and staked collateral to the bidder
       farmableTokenAdapter.moveRewards(address(this), collateralRecipient, slice);
@@ -499,14 +469,14 @@ contract FarmableTokenAuctioneer is
       LiquidationEngineLike liquidationEngine_ = liquidationEngine;
       if (
         data.length > 0 &&
-        collateralRecipient != address(government) &&
+        collateralRecipient != address(bookKeeper) &&
         collateralRecipient != address(liquidationEngine_)
       ) {
         FlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
       }
 
       // Get DAI from caller
-      government.moveStablecoin(msg.sender, systemDebtEngine, owe);
+      bookKeeper.moveStablecoin(msg.sender, systemDebtEngine, owe);
 
       // Removes Dai out for liquidation from accumulator
       liquidationEngine_.removeRepaidDebtFromAuction(collateralPoolId, collateralAmount == 0 ? debt + owe : owe);
@@ -515,7 +485,7 @@ contract FarmableTokenAuctioneer is
     if (collateralAmount == 0) {
       _remove(id);
     } else if (debt == 0) {
-      government.moveCollateral(collateralPoolId, address(this), positionAddress, collateralAmount);
+      bookKeeper.moveCollateral(collateralPoolId, address(this), positionAddress, collateralAmount);
       // Return the remaining confiscated rewards and staked collateral to the original position
       farmableTokenAdapter.moveRewards(address(this), positionAddress, collateralAmount);
       _remove(id);
@@ -580,7 +550,7 @@ contract FarmableTokenAuctioneer is
 
   // Public function to update the cached debtFloor*liquidationPenalty value.
   function updateMinimumRemainingDebt() external nonReentrant {
-    (, , , , uint256 _debtFloor) = GovernmentLike(government).collateralPools(collateralPoolId);
+    (, , , , uint256 _debtFloor) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId);
     minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPoolId));
   }
 
@@ -588,7 +558,7 @@ contract FarmableTokenAuctioneer is
   function yank(uint256 id) external auth lock {
     require(sales[id].positionAddress != address(0), "CollateralAuctioneer/not-running-auction");
     liquidationEngine.removeRepaidDebtFromAuction(collateralPoolId, sales[id].debt);
-    government.moveCollateral(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
+    bookKeeper.moveCollateral(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
     _remove(id);
     emit Yank(id);
   }

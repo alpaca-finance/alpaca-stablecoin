@@ -99,7 +99,7 @@ contract IbTokenAdapter is
   event File(bytes32 indexed what, address data);
 
   /**
-        @param government_                 MCD_VAT DSS core accounting module
+        @param _bookKeeper                 MCD_VAT DSS core accounting module
         @param collateralPoolId_                 Collateral type
         @param collateralToken_                 The collateral LP token address
         @param rewardToken_               The SUSHI token contract address.
@@ -109,7 +109,7 @@ contract IbTokenAdapter is
         @param timelock_            The expected value of the owner field. Also needs to be an instance of Timelock.
     */
   function initialize(
-    address government_,
+    address _bookKeeper,
     bytes32 collateralPoolId_,
     address collateralToken_,
     address rewardToken_,
@@ -122,7 +122,7 @@ contract IbTokenAdapter is
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
-    FarmableTokenAdapter.__FarmableTokenAdapter_init(government_, collateralPoolId_, collateralToken_, rewardToken_);
+    FarmableTokenAdapter.__FarmableTokenAdapter_init(_bookKeeper, collateralPoolId_, collateralToken_, rewardToken_);
 
     // Sanity checks
     (address lpToken, uint256 allocPoint, , , ) = FairlaunchLike(fairlaunch_).poolInfo(pid_);
@@ -177,7 +177,7 @@ contract IbTokenAdapter is
 
   function emergencyWithdraw(address urn, address usr) public override nonReentrant {
     if (live == 1) {
-      uint256 val = government.collateralToken(collateralPoolId, urn);
+      uint256 val = bookKeeper.collateralToken(collateralPoolId, urn);
       fairlaunch.withdraw(address(this), pid, val);
     }
     super.emergencyWithdraw(urn, usr);

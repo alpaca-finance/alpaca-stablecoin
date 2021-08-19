@@ -19,47 +19,13 @@
 
 pragma solidity 0.6.12;
 
-interface GovernmentLike {
-  function positions(bytes32, address) external view returns (uint256, uint256);
-
-  function hope(address) external;
-
-  function moveCollateral(
-    bytes32,
-    address,
-    address,
-    uint256
-  ) external;
-
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-
-  function adjustPosition(
-    bytes32,
-    address,
-    address,
-    address,
-    int256,
-    int256
-  ) external;
-
-  function movePosition(
-    bytes32,
-    address,
-    address,
-    int256,
-    int256
-  ) external;
-}
+import "../interfaces/IBookKeeper.sol";
 
 contract PositionHandler {
   address public immutable owner;
 
-  constructor(address government) public {
+  constructor(address bookKeeper) public {
     owner = msg.sender;
-    GovernmentLike(government).hope(msg.sender);
+    IBookKeeper(bookKeeper).hope(msg.sender);
   }
 }

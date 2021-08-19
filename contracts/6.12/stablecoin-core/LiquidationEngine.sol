@@ -23,42 +23,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "../interfaces/IBookKeeper.sol";
 
 import "../interfaces/IAuctioneer.sol";
-
-interface GovernmentLike {
-  function collateralPools(bytes32)
-    external
-    view
-    returns (
-      uint256 totalDebtShare, // [wad]
-      uint256 debtAccumulatedRate, // [ray]
-      uint256 priceWithSafetyMargin, // [ray]
-      uint256 line, // [rad]
-      uint256 debtFloor // [rad]
-    );
-
-  function positions(bytes32, address)
-    external
-    view
-    returns (
-      uint256 lockedCollateral, // [wad]
-      uint256 debtShare // [wad]
-    );
-
-  function confiscate(
-    bytes32,
-    address,
-    address,
-    address,
-    int256,
-    int256
-  ) external;
-
-  function hope(address) external;
-
-  function nope(address) external;
-}
 
 interface SystemDebtEngine {
   function pushToBadDebtQueue(uint256) external;
@@ -96,7 +63,7 @@ contract LiquidationEngine is
     uint256 stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions per collateralPool [rad]
   }
 
-  GovernmentLike public government; // CDP Engine
+  IBookKeeper public bookKeeper; // CDP Engine
 
   mapping(bytes32 => CollateralPool) public collateralPools;
 
@@ -127,13 +94,13 @@ contract LiquidationEngine is
   event Cage();
 
   // --- Init ---
-  function initialize(address government_) external initializer {
+  function initialize(address _bookKeeper) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    government = GovernmentLike(government_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     live = 1;
     whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
@@ -225,14 +192,14 @@ contract LiquidationEngine is
     require(live == 1, "LiquidationEngine/not-live");
 
     (uint256 positionLockedCollateral, uint256 positionDebtShare) =
-      government.positions(collateralPoolId, positionAddress);
+      bookKeeper.positions(collateralPoolId, positionAddress);
     CollateralPool memory mcollateralPool = collateralPools[collateralPoolId];
     uint256 debtShareToBeLiquidated;
     uint256 debtAccumulatedRate;
     uint256 debtFloor;
     {
       uint256 priceWithSafetyMargin;
-      (, debtAccumulatedRate, priceWithSafetyMargin, , debtFloor) = government.collateralPools(collateralPoolId);
+      (, debtAccumulatedRate, priceWithSafetyMargin, , debtFloor) = bookKeeper.collateralPools(collateralPoolId);
       require(
         priceWithSafetyMargin > 0 &&
           mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate),
@@ -286,7 +253,7 @@ contract LiquidationEngine is
       "LiquidationEngine/overflow"
     );
 
-    government.confiscate(
+    bookKeeper.confiscatePosition(
       collateralPoolId,
       positionAddress,
       mcollateralPool.auctioneer,
