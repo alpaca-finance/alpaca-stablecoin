@@ -25,6 +25,8 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
+import "../interfaces/IAuctioneer.sol";
+
 interface GovernmentLike {
   function stablecoin(address) external view returns (uint256);
 
@@ -99,22 +101,6 @@ interface StablecoinSavingsLike {
 
 interface SystemDebtEngine {
   function cage() external;
-}
-
-interface CollateralAuctioneerLike {
-  function sales(uint256 id)
-    external
-    view
-    returns (
-      uint256 pos,
-      uint256 debt,
-      uint256 collateralAmount,
-      address positionAddress,
-      uint96 auctionStartBlock,
-      uint256 startingPrice
-    );
-
-  function yank(uint256 id) external;
 }
 
 interface PriceFeedLike {
@@ -406,7 +392,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
 
     (address _auctioneer, , , ) = liquidationEngine.collateralPools(collateralPoolId);
-    CollateralAuctioneerLike auctioneer = CollateralAuctioneerLike(_auctioneer);
+    IAuctioneer auctioneer = IAuctioneer(_auctioneer);
     (, uint256 debtAccumulatedRate, , , ) = government.collateralPools(collateralPoolId);
     (, uint256 tab, uint256 lot, address usr, , ) = auctioneer.sales(id);
 
