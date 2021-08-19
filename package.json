@@ -2,8 +2,8 @@
   "name": "@alpaca-finance/alpaca-stablecoin",
   "version": "0.0.1",
   "scripts": {
-    "compile6.12": "hardhat typechain --config hardhat.config.6.12.ts",
-    "compile": "hardhat typechain --config hardhat.config.6.12.ts",
+    "compile6.12": "hardhat typechain",
+    "compile": "hardhat typechain",
     "mainnet": "hardhat console --no-compile --network mainnet",
     "test:case": "mocha --require hardhat/register --extension ts -g",
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
@@ -56,5 +56,8 @@
   ],
   "engines": {
     "node": ">=12"
+  },
+  "dependencies": {
+    "@eth-optimism/smock": "^1.1.10"
   }
 }
