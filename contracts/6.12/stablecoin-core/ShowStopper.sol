@@ -28,6 +28,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IAuctioneer.sol";
 import "../interfaces/ILiquidationEngine.sol";
+import "../interfaces/IPriceFeed.sol";
 
 interface StablecoinSavingsLike {
   function cage() external;
@@ -37,10 +38,6 @@ interface SystemDebtEngine {
   function cage() external;
 }
 
-interface PriceFeedLike {
-  function read() external view returns (bytes32);
-}
-
 interface PriceOracleLike {
   function par() external view returns (uint256);
 
@@ -48,7 +45,7 @@ interface PriceOracleLike {
     external
     view
     returns (
-      PriceFeedLike priceFeed,
+      IPriceFeed priceFeed,
       uint256 liquidationRatio // [ray]
     );
 
@@ -316,7 +313,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     require(live == 0, "End/still-live");
     require(cagePrice[collateralPoolId] == 0, "End/cagePrice-collateralPoolId-already-defined");
     (totalDebtShare[collateralPoolId], , , , ) = bookKeeper.collateralPools(collateralPoolId);
-    (PriceFeedLike priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
+    (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
     // par is a ray, priceFeed returns a wad
     cagePrice[collateralPoolId] = wdiv(priceOracle.par(), uint256(priceFeed.read()));
     emit Cage(collateralPoolId);
