@@ -25,16 +25,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
 
-interface CollateralAuctioneerLike {
-  function collateralPoolId() external view returns (bytes32);
-
-  function startAuction(
-    uint256 debt,
-    uint256 collateralAmount,
-    address positionAddress,
-    address liquidatorAddress
-  ) external returns (uint256);
-}
+import "../interfaces/IAuctioneer.sol";
 
 interface SystemDebtEngine {
   function pushToBadDebtQueue(uint256) external;
@@ -167,7 +158,7 @@ contract LiquidationEngine is
   ) external auth {
     if (what == "auctioneer") {
       require(
-        collateralPoolId == CollateralAuctioneerLike(auctioneer).collateralPoolId(),
+        collateralPoolId == IAuctioneer(auctioneer).collateralPoolId(),
         "LiquidationEngine/file-collateralPoolId-neq-auctioneer.collateralPoolId"
       );
       collateralPools[collateralPoolId].auctioneer = auctioneer;
@@ -288,7 +279,7 @@ contract LiquidationEngine is
         debtValueToBeLiquidatedWithPenalty
       );
 
-      id = CollateralAuctioneerLike(mcollateralPool.auctioneer).startAuction({
+      id = IAuctioneer(mcollateralPool.auctioneer).startAuction({
         debt: debtValueToBeLiquidatedWithPenalty,
         collateralAmount: collateralAmountToBeLiquidated,
         positionAddress: positionAddress,
