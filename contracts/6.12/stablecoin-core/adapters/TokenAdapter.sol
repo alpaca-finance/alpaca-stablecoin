@@ -25,6 +25,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "../../interfaces/IBookKeeper.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -42,29 +43,9 @@ interface TokenLike {
   ) external returns (bool);
 }
 
-interface StablecoinLike {
-  function mint(address, uint256) external;
-
-  function burn(address, uint256) external;
-}
-
-interface GovernmentLike {
-  function addCollateral(
-    bytes32,
-    address,
-    int256
-  ) external;
-
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-}
-
 /*
-    Here we provide *adapters* to connect the Government to arbitrary external
-    token implementations, creating a bounded context for the Government. The
+    Here we provide *adapters* to connect the BookKeeper to arbitrary external
+    token implementations, creating a bounded context for the BookKeeper. The
     adapters here are provided as working examples:
 
       - `TokenAdapter`: For well behaved ERC20 tokens, with simple transfer
@@ -105,14 +86,14 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     _;
   }
 
-  GovernmentLike public government; // CDP Engine
+  IBookKeeper public bookKeeper; // CDP Engine
   bytes32 public collateralPoolId; // Collateral Type
   TokenLike public collateralToken;
   uint256 public decimals;
   uint256 public live; // Active Flag
 
   function initialize(
-    address government_,
+    address _bookKeeper,
     bytes32 collateralPoolId_,
     address collateralToken_
   ) external initializer {
@@ -123,7 +104,7 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
 
     wards[msg.sender] = 1;
     live = 1;
-    government = GovernmentLike(government_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
     collateralToken = TokenLike(collateralToken_);
     decimals = collateralToken.decimals();
@@ -136,13 +117,13 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
   function deposit(address usr, uint256 wad) external nonReentrant {
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
-    government.addCollateral(collateralPoolId, usr, int256(wad));
+    bookKeeper.addCollateral(collateralPoolId, usr, int256(wad));
     IERC20Upgradeable(usr).transferFrom(msg.sender, address(this), wad);
   }
 
   function withdraw(address usr, uint256 wad) external nonReentrant {
     require(wad <= 2**255, "TokenAdapter/overflow");
-    government.addCollateral(collateralPoolId, msg.sender, -int256(wad));
+    bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
     SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(usr), usr, wad);
   }
 }

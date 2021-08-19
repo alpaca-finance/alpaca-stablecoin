@@ -20,12 +20,13 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "../interfaces/IStablecoin.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract AlpacaStablecoin is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract AlpacaStablecoin is IStablecoin, OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -108,13 +109,13 @@ contract AlpacaStablecoin is OwnableUpgradeable, PausableUpgradeable, AccessCont
     return true;
   }
 
-  function mint(address usr, uint256 wad) external auth {
+  function mint(address usr, uint256 wad) external override auth {
     balanceOf[usr] = add(balanceOf[usr], wad);
     totalSupply = add(totalSupply, wad);
     emit Transfer(address(0), usr, wad);
   }
 
-  function burn(address usr, uint256 wad) external {
+  function burn(address usr, uint256 wad) external override {
     require(balanceOf[usr] >= wad, "AlpacaStablecoin/insufficient-balance");
     if (usr != msg.sender && allowance[usr][msg.sender] != uint256(-1)) {
       require(allowance[usr][msg.sender] >= wad, "AlpacaStablecoin/insufficient-allowance");
