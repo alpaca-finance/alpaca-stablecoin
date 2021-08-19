@@ -29,26 +29,13 @@ import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IAuctioneer.sol";
 import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/IPriceFeed.sol";
+import "../interfaces/IPriceOracle.sol";
 
 interface StablecoinSavingsLike {
   function cage() external;
 }
 
 interface SystemDebtEngine {
-  function cage() external;
-}
-
-interface PriceOracleLike {
-  function par() external view returns (uint256);
-
-  function collateralPools(bytes32)
-    external
-    view
-    returns (
-      IPriceFeed priceFeed,
-      uint256 liquidationRatio // [ray]
-    );
-
   function cage() external;
 }
 
@@ -191,7 +178,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   ILiquidationEngine public liquidationEngine;
   SystemDebtEngine public systemDebtEngine; // Debt Engine
   StablecoinSavingsLike public stablecoinSavings;
-  PriceOracleLike public priceOracle;
+  IPriceOracle public priceOracle;
 
   uint256 public live; // Active Flag
   uint256 public when; // Time of cage                   [unix epoch time]
@@ -284,7 +271,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
     else if (what == "systemDebtEngine") systemDebtEngine = SystemDebtEngine(data);
     else if (what == "stablecoinSavings") stablecoinSavings = StablecoinSavingsLike(data);
-    else if (what == "priceOracle") priceOracle = PriceOracleLike(data);
+    else if (what == "priceOracle") priceOracle = IPriceOracle(data);
     else revert("End/file-unrecognized-param");
     emit File(what, data);
   }
@@ -315,7 +302,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     (totalDebtShare[collateralPoolId], , , , ) = bookKeeper.collateralPools(collateralPoolId);
     (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
     // par is a ray, priceFeed returns a wad
-    cagePrice[collateralPoolId] = wdiv(priceOracle.par(), uint256(priceFeed.read()));
+    cagePrice[collateralPoolId] = wdiv(priceOracle.stableCoinReferencePrice(), uint256(priceFeed.read()));
     emit Cage(collateralPoolId);
   }
 
