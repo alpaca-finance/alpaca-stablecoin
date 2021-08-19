@@ -25,22 +25,11 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "../../interfaces/IStablecoin.sol";
 import "../../interfaces/IBookKeeper.sol";
+import "../../interfaces/IToken.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
-
-interface TokenLike {
-  function decimals() external view returns (uint256);
-
-  function transfer(address, uint256) external returns (bool);
-
-  function transferFrom(
-    address,
-    address,
-    uint256
-  ) external returns (bool);
-}
 
 /*
     Here we provide *adapters* to connect the BookKeeper to arbitrary external
