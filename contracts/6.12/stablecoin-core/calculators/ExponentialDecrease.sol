@@ -15,19 +15,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.6.12;
+pragma solidity 0.6.12;
 
-interface Calculator {
-  // 1st arg: initial price               [ray]
-  // 2nd arg: seconds since auction start [seconds]
-  // returns: current auction price       [ray]
-  function price(uint256, uint256) external view returns (uint256);
-}
+import "../../interfaces/ICalculator.sol";
 
 // While an equivalent function can be obtained by setting step = 1 in StairstepExponentialDecrease,
 // this continous (i.e. per-second) exponential decrease has be implemented as it is more gas-efficient
 // than using the stairstep version with step = 1 (primarily due to 1 fewer SLOAD per price calculation).
-contract ExponentialDecrease is Calculator {
+contract ExponentialDecrease is ICalculator {
   // --- Auth ---
   mapping(address => uint256) public wards;
 
