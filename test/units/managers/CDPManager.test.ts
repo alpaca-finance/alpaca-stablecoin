@@ -308,7 +308,7 @@ describe("CDPManager", () => {
       })
     })
     context("when parameters are valid", async () => {
-      it("should be able to call moveStablecoin(uint256,address,uint256)", async () => {
+      it("should be able to call moveStablecoin()", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         const positionAddress = await cdpManager.positions(1)
 
