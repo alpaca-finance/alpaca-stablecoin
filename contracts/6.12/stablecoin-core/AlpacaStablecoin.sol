@@ -50,7 +50,7 @@ contract AlpacaStablecoin is IStablecoin, OwnableUpgradeable, PausableUpgradeabl
   uint256 public constant override decimals = 18;
   uint256 public totalSupply;
 
-  mapping(address => uint256) public balanceOf;
+  mapping(address => uint256) public override balanceOf;
   mapping(address => mapping(address => uint256)) public allowance;
   mapping(address => uint256) public nonces;
 
@@ -126,7 +126,7 @@ contract AlpacaStablecoin is IStablecoin, OwnableUpgradeable, PausableUpgradeabl
     emit Transfer(usr, address(0), wad);
   }
 
-  function approve(address usr, uint256 wad) external returns (bool) {
+  function approve(address usr, uint256 wad) external override returns (bool) {
     allowance[msg.sender][usr] = wad;
     emit Approval(msg.sender, usr, wad);
     return true;

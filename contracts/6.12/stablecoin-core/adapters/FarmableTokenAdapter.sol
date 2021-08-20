@@ -17,8 +17,8 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "../../interfaces/IBookKeeper.sol";
+import "../../interfaces/IToken.sol";
 
 // receives tokens and shares them among holders
 contract FarmableTokenAdapter is Initializable {
@@ -27,9 +27,9 @@ contract FarmableTokenAdapter is Initializable {
 
   IBookKeeper public bookKeeper; // cdp engine
   bytes32 public collateralPoolId; // collateral type
-  ERC20Upgradeable public collateralToken; // collateral token
+  IToken public collateralToken; // collateral token
   uint256 public decimals; // collateralToken decimals
-  ERC20Upgradeable public rewardToken; // rewhitelist token
+  IToken public rewardToken; // rewhitelist token
 
   uint256 public accRewardPerShare; // rewards per collateralToken    [ray]
   uint256 public totalShare; // total collateralTokens       [wad]
@@ -84,13 +84,13 @@ contract FarmableTokenAdapter is Initializable {
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
-    collateralToken = ERC20Upgradeable(collateralToken_);
-    uint256 decimals_ = ERC20Upgradeable(collateralToken_).decimals();
+    collateralToken = IToken(collateralToken_);
+    uint256 decimals_ = IToken(collateralToken_).decimals();
     require(decimals_ <= 18);
     decimals = decimals_;
     to18ConversionFactor = 10**(18 - decimals_);
     toTokenConversionFactor = 10**decimals_;
-    rewardToken = ERC20Upgradeable(rewardToken_);
+    rewardToken = IToken(rewardToken_);
   }
 
   function add(uint256 x, uint256 y) public pure returns (uint256 z) {
