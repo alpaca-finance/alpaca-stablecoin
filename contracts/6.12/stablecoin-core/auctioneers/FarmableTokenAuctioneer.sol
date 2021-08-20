@@ -32,19 +32,8 @@ import "../../interfaces/IPriceOracle.sol";
 import "../../interfaces/ILiquidationEngine.sol";
 import "../../interfaces/IFarmableTokenAdapter.sol";
 import "../../interfaces/ICalculator.sol";
-
-interface FlashLendingCallee {
-  function flashLendingCall(
-    address,
-    uint256,
-    uint256,
-    bytes calldata
-  ) external;
-}
-
-interface ProxyLike {
-  function owner() external view returns (address);
-}
+import "../../interfaces/IProxy.sol";
+import "../../interfaces/IFlashLendingCallee.sol";
 
 contract FarmableTokenAuctioneer is
   OwnableUpgradeable,
@@ -443,7 +432,7 @@ contract FarmableTokenAuctioneer is
         collateralRecipient != address(bookKeeper) &&
         collateralRecipient != address(liquidationEngine_)
       ) {
-        FlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
+        IFlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
       }
 
       // Get DAI from caller

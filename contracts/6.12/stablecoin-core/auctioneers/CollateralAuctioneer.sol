@@ -30,15 +30,7 @@ import "../../interfaces/IPriceFeed.sol";
 import "../../interfaces/IPriceOracle.sol";
 import "../../interfaces/ILiquidationEngine.sol";
 import "../../interfaces/ICalculator.sol";
-
-interface FlashLendingCallee {
-  function flashLendingCall(
-    address,
-    uint256,
-    uint256,
-    bytes calldata
-  ) external;
-}
+import "../../interfaces/IFlashLendingCallee.sol";
 
 contract CollateralAuctioneer is
   OwnableUpgradeable,
@@ -425,7 +417,7 @@ contract CollateralAuctioneer is
         collateralRecipient != address(bookKeeper) &&
         collateralRecipient != address(liquidationEngine_)
       ) {
-        FlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
+        IFlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
       }
 
       // Get DAI from caller
