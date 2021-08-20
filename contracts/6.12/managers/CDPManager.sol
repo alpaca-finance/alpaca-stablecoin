@@ -192,7 +192,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     IBookKeeper(bookKeeper).moveCollateral(collateralPoolId, positions[cdp], dst, wad);
   }
 
-  // Transfer wad amount of DAI from the cdp address to a dst address.
+  // Transfer rad amount of DAI from the cdp address to a dst address.
   function moveStablecoin(
     uint256 cdp,
     address dst,

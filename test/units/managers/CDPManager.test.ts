@@ -5,6 +5,7 @@ import { MockProvider, solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
 import { BookKeeper__factory, CDPManager, CDPManager__factory, BookKeeper } from "../../../typechain"
 import { ModifiableContract, smoddit, smockit, MockContract } from "@eth-optimism/smock"
+import { WeiPerRad } from "../../helper/unit"
 
 chai.use(solidity)
 const { expect } = chai
@@ -295,6 +296,30 @@ describe("CDPManager", () => {
         expect(calls[0].src).to.be.equal(positionAddress)
         expect(calls[0].dst).to.be.equal(bobAddress)
         expect(calls[0].wad).to.be.equal(parseEther("1"))
+      })
+    })
+  })
+
+  describe("#moveStablecoin()", () => {
+    context("when caller is not the owner of the cdp", () => {
+      it("should revert", async () => {
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        await expect(cdpManager.moveStablecoin(1, bobAddress, WeiPerRad.mul(10))).to.be.revertedWith("cdp-not-allowed")
+      })
+    })
+    context("when parameters are valid", async () => {
+      it("should be able to call moveStablecoin(uint256,address,uint256)", async () => {
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        const positionAddress = await cdpManager.positions(1)
+
+        mockedBookKeeper.smocked.moveStablecoin.will.return.with()
+        await cdpManagerAsAlice.moveStablecoin(1, bobAddress, WeiPerRad.mul(10))
+
+        const { calls } = mockedBookKeeper.smocked.moveStablecoin
+        expect(calls.length).to.be.equal(1)
+        expect(calls[0].src).to.be.equal(positionAddress)
+        expect(calls[0].dst).to.be.equal(bobAddress)
+        expect(calls[0].rad).to.be.equal(WeiPerRad.mul(10))
       })
     })
   })
