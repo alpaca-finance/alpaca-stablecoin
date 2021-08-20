@@ -109,21 +109,11 @@ describe("CDPManager", () => {
       })
     })
     context("when parameters are valid", () => {
-      it("should be able to open CDP with an incremental CDP index", async () => {
-        expect(await cdpManager.owns(1)).to.equal(AddressZero)
+      it("should be able to change the owner of CDP ", async () => {
         await cdpManager.open(ethers.utils.formatBytes32String("BNB"), aliceAddress)
-        expect(await cdpManager.cdpi()).to.bignumber.equal(1)
         expect(await cdpManager.owns(1)).to.equal(aliceAddress)
-
-        expect(await cdpManager.owns(2)).to.equal(AddressZero)
-        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), bobAddress)
-        expect(await cdpManager.cdpi()).to.bignumber.equal(2)
-        expect(await cdpManager.owns(2)).to.equal(bobAddress)
-
-        expect(await cdpManager.owns(3)).to.equal(AddressZero)
-        await cdpManager.open(ethers.utils.formatBytes32String("COL"), aliceAddress)
-        expect(await cdpManager.cdpi()).to.bignumber.equal(3)
-        expect(await cdpManager.owns(3)).to.equal(aliceAddress)
+        await cdpManagerAsAlice.give(1, bobAddress)
+        expect(await cdpManager.owns(1)).to.equal(bobAddress)
       })
     })
   })
