@@ -3,24 +3,27 @@ import { Signer, BigNumber, Wallet } from "ethers"
 import chai from "chai"
 import { MockProvider, solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import { CDPManager, CDPManager__factory } from "../../../typechain"
-import { ModifiableContract, smoddit } from "@eth-optimism/smock"
+import { BookKeeper__factory, CDPManager, CDPManager__factory, BookKeeper } from "../../../typechain"
+import { ModifiableContract, smoddit, smockit, MockContract } from "@eth-optimism/smock"
 
 chai.use(solidity)
 const { expect } = chai
-const { AddressZero } = ethers.constants
+const { AddressZero, WeiPerEther } = ethers.constants
+const { parseEther } = ethers.utils
 
 type fixture = {
   cdpManager: CDPManager
-  mockedBookKeeper: ModifiableContract
+  mockedBookKeeper: MockContract
 }
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
 
-  // Deploy mocked booster config
-  const BookKeeperFactory = await smoddit("BookKeeper", deployer)
-  const mockedBookKeeper = await BookKeeperFactory.deploy()
+  // Deploy mocked BookKeeper
+  const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
+  await bookKeeper.deployed()
+  const mockedBookKeeper = await smockit(bookKeeper)
 
   // Deploy CDPManager
   const CDPManager = (await ethers.getContractFactory("CDPManager", deployer)) as CDPManager__factory
@@ -45,7 +48,8 @@ describe("CDPManager", () => {
 
   // Contracts
   let cdpManager: CDPManager
-  let mockedBookKeeper: ModifiableContract
+  let bookKeeper: BookKeeper
+  let mockedBookKeeper: MockContract
   let cdpManagerAsAlice: CDPManager
 
   beforeEach(async () => {
@@ -199,6 +203,35 @@ describe("CDPManager", () => {
         expect(await cdpManager.list(6)).to.be.deep.equal([BigNumber.from(5), BigNumber.from(7)])
         expect(await cdpManager.list(7)).to.be.deep.equal([BigNumber.from(6), BigNumber.from(2)])
         expect(await cdpManager.list(2)).to.be.deep.equal([BigNumber.from(7), BigNumber.from(0)])
+      })
+    })
+  })
+
+  describe("#adjustPosition()", () => {
+    context("when caller is not the owner of the cdp (or have no allowance)", () => {
+      it("should revert", async () => {
+        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), aliceAddress)
+        await expect(cdpManager.adjustPosition(1, parseEther("2"), parseEther("1"))).to.be.revertedWith(
+          "cdp-not-allowed"
+        )
+      })
+    })
+    context("when parameters are valid", async () => {
+      it("should be able to call BookKeeper.adjustPosition", async () => {
+        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), aliceAddress)
+        const positionAddress = await cdpManager.positions(1)
+
+        mockedBookKeeper.smocked.adjustPosition.will.return.with()
+        await cdpManagerAsAlice.adjustPosition(1, parseEther("2"), parseEther("1"))
+
+        const { calls } = mockedBookKeeper.smocked.adjustPosition
+        expect(calls.length).to.be.equal(1)
+        expect(calls[0].collateralPoolId).to.be.equal(ethers.utils.formatBytes32String("BNB"))
+        expect(calls[0].positionAddress).to.be.equal(positionAddress)
+        expect(calls[0].collateralOwner).to.be.equal(positionAddress)
+        expect(calls[0].stablecoinOwner).to.be.equal(positionAddress)
+        expect(calls[0].collateralValue).to.be.equal(parseEther("2"))
+        expect(calls[0].debtShare).to.be.equal(parseEther("1"))
       })
     })
   })
