@@ -134,4 +134,72 @@ describe("CDPManager", () => {
       })
     })
   })
+
+  describe("#list()", () => {
+    context("when a few cdp has been opened", () => {
+      it("should work as a linklist perfectly", async () => {
+        // Alice open cdp 1-3
+        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), aliceAddress)
+        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), aliceAddress)
+        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), aliceAddress)
+
+        // Bob open cdp 4-7
+        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), bobAddress)
+        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), bobAddress)
+        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), bobAddress)
+        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), bobAddress)
+
+        let [aliceCount, aliceFirst, aliceLast] = await Promise.all([
+          cdpManager.count(aliceAddress),
+          cdpManager.first(aliceAddress),
+          cdpManager.last(aliceAddress),
+        ])
+        expect(aliceCount).to.bignumber.equal(3)
+        expect(aliceFirst).to.bignumber.equal(1)
+        expect(aliceLast).to.bignumber.equal(3)
+        expect(await cdpManager.list(1)).to.be.deep.equal([BigNumber.from(0), BigNumber.from(2)])
+        expect(await cdpManager.list(2)).to.be.deep.equal([BigNumber.from(1), BigNumber.from(3)])
+        expect(await cdpManager.list(3)).to.be.deep.equal([BigNumber.from(2), BigNumber.from(0)])
+
+        let [bobCount, bobFirst, bobLast] = await Promise.all([
+          cdpManager.count(bobAddress),
+          cdpManager.first(bobAddress),
+          cdpManager.last(bobAddress),
+        ])
+        expect(bobCount).to.bignumber.equal(4)
+        expect(bobFirst).to.bignumber.equal(4)
+        expect(bobLast).to.bignumber.equal(7)
+        expect(await cdpManager.list(4)).to.be.deep.equal([BigNumber.from(0), BigNumber.from(5)])
+        expect(await cdpManager.list(5)).to.be.deep.equal([BigNumber.from(4), BigNumber.from(6)])
+        expect(await cdpManager.list(6)).to.be.deep.equal([BigNumber.from(5), BigNumber.from(7)])
+        expect(await cdpManager.list(7)).to.be.deep.equal([BigNumber.from(6), BigNumber.from(0)])
+
+        // try giving cdp 2 to Bob, the CDP#2 should be concat at the end of the link list
+        await cdpManagerAsAlice.give(2, bobAddress)
+        ;[aliceCount, aliceFirst, aliceLast] = await Promise.all([
+          cdpManager.count(aliceAddress),
+          cdpManager.first(aliceAddress),
+          cdpManager.last(aliceAddress),
+        ])
+        expect(aliceCount).to.bignumber.equal(2)
+        expect(aliceFirst).to.bignumber.equal(1)
+        expect(aliceLast).to.bignumber.equal(3)
+        expect(await cdpManager.list(1)).to.be.deep.equal([BigNumber.from(0), BigNumber.from(3)])
+        expect(await cdpManager.list(3)).to.be.deep.equal([BigNumber.from(1), BigNumber.from(0)])
+        ;[bobCount, bobFirst, bobLast] = await Promise.all([
+          cdpManager.count(bobAddress),
+          cdpManager.first(bobAddress),
+          cdpManager.last(bobAddress),
+        ])
+        expect(bobCount).to.bignumber.equal(5)
+        expect(bobFirst).to.bignumber.equal(4)
+        expect(bobLast).to.bignumber.equal(2) // CDP#2 concatted at the end of the list
+        expect(await cdpManager.list(4)).to.be.deep.equal([BigNumber.from(0), BigNumber.from(5)])
+        expect(await cdpManager.list(5)).to.be.deep.equal([BigNumber.from(4), BigNumber.from(6)])
+        expect(await cdpManager.list(6)).to.be.deep.equal([BigNumber.from(5), BigNumber.from(7)])
+        expect(await cdpManager.list(7)).to.be.deep.equal([BigNumber.from(6), BigNumber.from(2)])
+        expect(await cdpManager.list(2)).to.be.deep.equal([BigNumber.from(7), BigNumber.from(0)])
+      })
+    })
+  })
 })
