@@ -102,8 +102,8 @@ interface FarmableTokenAdapterLike {
   function collateralPoolId() external view returns (bytes32);
 }
 
-interface ProxyLike {
-  function owner() external view returns (address);
+interface CDPManagerLike {
+  function ownerMapByPositionHandler(address) external view returns (address);
 }
 
 contract FarmableTokenAuctioneer is
@@ -212,7 +212,8 @@ contract FarmableTokenAuctioneer is
     address government_,
     address priceOracle_,
     address liquidationEngine_,
-    address farmableTokenAdapter_
+    address farmableTokenAdapter_,
+    address cdpManager_
   ) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();

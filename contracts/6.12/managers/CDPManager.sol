@@ -100,7 +100,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     cdpi = add(cdpi, 1);
     positions[cdpi] = address(new PositionHandler(government));
     owns[cdpi] = usr;
-    ownerMapByPositionHandler[positions[cdpi]] = usr;
+    mapPositionHandlerToOwner[positions[cdpi]] = usr;
     collateralPools[cdpi] = collateralPoolId;
 
     // Add new CDP to double linked list and pointers
@@ -142,7 +142,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
 
     // Transfer ownership
     owns[cdp] = dst;
-    ownerMapByPositionHandler[positions[cdp]] = dst;
+    mapPositionHandlerToOwner[positions[cdp]] = dst;
 
     // Add transferred CDP to double linked list of destiny user and pointers
     list[cdp].prev = last[dst];
