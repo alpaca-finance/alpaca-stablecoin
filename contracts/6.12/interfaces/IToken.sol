@@ -10,8 +10,4 @@ interface IToken {
     address,
     uint256
   ) external returns (bool);
-
-  function _burn(address, uint256) external;
-
-  function _mint(address, uint256) external;
 }
