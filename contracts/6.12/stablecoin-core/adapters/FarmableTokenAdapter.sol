@@ -19,15 +19,16 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
+import "../../interfaces/IFarmableTokenAdapter.sol";
 
 // receives tokens and shares them among holders
-contract FarmableTokenAdapter is Initializable {
+contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
   mapping(address => uint256) whitelist;
   uint256 live;
 
   IBookKeeper public bookKeeper; // cdp engine
-  bytes32 public collateralPoolId; // collateral type
-  IToken public collateralToken; // collateral token
+  bytes32 public override collateralPoolId; // collateral type
+  IToken public override collateralToken; // collateral token
   uint256 public decimals; // collateralToken decimals
   IToken public rewardToken; // rewhitelist token
 
@@ -166,7 +167,7 @@ contract FarmableTokenAdapter is Initializable {
     address positionAddress,
     address usr,
     uint256 val
-  ) public virtual {
+  ) public virtual override {
     require(live == 1, "FarmableToken/not-live");
 
     harvest(positionAddress, usr);
@@ -191,7 +192,7 @@ contract FarmableTokenAdapter is Initializable {
     address positionAddress,
     address usr,
     uint256 val
-  ) public virtual {
+  ) public virtual override {
     harvest(positionAddress, usr);
     if (val > 0) {
       uint256 wad = wdivup(mul(val, to18ConversionFactor), nps());
@@ -229,7 +230,7 @@ contract FarmableTokenAdapter is Initializable {
     address src,
     address dst,
     uint256 wad
-  ) public {
+  ) public override {
     uint256 ss = stake[src];
     stake[src] = sub(ss, wad);
     stake[dst] = add(stake[dst], wad);
