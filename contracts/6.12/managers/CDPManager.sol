@@ -22,22 +22,24 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+
 import "./PositionHandler.sol";
+import "../interfaces/IManager.sol";
 import "../interfaces/IBookKeeper.sol";
 
-contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
-  address public bookKeeper;
+contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IManager {
+  address public override bookKeeper;
   uint256 public cdpi; // Auto incremental
-  mapping(uint256 => address) public positions; // CDPId => PositionHandler
+  mapping(uint256 => address) public override positions; // CDPId => PositionHandler
   mapping(uint256 => List) public list; // CDPId => Prev & Next CDPIds (double linked list)
-  mapping(uint256 => address) public owns; // CDPId => Owner
-  mapping(uint256 => bytes32) public collateralPools; // CDPId => Ilk
+  mapping(uint256 => address) public override owns; // CDPId => Owner
+  mapping(uint256 => bytes32) public override collateralPools; // CDPId => Ilk
 
   mapping(address => uint256) public first; // Owner => First CDPId
   mapping(address => uint256) public last; // Owner => Last CDPId
   mapping(address => uint256) public count; // Owner => Amount of CDPs
 
-  mapping(address => mapping(uint256 => mapping(address => uint256))) public cdpCan; // Owner => CDPId => Allowed Addr => True/False
+  mapping(address => mapping(uint256 => mapping(address => uint256))) public override cdpCan; // Owner => CDPId => Allowed Addr => True/False
 
   mapping(address => mapping(address => uint256)) public positionCan; // Urn => Allowed Addr => True/False
 
@@ -84,17 +86,17 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     uint256 cdp,
     address usr,
     uint256 ok
-  ) public cdpAllowed(cdp) {
+  ) public override cdpAllowed(cdp) {
     cdpCan[owns[cdp]][cdp][usr] = ok;
   }
 
   // Allow/disallow a usr address to quit to the the sender urn.
-  function urnAllow(address usr, uint256 ok) public {
+  function positionAllow(address usr, uint256 ok) public override {
     positionCan[msg.sender][usr] = ok;
   }
 
   // Open a new cdp for a given usr address.
-  function open(bytes32 collateralPoolId, address usr) public returns (uint256) {
+  function open(bytes32 collateralPoolId, address usr) public override returns (uint256) {
     require(usr != address(0), "usr-address-0");
 
     cdpi = add(cdpi, 1);
@@ -118,7 +120,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
   }
 
   // Give the cdp ownership to a dst address.
-  function give(uint256 cdp, address dst) public cdpAllowed(cdp) {
+  function give(uint256 cdp, address dst) public override cdpAllowed(cdp) {
     require(dst != address(0), "dst-address-0");
     require(dst != owns[cdp], "dst-already-owner");
 
@@ -160,7 +162,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     uint256 cdp,
     int256 collateralValue,
     int256 debtShare
-  ) public cdpAllowed(cdp) {
+  ) public override cdpAllowed(cdp) {
     address positionAddress = positions[cdp];
     IBookKeeper(bookKeeper).adjustPosition(
       collateralPools[cdp],
@@ -177,7 +179,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     uint256 cdp,
     address dst,
     uint256 wad
-  ) public cdpAllowed(cdp) {
+  ) public override cdpAllowed(cdp) {
     IBookKeeper(bookKeeper).moveCollateral(collateralPools[cdp], positions[cdp], dst, wad);
   }
 
@@ -197,12 +199,12 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     uint256 cdp,
     address dst,
     uint256 rad
-  ) public cdpAllowed(cdp) {
+  ) public override cdpAllowed(cdp) {
     IBookKeeper(bookKeeper).moveStablecoin(positions[cdp], dst, rad);
   }
 
   // Quit the system, migrating the cdp (ink, art) to a different dst positionAddress
-  function quit(uint256 cdp, address dst) public cdpAllowed(cdp) positionAllowed(dst) {
+  function quit(uint256 cdp, address dst) public override cdpAllowed(cdp) positionAllowed(dst) {
     (uint256 lockedCollateral, uint256 debtShare) =
       IBookKeeper(bookKeeper).positions(collateralPools[cdp], positions[cdp]);
     IBookKeeper(bookKeeper).movePosition(
@@ -215,7 +217,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
   }
 
   // Import a position from src urn to the urn owned by cdp
-  function enter(address src, uint256 cdp) public positionAllowed(src) cdpAllowed(cdp) {
+  function enter(address src, uint256 cdp) public override positionAllowed(src) cdpAllowed(cdp) {
     (uint256 lockedCollateral, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPools[cdp], src);
     IBookKeeper(bookKeeper).movePosition(
       collateralPools[cdp],
@@ -227,7 +229,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
   }
 
   // Move a position from cdpSrc urn to the cdpDst urn
-  function shift(uint256 cdpSrc, uint256 cdpDst) public cdpAllowed(cdpSrc) cdpAllowed(cdpDst) {
+  function shift(uint256 cdpSrc, uint256 cdpDst) public override cdpAllowed(cdpSrc) cdpAllowed(cdpDst) {
     require(collateralPools[cdpSrc] == collateralPools[cdpDst], "non-matching-cdps");
     (uint256 lockedCollateral, uint256 debtShare) =
       IBookKeeper(bookKeeper).positions(collateralPools[cdpSrc], positions[cdpSrc]);
