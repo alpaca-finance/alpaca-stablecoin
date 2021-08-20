@@ -23,7 +23,11 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
 import "../../interfaces/IBookKeeper.sol";
+import "../../interfaces/IAuctioneer.sol";
+import "../../interfaces/IPriceFeed.sol";
+import "../../interfaces/IPriceOracle.sol";
 
 interface GovernmentLike {
   function moveStablecoin(
@@ -56,16 +60,6 @@ interface GovernmentLike {
   ) external;
 }
 
-interface PriceFeedLike {
-  function peek() external returns (bytes32, bool);
-}
-
-interface PriceOracleLike {
-  function stableCoinReferencePrice() external returns (uint256);
-
-  function collateralPools(bytes32) external returns (PriceFeedLike, uint256);
-}
-
 interface LiquidationEngineLike {
   function liquidationPenalty(bytes32) external returns (uint256);
 
@@ -89,7 +83,8 @@ contract CollateralAuctioneer is
   OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  IAuctioneer
 {
   // --- Auth ---
   mapping(address => uint256) public wards;
@@ -110,12 +105,12 @@ contract CollateralAuctioneer is
   }
 
   // --- Data ---
-  bytes32 public collateralPoolId; // Collateral type of this CollateralAuctioneer
+  bytes32 public override collateralPoolId; // Collateral type of this CollateralAuctioneer
   IBookKeeper public bookKeeper; // Core CDP Engine
 
   LiquidationEngineLike public liquidationEngine; // Liquidation module
   address public systemDebtEngine; // Recipient of dai raised in auctions
-  PriceOracleLike public priceOracle; // Collateral price module
+  IPriceOracle public priceOracle; // Collateral price module
   CalculatorLike public calc; // Current price calculator
 
   uint256 public startingPriceBuffer; // Multiplicative factor to increase starting price                  [ray]
@@ -136,7 +131,7 @@ contract CollateralAuctioneer is
     uint96 auctionStartBlock; // Auction start time
     uint256 startingPrice; // Starting price     [ray]
   }
-  mapping(uint256 => Sale) public sales;
+  mapping(uint256 => Sale) public override sales;
 
   uint256 internal locked;
 
@@ -197,7 +192,7 @@ contract CollateralAuctioneer is
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
-    priceOracle = PriceOracleLike(priceOracle_);
+    priceOracle = IPriceOracle(priceOracle_);
     liquidationEngine = LiquidationEngineLike(liquidationEngine_);
     collateralPoolId = collateralPoolId_;
     startingPriceBuffer = RAY;
@@ -236,7 +231,7 @@ contract CollateralAuctioneer is
   }
 
   function file(bytes32 what, address data) external auth lock {
-    if (what == "priceOracle") priceOracle = PriceOracleLike(data);
+    if (what == "priceOracle") priceOracle = IPriceOracle(data);
     else if (what == "liquidationEngine") liquidationEngine = LiquidationEngineLike(data);
     else if (what == "systemDebtEngine") systemDebtEngine = data;
     else if (what == "calc") calc = CalculatorLike(data);
@@ -284,7 +279,7 @@ contract CollateralAuctioneer is
   // if mat has changed since the last poke, the resulting value will be
   // incorrect.
   function getFeedPrice() internal returns (uint256 feedPrice) {
-    (PriceFeedLike priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
+    (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
     (bytes32 val, bool has) = priceFeed.peek();
     require(has, "CollateralAuctioneer/invalid-price");
     feedPrice = rdiv(mul(uint256(val), BLN), priceOracle.stableCoinReferencePrice());
@@ -304,7 +299,7 @@ contract CollateralAuctioneer is
     uint256 collateralAmount, // Collateral             [wad]
     address positionAddress, // Address that will receive any leftover collateral
     address liquidatorAddress // Address that will receive incentives
-  ) external auth lock isStopped(1) returns (uint256 id) {
+  ) external override auth lock isStopped(1) returns (uint256 id) {
     // Input validation
     require(debt > 0, "CollateralAuctioneer/zero-debt");
     require(collateralAmount > 0, "CollateralAuctioneer/zero-collateralAmount");
@@ -550,7 +545,7 @@ contract CollateralAuctioneer is
   }
 
   // Cancel an auction during Emergency Shutdown or via governance action.
-  function yank(uint256 id) external auth lock {
+  function yank(uint256 id) external override auth lock {
     require(sales[id].positionAddress != address(0), "CollateralAuctioneer/not-running-auction");
     liquidationEngine.removeRepaidDebtFromAuction(collateralPoolId, sales[id].debt);
     bookKeeper.moveCollateral(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
