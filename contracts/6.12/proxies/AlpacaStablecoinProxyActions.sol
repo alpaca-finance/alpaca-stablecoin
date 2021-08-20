@@ -21,22 +21,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
-
-interface TokenLike {
-  function approve(address, uint256) external;
-
-  function transfer(address, uint256) external;
-
-  function transferFrom(
-    address,
-    address,
-    uint256
-  ) external;
-
-  function deposit() external payable;
-
-  function withdraw(uint256) external;
-}
+import "../interfaces/IWBNB.sol";
+import "../interfaces/IToken.sol";
+import "../interfaces/IManager.sol";
 
 interface ManagerLike {
   function cdpCan(
@@ -100,7 +87,7 @@ interface ManagerLike {
 interface TokenAdapterLike {
   function decimals() external returns (uint256);
 
-  function collateralToken() external returns (TokenLike);
+  function collateralToken() external returns (IToken);
 
   function deposit(address, uint256) external payable;
 
@@ -110,7 +97,7 @@ interface TokenAdapterLike {
 interface FarmableTokenAdapterLike {
   function decimals() external returns (uint256);
 
-  function collateralToken() external returns (TokenLike);
+  function collateralToken() external returns (IToken);
 
   function deposit(
     address,
@@ -128,7 +115,7 @@ interface FarmableTokenAdapterLike {
 interface StablecoinAdapterLike {
   function bookKeeper() external returns (IBookKeeper);
 
-  function stablecoin() external returns (TokenLike);
+  function stablecoin() external returns (IToken);
 
   function deposit(address, uint256) external payable;
 
@@ -281,12 +268,12 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address dst,
     uint256 amt
   ) public {
-    TokenLike(collateralToken).transfer(dst, amt);
+    IToken(collateralToken).transfer(dst, amt);
   }
 
   function bnbAdapter_deposit(address apt, address positionAddress) public payable {
     // Wraps BNB in WBNB
-    TokenAdapterLike(apt).collateralToken().deposit.value(msg.value)();
+    IWBNB(address(TokenAdapterLike(apt).collateralToken())).deposit.value(msg.value)();
     // Approves adapter to take the WBNB amount
     TokenAdapterLike(apt).collateralToken().approve(address(apt), msg.value);
     // Deposits WBNB collateral into the bookKeeper
@@ -547,7 +534,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Withdraws WBNB amount to proxy address as a token
     TokenAdapterLike(bnbAdapter).withdraw(address(this), wad);
     // Converts WBNB to BNB
-    TokenAdapterLike(bnbAdapter).collateralToken().withdraw(wad);
+    IWBNB(address(TokenAdapterLike(bnbAdapter).collateralToken())).withdraw(wad);
     // Sends BNB back to the user's wallet
     msg.sender.transfer(wad);
   }
@@ -595,7 +582,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Withdraws WBNB amount to proxy address as a token
     TokenAdapterLike(bnbAdapter).withdraw(address(this), wad);
     // Converts WBNB to BNB
-    TokenAdapterLike(bnbAdapter).collateralToken().withdraw(wad);
+    IWBNB(address(TokenAdapterLike(bnbAdapter).collateralToken())).withdraw(wad);
     // Sends BNB back to the user's wallet
     msg.sender.transfer(wad);
   }
@@ -926,7 +913,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Withdraws WBNB amount to proxy address as a token
     TokenAdapterLike(bnbAdapter).withdraw(address(this), wadC);
     // Converts WBNB to BNB
-    TokenAdapterLike(bnbAdapter).collateralToken().withdraw(wadC);
+    IWBNB(address(TokenAdapterLike(bnbAdapter).collateralToken())).withdraw(wadC);
     // Sends BNB back to the user's wallet
     msg.sender.transfer(wadC);
   }
@@ -956,7 +943,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Withdraws WBNB amount to proxy address as a token
     TokenAdapterLike(bnbAdapter).withdraw(address(this), wadC);
     // Converts WBNB to BNB
-    TokenAdapterLike(bnbAdapter).collateralToken().withdraw(wadC);
+    IWBNB(address(TokenAdapterLike(bnbAdapter).collateralToken())).withdraw(wadC);
     // Sends BNB back to the user's wallet
     msg.sender.transfer(wadC);
   }
