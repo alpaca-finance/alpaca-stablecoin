@@ -92,7 +92,7 @@ contract LiquidationEngine is
     address auctioneer,
     uint256 indexed id
   );
-  event Digs(bytes32 indexed collateralPoolId, uint256 rad);
+  event RemoveRepaidDebtFromAuction(bytes32 indexed collateralPoolId, uint256 rad);
   event Cage();
 
   // --- Init ---
@@ -306,7 +306,7 @@ contract LiquidationEngine is
       collateralPools[collateralPoolId].stablecoinNeededForDebtRepay,
       rad
     );
-    emit Digs(collateralPoolId, rad);
+    emit RemoveRepaidDebtFromAuction(collateralPoolId, rad);
   }
 
   function cage() external override auth {
