@@ -29,12 +29,9 @@ import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IAuctioneer.sol";
 import "../../interfaces/IPriceFeed.sol";
 import "../../interfaces/IPriceOracle.sol";
-
-interface LiquidationEngineLike {
-  function liquidationPenalty(bytes32) external returns (uint256);
-
-  function removeRepaidDebtFromAuction(bytes32, uint256) external;
-}
+import "../../interfaces/ILiquidationEngine.sol";
+import "../../interfaces/IFarmableTokenAdapter.sol";
+import "../../interfaces/ICalculator.sol";
 
 interface FlashLendingCallee {
   function flashLendingCall(
@@ -43,26 +40,6 @@ interface FlashLendingCallee {
     uint256,
     bytes calldata
   ) external;
-}
-
-interface CalculatorLike {
-  function price(uint256, uint256) external view returns (uint256);
-}
-
-interface FarmableTokenAdapterLike {
-  function deposit(
-    address,
-    address,
-    uint256
-  ) external;
-
-  function moveRewards(
-    address,
-    address,
-    uint256
-  ) external;
-
-  function collateralPoolId() external view returns (bytes32);
 }
 
 interface ProxyLike {
@@ -97,12 +74,12 @@ contract FarmableTokenAuctioneer is
   // --- Data ---
   bytes32 public override collateralPoolId; // Collateral type of this CollateralAuctioneer
   IBookKeeper public bookKeeper; // Core CDP Engine
-  FarmableTokenAdapterLike public farmableTokenAdapter;
+  IFarmableTokenAdapter public farmableTokenAdapter;
 
-  LiquidationEngineLike public liquidationEngine; // Liquidation module
+  ILiquidationEngine public liquidationEngine; // Liquidation module
   address public systemDebtEngine; // Recipient of dai raised in auctions
   IPriceOracle public priceOracle; // Collateral price module
-  CalculatorLike public calc; // Current price calculator
+  ICalculator public calc; // Current price calculator
 
   uint256 public startingPriceBuffer; // Multiplicative factor to increase starting price                  [ray]
   uint256 public auctionTimeLimit; // Time elapsed before auction reset                                 [seconds]
@@ -184,9 +161,9 @@ contract FarmableTokenAuctioneer is
 
     bookKeeper = IBookKeeper(_bookKeeper);
     priceOracle = IPriceOracle(priceOracle_);
-    liquidationEngine = LiquidationEngineLike(liquidationEngine_);
-    farmableTokenAdapter = FarmableTokenAdapterLike(farmableTokenAdapter_);
-    collateralPoolId = FarmableTokenAdapterLike(farmableTokenAdapter_).collateralPoolId();
+    liquidationEngine = ILiquidationEngine(liquidationEngine_);
+    farmableTokenAdapter = IFarmableTokenAdapter(farmableTokenAdapter_);
+    collateralPoolId = IFarmableTokenAdapter(farmableTokenAdapter_).collateralPoolId();
     startingPriceBuffer = RAY;
     wards[msg.sender] = 1;
     emit Rely(msg.sender);
@@ -224,9 +201,9 @@ contract FarmableTokenAuctioneer is
 
   function file(bytes32 what, address data) external auth lock {
     if (what == "priceOracle") priceOracle = IPriceOracle(data);
-    else if (what == "liquidationEngine") liquidationEngine = LiquidationEngineLike(data);
+    else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
     else if (what == "systemDebtEngine") systemDebtEngine = data;
-    else if (what == "calc") calc = CalculatorLike(data);
+    else if (what == "calc") calc = ICalculator(data);
     else revert("CollateralAuctioneer/file-unrecognized-param");
     emit File(what, data);
   }
@@ -460,7 +437,7 @@ contract FarmableTokenAuctioneer is
       // Do external call (if data is defined) but to be
       // extremely careful we don't allow to do it to the two
       // contracts which the CollateralAuctioneer needs to be authorized
-      LiquidationEngineLike liquidationEngine_ = liquidationEngine;
+      ILiquidationEngine liquidationEngine_ = liquidationEngine;
       if (
         data.length > 0 &&
         collateralRecipient != address(bookKeeper) &&
