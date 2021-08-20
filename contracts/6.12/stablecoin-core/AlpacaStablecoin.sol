@@ -47,10 +47,10 @@ contract AlpacaStablecoin is IStablecoin, OwnableUpgradeable, PausableUpgradeabl
   string public constant name = "Alpaca USD Stablecoin";
   string public constant symbol = "AUSD";
   string public constant version = "1";
-  uint8 public constant decimals = 18;
+  uint256 public constant override decimals = 18;
   uint256 public totalSupply;
 
-  mapping(address => uint256) public balanceOf;
+  mapping(address => uint256) public override balanceOf;
   mapping(address => mapping(address => uint256)) public allowance;
   mapping(address => uint256) public nonces;
 
@@ -89,7 +89,7 @@ contract AlpacaStablecoin is IStablecoin, OwnableUpgradeable, PausableUpgradeabl
   }
 
   // --- Token ---
-  function transfer(address dst, uint256 wad) external returns (bool) {
+  function transfer(address dst, uint256 wad) external override returns (bool) {
     return transferFrom(msg.sender, dst, wad);
   }
 
@@ -97,7 +97,7 @@ contract AlpacaStablecoin is IStablecoin, OwnableUpgradeable, PausableUpgradeabl
     address src,
     address dst,
     uint256 wad
-  ) public returns (bool) {
+  ) public override returns (bool) {
     require(balanceOf[src] >= wad, "AlpacaStablecoin/insufficient-balance");
     if (src != msg.sender && allowance[src][msg.sender] != uint256(-1)) {
       require(allowance[src][msg.sender] >= wad, "AlpacaStablecoin/insufficient-allowance");
@@ -126,7 +126,7 @@ contract AlpacaStablecoin is IStablecoin, OwnableUpgradeable, PausableUpgradeabl
     emit Transfer(usr, address(0), wad);
   }
 
-  function approve(address usr, uint256 wad) external returns (bool) {
+  function approve(address usr, uint256 wad) external override returns (bool) {
     allowance[msg.sender][usr] = wad;
     emit Approval(msg.sender, usr, wad);
     return true;

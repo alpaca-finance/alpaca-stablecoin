@@ -24,22 +24,11 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "../../interfaces/IBookKeeper.sol";
+import "../../interfaces/IToken.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
-
-interface TokenLike {
-  function decimals() external view returns (uint256);
-
-  function transfer(address, uint256) external returns (bool);
-
-  function transferFrom(
-    address,
-    address,
-    uint256
-  ) external returns (bool);
-}
 
 /*
     Here we provide *adapters* to connect the BookKeeper to arbitrary external
@@ -84,7 +73,7 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
 
   IBookKeeper public bookKeeper; // CDP Engine
   bytes32 public collateralPoolId; // Collateral Type
-  TokenLike public collateralToken;
+  IToken public collateralToken;
   uint256 public decimals;
   uint256 public live; // Active Flag
 
@@ -102,7 +91,7 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
-    collateralToken = TokenLike(collateralToken_);
+    collateralToken = IToken(collateralToken_);
     decimals = collateralToken.decimals();
   }
 
