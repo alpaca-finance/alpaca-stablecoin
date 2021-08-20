@@ -27,43 +27,15 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IAuctioneer.sol";
-
-interface LiquidationEngineLike {
-  function collateralPools(bytes32)
-    external
-    returns (
-      address auctioneer,
-      uint256 liquidationPenalty,
-      uint256 liquidationMaxSize,
-      uint256 stablecoinNeededForDebtRepay
-    );
-
-  function cage() external;
-}
+import "../interfaces/ILiquidationEngine.sol";
+import "../interfaces/IPriceFeed.sol";
+import "../interfaces/IPriceOracle.sol";
 
 interface StablecoinSavingsLike {
   function cage() external;
 }
 
 interface SystemDebtEngine {
-  function cage() external;
-}
-
-interface PriceFeedLike {
-  function read() external view returns (bytes32);
-}
-
-interface PriceOracleLike {
-  function par() external view returns (uint256);
-
-  function collateralPools(bytes32)
-    external
-    view
-    returns (
-      PriceFeedLike priceFeed,
-      uint256 liquidationRatio // [ray]
-    );
-
   function cage() external;
 }
 
@@ -203,10 +175,10 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
 
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
-  LiquidationEngineLike public liquidationEngine;
+  ILiquidationEngine public liquidationEngine;
   SystemDebtEngine public systemDebtEngine; // Debt Engine
   StablecoinSavingsLike public stablecoinSavings;
-  PriceOracleLike public priceOracle;
+  IPriceOracle public priceOracle;
 
   uint256 public live; // Active Flag
   uint256 public when; // Time of cage                   [unix epoch time]
@@ -296,10 +268,10 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   function file(bytes32 what, address data) external auth {
     require(live == 1, "End/not-live");
     if (what == "bookKeeper") bookKeeper = IBookKeeper(data);
-    else if (what == "liquidationEngine") liquidationEngine = LiquidationEngineLike(data);
+    else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
     else if (what == "systemDebtEngine") systemDebtEngine = SystemDebtEngine(data);
     else if (what == "stablecoinSavings") stablecoinSavings = StablecoinSavingsLike(data);
-    else if (what == "priceOracle") priceOracle = PriceOracleLike(data);
+    else if (what == "priceOracle") priceOracle = IPriceOracle(data);
     else revert("End/file-unrecognized-param");
     emit File(what, data);
   }
@@ -328,9 +300,9 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     require(live == 0, "End/still-live");
     require(cagePrice[collateralPoolId] == 0, "End/cagePrice-collateralPoolId-already-defined");
     (totalDebtShare[collateralPoolId], , , , ) = bookKeeper.collateralPools(collateralPoolId);
-    (PriceFeedLike priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
+    (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
     // par is a ray, priceFeed returns a wad
-    cagePrice[collateralPoolId] = wdiv(priceOracle.par(), uint256(priceFeed.read()));
+    cagePrice[collateralPoolId] = wdiv(priceOracle.stableCoinReferencePrice(), uint256(priceFeed.read()));
     emit Cage(collateralPoolId);
   }
 
