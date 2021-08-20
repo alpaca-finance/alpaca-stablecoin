@@ -28,16 +28,8 @@ import "../interfaces/ITokenAdapter.sol";
 import "../interfaces/IFarmableTokenAdapter.sol";
 import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IStabilityFeeCollector.sol";
-
-interface ProxyRegistryLike {
-  function proxies(address) external view returns (address);
-
-  function build(address) external returns (address);
-}
-
-interface ProxyLike {
-  function owner() external view returns (address);
-}
+import "../interfaces/IProxyRegistry.sol";
+import "../interfaces/IProxy.sol";
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // WARNING: These functions meant to be used as a a library for a DSProxy. Some are unsafe if you call them directly.
@@ -242,9 +234,9 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address dst
   ) public {
     // Gets actual proxy address
-    address proxy = ProxyRegistryLike(proxyRegistry).proxies(dst);
+    address proxy = IProxyRegistry(proxyRegistry).proxies(dst);
     // Checks if the proxy address already existed and dst address is still the owner
-    if (proxy == address(0) || ProxyLike(proxy).owner() != dst) {
+    if (proxy == address(0) || IProxy(proxy).owner() != dst) {
       uint256 csize;
       assembly {
         csize := extcodesize(dst)
@@ -252,7 +244,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       // We want to avoid creating a proxy for a contract address that might not be able to handle proxies, then losing the CDP
       require(csize == 0, "Dst-is-a-contract");
       // Creates the proxy for the dst address
-      proxy = ProxyRegistryLike(proxyRegistry).build(dst);
+      proxy = IProxyRegistry(proxyRegistry).build(dst);
     }
     // Transfers CDP to the dst proxy
     give(manager, cdp, proxy);
