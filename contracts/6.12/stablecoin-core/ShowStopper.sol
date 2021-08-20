@@ -30,14 +30,8 @@ import "../interfaces/IAuctioneer.sol";
 import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IPriceOracle.sol";
-
-interface StablecoinSavingsLike {
-  function cage() external;
-}
-
-interface SystemDebtEngine {
-  function cage() external;
-}
+import "../interfaces/IStablecoinSavings.sol";
+import "../interfaces/ISystemDebtEngine.sol";
 
 /*
     This is the `End` and it coordinates Global Settlement. This is an
@@ -176,8 +170,8 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
   ILiquidationEngine public liquidationEngine;
-  SystemDebtEngine public systemDebtEngine; // Debt Engine
-  StablecoinSavingsLike public stablecoinSavings;
+  ISystemDebtEngine public systemDebtEngine; // Debt Engine
+  IStablecoinSavings public stablecoinSavings;
   IPriceOracle public priceOracle;
 
   uint256 public live; // Active Flag
@@ -269,8 +263,8 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     require(live == 1, "End/not-live");
     if (what == "bookKeeper") bookKeeper = IBookKeeper(data);
     else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
-    else if (what == "systemDebtEngine") systemDebtEngine = SystemDebtEngine(data);
-    else if (what == "stablecoinSavings") stablecoinSavings = StablecoinSavingsLike(data);
+    else if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
+    else if (what == "stablecoinSavings") stablecoinSavings = IStablecoinSavings(data);
     else if (what == "priceOracle") priceOracle = IPriceOracle(data);
     else revert("End/file-unrecognized-param");
     emit File(what, data);
