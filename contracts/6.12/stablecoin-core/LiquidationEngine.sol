@@ -24,60 +24,17 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-interface CollateralAuctioneerLike {
-  function collateralPoolId() external view returns (bytes32);
-
-  function startAuction(
-    uint256 debt,
-    uint256 collateralAmount,
-    address positionAddress,
-    address liquidatorAddress
-  ) external returns (uint256);
-}
-
-interface GovernmentLike {
-  function collateralPools(bytes32)
-    external
-    view
-    returns (
-      uint256 totalDebtShare, // [wad]
-      uint256 debtAccumulatedRate, // [ray]
-      uint256 priceWithSafetyMargin, // [ray]
-      uint256 line, // [rad]
-      uint256 debtFloor // [rad]
-    );
-
-  function positions(bytes32, address)
-    external
-    view
-    returns (
-      uint256 lockedCollateral, // [wad]
-      uint256 debtShare // [wad]
-    );
-
-  function confiscate(
-    bytes32,
-    address,
-    address,
-    address,
-    int256,
-    int256
-  ) external;
-
-  function hope(address) external;
-
-  function nope(address) external;
-}
-
-interface SystemDebtEngine {
-  function pushToBadDebtQueue(uint256) external;
-}
+import "../interfaces/IBookKeeper.sol";
+import "../interfaces/IAuctioneer.sol";
+import "../interfaces/ILiquidationEngine.sol";
+import "../interfaces/ISystemDebtEngine.sol";
 
 contract LiquidationEngine is
   OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  ILiquidationEngine
 {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
@@ -105,11 +62,11 @@ contract LiquidationEngine is
     uint256 stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions per collateralPool [rad]
   }
 
-  GovernmentLike public government; // CDP Engine
+  IBookKeeper public bookKeeper; // CDP Engine
 
-  mapping(bytes32 => CollateralPool) public collateralPools;
+  mapping(bytes32 => CollateralPool) public override collateralPools;
 
-  SystemDebtEngine public systemDebtEngine; // Debt Engine
+  ISystemDebtEngine public systemDebtEngine; // Debt Engine
   uint256 public live; // Active Flag
   uint256 public liquidationMaxSize; // Max DAI needed to cover debt+fees of active auctions [rad]
   uint256 public stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions [rad]
@@ -132,17 +89,17 @@ contract LiquidationEngine is
     address auctioneer,
     uint256 indexed id
   );
-  event Digs(bytes32 indexed collateralPoolId, uint256 rad);
+  event RemoveRepaidDebtFromAuction(bytes32 indexed collateralPoolId, uint256 rad);
   event Cage();
 
   // --- Init ---
-  function initialize(address government_) external initializer {
+  function initialize(address _bookKeeper) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    government = GovernmentLike(government_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     live = 1;
     whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
@@ -169,7 +126,7 @@ contract LiquidationEngine is
 
   // --- Administration ---
   function file(bytes32 what, address data) external auth {
-    if (what == "systemDebtEngine") systemDebtEngine = SystemDebtEngine(data);
+    if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
     else revert("LiquidationEngine/file-unrecognized-param");
     emit File(what, data);
   }
@@ -200,7 +157,7 @@ contract LiquidationEngine is
   ) external auth {
     if (what == "auctioneer") {
       require(
-        collateralPoolId == CollateralAuctioneerLike(auctioneer).collateralPoolId(),
+        collateralPoolId == IAuctioneer(auctioneer).collateralPoolId(),
         "LiquidationEngine/file-collateralPoolId-neq-auctioneer.collateralPoolId"
       );
       collateralPools[collateralPoolId].auctioneer = auctioneer;
@@ -208,7 +165,7 @@ contract LiquidationEngine is
     emit File(collateralPoolId, what, auctioneer);
   }
 
-  function liquidationPenalty(bytes32 collateralPoolId) external view returns (uint256) {
+  function liquidationPenalty(bytes32 collateralPoolId) external view override returns (uint256) {
     return collateralPools[collateralPoolId].liquidationPenalty;
   }
 
@@ -234,14 +191,14 @@ contract LiquidationEngine is
     require(live == 1, "LiquidationEngine/not-live");
 
     (uint256 positionLockedCollateral, uint256 positionDebtShare) =
-      government.positions(collateralPoolId, positionAddress);
+      bookKeeper.positions(collateralPoolId, positionAddress);
     CollateralPool memory mcollateralPool = collateralPools[collateralPoolId];
     uint256 debtShareToBeLiquidated;
     uint256 debtAccumulatedRate;
     uint256 debtFloor;
     {
       uint256 priceWithSafetyMargin;
-      (, debtAccumulatedRate, priceWithSafetyMargin, , debtFloor) = government.collateralPools(collateralPoolId);
+      (, debtAccumulatedRate, priceWithSafetyMargin, , debtFloor) = bookKeeper.collateralPools(collateralPoolId);
       require(
         priceWithSafetyMargin > 0 &&
           mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate),
@@ -295,7 +252,7 @@ contract LiquidationEngine is
       "LiquidationEngine/overflow"
     );
 
-    government.confiscate(
+    bookKeeper.confiscatePosition(
       collateralPoolId,
       positionAddress,
       mcollateralPool.auctioneer,
@@ -321,7 +278,7 @@ contract LiquidationEngine is
         debtValueToBeLiquidatedWithPenalty
       );
 
-      id = CollateralAuctioneerLike(mcollateralPool.auctioneer).startAuction({
+      id = IAuctioneer(mcollateralPool.auctioneer).startAuction({
         debt: debtValueToBeLiquidatedWithPenalty,
         collateralAmount: collateralAmountToBeLiquidated,
         positionAddress: positionAddress,
@@ -340,16 +297,16 @@ contract LiquidationEngine is
     );
   }
 
-  function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external auth {
+  function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override auth {
     stablecoinNeededForDebtRepay = sub(stablecoinNeededForDebtRepay, rad);
     collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = sub(
       collateralPools[collateralPoolId].stablecoinNeededForDebtRepay,
       rad
     );
-    emit Digs(collateralPoolId, rad);
+    emit RemoveRepaidDebtFromAuction(collateralPoolId, rad);
   }
 
-  function cage() external auth {
+  function cage() external override auth {
     live = 0;
     emit Cage();
   }

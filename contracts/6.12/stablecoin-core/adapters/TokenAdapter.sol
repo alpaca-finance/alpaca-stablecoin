@@ -24,45 +24,17 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
+import "../../interfaces/IBookKeeper.sol";
+import "../../interfaces/IToken.sol";
+import "../../interfaces/ITokenAdapter.sol";
+
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface TokenLike {
-  function decimals() external view returns (uint256);
-
-  function transfer(address, uint256) external returns (bool);
-
-  function transferFrom(
-    address,
-    address,
-    uint256
-  ) external returns (bool);
-}
-
-interface StablecoinLike {
-  function mint(address, uint256) external;
-
-  function burn(address, uint256) external;
-}
-
-interface GovernmentLike {
-  function addCollateral(
-    bytes32,
-    address,
-    int256
-  ) external;
-
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-}
-
 /*
-    Here we provide *adapters* to connect the Government to arbitrary external
-    token implementations, creating a bounded context for the Government. The
+    Here we provide *adapters* to connect the BookKeeper to arbitrary external
+    token implementations, creating a bounded context for the BookKeeper. The
     adapters here are provided as working examples:
 
       - `TokenAdapter`: For well behaved ERC20 tokens, with simple transfer
@@ -84,7 +56,13 @@ interface GovernmentLike {
 
 */
 
-contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
+contract TokenAdapter is
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable,
+  ITokenAdapter
+{
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -101,14 +79,14 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     _;
   }
 
-  GovernmentLike public government; // CDP Engine
+  IBookKeeper public bookKeeper; // CDP Engine
   bytes32 public collateralPoolId; // Collateral Type
-  TokenLike public collateralToken;
-  uint256 public decimals;
+  IToken public override collateralToken;
+  uint256 public override decimals;
   uint256 public live; // Active Flag
 
   function initialize(
-    address government_,
+    address _bookKeeper,
     bytes32 collateralPoolId_,
     address collateralToken_
   ) external initializer {
@@ -119,9 +97,9 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
 
     wards[msg.sender] = 1;
     live = 1;
-    government = GovernmentLike(government_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
-    collateralToken = TokenLike(collateralToken_);
+    collateralToken = IToken(collateralToken_);
     decimals = collateralToken.decimals();
   }
 
@@ -129,16 +107,16 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     live = 0;
   }
 
-  function deposit(address usr, uint256 wad) external nonReentrant {
+  function deposit(address usr, uint256 wad) external payable override nonReentrant {
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
-    government.addCollateral(collateralPoolId, usr, int256(wad));
+    bookKeeper.addCollateral(collateralPoolId, usr, int256(wad));
     require(collateralToken.transferFrom(msg.sender, address(this), wad), "TokenAdapter/failed-transfer");
   }
 
-  function withdraw(address usr, uint256 wad) external nonReentrant {
+  function withdraw(address usr, uint256 wad) external override nonReentrant {
     require(wad <= 2**255, "TokenAdapter/overflow");
-    government.addCollateral(collateralPoolId, msg.sender, -int256(wad));
+    bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
     require(collateralToken.transfer(usr, wad), "TokenAdapter/failed-transfer");
   }
 }

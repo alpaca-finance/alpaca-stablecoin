@@ -25,115 +25,13 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
-interface GovernmentLike {
-  function stablecoin(address) external view returns (uint256);
-
-  function collateralPools(bytes32 collateralPoolId)
-    external
-    returns (
-      uint256 totalDebtShare, // [wad]
-      uint256 debtAccumulatedRate, // [ray]
-      uint256 priceWithSafetyMargin, // [ray]
-      uint256 debtCeiling, // [rad]
-      uint256 debtFloor // [rad]
-    );
-
-  function positions(bytes32 collateralPoolId, address urn)
-    external
-    returns (
-      uint256 lockedCollateral, // [wad]
-      uint256 debtShare // [wad]
-    );
-
-  function debt() external returns (uint256);
-
-  function moveStablecoin(
-    address src,
-    address dst,
-    uint256 rad
-  ) external;
-
-  function hope(address) external;
-
-  function moveCollateral(
-    bytes32 collateralPoolId,
-    address src,
-    address dst,
-    uint256 rad
-  ) external;
-
-  function grab(
-    bytes32 i,
-    address u,
-    address v,
-    address w,
-    int256 dink,
-    int256 dart
-  ) external;
-
-  function mintUnbackedStablecoin(
-    address u,
-    address v,
-    uint256 rad
-  ) external;
-
-  function cage() external;
-}
-
-interface LiquidationEngineLike {
-  function collateralPools(bytes32)
-    external
-    returns (
-      address auctioneer,
-      uint256 liquidationPenalty,
-      uint256 liquidationMaxSize,
-      uint256 stablecoinNeededForDebtRepay
-    );
-
-  function cage() external;
-}
-
-interface StablecoinSavingsLike {
-  function cage() external;
-}
-
-interface SystemDebtEngine {
-  function cage() external;
-}
-
-interface CollateralAuctioneerLike {
-  function sales(uint256 id)
-    external
-    view
-    returns (
-      uint256 pos,
-      uint256 debt,
-      uint256 collateralAmount,
-      address positionAddress,
-      uint96 auctionStartBlock,
-      uint256 startingPrice
-    );
-
-  function yank(uint256 id) external;
-}
-
-interface PriceFeedLike {
-  function read() external view returns (bytes32);
-}
-
-interface PriceOracleLike {
-  function par() external view returns (uint256);
-
-  function collateralPools(bytes32)
-    external
-    view
-    returns (
-      PriceFeedLike priceFeed,
-      uint256 liquidationRatio // [ray]
-    );
-
-  function cage() external;
-}
+import "../interfaces/IBookKeeper.sol";
+import "../interfaces/IAuctioneer.sol";
+import "../interfaces/ILiquidationEngine.sol";
+import "../interfaces/IPriceFeed.sol";
+import "../interfaces/IPriceOracle.sol";
+import "../interfaces/IStablecoinSavings.sol";
+import "../interfaces/ISystemDebtEngine.sol";
 
 /*
     This is the `End` and it coordinates Global Settlement. This is an
@@ -270,11 +168,11 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   }
 
   // --- Data ---
-  GovernmentLike public government; // CDP Engine
-  LiquidationEngineLike public liquidationEngine;
-  SystemDebtEngine public systemDebtEngine; // Debt Engine
-  StablecoinSavingsLike public stablecoinSavings;
-  PriceOracleLike public priceOracle;
+  IBookKeeper public bookKeeper; // CDP Engine
+  ILiquidationEngine public liquidationEngine;
+  ISystemDebtEngine public systemDebtEngine; // Debt Engine
+  IStablecoinSavings public stablecoinSavings;
+  IPriceOracle public priceOracle;
 
   uint256 public live; // Active Flag
   uint256 public when; // Time of cage                   [unix epoch time]
@@ -363,11 +261,11 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   // --- Administration ---
   function file(bytes32 what, address data) external auth {
     require(live == 1, "End/not-live");
-    if (what == "government") government = GovernmentLike(data);
-    else if (what == "liquidationEngine") liquidationEngine = LiquidationEngineLike(data);
-    else if (what == "systemDebtEngine") systemDebtEngine = SystemDebtEngine(data);
-    else if (what == "stablecoinSavings") stablecoinSavings = StablecoinSavingsLike(data);
-    else if (what == "priceOracle") priceOracle = PriceOracleLike(data);
+    if (what == "bookKeeper") bookKeeper = IBookKeeper(data);
+    else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
+    else if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
+    else if (what == "stablecoinSavings") stablecoinSavings = IStablecoinSavings(data);
+    else if (what == "priceOracle") priceOracle = IPriceOracle(data);
     else revert("End/file-unrecognized-param");
     emit File(what, data);
   }
@@ -384,7 +282,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     require(live == 1, "End/not-live");
     live = 0;
     when = block.timestamp;
-    government.cage();
+    bookKeeper.cage();
     liquidationEngine.cage();
     systemDebtEngine.cage();
     priceOracle.cage();
@@ -395,10 +293,10 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   function cage(bytes32 collateralPoolId) external {
     require(live == 0, "End/still-live");
     require(cagePrice[collateralPoolId] == 0, "End/cagePrice-collateralPoolId-already-defined");
-    (totalDebtShare[collateralPoolId], , , , ) = government.collateralPools(collateralPoolId);
-    (PriceFeedLike priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
+    (totalDebtShare[collateralPoolId], , , , ) = bookKeeper.collateralPools(collateralPoolId);
+    (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
     // par is a ray, priceFeed returns a wad
-    cagePrice[collateralPoolId] = wdiv(priceOracle.par(), uint256(priceFeed.read()));
+    cagePrice[collateralPoolId] = wdiv(priceOracle.stableCoinReferencePrice(), uint256(priceFeed.read()));
     emit Cage(collateralPoolId);
   }
 
@@ -406,49 +304,70 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
 
     (address _auctioneer, , , ) = liquidationEngine.collateralPools(collateralPoolId);
-    CollateralAuctioneerLike auctioneer = CollateralAuctioneerLike(_auctioneer);
-    (, uint256 debtAccumulatedRate, , , ) = government.collateralPools(collateralPoolId);
+    IAuctioneer auctioneer = IAuctioneer(_auctioneer);
+    (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
     (, uint256 tab, uint256 lot, address usr, , ) = auctioneer.sales(id);
 
-    government.mintUnbackedStablecoin(address(systemDebtEngine), address(systemDebtEngine), tab);
+    bookKeeper.mintUnbackedStablecoin(address(systemDebtEngine), address(systemDebtEngine), tab);
     auctioneer.yank(id);
 
     uint256 debtShare = tab / debtAccumulatedRate;
     totalDebtShare[collateralPoolId] = add(totalDebtShare[collateralPoolId], debtShare);
     require(int256(lot) >= 0 && int256(debtShare) >= 0, "End/overflow");
-    government.grab(collateralPoolId, usr, address(this), address(systemDebtEngine), int256(lot), int256(debtShare));
+    bookKeeper.confiscatePosition(
+      collateralPoolId,
+      usr,
+      address(this),
+      address(systemDebtEngine),
+      int256(lot),
+      int256(debtShare)
+    );
     emit Snip(collateralPoolId, id, usr, tab, lot, debtShare);
   }
 
   function skim(bytes32 collateralPoolId, address urn) external {
     require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
-    (, uint256 debtAccumulatedRate, , , ) = government.collateralPools(collateralPoolId);
-    (uint256 lockedCollateral, uint256 debtShare) = government.positions(collateralPoolId, urn);
+    (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
+    (uint256 lockedCollateral, uint256 debtShare) = bookKeeper.positions(collateralPoolId, urn);
 
     uint256 owe = rmul(rmul(debtShare, debtAccumulatedRate), cagePrice[collateralPoolId]);
     uint256 wad = min(lockedCollateral, owe);
     shortfall[collateralPoolId] = add(shortfall[collateralPoolId], sub(owe, wad));
 
     require(wad <= 2**255 && debtShare <= 2**255, "End/overflow");
-    government.grab(collateralPoolId, urn, address(this), address(systemDebtEngine), -int256(wad), -int256(debtShare));
+    bookKeeper.confiscatePosition(
+      collateralPoolId,
+      urn,
+      address(this),
+      address(systemDebtEngine),
+      -int256(wad),
+      -int256(debtShare)
+    );
     emit Skim(collateralPoolId, urn, wad, debtShare);
   }
 
   function free(bytes32 collateralPoolId) external {
     require(live == 0, "End/still-live");
-    (uint256 lockedCollateral, uint256 debtShare) = government.positions(collateralPoolId, msg.sender);
+    (uint256 lockedCollateral, uint256 debtShare) = bookKeeper.positions(collateralPoolId, msg.sender);
     require(debtShare == 0, "End/debtShare-not-zero");
     require(lockedCollateral <= 2**255, "End/overflow");
-    government.grab(collateralPoolId, msg.sender, msg.sender, address(systemDebtEngine), -int256(lockedCollateral), 0);
+    bookKeeper.confiscatePosition(
+      collateralPoolId,
+      msg.sender,
+      msg.sender,
+      address(systemDebtEngine),
+      -int256(lockedCollateral),
+      0
+    );
     emit Free(collateralPoolId, msg.sender, lockedCollateral);
   }
 
   function thaw() external {
     require(live == 0, "End/still-live");
     require(debt == 0, "End/debt-not-zero");
-    require(government.stablecoin(address(systemDebtEngine)) == 0, "End/surplus-not-zero");
+    require(bookKeeper.stablecoin(address(systemDebtEngine)) == 0, "End/surplus-not-zero");
     require(block.timestamp >= add(when, wait), "End/wait-not-finished");
-    debt = government.debt();
+    debt = bookKeeper.totalStablecoinIssued();
     emit Thaw();
   }
 
@@ -456,7 +375,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     require(debt != 0, "End/debt-zero");
     require(finalCashPrice[collateralPoolId] == 0, "End/finalCashPrice-collateralPoolId-already-defined");
 
-    (, uint256 debtAccumulatedRate, , , ) = government.collateralPools(collateralPoolId);
+    (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
     uint256 wad = rmul(rmul(totalDebtShare[collateralPoolId], debtAccumulatedRate), cagePrice[collateralPoolId]);
     finalCashPrice[collateralPoolId] = mul(sub(wad, shortfall[collateralPoolId]), RAY) / (debt / RAY);
     emit Flow(collateralPoolId);
@@ -464,14 +383,14 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
 
   function pack(uint256 wad) external {
     require(debt != 0, "End/debt-zero");
-    government.moveStablecoin(msg.sender, address(systemDebtEngine), mul(wad, RAY));
+    bookKeeper.moveStablecoin(msg.sender, address(systemDebtEngine), mul(wad, RAY));
     bag[msg.sender] = add(bag[msg.sender], wad);
     emit Pack(msg.sender, wad);
   }
 
   function cash(bytes32 collateralPoolId, uint256 wad) external {
     require(finalCashPrice[collateralPoolId] != 0, "End/finalCashPrice-collateralPoolId-not-defined");
-    government.moveCollateral(collateralPoolId, address(this), msg.sender, rmul(wad, finalCashPrice[collateralPoolId]));
+    bookKeeper.moveCollateral(collateralPoolId, address(this), msg.sender, rmul(wad, finalCashPrice[collateralPoolId]));
     out[collateralPoolId][msg.sender] = add(out[collateralPoolId][msg.sender], wad);
     require(out[collateralPoolId][msg.sender] <= bag[msg.sender], "End/insufficient-bag-balance");
     emit Cash(collateralPoolId, msg.sender, wad);

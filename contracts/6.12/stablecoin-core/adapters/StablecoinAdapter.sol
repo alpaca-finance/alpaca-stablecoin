@@ -23,46 +23,18 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "../../interfaces/IStablecoin.sol";
+import "../../interfaces/IBookKeeper.sol";
+import "../../interfaces/IToken.sol";
+import "../../interfaces/IStablecoinAdapter.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface TokenLike {
-  function decimals() external view returns (uint256);
-
-  function transfer(address, uint256) external returns (bool);
-
-  function transferFrom(
-    address,
-    address,
-    uint256
-  ) external returns (bool);
-}
-
-interface StablecoinLike {
-  function mint(address, uint256) external;
-
-  function burn(address, uint256) external;
-}
-
-interface GovernmentLike {
-  function addCollateral(
-    bytes32,
-    address,
-    int256
-  ) external;
-
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-}
-
 /*
-    Here we provide *adapters* to connect the Government to arbitrary external
-    token implementations, creating a bounded context for the Government. The
+    Here we provide *adapters* to connect the BookKeeper to arbitrary external
+    token implementations, creating a bounded context for the BookKeeper. The
     adapters here are provided as working examples:
 
       - `TokenAdapter`: For well behaved ERC20 tokens, with simple transfer
@@ -88,7 +60,8 @@ contract StablecoinAdapter is
   OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  IStablecoinAdapter
 {
   // --- Auth ---
   mapping(address => uint256) public wards;
@@ -106,11 +79,11 @@ contract StablecoinAdapter is
     _;
   }
 
-  GovernmentLike public government; // CDP Engine
-  StablecoinLike public stablecoin; // Stablecoin Token
+  IBookKeeper public override bookKeeper; // CDP Engine
+  IStablecoin public override stablecoin; // Stablecoin Token
   uint256 public live; // Active Flag
 
-  function initialize(address government_, address stablecoin_) external initializer {
+  function initialize(address _bookKeeper, address stablecoin_) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
@@ -118,8 +91,8 @@ contract StablecoinAdapter is
 
     wards[msg.sender] = 1;
     live = 1;
-    government = GovernmentLike(government_);
-    stablecoin = StablecoinLike(stablecoin_);
+    bookKeeper = IBookKeeper(_bookKeeper);
+    stablecoin = IStablecoin(stablecoin_);
   }
 
   function cage() external auth {
@@ -132,14 +105,14 @@ contract StablecoinAdapter is
     require(y == 0 || (z = x * y) / y == x);
   }
 
-  function deposit(address usr, uint256 wad) external nonReentrant {
-    government.moveStablecoin(address(this), usr, mul(ONE, wad));
+  function deposit(address usr, uint256 wad) external payable override nonReentrant {
+    bookKeeper.moveStablecoin(address(this), usr, mul(ONE, wad));
     stablecoin.burn(msg.sender, wad);
   }
 
-  function withdraw(address usr, uint256 wad) external nonReentrant {
+  function withdraw(address usr, uint256 wad) external override nonReentrant {
     require(live == 1, "StablecoinAdapter/not-live");
-    government.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
+    bookKeeper.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
     stablecoin.mint(usr, wad);
   }
 }

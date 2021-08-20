@@ -24,71 +24,20 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-interface GovernmentLike {
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-
-  function moveCollateral(
-    bytes32,
-    address,
-    address,
-    uint256
-  ) external;
-
-  function collateralPools(bytes32)
-    external
-    returns (
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    );
-
-  function mintUnbackedStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-}
-
-interface PriceFeedLike {
-  function peek() external returns (bytes32, bool);
-}
-
-interface PriceOracleLike {
-  function stableCoinReferencePrice() external returns (uint256);
-
-  function collateralPools(bytes32) external returns (PriceFeedLike, uint256);
-}
-
-interface LiquidationEngineLike {
-  function liquidationPenalty(bytes32) external returns (uint256);
-
-  function removeRepaidDebtFromAuction(bytes32, uint256) external;
-}
-
-interface FlashLendingCallee {
-  function flashLendingCall(
-    address,
-    uint256,
-    uint256,
-    bytes calldata
-  ) external;
-}
-
-interface CalculatorLike {
-  function price(uint256, uint256) external view returns (uint256);
-}
+import "../../interfaces/IBookKeeper.sol";
+import "../../interfaces/IAuctioneer.sol";
+import "../../interfaces/IPriceFeed.sol";
+import "../../interfaces/IPriceOracle.sol";
+import "../../interfaces/ILiquidationEngine.sol";
+import "../../interfaces/ICalculator.sol";
+import "../../interfaces/IFlashLendingCallee.sol";
 
 contract CollateralAuctioneer is
   OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  IAuctioneer
 {
   // --- Auth ---
   mapping(address => uint256) public wards;
@@ -109,13 +58,13 @@ contract CollateralAuctioneer is
   }
 
   // --- Data ---
-  bytes32 public collateralPoolId; // Collateral type of this CollateralAuctioneer
-  GovernmentLike public government; // Core CDP Engine
+  bytes32 public override collateralPoolId; // Collateral type of this CollateralAuctioneer
+  IBookKeeper public bookKeeper; // Core CDP Engine
 
-  LiquidationEngineLike public liquidationEngine; // Liquidation module
+  ILiquidationEngine public liquidationEngine; // Liquidation module
   address public systemDebtEngine; // Recipient of dai raised in auctions
-  PriceOracleLike public priceOracle; // Collateral price module
-  CalculatorLike public calc; // Current price calculator
+  IPriceOracle public priceOracle; // Collateral price module
+  ICalculator public calc; // Current price calculator
 
   uint256 public startingPriceBuffer; // Multiplicative factor to increase starting price                  [ray]
   uint256 public auctionTimeLimit; // Time elapsed before auction reset                                 [seconds]
@@ -135,7 +84,7 @@ contract CollateralAuctioneer is
     uint96 auctionStartBlock; // Auction start time
     uint256 startingPrice; // Starting price     [ray]
   }
-  mapping(uint256 => Sale) public sales;
+  mapping(uint256 => Sale) public override sales;
 
   uint256 internal locked;
 
@@ -185,7 +134,7 @@ contract CollateralAuctioneer is
 
   // --- Init ---
   function initialize(
-    address government_,
+    address _bookKeeper,
     address priceOracle_,
     address liquidationEngine_,
     bytes32 collateralPoolId_
@@ -195,9 +144,9 @@ contract CollateralAuctioneer is
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    government = GovernmentLike(government_);
-    priceOracle = PriceOracleLike(priceOracle_);
-    liquidationEngine = LiquidationEngineLike(liquidationEngine_);
+    bookKeeper = IBookKeeper(_bookKeeper);
+    priceOracle = IPriceOracle(priceOracle_);
+    liquidationEngine = ILiquidationEngine(liquidationEngine_);
     collateralPoolId = collateralPoolId_;
     startingPriceBuffer = RAY;
     wards[msg.sender] = 1;
@@ -235,10 +184,10 @@ contract CollateralAuctioneer is
   }
 
   function file(bytes32 what, address data) external auth lock {
-    if (what == "priceOracle") priceOracle = PriceOracleLike(data);
-    else if (what == "liquidationEngine") liquidationEngine = LiquidationEngineLike(data);
+    if (what == "priceOracle") priceOracle = IPriceOracle(data);
+    else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
     else if (what == "systemDebtEngine") systemDebtEngine = data;
-    else if (what == "calc") calc = CalculatorLike(data);
+    else if (what == "calc") calc = ICalculator(data);
     else revert("CollateralAuctioneer/file-unrecognized-param");
     emit File(what, data);
   }
@@ -279,11 +228,11 @@ contract CollateralAuctioneer is
   // --- Auction ---
 
   // get the price directly from the OSM
-  // Could get this from rmul(Government.collateralPools(collateralPoolId).spot, Spotter.mat()) instead, but
+  // Could get this from rmul(BookKeeper.collateralPools(collateralPoolId).spot, Spotter.mat()) instead, but
   // if mat has changed since the last poke, the resulting value will be
   // incorrect.
   function getFeedPrice() internal returns (uint256 feedPrice) {
-    (PriceFeedLike priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
+    (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
     (bytes32 val, bool has) = priceFeed.peek();
     require(has, "CollateralAuctioneer/invalid-price");
     feedPrice = rdiv(mul(uint256(val), BLN), priceOracle.stableCoinReferencePrice());
@@ -303,7 +252,7 @@ contract CollateralAuctioneer is
     uint256 collateralAmount, // Collateral             [wad]
     address positionAddress, // Address that will receive any leftover collateral
     address liquidatorAddress // Address that will receive incentives
-  ) external auth lock isStopped(1) returns (uint256 id) {
+  ) external override auth lock isStopped(1) returns (uint256 id) {
     // Input validation
     require(debt > 0, "CollateralAuctioneer/zero-debt");
     require(collateralAmount > 0, "CollateralAuctioneer/zero-collateralAmount");
@@ -331,7 +280,7 @@ contract CollateralAuctioneer is
     uint256 prize;
     if (_liquidatorTip > 0 || _liquidatorBountyRate > 0) {
       prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-      government.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
+      bookKeeper.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
     }
 
     emit Kick(id, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize);
@@ -372,7 +321,7 @@ contract CollateralAuctioneer is
       uint256 _minimumRemainingDebt = minimumRemainingDebt;
       if (debt >= _minimumRemainingDebt && mul(collateralAmount, feedPrice) >= _minimumRemainingDebt) {
         prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
-        government.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
+        bookKeeper.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
       }
     }
 
@@ -388,7 +337,7 @@ contract CollateralAuctioneer is
   // To avoid partial purchases resulting in very small leftover auctions that will
   // never be cleared, any partial purchase must leave at least `CollateralAuctioneer.minimumRemainingDebt`
   // remaining DAI target. `minimumRemainingDebt` is an asynchronously updated value equal to
-  // (Government.debtFloor * Dog.liquidationPenalty(collateralPoolId) / WAD) where the values are understood to be determined
+  // (BookKeeper.debtFloor * Dog.liquidationPenalty(collateralPoolId) / WAD) where the values are understood to be determined
   // by whatever they were when CollateralAuctioneer.updateMinimumRemainingDebt() was last called. Purchase amounts
   // will be minimally decreased when necessary to respect this limit; i.e., if the
   // specified `collateralAmountToBuy` would leave `debt < minimumRemainingDebt` but `debt > 0`, the amount actually
@@ -457,22 +406,22 @@ contract CollateralAuctioneer is
       collateralAmount = collateralAmount - slice;
 
       // Send collateral to collateralRecipient
-      government.moveCollateral(collateralPoolId, address(this), collateralRecipient, slice);
+      bookKeeper.moveCollateral(collateralPoolId, address(this), collateralRecipient, slice);
 
       // Do external call (if data is defined) but to be
       // extremely careful we don't allow to do it to the two
       // contracts which the CollateralAuctioneer needs to be authorized
-      LiquidationEngineLike liquidationEngine_ = liquidationEngine;
+      ILiquidationEngine liquidationEngine_ = liquidationEngine;
       if (
         data.length > 0 &&
-        collateralRecipient != address(government) &&
+        collateralRecipient != address(bookKeeper) &&
         collateralRecipient != address(liquidationEngine_)
       ) {
-        FlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
+        IFlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
       }
 
       // Get DAI from caller
-      government.moveStablecoin(msg.sender, systemDebtEngine, owe);
+      bookKeeper.moveStablecoin(msg.sender, systemDebtEngine, owe);
 
       // Removes Dai out for liquidation from accumulator
       liquidationEngine_.removeRepaidDebtFromAuction(collateralPoolId, collateralAmount == 0 ? debt + owe : owe);
@@ -481,7 +430,7 @@ contract CollateralAuctioneer is
     if (collateralAmount == 0) {
       _remove(id);
     } else if (debt == 0) {
-      government.moveCollateral(collateralPoolId, address(this), positionAddress, collateralAmount);
+      bookKeeper.moveCollateral(collateralPoolId, address(this), positionAddress, collateralAmount);
       _remove(id);
     } else {
       sales[id].debt = debt;
@@ -544,15 +493,15 @@ contract CollateralAuctioneer is
 
   // Public function to update the cached debtFloor*liquidationPenalty value.
   function updateMinimumRemainingDebt() external nonReentrant {
-    (, , , , uint256 _debtFloor) = GovernmentLike(government).collateralPools(collateralPoolId);
+    (, , , , uint256 _debtFloor) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId);
     minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPoolId));
   }
 
   // Cancel an auction during Emergency Shutdown or via governance action.
-  function yank(uint256 id) external auth lock {
+  function yank(uint256 id) external override auth lock {
     require(sales[id].positionAddress != address(0), "CollateralAuctioneer/not-running-auction");
     liquidationEngine.removeRepaidDebtFromAuction(collateralPoolId, sales[id].debt);
-    government.moveCollateral(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
+    bookKeeper.moveCollateral(collateralPoolId, address(this), msg.sender, sales[id].collateralAmount);
     _remove(id);
     emit Yank(id);
   }

@@ -20,67 +20,11 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "../../interfaces/IFairLaunch.sol";
+import "../../interfaces/ITimeLock.sol";
+import "../../interfaces/IShield.sol";
 
 import "./FarmableTokenAdapter.sol";
-
-interface FairlaunchLike {
-  function deposit(
-    address,
-    uint256,
-    uint256
-  ) external;
-
-  function withdraw(
-    address,
-    uint256,
-    uint256
-  ) external;
-
-  function emergencyWithdraw(uint256) external;
-
-  function owner() external view returns (address);
-
-  function alpaca() external view returns (address);
-
-  function poolInfo(uint256)
-    external
-    view
-    returns (
-      address,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    );
-}
-
-interface TimelockLike {
-  function queuedTransactions(bytes32) external view returns (bool);
-
-  function queueTransaction(
-    address,
-    uint256,
-    string memory,
-    bytes memory,
-    uint256
-  ) external;
-
-  function executeTransaction(
-    address,
-    uint256,
-    string memory,
-    bytes memory,
-    uint256
-  ) external payable;
-
-  function delay() external view returns (uint256);
-
-  function admin() external view returns (address);
-}
-
-interface ShieldLike {
-  function owner() external view returns (address);
-}
 
 // IbTokenAdapter for Fairlaunch V1
 contract IbTokenAdapter is
@@ -90,16 +34,16 @@ contract IbTokenAdapter is
   ReentrancyGuardUpgradeable,
   FarmableTokenAdapter
 {
-  FairlaunchLike public fairlaunch;
-  ShieldLike public shield;
-  TimelockLike public timelock;
+  IFairLaunch public fairlaunch;
+  IShield public shield;
+  ITimeLock public timelock;
   uint256 public pid;
 
   // --- Events ---
   event File(bytes32 indexed what, address data);
 
   /**
-        @param government_                 MCD_VAT DSS core accounting module
+        @param _bookKeeper                 MCD_VAT DSS core accounting module
         @param collateralPoolId_                 Collateral type
         @param collateralToken_                 The collateral LP token address
         @param rewardToken_               The SUSHI token contract address.
@@ -109,7 +53,7 @@ contract IbTokenAdapter is
         @param timelock_            The expected value of the owner field. Also needs to be an instance of Timelock.
     */
   function initialize(
-    address government_,
+    address _bookKeeper,
     bytes32 collateralPoolId_,
     address collateralToken_,
     address rewardToken_,
@@ -122,19 +66,19 @@ contract IbTokenAdapter is
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
-    FarmableTokenAdapter.__FarmableTokenAdapter_init(government_, collateralPoolId_, collateralToken_, rewardToken_);
+    FarmableTokenAdapter.__FarmableTokenAdapter_init(_bookKeeper, collateralPoolId_, collateralToken_, rewardToken_);
 
     // Sanity checks
-    (address lpToken, uint256 allocPoint, , , ) = FairlaunchLike(fairlaunch_).poolInfo(pid_);
+    (address lpToken, uint256 allocPoint, , , ) = IFairLaunch(fairlaunch_).poolInfo(pid_);
     require(lpToken == collateralToken_, "IbTokenAdapter/pid-does-not-match-collateralToken");
-    require(FairlaunchLike(fairlaunch_).alpaca() == rewardToken_, "IbTokenAdapter/rewardToken-does-not-match-sushi");
+    require(IFairLaunch(fairlaunch_).alpaca() == rewardToken_, "IbTokenAdapter/rewardToken-does-not-match-sushi");
     require(allocPoint > 0, "IbTokenAdapter/pool-not-active");
-    require(FairlaunchLike(fairlaunch_).owner() == shield_, "IbTokenAdapter/shield-mismatch");
-    require(ShieldLike(shield_).owner() == timelock_, "IbTokenAdapter/owner-mismatch");
+    require(IFairLaunch(fairlaunch_).owner() == shield_, "IbTokenAdapter/shield-mismatch");
+    require(IShield(shield_).owner() == timelock_, "IbTokenAdapter/owner-mismatch");
 
-    fairlaunch = FairlaunchLike(fairlaunch_);
-    shield = ShieldLike(shield_);
-    timelock = TimelockLike(timelock_);
+    fairlaunch = IFairLaunch(fairlaunch_);
+    shield = IShield(shield_);
+    timelock = ITimeLock(timelock_);
     pid = pid_;
   }
 
@@ -177,7 +121,7 @@ contract IbTokenAdapter is
 
   function emergencyWithdraw(address urn, address usr) public override nonReentrant {
     if (live == 1) {
-      uint256 val = government.collateralToken(collateralPoolId, urn);
+      uint256 val = bookKeeper.collateralToken(collateralPoolId, urn);
       fairlaunch.withdraw(address(this), pid, val);
     }
     super.emergencyWithdraw(urn, usr);
