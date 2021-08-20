@@ -25,44 +25,8 @@ import "../interfaces/IWBNB.sol";
 import "../interfaces/IToken.sol";
 import "../interfaces/IManager.sol";
 import "../interfaces/ITokenAdapter.sol";
-
-// interface TokenAdapterLike {
-//   function decimals() external returns (uint256);
-
-//   function collateralToken() external returns (IToken);
-
-//   function deposit(address, uint256) external payable;
-
-//   function withdraw(address, uint256) external;
-// }
-
-interface FarmableTokenAdapterLike {
-  function decimals() external returns (uint256);
-
-  function collateralToken() external returns (IToken);
-
-  function deposit(
-    address,
-    address,
-    uint256
-  ) external payable;
-
-  function withdraw(
-    address,
-    address,
-    uint256
-  ) external;
-}
-
-interface StablecoinAdapterLike {
-  function bookKeeper() external returns (IBookKeeper);
-
-  function stablecoin() external returns (IToken);
-
-  function deposit(address, uint256) external payable;
-
-  function withdraw(address, uint256) external;
-}
+import "../interfaces/IFarmableTokenAdapter.sol";
+import "../interfaces/IStablecoinAdapter.sol";
 
 interface HopeLike {
   function hope(address) external;
@@ -105,11 +69,11 @@ contract Common {
     uint256 wad
   ) public {
     // Gets Alpaca Stablecoin from the user's wallet
-    StablecoinAdapterLike(apt).stablecoin().transferFrom(msg.sender, address(this), wad);
+    IStablecoinAdapter(apt).stablecoin().transferFrom(msg.sender, address(this), wad);
     // Approves adapter to take the Alpaca Stablecoin amount
-    StablecoinAdapterLike(apt).stablecoin().approve(apt, wad);
+    IStablecoinAdapter(apt).stablecoin().approve(apt, wad);
     // Deposits Alpaca Stablecoin into the bookKeeper
-    StablecoinAdapterLike(apt).deposit(positionAddress, wad);
+    IStablecoinAdapter(apt).deposit(positionAddress, wad);
   }
 }
 
@@ -248,12 +212,12 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Only executes for tokens that have approval/transferFrom implementation
     if (transferFrom) {
       // Gets token from the user's wallet
-      FarmableTokenAdapterLike(apt).collateralToken().transferFrom(msg.sender, address(this), amt);
+      IFarmableTokenAdapter(apt).collateralToken().transferFrom(msg.sender, address(this), amt);
       // Approves adapter to take the token amount
-      FarmableTokenAdapterLike(apt).collateralToken().approve(apt, amt);
+      IFarmableTokenAdapter(apt).collateralToken().approve(apt, amt);
     }
     // Deposits token collateral into the bookKeeper
-    FarmableTokenAdapterLike(apt).deposit(positionAddress, msg.sender, amt);
+    IFarmableTokenAdapter(apt).deposit(positionAddress, msg.sender, amt);
   }
 
   function hope(address obj, address usr) public {
@@ -509,7 +473,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wad);
     // Withdraws token amount to the user's wallet as a token
-    FarmableTokenAdapterLike(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amt);
+    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amt);
   }
 
   function exitBNB(
@@ -553,7 +517,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     moveCollateral(manager, cdp, address(this), convertTo18(farmableTokenAdapter, amt));
 
     // Withdraws token amount to the user's wallet as a token
-    FarmableTokenAdapterLike(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amt);
+    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amt);
   }
 
   function draw(
@@ -580,7 +544,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
-    StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wad);
+    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wad);
   }
 
   function wipe(
@@ -711,7 +675,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
-    StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
+    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wadD);
   }
 
   function openLockBNBAndDraw(
@@ -755,7 +719,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
-    StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
+    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wadD);
   }
 
   function openLockTokenAndDraw(
@@ -801,7 +765,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
-    StablecoinAdapterLike(stablecoinAdapter).withdraw(msg.sender, wadD);
+    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wadD);
   }
 
   function openLockFarmableTokenAndDraw(
@@ -974,7 +938,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wadC);
     // Withdraws token amount to the user's wallet as a token
-    FarmableTokenAdapterLike(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amtC);
+    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amtC);
   }
 
   function wipeAllAndFreeFarmableToken(
@@ -1001,6 +965,6 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wadC);
     // Withdraws token amount to the user's wallet as a token
-    FarmableTokenAdapterLike(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amtC);
+    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amtC);
   }
 }
