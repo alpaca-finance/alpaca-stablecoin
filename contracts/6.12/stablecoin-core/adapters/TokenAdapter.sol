@@ -23,8 +23,8 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "../../interfaces/IBookKeeper.sol";
-import "../../interfaces/IToken.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -73,7 +73,7 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
 
   IBookKeeper public bookKeeper; // CDP Engine
   bytes32 public collateralPoolId; // Collateral Type
-  IToken public collateralToken;
+  ERC20Upgradeable public collateralToken;
   uint256 public decimals;
   uint256 public live; // Active Flag
 
@@ -91,7 +91,7 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
-    collateralToken = IToken(collateralToken_);
+    collateralToken = ERC20Upgradeable(collateralToken_);
     decimals = collateralToken.decimals();
   }
 
