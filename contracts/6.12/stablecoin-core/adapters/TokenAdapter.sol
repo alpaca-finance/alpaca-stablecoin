@@ -23,8 +23,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
+import "../../interfaces/ITokenAdapter.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -54,7 +56,13 @@ import "../../interfaces/IToken.sol";
 
 */
 
-contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
+contract TokenAdapter is
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable,
+  ITokenAdapter
+{
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -73,8 +81,8 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
 
   IBookKeeper public bookKeeper; // CDP Engine
   bytes32 public collateralPoolId; // Collateral Type
-  IToken public collateralToken;
-  uint256 public decimals;
+  IToken public override collateralToken;
+  uint256 public override decimals;
   uint256 public live; // Active Flag
 
   function initialize(
@@ -99,14 +107,14 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     live = 0;
   }
 
-  function deposit(address usr, uint256 wad) external nonReentrant {
+  function deposit(address usr, uint256 wad) external payable override nonReentrant {
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, usr, int256(wad));
     require(collateralToken.transferFrom(msg.sender, address(this), wad), "TokenAdapter/failed-transfer");
   }
 
-  function withdraw(address usr, uint256 wad) external nonReentrant {
+  function withdraw(address usr, uint256 wad) external override nonReentrant {
     require(wad <= 2**255, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
     require(collateralToken.transfer(usr, wad), "TokenAdapter/failed-transfer");
