@@ -27,16 +27,7 @@ import "../interfaces/IManager.sol";
 import "../interfaces/ITokenAdapter.sol";
 import "../interfaces/IFarmableTokenAdapter.sol";
 import "../interfaces/IStablecoinAdapter.sol";
-
-interface HopeLike {
-  function hope(address) external;
-
-  function nope(address) external;
-}
-
-interface StabilityFeeCollectorLike {
-  function collect(bytes32) external returns (uint256);
-}
+import "../interfaces/IStabilityFeeCollector.sol";
 
 interface ProxyRegistryLike {
   function proxies(address) external view returns (address);
@@ -114,7 +105,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 wad
   ) internal returns (int256 resultDebtShare) {
     // Updates stability fee rate
-    uint256 debtAccumulatedRate = StabilityFeeCollectorLike(stabilityFeeCollector).collect(collateralPoolId);
+    uint256 debtAccumulatedRate = IStabilityFeeCollector(stabilityFeeCollector).collect(collateralPoolId);
 
     // Gets Alpaca Stablecoin balance of the positionAddress in the bookKeeper
     uint256 stablecoin = IBookKeeper(bookKeeper).stablecoin(positionAddress);
@@ -221,11 +212,11 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
   }
 
   function hope(address obj, address usr) public {
-    HopeLike(obj).hope(usr);
+    IBookKeeper(obj).hope(usr);
   }
 
   function nope(address obj, address usr) public {
-    HopeLike(obj).nope(usr);
+    IBookKeeper(obj).nope(usr);
   }
 
   function open(
