@@ -117,4 +117,21 @@ describe("CDPManager", () => {
       })
     })
   })
+
+  describe("#cdpAllow()", () => {
+    context("when caller is not the owner of the cdp (or have no allowance)", () => {
+      it("should revert", async () => {
+        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), aliceAddress)
+        await expect(cdpManager.cdpAllow(1, aliceAddress, 1)).to.be.revertedWith("cdp-not-allowed")
+      })
+    })
+    context("when parameters are valid", () => {
+      it("should be able to add user allowance to a cdp", async () => {
+        await cdpManager.open(ethers.utils.formatBytes32String("BNB"), aliceAddress)
+        expect(await cdpManager.cdpCan(aliceAddress, 1, bobAddress)).to.bignumber.equal(0)
+        await cdpManagerAsAlice.cdpAllow(1, bobAddress, 1)
+        expect(await cdpManager.cdpCan(aliceAddress, 1, bobAddress)).to.bignumber.equal(1)
+      })
+    })
+  })
 })
