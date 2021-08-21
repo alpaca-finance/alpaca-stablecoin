@@ -56,7 +56,7 @@ contract Common {
     // Approves adapter to take the Alpaca Stablecoin amount
     IStablecoinAdapter(apt).stablecoin().approve(apt, wad);
     // Deposits Alpaca Stablecoin into the bookKeeper
-    IStablecoinAdapter(apt).deposit(positionAddress, wad);
+    IStablecoinAdapter(apt).deposit(positionAddress, wad, abi.encode(0));
   }
 }
 
@@ -527,7 +527,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
-    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wad);
+    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wad, abi.encode(0));
   }
 
   function wipe(
@@ -658,7 +658,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
-    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wadD);
+    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wadD, abi.encode(0));
   }
 
   function openLockBNBAndDraw(
@@ -702,7 +702,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
-    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wadD);
+    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wadD, abi.encode(0));
   }
 
   function openLockTokenAndDraw(
@@ -748,7 +748,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       IBookKeeper(bookKeeper).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
-    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wadD);
+    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wadD, abi.encode(0));
   }
 
   function openLockFarmableTokenAndDraw(

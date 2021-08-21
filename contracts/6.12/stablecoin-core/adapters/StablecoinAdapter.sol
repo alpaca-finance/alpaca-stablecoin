@@ -66,11 +66,11 @@ contract StablecoinAdapter is
   // --- Auth ---
   mapping(address => uint256) public wards;
 
-  function rely(address usr) external auth {
+  function rely(address usr) external override auth {
     wards[usr] = 1;
   }
 
-  function deny(address usr) external auth {
+  function deny(address usr) external override auth {
     wards[usr] = 0;
   }
 
@@ -95,7 +95,7 @@ contract StablecoinAdapter is
     stablecoin = IStablecoin(stablecoin_);
   }
 
-  function cage() external auth {
+  function cage() external override auth {
     live = 0;
   }
 
@@ -105,12 +105,12 @@ contract StablecoinAdapter is
     require(y == 0 || (z = x * y) / y == x);
   }
 
-  function deposit(address usr, uint256 wad) external payable override nonReentrant {
+  function deposit(address usr, uint256 wad, bytes calldata data) external payable override nonReentrant {
     bookKeeper.moveStablecoin(address(this), usr, mul(ONE, wad));
     stablecoin.burn(msg.sender, wad);
   }
 
-  function withdraw(address usr, uint256 wad) external override nonReentrant {
+  function withdraw(address usr, uint256 wad, bytes calldata data) external override nonReentrant {
     require(live == 1, "StablecoinAdapter/not-live");
     bookKeeper.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
     stablecoin.mint(usr, wad);

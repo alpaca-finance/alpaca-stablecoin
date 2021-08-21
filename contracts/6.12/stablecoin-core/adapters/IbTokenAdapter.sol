@@ -103,7 +103,7 @@ contract IbTokenAdapter is
     address positionAddress,
     uint256 val,
     bytes calldata data
-  ) public override nonReentrant {
+  ) public payable override nonReentrant {
     super.deposit(positionAddress, val, data);
     fairlaunch.deposit(address(this), pid, val);
   }

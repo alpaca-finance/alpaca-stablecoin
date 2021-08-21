@@ -13,7 +13,7 @@ interface IAdapter {
     address positionAddress,
     uint256 wad,
     bytes calldata data
-  ) external;
+  ) external payable;
 
   function withdraw(
     address positionAddress,

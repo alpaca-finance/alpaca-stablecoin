@@ -169,7 +169,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
     address positionAddress,
     uint256 val,
     bytes calldata data
-  ) public virtual override {
+  ) public payable virtual override {
     require(live == 1, "FarmableToken/not-live");
     (address usr, bytes memory ext) = abi.decode(data, (address, bytes));
     harvest(positionAddress, usr);
