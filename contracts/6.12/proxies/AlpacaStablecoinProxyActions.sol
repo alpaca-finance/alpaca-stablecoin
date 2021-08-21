@@ -200,7 +200,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       IFarmableTokenAdapter(apt).collateralToken().approve(apt, amt);
     }
     // Deposits token collateral into the bookKeeper
-    IFarmableTokenAdapter(apt).deposit(positionAddress, msg.sender, amt);
+    IFarmableTokenAdapter(apt).deposit(positionAddress, amt, abi.encode(msg.sender));
   }
 
   function hope(address obj, address usr) public {
@@ -456,7 +456,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wad);
     // Withdraws token amount to the user's wallet as a token
-    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amt);
+    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, amt, abi.encode(msg.sender));
   }
 
   function exitBNB(
@@ -500,7 +500,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     moveCollateral(manager, cdp, address(this), convertTo18(farmableTokenAdapter, amt));
 
     // Withdraws token amount to the user's wallet as a token
-    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amt);
+    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, amt, abi.encode(msg.sender));
   }
 
   function draw(
@@ -921,7 +921,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wadC);
     // Withdraws token amount to the user's wallet as a token
-    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amtC);
+    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, amtC, abi.encode(msg.sender));
   }
 
   function wipeAllAndFreeFarmableToken(
@@ -948,6 +948,6 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wadC);
     // Withdraws token amount to the user's wallet as a token
-    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, msg.sender, amtC);
+    IFarmableTokenAdapter(farmableTokenAdapter).withdraw(positionAddress, amtC, abi.encode(msg.sender));
   }
 }

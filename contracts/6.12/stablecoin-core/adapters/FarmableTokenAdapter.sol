@@ -20,6 +20,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
 import "../../interfaces/IFarmableTokenAdapter.sol";
+import "../../interfaces/IAdapter.sol";
+import "../../interfaces/IManager.sol";
 
 // receives tokens and shares them among holders
 contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
@@ -55,12 +57,12 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
     _;
   }
 
-  function rely(address usr) external auth {
+  function rely(address usr) external override auth {
     whitelist[usr] = 1;
     emit Rely(msg.sender);
   }
 
-  function deny(address usr) external auth {
+  function deny(address usr) external override auth {
     whitelist[usr] = 0;
     emit Deny(msg.sender);
   }
@@ -165,11 +167,11 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
 
   function deposit(
     address positionAddress,
-    address usr,
-    uint256 val
+    uint256 val,
+    bytes calldata data
   ) public virtual override {
     require(live == 1, "FarmableToken/not-live");
-
+    (address usr, bytes memory ext) = abi.decode(data, (address, bytes));
     harvest(positionAddress, usr);
     if (val > 0) {
       uint256 wad = wdiv(mul(val, to18ConversionFactor), nps());
@@ -190,9 +192,10 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
 
   function withdraw(
     address positionAddress,
-    address usr,
-    uint256 val
+    uint256 val,
+    bytes calldata data
   ) public virtual override {
+    (address usr, bytes memory ext) = abi.decode(data, (address, bytes));
     harvest(positionAddress, usr);
     if (val > 0) {
       uint256 wad = wdivup(mul(val, to18ConversionFactor), nps());
@@ -250,7 +253,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
     emit MoveRewards(src, dst, wad);
   }
 
-  function cage() public virtual auth {
+  function cage() public override virtual auth {
     live = 0;
   }
 }

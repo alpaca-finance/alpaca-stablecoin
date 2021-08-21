@@ -34,6 +34,7 @@ import "../../interfaces/IFarmableTokenAdapter.sol";
 import "../../interfaces/ICalculator.sol";
 import "../../interfaces/IProxy.sol";
 import "../../interfaces/IFlashLendingCallee.sol";
+import "../../interfaces/IManager.sol";
 
 contract FarmableTokenAuctioneer is
   OwnableUpgradeable,
@@ -155,7 +156,7 @@ contract FarmableTokenAuctioneer is
     liquidationEngine = ILiquidationEngine(liquidationEngine_);
     farmableTokenAdapter = IFarmableTokenAdapter(farmableTokenAdapter_);
     collateralPoolId = IFarmableTokenAdapter(farmableTokenAdapter_).collateralPoolId();
-    cdpManager = CDPManagerLike(cdpManager_);
+    cdpManager = IManager(cdpManager_);
     startingPriceBuffer = RAY;
     wards[msg.sender] = 1;
     emit Rely(msg.sender);
@@ -195,8 +196,8 @@ contract FarmableTokenAuctioneer is
     if (what == "priceOracle") priceOracle = IPriceOracle(data);
     else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
     else if (what == "systemDebtEngine") systemDebtEngine = data;
-    else if (what == "calc") calc = CalculatorLike(data);
-    else if (what == "cdpManager") cdpManager = CDPManagerLike(data);
+    else if (what == "calc") calc = ICalculator(data);
+    else if (what == "cdpManager") cdpManager = IManager(data);
     else revert("CollateralAuctioneer/file-unrecognized-param");
     emit File(what, data);
   }
@@ -296,7 +297,7 @@ contract FarmableTokenAuctioneer is
     // 1. Harvest the rewards of this CDP owner and distribute to the CDP Owner
     address positionOwner = cdpManager.mapPositionHandlerToOwner(positionAddress);
     if(positionOwner == address(0)) positionOwner = positionAddress; // If CDP Owner is not foudn from CDP Manager, this means the positionAddress is actually the EOA address
-    farmableTokenAdapter.deposit(positionAddress, positionOwner, 0);
+    farmableTokenAdapter.deposit(positionAddress, 0, abi.encode(positionOwner));
     // 2. Confiscate and move the rewards and the staked collateral to this address, they will be distributed to the bidder later
     farmableTokenAdapter.moveRewards(positionAddress, address(this), collateralAmount);
 

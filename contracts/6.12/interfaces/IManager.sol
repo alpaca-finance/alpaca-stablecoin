@@ -1,6 +1,8 @@
 pragma solidity 0.6.12;
 
 interface IManager {
+  function mapPositionHandlerToOwner(address) external view returns (address);
+
   function cdpCan(
     address,
     uint256,

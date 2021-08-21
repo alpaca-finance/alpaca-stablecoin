@@ -101,22 +101,22 @@ contract IbTokenAdapter is
 
   function deposit(
     address positionAddress,
-    address usr,
-    uint256 val
+    uint256 val,
+    bytes calldata data
   ) public override nonReentrant {
-    super.deposit(positionAddress, usr, val);
+    super.deposit(positionAddress, val, data);
     fairlaunch.deposit(address(this), pid, val);
   }
 
   function withdraw(
-    address urn,
-    address usr,
-    uint256 val
+    address positionAddress,
+    uint256 val,
+    bytes calldata data
   ) public override nonReentrant {
     if (live == 1) {
       fairlaunch.withdraw(address(this), pid, val);
     }
-    super.withdraw(urn, usr, val);
+    super.withdraw(positionAddress, val, data);
   }
 
   function emergencyWithdraw(address urn, address usr) public override nonReentrant {
