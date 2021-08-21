@@ -25,6 +25,7 @@ import "../interfaces/IWBNB.sol";
 import "../interfaces/IToken.sol";
 import "../interfaces/IManager.sol";
 import "../interfaces/IAdapter.sol";
+import "../interfaces/IFarmableTokenAdapter.sol";
 import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IStabilityFeeCollector.sol";
 import "../interfaces/IProxyRegistry.sol";
@@ -382,15 +383,19 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address manager,
     address tokenAdapter,
     uint256 cdp,
-    uint256 amt
+    uint256 amt,
+    bytes calldata data
   ) public {
+    address positionAddress = IManager(manager).positions(cdp);
     uint256 wad = convertTo18(tokenAdapter, amt);
     // Unlocks token amount from the CDP
     adjustPosition(manager, cdp, -toInt(wad), 0);
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wad);
     // Withdraws token amount to the user's wallet as a token
-    IAdapter(tokenAdapter).withdraw(msg.sender, amt, abi.encode(0));
+    (address usr, bytes memory ext) = abi.decode(data, (address, bytes));
+    if(usr != address(0)) IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), wad);
+    IAdapter(tokenAdapter).withdraw(msg.sender, amt, data);
   }
 
   function exitBNB(
