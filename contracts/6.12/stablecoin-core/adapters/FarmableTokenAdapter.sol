@@ -31,7 +31,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
   IBookKeeper public bookKeeper; // cdp engine
   bytes32 public override collateralPoolId; // collateral type
   IToken public override collateralToken; // collateral token
-  uint256 public decimals; // collateralToken decimals
+  uint256 public override decimals; // collateralToken decimals
   IToken public rewardToken; // rewhitelist token
 
   uint256 public accRewardPerShare; // rewards per collateralToken    [ray]

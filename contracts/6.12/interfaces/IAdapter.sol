@@ -9,6 +9,8 @@ interface IAdapter {
 
   function cage() external;
 
+  function decimals() external returns (uint256);
+
   function deposit(
     address positionAddress,
     uint256 wad,

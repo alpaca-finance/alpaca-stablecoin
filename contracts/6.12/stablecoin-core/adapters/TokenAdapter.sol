@@ -82,7 +82,7 @@ contract TokenAdapter is
   IBookKeeper public bookKeeper; // CDP Engine
   bytes32 public override collateralPoolId; // Collateral Type
   IToken public override collateralToken;
-  uint256 public decimals;
+  uint256 public override decimals;
   uint256 public live; // Active Flag
 
   function initialize(
