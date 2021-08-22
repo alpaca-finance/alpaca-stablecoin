@@ -11,6 +11,8 @@ interface IAdapter {
 
   function decimals() external returns (uint256);
 
+  function isFarmable() external returns (bool);
+
   function deposit(
     address positionAddress,
     uint256 wad,

@@ -33,6 +33,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
   IToken public override collateralToken; // collateral token
   uint256 public override decimals; // collateralToken decimals
   IToken public rewardToken; // rewhitelist token
+  bool public override isFarmable; // if true `moveRewards` must be called on every movement of collateral
 
   uint256 public accRewardPerShare; // rewards per collateralToken    [ray]
   uint256 public totalShare; // total collateralTokens       [wad]

@@ -336,6 +336,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 amt,
     bool transferFrom
   ) public {
+    address positionAddress = IManager(manager).positions(cdp);
     // Takes token amount from user's wallet and joins into the bookKeeper
     tokenAdapter_deposit(tokenAdapter, address(this), amt, transferFrom);
     // Locks token amount into the CDP
@@ -347,6 +348,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       toInt(convertTo18(tokenAdapter, amt)),
       0
     );
+    if(IAdapter(tokenAdapter).isFarmable()) IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), amt);
   }
 
   function safeLockToken(
@@ -393,8 +395,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wad);
     // Withdraws token amount to the user's wallet as a token
-    (address usr, bytes memory ext) = abi.decode(data, (address, bytes));
-    if(usr != address(0)) IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), wad);
+    if(IAdapter(tokenAdapter).isFarmable()) IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), wad);
     IAdapter(tokenAdapter).withdraw(msg.sender, amt, data);
   }
 
