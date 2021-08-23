@@ -140,6 +140,18 @@ describe("CDPManager", () => {
     })
   })
 
+  describe("#positionAllow()", () => {
+    context("when parameters are valid", () => {
+      it("should be able to give/revoke allowance to other address", async () => {
+        expect(await cdpManager.positionCan(aliceAddress, bobAddress)).to.bignumber.equal(0)
+        await cdpManagerAsAlice.positionAllow(bobAddress, 1)
+        expect(await cdpManager.positionCan(aliceAddress, bobAddress)).to.bignumber.equal(1)
+        await cdpManagerAsAlice.positionAllow(bobAddress, 0)
+        expect(await cdpManager.positionCan(aliceAddress, bobAddress)).to.bignumber.equal(0)
+      })
+    })
+  })
+
   describe("#list()", () => {
     context("when a few cdp has been opened", () => {
       it("should work as a linklist perfectly", async () => {
@@ -552,36 +564,5 @@ describe("CDPManager", () => {
         expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
-    // context("when Alice wants Bob to shift her position from Bob's address", async () => {
-    //   it("should be able to call shift()", async () => {
-    //     await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
-    //     const positionAddress = await cdpManager.positions(1)
-
-    //     // Alice allows Bob to manage her cdp#1
-    //     await cdpManagerAsAlice.cdpAllow(1, bobAddress, 1)
-    //     // Bob allows cdp#1 to be quitted to his address
-    //     await cdpManagerAsAlice.positionAllow(bobAddress, 1)
-
-    //     mockedBookKeeper.smocked.positions.will.return.with([WeiPerWad.mul(2), WeiPerWad.mul(1)])
-    //     mockedBookKeeper.smocked.movePosition.will.return.with()
-
-    //     // Bob quits cdp#1 to his address
-    //     await cdpManagerAsBob.shift(bobAddress, 1)
-
-    //     const { calls: positionsCalls } = mockedBookKeeper.smocked.positions
-    //     const { calls: movePositionCalls } = mockedBookKeeper.smocked.movePosition
-
-    //     expect(positionsCalls.length).to.be.equal(1)
-    //     expect(positionsCalls[0][0]).to.be.equal(formatBytes32String("BNB"))
-    //     expect(positionsCalls[0][1]).to.be.equal(bobAddress)
-
-    //     expect(movePositionCalls.length).to.be.equal(1)
-    //     expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-    //     expect(movePositionCalls[0].src).to.be.equal(bobAddress)
-    //     expect(movePositionCalls[0].dst).to.be.equal(positionAddress)
-    //     expect(movePositionCalls[0].collateralValue).to.be.equal(WeiPerWad.mul(2))
-    //     expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
-    //   })
-    // })
   })
 })
