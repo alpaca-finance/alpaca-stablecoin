@@ -9,7 +9,7 @@ import { WeiPerRad, WeiPerWad } from "../../helper/unit"
 
 chai.use(solidity)
 const { expect } = chai
-const { AddressZero, WeiPerEther } = ethers.constants
+const { AddressZero } = ethers.constants
 const { parseEther, formatBytes32String } = ethers.utils
 
 type fixture = {
@@ -140,14 +140,14 @@ describe("CDPManager", () => {
     })
   })
 
-  describe("#positionAllow()", () => {
+  describe("#migrationAllow()", () => {
     context("when parameters are valid", () => {
-      it("should be able to give/revoke allowance to other address", async () => {
-        expect(await cdpManager.positionCan(aliceAddress, bobAddress)).to.bignumber.equal(0)
-        await cdpManagerAsAlice.positionAllow(bobAddress, 1)
-        expect(await cdpManager.positionCan(aliceAddress, bobAddress)).to.bignumber.equal(1)
-        await cdpManagerAsAlice.positionAllow(bobAddress, 0)
-        expect(await cdpManager.positionCan(aliceAddress, bobAddress)).to.bignumber.equal(0)
+      it("should be able to give/revoke migration allowance to other address", async () => {
+        expect(await cdpManager.migrationCan(aliceAddress, bobAddress)).to.bignumber.equal(0)
+        await cdpManagerAsAlice.migrationAllow(bobAddress, 1)
+        expect(await cdpManager.migrationCan(aliceAddress, bobAddress)).to.bignumber.equal(1)
+        await cdpManagerAsAlice.migrationAllow(bobAddress, 0)
+        expect(await cdpManager.migrationCan(aliceAddress, bobAddress)).to.bignumber.equal(0)
       })
     })
   })
@@ -345,11 +345,11 @@ describe("CDPManager", () => {
         await expect(cdpManagerAsBob.quit(1, bobAddress)).to.be.revertedWith("cdp-not-allowed")
       })
     })
-    context("when destination address has no access to the position", () => {
+    context("when destination (Bob) has no migration access on caller (Alice)", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         await cdpManagerAsAlice.cdpAllow(1, bobAddress, 1)
-        await expect(cdpManagerAsAlice.quit(1, bobAddress)).to.be.revertedWith("position-not-allowed")
+        await expect(cdpManagerAsAlice.quit(1, bobAddress)).to.be.revertedWith("migration-not-allowed")
       })
     })
     context("when Alice wants to quit her own position to her own address", async () => {
@@ -385,7 +385,7 @@ describe("CDPManager", () => {
         // Alice allows Bob to manage her cdp#1
         await cdpManagerAsAlice.cdpAllow(1, bobAddress, 1)
         // Bob allows cdp#1 to be quitted to his address
-        await cdpManagerAsBob.positionAllow(bobAddress, 1)
+        await cdpManagerAsBob.migrationAllow(bobAddress, 1)
 
         mockedBookKeeper.smocked.positions.will.return.with([WeiPerWad.mul(2), WeiPerWad.mul(1)])
         mockedBookKeeper.smocked.movePosition.will.return.with()
@@ -411,17 +411,17 @@ describe("CDPManager", () => {
   })
 
   describe("#enter()", () => {
-    context("when destination address has no access to the position", () => {
+    context("when caller (Bob) has no migration access on source address (Alice)", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
-        await expect(cdpManagerAsBob.enter(aliceAddress, 1)).to.be.revertedWith("position-not-allowed")
+        await expect(cdpManagerAsBob.enter(aliceAddress, 1)).to.be.revertedWith("migration-not-allowed")
       })
     })
     context("when caller has no access to the cdp", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         // Alice allows Bob to call enter on her address to cdp#1
-        await cdpManagerAsAlice.positionAllow(bobAddress, 1)
+        await cdpManagerAsAlice.migrationAllow(bobAddress, 1)
         await expect(cdpManagerAsBob.enter(aliceAddress, 1)).to.be.revertedWith("cdp-not-allowed")
       })
     })
@@ -458,7 +458,7 @@ describe("CDPManager", () => {
         // Alice allows Bob to manage her cdp#1
         await cdpManagerAsAlice.cdpAllow(1, bobAddress, 1)
         // Bob allows cdp#1 to be quitted to his address
-        await cdpManagerAsAlice.positionAllow(bobAddress, 1)
+        await cdpManagerAsAlice.migrationAllow(bobAddress, 1)
 
         mockedBookKeeper.smocked.positions.will.return.with([WeiPerWad.mul(2), WeiPerWad.mul(1)])
         mockedBookKeeper.smocked.movePosition.will.return.with()
@@ -484,7 +484,7 @@ describe("CDPManager", () => {
   })
 
   describe("#shift()", () => {
-    context("when caller has no access to the source cdp", () => {
+    context("when caller (Bob) has no access to the source cdp", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         await cdpManager.open(formatBytes32String("BNB"), bobAddress)
@@ -492,7 +492,7 @@ describe("CDPManager", () => {
         await expect(cdpManagerAsBob.shift(1, 2)).to.be.revertedWith("cdp-not-allowed")
       })
     })
-    context("when caller has no access to the destination cdp", () => {
+    context("when caller (Alice) has no access to the destination cdp", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         await cdpManager.open(formatBytes32String("BNB"), bobAddress)
@@ -500,7 +500,7 @@ describe("CDPManager", () => {
         await expect(cdpManagerAsAlice.shift(1, 2)).to.be.revertedWith("cdp-not-allowed")
       })
     })
-    context("when caller these two cdps are from different collateral pool", () => {
+    context("when these two cdps are from different collateral pool", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         await cdpManager.open(formatBytes32String("BTC"), bobAddress)
