@@ -39,7 +39,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
 
   mapping(address => mapping(uint256 => mapping(address => uint256))) public cdpCan; // Owner => CDPId => Allowed Addr => True/False
 
-  mapping(address => mapping(address => uint256)) public positionCan; // Urn => Allowed Addr => True/False
+  mapping(address => mapping(address => uint256)) public positionCan; // Position => Allowed Addr => True/False
 
   struct List {
     uint256 prev;
@@ -54,7 +54,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
   }
 
   modifier positionAllowed(address positionAddress) {
-    require(msg.sender == positionAddress || positionCan[positionAddress][msg.sender] == 1, "urn-not-allowed");
+    require(msg.sender == positionAddress || positionCan[positionAddress][msg.sender] == 1, "position-not-allowed");
     _;
   }
 
@@ -88,8 +88,8 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     cdpCan[owns[cdp]][cdp][usr] = ok;
   }
 
-  // Allow/disallow a usr address to quit to the the sender urn.
-  function urnAllow(address usr, uint256 ok) public {
+  // Allow/disallow a usr address to quit to the the sender position.
+  function positionAllow(address usr, uint256 ok) public {
     positionCan[msg.sender][usr] = ok;
   }
 
@@ -203,8 +203,10 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
 
   // Quit the system, migrating the cdp (ink, art) to a different dst positionAddress
   function quit(uint256 cdp, address dst) public cdpAllowed(cdp) positionAllowed(dst) {
-    (uint256 lockedCollateral, uint256 debtShare) =
-      IBookKeeper(bookKeeper).positions(collateralPools[cdp], positions[cdp]);
+    (uint256 lockedCollateral, uint256 debtShare) = IBookKeeper(bookKeeper).positions(
+      collateralPools[cdp],
+      positions[cdp]
+    );
     IBookKeeper(bookKeeper).movePosition(
       collateralPools[cdp],
       positions[cdp],
@@ -229,8 +231,10 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
   // Move a position from cdpSrc urn to the cdpDst urn
   function shift(uint256 cdpSrc, uint256 cdpDst) public cdpAllowed(cdpSrc) cdpAllowed(cdpDst) {
     require(collateralPools[cdpSrc] == collateralPools[cdpDst], "non-matching-cdps");
-    (uint256 lockedCollateral, uint256 debtShare) =
-      IBookKeeper(bookKeeper).positions(collateralPools[cdpSrc], positions[cdpSrc]);
+    (uint256 lockedCollateral, uint256 debtShare) = IBookKeeper(bookKeeper).positions(
+      collateralPools[cdpSrc],
+      positions[cdpSrc]
+    );
     IBookKeeper(bookKeeper).movePosition(
       collateralPools[cdpSrc],
       positions[cdpSrc],

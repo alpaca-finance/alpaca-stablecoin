@@ -4,8 +4,8 @@ import chai from "chai"
 import { MockProvider, solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
 import { BookKeeper__factory, CDPManager, CDPManager__factory, BookKeeper } from "../../../typechain"
-import { ModifiableContract, smoddit, smockit, MockContract } from "@eth-optimism/smock"
-import { WeiPerRad } from "../../helper/unit"
+import { smockit, MockContract } from "@eth-optimism/smock"
+import { WeiPerRad, WeiPerWad } from "../../helper/unit"
 
 chai.use(solidity)
 const { expect } = chai
@@ -52,6 +52,7 @@ describe("CDPManager", () => {
   let bookKeeper: BookKeeper
   let mockedBookKeeper: MockContract
   let cdpManagerAsAlice: CDPManager
+  let cdpManagerAsBob: CDPManager
 
   beforeEach(async () => {
     ;({ cdpManager, mockedBookKeeper } = await waffle.loadFixture(loadFixtureHandler))
@@ -64,6 +65,7 @@ describe("CDPManager", () => {
     ])
 
     cdpManagerAsAlice = CDPManager__factory.connect(cdpManager.address, alice) as CDPManager
+    cdpManagerAsBob = CDPManager__factory.connect(cdpManager.address, bob) as CDPManager
   })
 
   describe("#open()", () => {
@@ -93,7 +95,7 @@ describe("CDPManager", () => {
   })
 
   describe("#give()", () => {
-    context("when caller is not the owner of the cdp (or have no allowance)", () => {
+    context("when caller has no access to the cdp (or have no allowance)", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(cdpManager.give(1, aliceAddress)).to.be.revertedWith("cdp-not-allowed")
@@ -122,7 +124,7 @@ describe("CDPManager", () => {
   })
 
   describe("#cdpAllow()", () => {
-    context("when caller is not the owner of the cdp (or have no allowance)", () => {
+    context("when caller has no access to the cdp (or have no allowance)", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(cdpManager.cdpAllow(1, aliceAddress, 1)).to.be.revertedWith("cdp-not-allowed")
@@ -207,7 +209,7 @@ describe("CDPManager", () => {
   })
 
   describe("#adjustPosition()", () => {
-    context("when caller is not the owner of the cdp (or have no allowance)", () => {
+    context("when caller has no access to the cdp", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(cdpManager.adjustPosition(1, parseEther("1"), parseEther("50"))).to.be.revertedWith(
@@ -236,7 +238,7 @@ describe("CDPManager", () => {
   })
 
   describe("#moveCollateral(uint256,address,uint256)", () => {
-    context("when caller is not the owner of the cdp", () => {
+    context("when caller has no access to the cdp", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(
@@ -264,7 +266,7 @@ describe("CDPManager", () => {
 
   // This function has the purpose to take away collateral from the system that doesn't correspond to the cdp but was sent there wrongly.
   describe("#moveCollateral(bytes32,uint256,address,uint256)", () => {
-    context("when caller is not the owner of the cdp", () => {
+    context("when caller has no access to the cdp", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(
@@ -301,7 +303,7 @@ describe("CDPManager", () => {
   })
 
   describe("#moveStablecoin()", () => {
-    context("when caller is not the owner of the cdp", () => {
+    context("when caller has no access to the cdp", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(cdpManager.moveStablecoin(1, bobAddress, WeiPerRad.mul(10))).to.be.revertedWith("cdp-not-allowed")
@@ -320,6 +322,78 @@ describe("CDPManager", () => {
         expect(calls[0].src).to.be.equal(positionAddress)
         expect(calls[0].dst).to.be.equal(bobAddress)
         expect(calls[0].rad).to.be.equal(WeiPerRad.mul(10))
+      })
+    })
+  })
+
+  describe("#quit()", () => {
+    context("when caller has no access to the cdp", () => {
+      it("should revert", async () => {
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        await expect(cdpManagerAsBob.quit(1, bobAddress)).to.be.revertedWith("cdp-not-allowed")
+      })
+    })
+    context("when destination address has no access to the position", () => {
+      it("should revert", async () => {
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        await cdpManagerAsAlice.cdpAllow(1, bobAddress, 1)
+        await expect(cdpManagerAsAlice.quit(1, bobAddress)).to.be.revertedWith("position-not-allowed")
+      })
+    })
+    context("when Alice wants to quit her own position", async () => {
+      it("should be able to call quit()", async () => {
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        const positionAddress = await cdpManager.positions(1)
+
+        mockedBookKeeper.smocked.positions.will.return.with([WeiPerWad.mul(2), WeiPerWad.mul(1)])
+        mockedBookKeeper.smocked.movePosition.will.return.with()
+
+        await cdpManagerAsAlice.quit(1, aliceAddress)
+
+        const { calls: positionsCalls } = mockedBookKeeper.smocked.positions
+        const { calls: movePositionCalls } = mockedBookKeeper.smocked.movePosition
+
+        expect(positionsCalls.length).to.be.equal(1)
+        expect(positionsCalls[0][0]).to.be.equal(formatBytes32String("BNB"))
+        expect(positionsCalls[0][1]).to.be.equal(positionAddress)
+
+        expect(movePositionCalls.length).to.be.equal(1)
+        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0].src).to.be.equal(positionAddress)
+        expect(movePositionCalls[0].dst).to.be.equal(aliceAddress)
+        expect(movePositionCalls[0].collateralValue).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+      })
+    })
+    context("when Alice wants Bob to quit her position", async () => {
+      it("should be able to call quit()", async () => {
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        const positionAddress = await cdpManager.positions(1)
+
+        // Alice allows Bob to manage her cdp#1
+        await cdpManagerAsAlice.cdpAllow(1, bobAddress, 1)
+        // Bob allows cdp#1 to be quitted to his address
+        await cdpManagerAsBob.positionAllow(bobAddress, 1)
+
+        mockedBookKeeper.smocked.positions.will.return.with([WeiPerWad.mul(2), WeiPerWad.mul(1)])
+        mockedBookKeeper.smocked.movePosition.will.return.with()
+
+        // Bob quits cdp#1 to his address
+        await cdpManagerAsBob.quit(1, bobAddress)
+
+        const { calls: positionsCalls } = mockedBookKeeper.smocked.positions
+        const { calls: movePositionCalls } = mockedBookKeeper.smocked.movePosition
+
+        expect(positionsCalls.length).to.be.equal(1)
+        expect(positionsCalls[0][0]).to.be.equal(formatBytes32String("BNB"))
+        expect(positionsCalls[0][1]).to.be.equal(positionAddress)
+
+        expect(movePositionCalls.length).to.be.equal(1)
+        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0].src).to.be.equal(positionAddress)
+        expect(movePositionCalls[0].dst).to.be.equal(bobAddress)
+        expect(movePositionCalls[0].collateralValue).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
   })
