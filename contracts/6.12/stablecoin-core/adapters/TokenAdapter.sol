@@ -27,7 +27,6 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
 import "../../interfaces/ITokenAdapter.sol";
-import "hardhat/console.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
