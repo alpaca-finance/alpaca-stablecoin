@@ -27,10 +27,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IAuctioneer.sol";
 import "../interfaces/ILiquidationEngine.sol";
-
-interface SystemDebtEngine {
-  function pushToBadDebtQueue(uint256) external;
-}
+import "../interfaces/ISystemDebtEngine.sol";
 
 contract LiquidationEngine is
   OwnableUpgradeable,
@@ -69,7 +66,7 @@ contract LiquidationEngine is
 
   mapping(bytes32 => CollateralPool) public override collateralPools;
 
-  SystemDebtEngine public systemDebtEngine; // Debt Engine
+  ISystemDebtEngine public systemDebtEngine; // Debt Engine
   uint256 public live; // Active Flag
   uint256 public liquidationMaxSize; // Max DAI needed to cover debt+fees of active auctions [rad]
   uint256 public stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions [rad]
@@ -129,7 +126,7 @@ contract LiquidationEngine is
 
   // --- Administration ---
   function file(bytes32 what, address data) external auth {
-    if (what == "systemDebtEngine") systemDebtEngine = SystemDebtEngine(data);
+    if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
     else revert("LiquidationEngine/file-unrecognized-param");
     emit File(what, data);
   }

@@ -23,7 +23,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
 import "../interfaces/IBookKeeper.sol";
+import "../interfaces/IStabilityFeeCollector.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -33,7 +35,8 @@ contract StabilityFeeCollector is
   OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  IStabilityFeeCollector
 {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
@@ -179,7 +182,7 @@ contract StabilityFeeCollector is
   }
 
   // --- Stability Fee Collection ---
-  function collect(bytes32 collateralPool) external nonReentrant returns (uint256 rate) {
+  function collect(bytes32 collateralPool) external override nonReentrant returns (uint256 rate) {
     require(now >= collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
     (, uint256 prev, , , ) = bookKeeper.collateralPools(collateralPool);
     rate = rmul(

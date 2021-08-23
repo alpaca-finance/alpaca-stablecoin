@@ -28,56 +28,9 @@ import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IAuctioneer.sol";
 import "../../interfaces/IPriceFeed.sol";
 import "../../interfaces/IPriceOracle.sol";
-
-interface GovernmentLike {
-  function moveStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-
-  function moveCollateral(
-    bytes32,
-    address,
-    address,
-    uint256
-  ) external;
-
-  function collateralPools(bytes32)
-    external
-    returns (
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    );
-
-  function mintUnbackedStablecoin(
-    address,
-    address,
-    uint256
-  ) external;
-}
-
-interface LiquidationEngineLike {
-  function liquidationPenalty(bytes32) external returns (uint256);
-
-  function removeRepaidDebtFromAuction(bytes32, uint256) external;
-}
-
-interface FlashLendingCallee {
-  function flashLendingCall(
-    address,
-    uint256,
-    uint256,
-    bytes calldata
-  ) external;
-}
-
-interface CalculatorLike {
-  function price(uint256, uint256) external view returns (uint256);
-}
+import "../../interfaces/ILiquidationEngine.sol";
+import "../../interfaces/ICalculator.sol";
+import "../../interfaces/IFlashLendingCallee.sol";
 
 contract CollateralAuctioneer is
   OwnableUpgradeable,
@@ -108,10 +61,10 @@ contract CollateralAuctioneer is
   bytes32 public override collateralPoolId; // Collateral type of this CollateralAuctioneer
   IBookKeeper public bookKeeper; // Core CDP Engine
 
-  LiquidationEngineLike public liquidationEngine; // Liquidation module
+  ILiquidationEngine public liquidationEngine; // Liquidation module
   address public systemDebtEngine; // Recipient of dai raised in auctions
   IPriceOracle public priceOracle; // Collateral price module
-  CalculatorLike public calc; // Current price calculator
+  ICalculator public calc; // Current price calculator
 
   uint256 public startingPriceBuffer; // Multiplicative factor to increase starting price                  [ray]
   uint256 public auctionTimeLimit; // Time elapsed before auction reset                                 [seconds]
@@ -193,7 +146,7 @@ contract CollateralAuctioneer is
 
     bookKeeper = IBookKeeper(_bookKeeper);
     priceOracle = IPriceOracle(priceOracle_);
-    liquidationEngine = LiquidationEngineLike(liquidationEngine_);
+    liquidationEngine = ILiquidationEngine(liquidationEngine_);
     collateralPoolId = collateralPoolId_;
     startingPriceBuffer = RAY;
     wards[msg.sender] = 1;
@@ -232,9 +185,9 @@ contract CollateralAuctioneer is
 
   function file(bytes32 what, address data) external auth lock {
     if (what == "priceOracle") priceOracle = IPriceOracle(data);
-    else if (what == "liquidationEngine") liquidationEngine = LiquidationEngineLike(data);
+    else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
     else if (what == "systemDebtEngine") systemDebtEngine = data;
-    else if (what == "calc") calc = CalculatorLike(data);
+    else if (what == "calc") calc = ICalculator(data);
     else revert("CollateralAuctioneer/file-unrecognized-param");
     emit File(what, data);
   }
@@ -458,13 +411,13 @@ contract CollateralAuctioneer is
       // Do external call (if data is defined) but to be
       // extremely careful we don't allow to do it to the two
       // contracts which the CollateralAuctioneer needs to be authorized
-      LiquidationEngineLike liquidationEngine_ = liquidationEngine;
+      ILiquidationEngine liquidationEngine_ = liquidationEngine;
       if (
         data.length > 0 &&
         collateralRecipient != address(bookKeeper) &&
         collateralRecipient != address(liquidationEngine_)
       ) {
-        FlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
+        IFlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
       }
 
       // Get DAI from caller
