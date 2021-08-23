@@ -27,6 +27,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
 import "../../interfaces/ITokenAdapter.sol";
+import "hardhat/console.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -74,7 +75,7 @@ contract TokenAdapter is
     wards[usr] = 0;
   }
 
-  modifier auth {
+  modifier auth() {
     require(wards[msg.sender] == 1, "TokenAdapter/not-authorized");
     _;
   }
