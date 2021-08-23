@@ -470,4 +470,118 @@ describe("CDPManager", () => {
       })
     })
   })
+
+  describe("#shift()", () => {
+    context("when caller has no access to the source cdp", () => {
+      it("should revert", async () => {
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        await cdpManager.open(formatBytes32String("BNB"), bobAddress)
+
+        await expect(cdpManagerAsBob.shift(1, 2)).to.be.revertedWith("cdp-not-allowed")
+      })
+    })
+    context("when caller has no access to the destination cdp", () => {
+      it("should revert", async () => {
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        await cdpManager.open(formatBytes32String("BNB"), bobAddress)
+
+        await expect(cdpManagerAsAlice.shift(1, 2)).to.be.revertedWith("cdp-not-allowed")
+      })
+    })
+    context("when caller these two cdps are from different collateral pool", () => {
+      it("should revert", async () => {
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        await cdpManager.open(formatBytes32String("BTC"), bobAddress)
+        await cdpManagerAsBob.cdpAllow(2, aliceAddress, 1)
+
+        await expect(cdpManagerAsAlice.shift(1, 2)).to.be.revertedWith("non-matching-cdps")
+      })
+    })
+    context("when Alice wants to shift her cdp#1 to her cdp#2", async () => {
+      it("should be able to call shift()", async () => {
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        const position1Address = await cdpManager.positions(1)
+        const position2Address = await cdpManager.positions(2)
+
+        mockedBookKeeper.smocked.positions.will.return.with([WeiPerWad.mul(2), WeiPerWad.mul(1)])
+        mockedBookKeeper.smocked.movePosition.will.return.with()
+
+        await cdpManagerAsAlice.shift(1, 2)
+
+        const { calls: positionsCalls } = mockedBookKeeper.smocked.positions
+        const { calls: movePositionCalls } = mockedBookKeeper.smocked.movePosition
+
+        expect(positionsCalls.length).to.be.equal(1)
+        expect(positionsCalls[0][0]).to.be.equal(formatBytes32String("BNB"))
+        expect(positionsCalls[0][1]).to.be.equal(position1Address)
+
+        expect(movePositionCalls.length).to.be.equal(1)
+        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0].src).to.be.equal(position1Address)
+        expect(movePositionCalls[0].dst).to.be.equal(position2Address)
+        expect(movePositionCalls[0].collateralValue).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+      })
+    })
+    context("when Alice wants to shift her cdp#1 to Bob's cdp#2", async () => {
+      it("should be able to call shift()", async () => {
+        await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+        await cdpManager.open(formatBytes32String("BNB"), bobAddress)
+        await cdpManagerAsBob.cdpAllow(2, aliceAddress, 1)
+        const position1Address = await cdpManager.positions(1)
+        const position2Address = await cdpManager.positions(2)
+
+        mockedBookKeeper.smocked.positions.will.return.with([WeiPerWad.mul(2), WeiPerWad.mul(1)])
+        mockedBookKeeper.smocked.movePosition.will.return.with()
+
+        await cdpManagerAsAlice.shift(1, 2)
+
+        const { calls: positionsCalls } = mockedBookKeeper.smocked.positions
+        const { calls: movePositionCalls } = mockedBookKeeper.smocked.movePosition
+
+        expect(positionsCalls.length).to.be.equal(1)
+        expect(positionsCalls[0][0]).to.be.equal(formatBytes32String("BNB"))
+        expect(positionsCalls[0][1]).to.be.equal(position1Address)
+
+        expect(movePositionCalls.length).to.be.equal(1)
+        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0].src).to.be.equal(position1Address)
+        expect(movePositionCalls[0].dst).to.be.equal(position2Address)
+        expect(movePositionCalls[0].collateralValue).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+      })
+    })
+    // context("when Alice wants Bob to shift her position from Bob's address", async () => {
+    //   it("should be able to call shift()", async () => {
+    //     await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
+    //     const positionAddress = await cdpManager.positions(1)
+
+    //     // Alice allows Bob to manage her cdp#1
+    //     await cdpManagerAsAlice.cdpAllow(1, bobAddress, 1)
+    //     // Bob allows cdp#1 to be quitted to his address
+    //     await cdpManagerAsAlice.positionAllow(bobAddress, 1)
+
+    //     mockedBookKeeper.smocked.positions.will.return.with([WeiPerWad.mul(2), WeiPerWad.mul(1)])
+    //     mockedBookKeeper.smocked.movePosition.will.return.with()
+
+    //     // Bob quits cdp#1 to his address
+    //     await cdpManagerAsBob.shift(bobAddress, 1)
+
+    //     const { calls: positionsCalls } = mockedBookKeeper.smocked.positions
+    //     const { calls: movePositionCalls } = mockedBookKeeper.smocked.movePosition
+
+    //     expect(positionsCalls.length).to.be.equal(1)
+    //     expect(positionsCalls[0][0]).to.be.equal(formatBytes32String("BNB"))
+    //     expect(positionsCalls[0][1]).to.be.equal(bobAddress)
+
+    //     expect(movePositionCalls.length).to.be.equal(1)
+    //     expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+    //     expect(movePositionCalls[0].src).to.be.equal(bobAddress)
+    //     expect(movePositionCalls[0].dst).to.be.equal(positionAddress)
+    //     expect(movePositionCalls[0].collateralValue).to.be.equal(WeiPerWad.mul(2))
+    //     expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+    //   })
+    // })
+  })
 })
