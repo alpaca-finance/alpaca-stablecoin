@@ -384,8 +384,6 @@ describe("CDPManager", () => {
 
         // Alice allows Bob to manage her cdp#1
         await cdpManagerAsAlice.cdpAllow(1, bobAddress, 1)
-        // Bob allows cdp#1 to be quitted to his address
-        await cdpManagerAsBob.migrationAllow(bobAddress, 1)
 
         mockedBookKeeper.smocked.positions.will.return.with([WeiPerWad.mul(2), WeiPerWad.mul(1)])
         mockedBookKeeper.smocked.movePosition.will.return.with()
@@ -420,7 +418,7 @@ describe("CDPManager", () => {
     context("when caller has no access to the cdp", () => {
       it("should revert", async () => {
         await cdpManager.open(formatBytes32String("BNB"), aliceAddress)
-        // Alice allows Bob to call enter on her address to cdp#1
+        // Alice gives Bob migration access on her address
         await cdpManagerAsAlice.migrationAllow(bobAddress, 1)
         await expect(cdpManagerAsBob.enter(aliceAddress, 1)).to.be.revertedWith("cdp-not-allowed")
       })
@@ -457,13 +455,13 @@ describe("CDPManager", () => {
 
         // Alice allows Bob to manage her cdp#1
         await cdpManagerAsAlice.cdpAllow(1, bobAddress, 1)
-        // Bob allows cdp#1 to be quitted to his address
+        // Alice gives Bob migration access on her address
         await cdpManagerAsAlice.migrationAllow(bobAddress, 1)
 
         mockedBookKeeper.smocked.positions.will.return.with([WeiPerWad.mul(2), WeiPerWad.mul(1)])
         mockedBookKeeper.smocked.movePosition.will.return.with()
 
-        // Bob quits cdp#1 to his address
+        // Bob enters cdp#1 from his address to cdp#1
         await cdpManagerAsBob.enter(bobAddress, 1)
 
         const { calls: positionsCalls } = mockedBookKeeper.smocked.positions
