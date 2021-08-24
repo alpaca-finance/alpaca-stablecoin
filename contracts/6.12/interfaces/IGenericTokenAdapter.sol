@@ -28,7 +28,8 @@ interface IGenericTokenAdapter {
   function onAdjustPosition(
     address src,
     address dst,
-    uint256 wad,
+    int256 collateralValue,
+    int256 debtShare,
     bytes calldata data
   ) external;
 

@@ -26,6 +26,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "./PositionHandler.sol";
 import "../interfaces/IManager.sol";
 import "../interfaces/IBookKeeper.sol";
+import "../interfaces/IGenericTokenAdapter.sol";
 
 contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IManager {
   address public override bookKeeper;
@@ -164,7 +165,9 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
   function adjustPosition(
     uint256 cdp,
     int256 collateralValue,
-    int256 debtShare
+    int256 debtShare,
+    address adapter,
+    bytes calldata data
   ) public override cdpAllowed(cdp) {
     address positionAddress = positions[cdp];
     IBookKeeper(bookKeeper).adjustPosition(
@@ -175,13 +178,16 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
       collateralValue,
       debtShare
     );
+    IGenericTokenAdapter(adapter).onAdjustPosition(positionAddress, positionAddress, collateralValue, debtShare, data);
   }
 
   // Transfer wad amount of cdp collateral from the cdp address to a dst address.
   function moveCollateral(
     uint256 cdp,
     address dst,
-    uint256 wad
+    uint256 wad,
+    address adapter,
+    bytes calldata data
   ) public override cdpAllowed(cdp) {
     IBookKeeper(bookKeeper).moveCollateral(collateralPools[cdp], positions[cdp], dst, wad);
   }

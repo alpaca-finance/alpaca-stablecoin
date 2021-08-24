@@ -32,13 +32,17 @@ interface IManager {
   function adjustPosition(
     uint256,
     int256,
-    int256
+    int256,
+    address,
+    bytes calldata
   ) external;
 
   function moveCollateral(
     uint256,
     address,
-    uint256
+    uint256,
+    address,
+    bytes calldata
   ) external;
 
   function moveStablecoin(

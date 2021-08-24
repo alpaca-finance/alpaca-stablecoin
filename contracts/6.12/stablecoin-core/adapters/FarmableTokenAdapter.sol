@@ -54,7 +54,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
   event Rely(address indexed usr);
   event Deny(address indexed usr);
 
-  modifier auth {
+  modifier auth() {
     require(whitelist[msg.sender] == 1, "FarmableToken/not-authed");
     _;
   }
@@ -260,18 +260,24 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
   function onAdjustPosition(
     address src,
     address dst,
-    uint256 wad,
+    int256 collateralValue,
+    int256 debtShare,
     bytes calldata data
-  ) external override nonReentrant {}
+  ) external override nonReentrant {
+    moveRewards(src, dst, uint256(collateralValue), data);
+  }
 
   function onMoveCollateral(
     address src,
     address dst,
     uint256 wad,
     bytes calldata data
-  ) external override nonReentrant {}
+  ) external override nonReentrant {
+    deposit(src, 0, data);
+    moveRewards(src, dst, wad, data);
+  }
 
-  function cage() public override virtual auth {
+  function cage() public virtual override auth {
     live = 0;
   }
 }
