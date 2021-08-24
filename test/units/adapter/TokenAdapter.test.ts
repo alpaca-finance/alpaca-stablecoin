@@ -21,12 +21,13 @@ const { parseEther, formatBytes32String } = ethers.utils
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
 
-  // Deploy mocked booster config
+  // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
   const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
   await bookKeeper.deployed()
   const mockedBookKeeper = await smockit(bookKeeper)
 
+  // Deploy mocked ERC20
   const Token = (await ethers.getContractFactory("ERC20", deployer)) as ERC20__factory
   const token = await Token.deploy("BTCB", "BTCB")
   await token.deployed()
@@ -79,7 +80,7 @@ describe("TokenAdapter", () => {
   describe("#deposit()", () => {
     context("when the token adapter is inactive", () => {
       it("should revert", async () => {
-        tokenAdapter.cage()
+        await tokenAdapter.cage()
         await expect(tokenAdapter.deposit(aliceAddress, WeiPerWad.mul(1))).to.be.revertedWith("TokenAdapter/not-live")
       })
     })
