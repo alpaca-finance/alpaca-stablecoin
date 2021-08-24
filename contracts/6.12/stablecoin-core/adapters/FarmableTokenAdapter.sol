@@ -18,35 +18,19 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "../../interfaces/IBookKeeper.sol";
-
-interface ERC20 {
-  function balanceOf(address owner) external view returns (uint256);
-
-  function transfer(address dst, uint256 amount) external returns (bool);
-
-  function transferFrom(
-    address src,
-    address dst,
-    uint256 amount
-  ) external returns (bool);
-
-  function approve(address spender, uint256 amount) external returns (bool);
-
-  function allowance(address owner, address spender) external view returns (uint256);
-
-  function decimals() external returns (uint8);
-}
+import "../../interfaces/IToken.sol";
+import "../../interfaces/IFarmableTokenAdapter.sol";
 
 // receives tokens and shares them among holders
-contract FarmableTokenAdapter is Initializable {
+contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
   mapping(address => uint256) whitelist;
   uint256 live;
 
   IBookKeeper public bookKeeper; // cdp engine
-  bytes32 public collateralPoolId; // collateral type
-  ERC20 public collateralToken; // collateral token
+  bytes32 public override collateralPoolId; // collateral type
+  IToken public override collateralToken; // collateral token
   uint256 public decimals; // collateralToken decimals
-  ERC20 public rewardToken; // rewhitelist token
+  IToken public rewardToken; // rewhitelist token
 
   uint256 public accRewardPerShare; // rewards per collateralToken    [ray]
   uint256 public totalShare; // total collateralTokens       [wad]
@@ -101,13 +85,13 @@ contract FarmableTokenAdapter is Initializable {
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
-    collateralToken = ERC20(collateralToken_);
-    uint256 decimals_ = ERC20(collateralToken_).decimals();
+    collateralToken = IToken(collateralToken_);
+    uint256 decimals_ = IToken(collateralToken_).decimals();
     require(decimals_ <= 18);
     decimals = decimals_;
     to18ConversionFactor = 10**(18 - decimals_);
     toTokenConversionFactor = 10**decimals_;
-    rewardToken = ERC20(rewardToken_);
+    rewardToken = IToken(rewardToken_);
   }
 
   function add(uint256 x, uint256 y) public pure returns (uint256 z) {
@@ -183,7 +167,7 @@ contract FarmableTokenAdapter is Initializable {
     address positionAddress,
     address usr,
     uint256 val
-  ) public virtual {
+  ) public virtual override {
     require(live == 1, "FarmableToken/not-live");
 
     harvest(positionAddress, usr);
@@ -208,7 +192,7 @@ contract FarmableTokenAdapter is Initializable {
     address positionAddress,
     address usr,
     uint256 val
-  ) public virtual {
+  ) public virtual override {
     harvest(positionAddress, usr);
     if (val > 0) {
       uint256 wad = wdivup(mul(val, to18ConversionFactor), nps());
@@ -246,7 +230,7 @@ contract FarmableTokenAdapter is Initializable {
     address src,
     address dst,
     uint256 wad
-  ) public {
+  ) public override {
     uint256 ss = stake[src];
     stake[src] = sub(ss, wad);
     stake[dst] = add(stake[dst], wad);

@@ -24,36 +24,20 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
+import "../interfaces/ISurplusAuctioneer.sol";
+import "../interfaces/IBadDebtAuctioneer.sol";
+import "../interfaces/ISystemDebtEngine.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-interface BadDebtAuctioneerLike {
-  function startAuction(
-    address gal,
-    uint256 lot,
-    uint256 bid
-  ) external returns (uint256);
-
-  function cage() external;
-
-  function live() external returns (uint256);
-}
-
-interface SurplusAuctioneerLike {
-  function startAuction(uint256 lot, uint256 bid) external returns (uint256);
-
-  function cage(uint256) external;
-
-  function live() external returns (uint256);
-}
-
 contract SystemDebtEngine is
   OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  ISystemDebtEngine
 {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
@@ -74,8 +58,8 @@ contract SystemDebtEngine is
 
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
-  SurplusAuctioneerLike public surplusAuctionHouse; // Surplus Auction House
-  BadDebtAuctioneerLike public badDebtAuctionHouse; // Debt Auction House
+  ISurplusAuctioneer public surplusAuctionHouse; // Surplus Auction House
+  IBadDebtAuctioneer public badDebtAuctionHouse; // Debt Auction House
 
   mapping(uint256 => uint256) public badDebtQueue; // debt queue
   uint256 public totalBadDebtValue; // Queued debt            [rad]
@@ -103,8 +87,8 @@ contract SystemDebtEngine is
 
     whitelist[msg.sender] = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
-    surplusAuctionHouse = SurplusAuctioneerLike(surplusAuctionHouse_);
-    badDebtAuctionHouse = BadDebtAuctioneerLike(badDebtAuctionHouse_);
+    surplusAuctionHouse = ISurplusAuctioneer(surplusAuctionHouse_);
+    badDebtAuctionHouse = IBadDebtAuctioneer(badDebtAuctionHouse_);
     bookKeeper.hope(surplusAuctionHouse_);
     live = 1;
   }
@@ -135,14 +119,14 @@ contract SystemDebtEngine is
   function file(bytes32 what, address data) external auth {
     if (what == "surplusAuctionHouse") {
       bookKeeper.nope(address(surplusAuctionHouse));
-      surplusAuctionHouse = SurplusAuctioneerLike(data);
+      surplusAuctionHouse = ISurplusAuctioneer(data);
       bookKeeper.hope(data);
-    } else if (what == "badDebtAuctionHouse") badDebtAuctionHouse = BadDebtAuctioneerLike(data);
+    } else if (what == "badDebtAuctionHouse") badDebtAuctionHouse = IBadDebtAuctioneer(data);
     else revert("SystemDebtEngine/file-unrecognized-param");
   }
 
   // Push to debt-queue
-  function pushToBadDebtQueue(uint256 tab) external auth {
+  function pushToBadDebtQueue(uint256 tab) external override auth {
     badDebtQueue[now] = add(badDebtQueue[now], tab);
     totalBadDebtValue = add(totalBadDebtValue, tab);
   }
@@ -197,7 +181,7 @@ contract SystemDebtEngine is
     id = surplusAuctionHouse.startAuction(surplusAuctionFixedLotSize, 0);
   }
 
-  function cage() external auth {
+  function cage() external override auth {
     require(live == 1, "SystemDebtEngine/not-live");
     live = 0;
     totalBadDebtValue = 0;

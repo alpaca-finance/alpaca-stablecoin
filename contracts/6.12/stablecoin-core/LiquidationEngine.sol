@@ -23,19 +23,18 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
 import "../interfaces/IBookKeeper.sol";
-
 import "../interfaces/IAuctioneer.sol";
-
-interface SystemDebtEngine {
-  function pushToBadDebtQueue(uint256) external;
-}
+import "../interfaces/ILiquidationEngine.sol";
+import "../interfaces/ISystemDebtEngine.sol";
 
 contract LiquidationEngine is
   OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  ILiquidationEngine
 {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
@@ -65,9 +64,9 @@ contract LiquidationEngine is
 
   IBookKeeper public bookKeeper; // CDP Engine
 
-  mapping(bytes32 => CollateralPool) public collateralPools;
+  mapping(bytes32 => CollateralPool) public override collateralPools;
 
-  SystemDebtEngine public systemDebtEngine; // Debt Engine
+  ISystemDebtEngine public systemDebtEngine; // Debt Engine
   uint256 public live; // Active Flag
   uint256 public liquidationMaxSize; // Max DAI needed to cover debt+fees of active auctions [rad]
   uint256 public stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions [rad]
@@ -90,7 +89,7 @@ contract LiquidationEngine is
     address auctioneer,
     uint256 indexed id
   );
-  event Digs(bytes32 indexed collateralPoolId, uint256 rad);
+  event RemoveRepaidDebtFromAuction(bytes32 indexed collateralPoolId, uint256 rad);
   event Cage();
 
   // --- Init ---
@@ -127,7 +126,7 @@ contract LiquidationEngine is
 
   // --- Administration ---
   function file(bytes32 what, address data) external auth {
-    if (what == "systemDebtEngine") systemDebtEngine = SystemDebtEngine(data);
+    if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
     else revert("LiquidationEngine/file-unrecognized-param");
     emit File(what, data);
   }
@@ -166,7 +165,7 @@ contract LiquidationEngine is
     emit File(collateralPoolId, what, auctioneer);
   }
 
-  function liquidationPenalty(bytes32 collateralPoolId) external view returns (uint256) {
+  function liquidationPenalty(bytes32 collateralPoolId) external view override returns (uint256) {
     return collateralPools[collateralPoolId].liquidationPenalty;
   }
 
@@ -298,16 +297,16 @@ contract LiquidationEngine is
     );
   }
 
-  function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external auth {
+  function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override auth {
     stablecoinNeededForDebtRepay = sub(stablecoinNeededForDebtRepay, rad);
     collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = sub(
       collateralPools[collateralPoolId].stablecoinNeededForDebtRepay,
       rad
     );
-    emit Digs(collateralPoolId, rad);
+    emit RemoveRepaidDebtFromAuction(collateralPoolId, rad);
   }
 
-  function cage() external auth {
+  function cage() external override auth {
     live = 0;
     emit Cage();
   }
