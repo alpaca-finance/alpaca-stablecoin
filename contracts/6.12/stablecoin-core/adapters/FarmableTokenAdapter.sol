@@ -17,6 +17,7 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
 import "../../interfaces/IFarmableTokenAdapter.sol";
@@ -24,7 +25,7 @@ import "../../interfaces/IGenericTokenAdapter.sol";
 import "../../interfaces/IManager.sol";
 
 // receives tokens and shares them among holders
-contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
+contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, ReentrancyGuardUpgradeable {
   mapping(address => uint256) whitelist;
   uint256 live;
 
@@ -83,6 +84,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
     address collateralToken_,
     address rewardToken_
   ) internal initializer {
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
     whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
     live = 1;
@@ -233,7 +235,8 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
   function moveRewards(
     address src,
     address dst,
-    uint256 wad
+    uint256 wad,
+    bytes calldata data
   ) public override {
     uint256 ss = stake[src];
     stake[src] = sub(ss, wad);
@@ -253,6 +256,20 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
 
     emit MoveRewards(src, dst, wad);
   }
+
+  function onAdjustPosition(
+    address src,
+    address dst,
+    uint256 wad,
+    bytes calldata data
+  ) external override nonReentrant {}
+
+  function onMoveCollateral(
+    address src,
+    address dst,
+    uint256 wad,
+    bytes calldata data
+  ) external override nonReentrant {}
 
   function cage() public override virtual auth {
     live = 0;

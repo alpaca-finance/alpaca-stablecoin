@@ -299,7 +299,7 @@ contract FarmableTokenAuctioneer is
     if(positionOwner == address(0)) positionOwner = positionAddress; // If CDP Owner is not foudn from CDP Manager, this means the positionAddress is actually the EOA address
     farmableTokenAdapter.deposit(positionAddress, 0, abi.encode(positionOwner));
     // 2. Confiscate and move the rewards and the staked collateral to this address, they will be distributed to the bidder later
-    farmableTokenAdapter.moveRewards(positionAddress, address(this), collateralAmount);
+    farmableTokenAdapter.moveRewards(positionAddress, address(this), collateralAmount, abi.encode(0));
 
     emit Kick(id, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize);
   }
@@ -427,7 +427,7 @@ contract FarmableTokenAuctioneer is
       bookKeeper.moveCollateral(collateralPoolId, address(this), collateralRecipient, slice);
       // Handle Farmable Token
       // Distribute the confisacted rewards and staked collateral to the bidder
-      farmableTokenAdapter.moveRewards(address(this), collateralRecipient, slice);
+      farmableTokenAdapter.moveRewards(address(this), collateralRecipient, slice, abi.encode(0));
 
       // Do external call (if data is defined) but to be
       // extremely careful we don't allow to do it to the two
@@ -453,7 +453,7 @@ contract FarmableTokenAuctioneer is
     } else if (debt == 0) {
       bookKeeper.moveCollateral(collateralPoolId, address(this), positionAddress, collateralAmount);
       // Return the remaining confiscated rewards and staked collateral to the original position
-      farmableTokenAdapter.moveRewards(address(this), positionAddress, collateralAmount);
+      farmableTokenAdapter.moveRewards(address(this), positionAddress, collateralAmount, abi.encode(0));
       _remove(id);
     } else {
       sales[id].debt = debt;

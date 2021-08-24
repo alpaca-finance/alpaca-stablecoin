@@ -6,6 +6,7 @@ interface IFarmableTokenAdapter is IGenericTokenAdapter {
   function moveRewards(
     address,
     address,
-    uint256
+    uint256,
+    bytes calldata
   ) external;
 }
