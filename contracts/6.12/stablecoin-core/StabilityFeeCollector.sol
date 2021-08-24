@@ -163,10 +163,7 @@ contract StabilityFeeCollector is
     bytes32 what,
     uint256 data
   ) external auth {
-    require(
-      now == collateralPools[collateralPool].lastAccumulationTime,
-      "StabilityFeeCollector/lastAccumulationTime-not-updated"
-    );
+    this.collect(collateralPool);
     if (what == "stabilityFeeRate") collateralPools[collateralPool].stabilityFeeRate = data;
     else revert("StabilityFeeCollector/file-unrecognized-param");
   }
