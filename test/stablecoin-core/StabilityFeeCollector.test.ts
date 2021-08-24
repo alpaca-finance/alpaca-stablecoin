@@ -6,8 +6,9 @@ import "@openzeppelin/test-helpers"
 import { BookKeeper__factory, BookKeeper, StabilityFeeCollector__factory, StabilityFeeCollector } from "../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 
-import * as TimeHelpers from "../helpers/time"
-import * as AssertHelpers from "../helpers/assert"
+import * as TimeHelpers from "../helper/time"
+import * as AssertHelpers from "../helper/assert"
+import * as UnitHelpers from "../helper/unit"
 
 chai.use(solidity)
 const { expect } = chai
@@ -84,7 +85,7 @@ describe("StabilityFeeCollector", () => {
         it("should be success", async () => {
           await stabilityFeeCollectorAsDeployer.init(ethers.utils.formatBytes32String("BNB"))
           const pool = await stabilityFeeCollectorAsAlice.collateralPools(ethers.utils.formatBytes32String("BNB"))
-          expect(pool.stabilityFeeRate.toString()).equal(BigNumber.from("1000000000000000000000000000"))
+          expect(pool.stabilityFeeRate.toString()).equal(UnitHelpers.WeiPerRay)
         })
       })
     })
@@ -104,13 +105,14 @@ describe("StabilityFeeCollector", () => {
           BigNumber.from("1000000000315522921573372069")
         )
 
-        await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from("31535998")))
+        // time increase ~ 1 year
+        await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from("31536000")))
 
         // mock bookeeper
         // set debtAccumulatedRate = 1 ray
         mockedBookKeeper.smocked.collateralPools.will.return.with([
           BigNumber.from(0),
-          BigNumber.from("1000000000000000000000000000"),
+          UnitHelpers.WeiPerRay,
           BigNumber.from(0),
           BigNumber.from(0),
           BigNumber.from(0),
@@ -123,6 +125,7 @@ describe("StabilityFeeCollector", () => {
         expect(calls.length).to.be.equal(1)
         expect(calls[0].collateralPoolId).to.be.equal(ethers.utils.formatBytes32String("BNB"))
         expect(calls[0].u).to.be.equal(AddressZero)
+        // rate ~ 0.01 ray ~ 1%
         AssertHelpers.assertAlmostEqual(
           calls[0].debtAccumulatedRate.toString(),
           BigNumber.from("10000000000000000000000000").toString()
