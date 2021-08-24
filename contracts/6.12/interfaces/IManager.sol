@@ -27,7 +27,7 @@ interface IManager {
     uint256
   ) external;
 
-  function positionAllow(address, uint256) external;
+  function migrationAllow(address, uint256) external;
 
   function adjustPosition(
     uint256,
