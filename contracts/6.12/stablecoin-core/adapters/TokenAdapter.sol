@@ -81,7 +81,7 @@ contract TokenAdapter is OwnableUpgradeable, PausableUpgradeable, AccessControlU
     wards[usr] = 0;
   }
 
-  modifier auth {
+  modifier auth() {
     require(wards[msg.sender] == 1, "TokenAdapter/not-authorized");
     _;
   }
