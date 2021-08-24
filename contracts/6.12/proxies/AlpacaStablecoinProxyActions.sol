@@ -264,7 +264,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address usr,
     uint256 ok
   ) public {
-    IManager(manager).positionAllow(usr, ok);
+    IManager(manager).migrationAllow(usr, ok);
   }
 
   function moveCollateral(
