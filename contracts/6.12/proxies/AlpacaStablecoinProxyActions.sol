@@ -435,7 +435,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Converts WBNB to BNB
     IWBNB(address(ITokenAdapter(bnbAdapter).collateralToken())).withdraw(wad);
     // Sends BNB back to the user's wallet
-    msg.sender.transfer(wad);
+    SafeToken.safeTransferETH(msg.sender, wad);
   }
 
   function freeToken(
@@ -483,7 +483,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Converts WBNB to BNB
     IWBNB(address(ITokenAdapter(bnbAdapter).collateralToken())).withdraw(wad);
     // Sends BNB back to the user's wallet
-    msg.sender.transfer(wad);
+    SafeToken.safeTransferETH(msg.sender, wad);
   }
 
   function exitToken(
@@ -814,7 +814,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Converts WBNB to BNB
     IWBNB(address(ITokenAdapter(bnbAdapter).collateralToken())).withdraw(wadC);
     // Sends BNB back to the user's wallet
-    msg.sender.transfer(wadC);
+    SafeToken.safeTransferETH(msg.sender, wadC);
   }
 
   function wipeAllAndFreeBNB(
@@ -844,7 +844,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Converts WBNB to BNB
     IWBNB(address(ITokenAdapter(bnbAdapter).collateralToken())).withdraw(wadC);
     // Sends BNB back to the user's wallet
-    msg.sender.transfer(wadC);
+    SafeToken.safeTransferETH(msg.sender, wadC);
   }
 
   function wipeAndFreeToken(
