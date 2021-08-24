@@ -29,6 +29,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
 
   const Token = (await ethers.getContractFactory("ERC20", deployer)) as ERC20__factory
   const token = await Token.deploy("BTCB", "BTCB")
+  await token.deployed()
   const mockedToken = await smockit(token)
 
   // Deploy TokenAdapter
@@ -181,14 +182,13 @@ describe("TokenAdapter", () => {
     })
   })
 
-  describe("#rely()", () => {
+  describe("#deny()", () => {
     context("when call deny ", () => {
       it("should be set wards to 0", async () => {
         await tokenAdapter.rely(aliceAddress)
         expect(await tokenAdapter.wards(aliceAddress)).to.be.equal(1)
 
         await tokenAdapter.deny(aliceAddress)
-
         expect(await tokenAdapter.wards(aliceAddress)).to.be.equal(0)
       })
     })
