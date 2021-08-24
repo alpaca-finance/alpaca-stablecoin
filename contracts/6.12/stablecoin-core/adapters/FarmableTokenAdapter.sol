@@ -20,7 +20,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
 import "../../interfaces/IFarmableTokenAdapter.sol";
-import "../../interfaces/IAdapter.sol";
+import "../../interfaces/IGenericTokenAdapter.sol";
 import "../../interfaces/IManager.sol";
 
 // receives tokens and shares them among holders

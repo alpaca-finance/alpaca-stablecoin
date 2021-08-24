@@ -2,7 +2,7 @@ pragma solidity 0.6.12;
 
 import "../interfaces/IToken.sol";
 
-interface IAdapter {
+interface IGenericTokenAdapter {
   function rely(address usr) external;
 
   function deny(address usr) external;

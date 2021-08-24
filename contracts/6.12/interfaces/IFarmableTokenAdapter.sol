@@ -1,8 +1,8 @@
 pragma solidity 0.6.12;
 
-import "../interfaces/IAdapter.sol";
+import "../interfaces/IGenericTokenAdapter.sol";
 
-interface IFarmableTokenAdapter is IAdapter {
+interface IFarmableTokenAdapter is IGenericTokenAdapter {
   function moveRewards(
     address,
     address,

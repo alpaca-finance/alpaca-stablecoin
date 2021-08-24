@@ -26,7 +26,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
-import "../../interfaces/IAdapter.sol";
+import "../../interfaces/IGenericTokenAdapter.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -61,7 +61,7 @@ contract TokenAdapter is
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
-  IAdapter
+  IGenericTokenAdapter
 {
   // --- Auth ---
   mapping(address => uint256) public wards;

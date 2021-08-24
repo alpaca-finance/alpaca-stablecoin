@@ -24,7 +24,7 @@ import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IWBNB.sol";
 import "../interfaces/IToken.sol";
 import "../interfaces/IManager.sol";
-import "../interfaces/IAdapter.sol";
+import "../interfaces/IGenericTokenAdapter.sol";
 import "../interfaces/IFarmableTokenAdapter.sol";
 import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IStabilityFeeCollector.sol";
@@ -86,7 +86,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
   function convertTo18(address tokenAdapter, uint256 amt) internal returns (uint256 wad) {
     // For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to adjustPosition function
     // Adapters will automatically handle the difference of precision
-    wad = mul(amt, 10**(18 - IAdapter(tokenAdapter).decimals()));
+    wad = mul(amt, 10**(18 - IGenericTokenAdapter(tokenAdapter).decimals()));
   }
 
   function _getDrawDebtShare(
@@ -162,11 +162,11 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
 
   function bnbAdapter_deposit(address apt, address positionAddress) public payable {
     // Wraps BNB in WBNB
-    IWBNB(address(IAdapter(apt).collateralToken())).deposit.value(msg.value)();
+    IWBNB(address(IGenericTokenAdapter(apt).collateralToken())).deposit.value(msg.value)();
     // Approves adapter to take the WBNB amount
-    IAdapter(apt).collateralToken().approve(address(apt), msg.value);
+    IGenericTokenAdapter(apt).collateralToken().approve(address(apt), msg.value);
     // Deposits WBNB collateral into the bookKeeper
-    IAdapter(apt).deposit(positionAddress, msg.value, abi.encode(0));
+    IGenericTokenAdapter(apt).deposit(positionAddress, msg.value, abi.encode(0));
   }
 
   function tokenAdapter_deposit(
@@ -178,12 +178,12 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Only executes for tokens that have approval/transferFrom implementation
     if (transferFrom) {
       // Gets token from the user's wallet
-      IAdapter(apt).collateralToken().transferFrom(msg.sender, address(this), amt);
+      IGenericTokenAdapter(apt).collateralToken().transferFrom(msg.sender, address(this), amt);
       // Approves adapter to take the token amount
-      IAdapter(apt).collateralToken().approve(apt, amt);
+      IGenericTokenAdapter(apt).collateralToken().approve(apt, amt);
     }
     // Deposits token collateral into the bookKeeper
-    IAdapter(apt).deposit(positionAddress, amt, abi.encode(msg.sender));
+    IGenericTokenAdapter(apt).deposit(positionAddress, amt, abi.encode(msg.sender));
   }
 
   function hope(address obj, address usr) public {
@@ -348,7 +348,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       toInt(convertTo18(tokenAdapter, amt)),
       0
     );
-    if(IAdapter(tokenAdapter).isFarmable()) IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), amt);
+    if(IGenericTokenAdapter(tokenAdapter).isFarmable()) IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), amt);
   }
 
   function safeLockToken(
@@ -374,9 +374,9 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wad);
     // Withdraws WBNB amount to proxy address as a token
-    IAdapter(bnbAdapter).withdraw(address(this), wad, abi.encode(0));
+    IGenericTokenAdapter(bnbAdapter).withdraw(address(this), wad, abi.encode(0));
     // Converts WBNB to BNB
-    IWBNB(address(IAdapter(bnbAdapter).collateralToken())).withdraw(wad);
+    IWBNB(address(IGenericTokenAdapter(bnbAdapter).collateralToken())).withdraw(wad);
     // Sends BNB back to the user's wallet
     msg.sender.transfer(wad);
   }
@@ -395,8 +395,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wad);
     // Withdraws token amount to the user's wallet as a token
-    if(IAdapter(tokenAdapter).isFarmable()) IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), wad);
-    IAdapter(tokenAdapter).withdraw(msg.sender, amt, data);
+    if(IGenericTokenAdapter(tokenAdapter).isFarmable()) IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), wad);
+    IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, amt, data);
   }
 
   function exitBNB(
@@ -409,9 +409,9 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     moveCollateral(manager, cdp, address(this), wad);
 
     // Withdraws WBNB amount to proxy address as a token
-    IAdapter(bnbAdapter).withdraw(address(this), wad, abi.encode(0));
+    IGenericTokenAdapter(bnbAdapter).withdraw(address(this), wad, abi.encode(0));
     // Converts WBNB to BNB
-    IWBNB(address(IAdapter(bnbAdapter).collateralToken())).withdraw(wad);
+    IWBNB(address(IGenericTokenAdapter(bnbAdapter).collateralToken())).withdraw(wad);
     // Sends BNB back to the user's wallet
     msg.sender.transfer(wad);
   }
@@ -426,7 +426,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     moveCollateral(manager, cdp, address(this), convertTo18(tokenAdapter, amt));
 
     // Withdraws token amount to the user's wallet as a token
-    IAdapter(tokenAdapter).withdraw(msg.sender, amt, abi.encode(0));
+    IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, amt, abi.encode(0));
   }
 
   function draw(
@@ -671,9 +671,9 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wadC);
     // Withdraws WBNB amount to proxy address as a token
-    IAdapter(bnbAdapter).withdraw(address(this), wadC, abi.encode(0));
+    IGenericTokenAdapter(bnbAdapter).withdraw(address(this), wadC, abi.encode(0));
     // Converts WBNB to BNB
-    IWBNB(address(IAdapter(bnbAdapter).collateralToken())).withdraw(wadC);
+    IWBNB(address(IGenericTokenAdapter(bnbAdapter).collateralToken())).withdraw(wadC);
     // Sends BNB back to the user's wallet
     msg.sender.transfer(wadC);
   }
@@ -701,9 +701,9 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wadC);
     // Withdraws WBNB amount to proxy address as a token
-    IAdapter(bnbAdapter).withdraw(address(this), wadC, abi.encode(0));
+    IGenericTokenAdapter(bnbAdapter).withdraw(address(this), wadC, abi.encode(0));
     // Converts WBNB to BNB
-    IWBNB(address(IAdapter(bnbAdapter).collateralToken())).withdraw(wadC);
+    IWBNB(address(IGenericTokenAdapter(bnbAdapter).collateralToken())).withdraw(wadC);
     // Sends BNB back to the user's wallet
     msg.sender.transfer(wadC);
   }
@@ -735,7 +735,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wadC);
     // Withdraws token amount to the user's wallet as a token
-    IAdapter(tokenAdapter).withdraw(msg.sender, amtC, abi.encode(0));
+    IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, amtC, abi.encode(0));
   }
 
   function wipeAllAndFreeToken(
@@ -762,6 +762,6 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wadC);
     // Withdraws token amount to the user's wallet as a token
-    IAdapter(tokenAdapter).withdraw(msg.sender, amtC, abi.encode(0));
+    IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, amtC, abi.encode(0));
   }
 }
