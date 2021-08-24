@@ -20,8 +20,6 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IWBNB.sol";
 import "../interfaces/IToken.sol";
@@ -32,13 +30,14 @@ import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IStabilityFeeCollector.sol";
 import "../interfaces/IProxyRegistry.sol";
 import "../interfaces/IProxy.sol";
+import "../utils/SafeToken.sol";
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // WARNING: These functions meant to be used as a a library for a DSProxy. Some are unsafe if you call them directly.
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 contract Common {
-  using SafeERC20Upgradeable for address;
+  using SafeToken for address;
   uint256 constant RAY = 10**27;
 
   // Internal functions
@@ -50,21 +49,23 @@ contract Common {
   // Public functions
 
   function stablecoinAdapter_deposit(
-    address apt,
+    address adapter,
     address positionAddress,
     uint256 wad
   ) public {
+    address stableCoin = address(IStablecoinAdapter(adapter).stablecoin());
+
     // Gets Alpaca Stablecoin from the user's wallet
-    IStablecoinAdapter(apt).stablecoin().transferFrom(msg.sender, address(this), wad);
+    stableCoin.safeTransferFrom(msg.sender, address(this), wad);
     // Approves adapter to take the Alpaca Stablecoin amount
-    IStablecoinAdapter(apt).stablecoin().approve(apt, wad);
+    stableCoin.safeApprove(adapter, wad);
     // Deposits Alpaca Stablecoin into the bookKeeper
-    IStablecoinAdapter(apt).deposit(positionAddress, wad);
+    IStablecoinAdapter(adapter).deposit(positionAddress, wad);
   }
 }
 
 contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, Common {
-  using SafeERC20Upgradeable for IERC20Upgradeable;
+  using SafeToken for address;
 
   // --- Init ---
   function initialize() external initializer {
@@ -162,50 +163,54 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address dst,
     uint256 amt
   ) public {
-    IToken(collateralToken).transfer(dst, amt);
+    address(collateralToken).safeTransfer(dst, amt);
   }
 
-  function bnbAdapter_deposit(address apt, address positionAddress) public payable {
+  function bnbAdapter_deposit(address adapter, address positionAddress) public payable {
+    address collateralToken = address(ITokenAdapter(adapter).collateralToken());
     // Wraps BNB in WBNB
-    IWBNB(address(ITokenAdapter(apt).collateralToken())).deposit.value(msg.value)();
+    IWBNB(collateralToken).deposit{ value: msg.value }();
     // Approves adapter to take the WBNB amount
-    ITokenAdapter(apt).collateralToken().approve(address(apt), msg.value);
+    collateralToken.safeApprove(address(adapter), msg.value);
     // Deposits WBNB collateral into the bookKeeper
-    ITokenAdapter(apt).deposit(positionAddress, msg.value);
+    ITokenAdapter(adapter).deposit(positionAddress, msg.value);
   }
 
   function tokenAdapter_deposit(
-    address apt,
+    address adapter,
     address positionAddress,
     uint256 amt,
     bool transferFrom
   ) public {
+    address collateralToken = address(ITokenAdapter(adapter).collateralToken());
+
     // Only executes for tokens that have approval/transferFrom implementation
     if (transferFrom) {
       // Gets token from the user's wallet
-      ITokenAdapter(apt).collateralToken().transferFrom(msg.sender, address(this), amt);
+      collateralToken.safeTransferFrom(msg.sender, address(this), amt);
       // Approves adapter to take the token amount
-      ITokenAdapter(apt).collateralToken().approve(apt, amt);
+      collateralToken.safeApprove(adapter, amt);
     }
     // Deposits token collateral into the bookKeeper
-    ITokenAdapter(apt).deposit(positionAddress, amt);
+    ITokenAdapter(adapter).deposit(positionAddress, amt);
   }
 
   function farmableTokenAdapter_deposit(
-    address apt,
+    address adapter,
     address positionAddress,
     uint256 amt,
     bool transferFrom
   ) public {
+    address collateralToken = address(IFarmableTokenAdapter(adapter).collateralToken());
     // Only executes for tokens that have approval/transferFrom implementation
     if (transferFrom) {
       // Gets token from the user's wallet
-      IFarmableTokenAdapter(apt).collateralToken().transferFrom(msg.sender, address(this), amt);
+      collateralToken.safeTransferFrom(msg.sender, address(this), amt);
       // Approves adapter to take the token amount
-      IFarmableTokenAdapter(apt).collateralToken().approve(apt, amt);
+      collateralToken.safeApprove(adapter, amt);
     }
     // Deposits token collateral into the bookKeeper
-    IFarmableTokenAdapter(apt).deposit(positionAddress, msg.sender, amt);
+    IFarmableTokenAdapter(adapter).deposit(positionAddress, msg.sender, amt);
   }
 
   function hope(address obj, address usr) public {
