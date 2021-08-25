@@ -84,7 +84,6 @@ contract TokenAdapter is
   IToken public override collateralToken;
   uint256 public override decimals;
   uint256 public live; // Active Flag
-  bool public override isFarmable; // if true `moveRewards` must be called on every movement of collateral
 
   function initialize(
     address _bookKeeper,

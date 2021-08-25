@@ -34,7 +34,6 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
   IToken public override collateralToken; // collateral token
   uint256 public override decimals; // collateralToken decimals
   IToken public rewardToken; // rewhitelist token
-  bool public override isFarmable; // if true `moveRewards` must be called on every movement of collateral
 
   uint256 public accRewardPerShare; // rewards per collateralToken    [ray]
   uint256 public totalShare; // total collateralTokens       [wad]
@@ -264,7 +263,8 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
     int256 debtShare,
     bytes calldata data
   ) external override nonReentrant {
-    moveRewards(src, dst, uint256(collateralValue), data);
+    uint256 unsignedCollateralValue = collateralValue < 0 ? uint256(-collateralValue) : uint256(collateralValue);
+    moveRewards(src, dst, unsignedCollateralValue, data);
   }
 
   function onMoveCollateral(

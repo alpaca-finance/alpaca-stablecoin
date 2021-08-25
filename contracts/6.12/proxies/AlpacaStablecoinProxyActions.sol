@@ -308,7 +308,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
   function lockBNB(
     address manager,
     address bnbAdapter,
-    uint256 cdp
+    uint256 cdp,
+    bytes calldata data
   ) public payable {
     // Receives BNB amount, converts it to WBNB and joins it into the bookKeeper
     bnbAdapter_deposit(bnbAdapter, address(this));
@@ -321,16 +322,18 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       toInt(msg.value),
       0
     );
+    IGenericTokenAdapter(bnbAdapter).onAdjustPosition(address(this), IManager(manager).positions(cdp), toInt(msg.value), 0, data);
   }
 
   function safeLockBNB(
     address manager,
     address bnbAdapter,
     uint256 cdp,
-    address owner
+    address owner,
+    bytes calldata data
   ) public payable {
     require(IManager(manager).owns(cdp) == owner, "owner-missmatch");
-    lockBNB(manager, bnbAdapter, cdp);
+    lockBNB(manager, bnbAdapter, cdp, data);
   }
 
   function lockToken(
@@ -338,7 +341,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     address tokenAdapter,
     uint256 cdp,
     uint256 amt,
-    bool transferFrom
+    bool transferFrom,
+    bytes calldata data
   ) public {
     address positionAddress = IManager(manager).positions(cdp);
     // Takes token amount from user's wallet and joins into the bookKeeper
@@ -352,8 +356,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       toInt(convertTo18(tokenAdapter, amt)),
       0
     );
-    if (IGenericTokenAdapter(tokenAdapter).isFarmable())
-      IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), amt, abi.encode(0));
+    IGenericTokenAdapter(tokenAdapter).onAdjustPosition(address(this), IManager(manager).positions(cdp), toInt(convertTo18(tokenAdapter, amt)), 0, data);
   }
 
   function safeLockToken(
@@ -362,10 +365,11 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     uint256 cdp,
     uint256 amt,
     bool transferFrom,
-    address owner
+    address owner,
+    bytes calldata data
   ) public {
     require(IManager(manager).owns(cdp) == owner, "owner-missmatch");
-    lockToken(manager, tokenAdapter, cdp, amt, transferFrom);
+    lockToken(manager, tokenAdapter, cdp, amt, transferFrom, data);
   }
 
   function freeBNB(
@@ -401,8 +405,6 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wad, tokenAdapter, data);
     // Withdraws token amount to the user's wallet as a token
-    if (IGenericTokenAdapter(tokenAdapter).isFarmable())
-      IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), wad, abi.encode(0));
     IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, amt, data);
   }
 

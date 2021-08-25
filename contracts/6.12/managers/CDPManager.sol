@@ -190,6 +190,7 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     bytes calldata data
   ) public override cdpAllowed(cdp) {
     IBookKeeper(bookKeeper).moveCollateral(collateralPools[cdp], positions[cdp], dst, wad);
+    IGenericTokenAdapter(adapter).onMoveCollateral(positions[cdp], dst, wad, data);
   }
 
   // Transfer wad amount of any type of collateral (collateralPoolId) from the cdp address to a dst address.
@@ -198,9 +199,12 @@ contract CDPManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpg
     bytes32 collateralPoolId,
     uint256 cdp,
     address dst,
-    uint256 wad
+    uint256 wad,
+    address adapter,
+    bytes calldata data
   ) public cdpAllowed(cdp) {
     IBookKeeper(bookKeeper).moveCollateral(collateralPoolId, positions[cdp], dst, wad);
+    IGenericTokenAdapter(adapter).onMoveCollateral(positions[cdp], dst, wad, data);
   }
 
   // Transfer rad amount of DAI from the cdp address to a dst address.
