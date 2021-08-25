@@ -18,7 +18,6 @@
 pragma solidity 0.6.12;
 
 import "../../interfaces/ICalculator.sol";
-import "hardhat/console.sol";
 
 // While an equivalent function can be obtained by setting step = 1 in StairstepExponentialDecrease,
 // this continous (i.e. per-second) exponential decrease has be implemented as it is more gas-efficient
@@ -69,8 +68,7 @@ contract ExponentialDecrease is ICalculator {
   // --- Math ---
   uint256 constant RAY = 10**27;
 
-  function rmul(uint256 x, uint256 y) internal view returns (uint256 z) {
-    console.log("y ", y);
+  function rmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
     z = x * y;
     require(y == 0 || z / y == x);
     z = z / RAY;
@@ -81,11 +79,7 @@ contract ExponentialDecrease is ICalculator {
     uint256 x,
     uint256 n,
     uint256 b
-  ) internal view returns (uint256 z) {
-    console.log("z ", z);
-    console.log("x ", x);
-    console.log("n ", n);
-    console.log("b ", b);
+  ) internal pure returns (uint256 z) {
     assembly {
       switch n
       case 0 {
@@ -134,8 +128,6 @@ contract ExponentialDecrease is ICalculator {
         }
       }
     }
-    console.log("z ", z);
-    console.log("----------------------------------------------");
   }
 
   // top: initial price
@@ -147,9 +139,6 @@ contract ExponentialDecrease is ICalculator {
   // returns: top * (cut ^ dur)
   //
   function price(uint256 top, uint256 dur) external view override returns (uint256) {
-    console.log("top ", top);
-    console.log("cut ", cut);
-    console.log("dur ", dur);
     return rmul(top, rpow(cut, dur, RAY));
   }
 }
