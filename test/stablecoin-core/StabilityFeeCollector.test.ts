@@ -13,6 +13,7 @@ import * as UnitHelpers from "../helper/unit"
 chai.use(solidity)
 const { expect } = chai
 const { AddressZero } = ethers.constants
+const { formatBytes32String } = ethers.utils
 
 type fixture = {
   stabilityFeeCollector: StabilityFeeCollector
@@ -53,18 +54,12 @@ describe("StabilityFeeCollector", () => {
   let mockedBookKeeper: MockContract
 
   let stabilityFeeCollector: StabilityFeeCollector
-  let stabilityFeeCollectorAsDeployer: StabilityFeeCollector
   let stabilityFeeCollectorAsAlice: StabilityFeeCollector
 
   beforeEach(async () => {
     ;({ stabilityFeeCollector, mockedBookKeeper } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
-
-    stabilityFeeCollectorAsDeployer = StabilityFeeCollector__factory.connect(
-      stabilityFeeCollector.address,
-      deployer
-    ) as StabilityFeeCollector
 
     stabilityFeeCollectorAsAlice = StabilityFeeCollector__factory.connect(
       stabilityFeeCollector.address,
@@ -75,7 +70,7 @@ describe("StabilityFeeCollector", () => {
   describe("#init", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
-        await expect(stabilityFeeCollectorAsAlice.init(ethers.utils.formatBytes32String("BNB"))).to.be.revertedWith(
+        await expect(stabilityFeeCollectorAsAlice.init(formatBytes32String("BNB"))).to.be.revertedWith(
           "StabilityFeeCollector/not-authorized"
         )
       })
@@ -83,8 +78,8 @@ describe("StabilityFeeCollector", () => {
     context("when the caller is the owner", async () => {
       context("when initialize BNB pool", async () => {
         it("should be success", async () => {
-          await stabilityFeeCollectorAsDeployer.init(ethers.utils.formatBytes32String("BNB"))
-          const pool = await stabilityFeeCollectorAsAlice.collateralPools(ethers.utils.formatBytes32String("BNB"))
+          await stabilityFeeCollector.init(formatBytes32String("BNB"))
+          const pool = await stabilityFeeCollectorAsAlice.collateralPools(formatBytes32String("BNB"))
           expect(pool.stabilityFeeRate.toString()).equal(UnitHelpers.WeiPerRay)
         })
       })
@@ -94,18 +89,18 @@ describe("StabilityFeeCollector", () => {
   describe("#collect", () => {
     context("when call collect", async () => {
       it("should be rate to ~ 1%", async () => {
-        await stabilityFeeCollectorAsDeployer.init(ethers.utils.formatBytes32String("BNB"))
+        await stabilityFeeCollector.init(formatBytes32String("BNB"))
 
         // rate ~ 1% annually
         // r^31536000 = 1.01
         // r =~ 1000000000315522921573372069...
-        await stabilityFeeCollectorAsDeployer["file(bytes32,bytes32,uint256)"](
-          ethers.utils.formatBytes32String("BNB"),
-          ethers.utils.formatBytes32String("stabilityFeeRate"),
+        await stabilityFeeCollector["file(bytes32,bytes32,uint256)"](
+          formatBytes32String("BNB"),
+          formatBytes32String("stabilityFeeRate"),
           BigNumber.from("1000000000315522921573372069")
         )
 
-        // time increase ~ 1 year
+        // time increase 1 year
         await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from("31536000")))
 
         // mock bookeeper
@@ -119,11 +114,11 @@ describe("StabilityFeeCollector", () => {
         ])
         mockedBookKeeper.smocked.accrueStabilityFee.will.return.with()
 
-        await stabilityFeeCollectorAsAlice.collect(ethers.utils.formatBytes32String("BNB"))
+        await stabilityFeeCollectorAsAlice.collect(formatBytes32String("BNB"))
 
         const { calls } = mockedBookKeeper.smocked.accrueStabilityFee
         expect(calls.length).to.be.equal(1)
-        expect(calls[0].collateralPoolId).to.be.equal(ethers.utils.formatBytes32String("BNB"))
+        expect(calls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
         expect(calls[0].u).to.be.equal(AddressZero)
         // rate ~ 0.01 ray ~ 1%
         AssertHelpers.assertAlmostEqual(
