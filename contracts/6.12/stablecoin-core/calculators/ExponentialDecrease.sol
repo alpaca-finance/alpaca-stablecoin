@@ -18,6 +18,7 @@
 pragma solidity 0.6.12;
 
 import "../../interfaces/ICalculator.sol";
+import "hardhat/console.sol";
 
 // While an equivalent function can be obtained by setting step = 1 in StairstepExponentialDecrease,
 // this continous (i.e. per-second) exponential decrease has be implemented as it is more gas-efficient
@@ -36,7 +37,7 @@ contract ExponentialDecrease is ICalculator {
     emit Deny(usr);
   }
 
-  modifier auth {
+  modifier auth() {
     require(wards[msg.sender] == 1, "ExponentialDecrease/not-authorized");
     _;
   }
@@ -68,7 +69,8 @@ contract ExponentialDecrease is ICalculator {
   // --- Math ---
   uint256 constant RAY = 10**27;
 
-  function rmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
+  function rmul(uint256 x, uint256 y) internal view returns (uint256 z) {
+    console.log("y ", y);
     z = x * y;
     require(y == 0 || z / y == x);
     z = z / RAY;
@@ -79,55 +81,61 @@ contract ExponentialDecrease is ICalculator {
     uint256 x,
     uint256 n,
     uint256 b
-  ) internal pure returns (uint256 z) {
+  ) internal view returns (uint256 z) {
+    console.log("z ", z);
+    console.log("x ", x);
+    console.log("n ", n);
+    console.log("b ", b);
     assembly {
       switch n
+      case 0 {
+        z := b
+      }
+      default {
+        switch x
         case 0 {
-          z := b
+          z := 0
         }
         default {
-          switch x
-            case 0 {
-              z := 0
+          switch mod(n, 2)
+          case 0 {
+            z := b
+          }
+          default {
+            z := x
+          }
+          let half := div(b, 2) // for rounding.
+          for {
+            n := div(n, 2)
+          } n {
+            n := div(n, 2)
+          } {
+            let xx := mul(x, x)
+            if shr(128, x) {
+              revert(0, 0)
             }
-            default {
-              switch mod(n, 2)
-                case 0 {
-                  z := b
-                }
-                default {
-                  z := x
-                }
-              let half := div(b, 2) // for rounding.
-              for {
-                n := div(n, 2)
-              } n {
-                n := div(n, 2)
-              } {
-                let xx := mul(x, x)
-                if shr(128, x) {
-                  revert(0, 0)
-                }
-                let xxRound := add(xx, half)
-                if lt(xxRound, xx) {
-                  revert(0, 0)
-                }
-                x := div(xxRound, b)
-                if mod(n, 2) {
-                  let zx := mul(z, x)
-                  if and(iszero(iszero(x)), iszero(eq(div(zx, x), z))) {
-                    revert(0, 0)
-                  }
-                  let zxRound := add(zx, half)
-                  if lt(zxRound, zx) {
-                    revert(0, 0)
-                  }
-                  z := div(zxRound, b)
-                }
+            let xxRound := add(xx, half)
+            if lt(xxRound, xx) {
+              revert(0, 0)
+            }
+            x := div(xxRound, b)
+            if mod(n, 2) {
+              let zx := mul(z, x)
+              if and(iszero(iszero(x)), iszero(eq(div(zx, x), z))) {
+                revert(0, 0)
               }
+              let zxRound := add(zx, half)
+              if lt(zxRound, zx) {
+                revert(0, 0)
+              }
+              z := div(zxRound, b)
             }
+          }
         }
+      }
     }
+    console.log("z ", z);
+    console.log("----------------------------------------------");
   }
 
   // top: initial price
@@ -139,6 +147,9 @@ contract ExponentialDecrease is ICalculator {
   // returns: top * (cut ^ dur)
   //
   function price(uint256 top, uint256 dur) external view override returns (uint256) {
+    console.log("top ", top);
+    console.log("cut ", cut);
+    console.log("dur ", dur);
     return rmul(top, rpow(cut, dur, RAY));
   }
 }

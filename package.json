@@ -9,7 +9,11 @@
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
     "test": "hardhat test --no-compile",
     "testnet": "hardhat console --no-compile --network testnet",
+<<<<<<< HEAD
     "test:exponentialdecrease": "hardhat test --no-compile ./test/units/calculators/ExponentialDecrease.test.ts",
+=======
+    "test:stabilityfeecollector": "hardhat test --no-compile ./test/stablecoin-core/StabilityFeeCollector.test.ts",
+>>>>>>> 6a04a2f94f28b504f12c7c64063348b131fc494b
     "coverage": "hardhat coverage",
     "solhint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
     "prettier:solidity": "./node_modules/.bin/prettier --write contracts/**/*.sol"

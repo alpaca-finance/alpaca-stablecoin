@@ -12,7 +12,7 @@ import {
   ExponentialDecrease,
 } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
-import { WeiPerRad, WeiPerWad } from "../../helper/unit"
+import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 import { Console } from "console"
 
 chai.use(solidity)
@@ -76,9 +76,26 @@ describe("ExponentialDecrease", () => {
   })
 
   describe("#price()", () => {
-    context("when supply zero address", () => {
+    // context("when starting price is 50 and 0 second", () => {
+    //   it("should revert", async () => {
+    //     const price = await exponentialDecrease.price(WeiPerWad.mul(50), 0)
+    //     expect(price).to.be.equal(WeiPerWad.mul(50))
+    //   })
+    // })
+
+    // context("when starting price is 50 and 1 second", () => {
+    //   it("should revert", async () => {
+    //     await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1))
+    //     const price = await exponentialDecrease.price(WeiPerWad.mul(50), 1)
+    //     expect(price).to.be.equal(WeiPerWad.mul(50))
+    //   })
+    // })
+
+    context("when starting price is 50 and 2 second", () => {
       it("should revert", async () => {
-        const value = await exponentialDecrease.price(WeiPerWad, WeiPerWad)
+        await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1).sub(parseEther("0.1")))
+        const price = await exponentialDecrease.price(WeiPerWad.mul(5), 4)
+        expect(price).to.be.equal(WeiPerWad.mul(50))
       })
     })
   })
