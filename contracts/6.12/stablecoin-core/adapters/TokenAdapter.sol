@@ -27,6 +27,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
 import "../../interfaces/IGenericTokenAdapter.sol";
+import "../../utils/SafeToken.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -63,6 +64,8 @@ contract TokenAdapter is
   ReentrancyGuardUpgradeable,
   IGenericTokenAdapter
 {
+  using SafeToken for address;
+
   // --- Auth ---
   mapping(address => uint256) public wards;
 
@@ -115,7 +118,9 @@ contract TokenAdapter is
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, usr, int256(wad));
-    require(collateralToken.transferFrom(msg.sender, address(this), wad), "TokenAdapter/failed-transfer");
+
+    // Move the actual token
+    address(collateralToken).safeTransferFrom(msg.sender, address(this), wad);
   }
 
   function withdraw(
@@ -125,7 +130,9 @@ contract TokenAdapter is
   ) external override nonReentrant {
     require(wad <= 2**255, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
-    require(collateralToken.transfer(usr, wad), "TokenAdapter/failed-transfer");
+
+    // Move the actual token
+    address(collateralToken).safeTransfer(usr, wad);
   }
 
   function onAdjustPosition(

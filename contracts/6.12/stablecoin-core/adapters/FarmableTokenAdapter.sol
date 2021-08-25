@@ -23,9 +23,12 @@ import "../../interfaces/IToken.sol";
 import "../../interfaces/IFarmableTokenAdapter.sol";
 import "../../interfaces/IGenericTokenAdapter.sol";
 import "../../interfaces/IManager.sol";
+import "../../utils/SafeToken.sol";
 
 // receives tokens and shares them among holders
 contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, ReentrancyGuardUpgradeable {
+  using SafeToken for address;
+
   mapping(address => uint256) whitelist;
   uint256 live;
 
@@ -164,7 +167,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
 
     uint256 last = rewardDebts[from];
     uint256 curr = rmul(stake[from], accRewardPerShare);
-    if (curr > last) require(rewardToken.transfer(to, curr - last));
+    if (curr > last) address(rewardToken).safeTransfer(to, curr - last);
     accRewardBalance = rewardToken.balanceOf(address(this));
   }
 
@@ -183,7 +186,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
       // Also enforces a non-zero wad
       require(int256(wad) > 0);
 
-      require(collateralToken.transferFrom(msg.sender, address(this), val));
+      address(collateralToken).safeTransferFrom(msg.sender, address(this), val);
       bookKeeper.addCollateral(collateralPoolId, positionAddress, int256(wad));
 
       totalShare = add(totalShare, wad);
@@ -207,7 +210,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
       // Also enforces a non-zero wad
       require(int256(wad) > 0);
 
-      require(collateralToken.transfer(usr, val));
+      address(collateralToken).safeTransfer(usr, val);
       bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(wad));
 
       totalShare = sub(totalShare, wad);
@@ -222,7 +225,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
     require(wad <= 2**255);
     uint256 val = wmul(wmul(wad, nps()), toTokenConversionFactor);
 
-    require(collateralToken.transfer(usr, val));
+    address(collateralToken).safeTransfer(usr, val);
     bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(wad));
 
     totalShare = sub(totalShare, wad);
