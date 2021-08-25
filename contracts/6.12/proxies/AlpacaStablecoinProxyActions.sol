@@ -352,7 +352,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       toInt(convertTo18(tokenAdapter, amt)),
       0
     );
-    if(IGenericTokenAdapter(tokenAdapter).isFarmable()) IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), amt, abi.encode(0));
+    if (IGenericTokenAdapter(tokenAdapter).isFarmable())
+      IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), amt, abi.encode(0));
   }
 
   function safeLockToken(
@@ -400,7 +401,8 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wad, tokenAdapter, data);
     // Withdraws token amount to the user's wallet as a token
-    if(IGenericTokenAdapter(tokenAdapter).isFarmable()) IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), wad, abi.encode(0));
+    if (IGenericTokenAdapter(tokenAdapter).isFarmable())
+      IFarmableTokenAdapter(tokenAdapter).moveRewards(positionAddress, address(this), wad, abi.encode(0));
     IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, amt, data);
   }
 
@@ -499,13 +501,14 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
       // Deposits Alpaca Stablecoin amount into the bookKeeper
       stablecoinAdapter_deposit(stablecoinAdapter, address(this), wad);
       // Paybacks debt to the CDP
+      int256 wipeDebtShare = _getWipeDebtShare(bookKeeper, wad * RAY, positionAddress, collateralPoolId);
       IBookKeeper(bookKeeper).adjustPosition(
         collateralPoolId,
         positionAddress,
         address(this),
         address(this),
         0,
-        _getWipeDebtShare(bookKeeper, wad * RAY, positionAddress, collateralPoolId)
+        wipeDebtShare
       );
     }
   }
@@ -620,7 +623,7 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
   }
 
   function lockTokenAndDraw(
-    address manager,
+    IManager manager,
     address stabilityFeeCollector,
     address tokenAdapter,
     address stablecoinAdapter,
@@ -630,25 +633,24 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     bool transferFrom,
     bytes calldata data
   ) public {
-    address positionAddress = IManager(manager).positions(cdp);
-    address bookKeeper = IManager(manager).bookKeeper();
-    bytes32 collateralPoolId = IManager(manager).collateralPools(cdp);
+    bytes32 collateralPoolId = manager.collateralPools(cdp);
     // Takes token amount from user's wallet and joins into the bookKeeper
-    tokenAdapter_deposit(tokenAdapter, positionAddress, amtC, transferFrom);
+    tokenAdapter_deposit(tokenAdapter, manager.positions(cdp), amtC, transferFrom);
     // Locks token amount into the CDP and generates debt
-    adjustPosition(
-      manager,
-      cdp,
-      toInt(convertTo18(tokenAdapter, amtC)),
-      _getDrawDebtShare(bookKeeper, stabilityFeeCollector, positionAddress, collateralPoolId, wadD),
-      tokenAdapter,
-      data
+    int256 collateralValue = toInt(convertTo18(tokenAdapter, amtC));
+    int256 drawDebtShare = _getDrawDebtShare(
+      manager.bookKeeper(),
+      stabilityFeeCollector,
+      manager.positions(cdp),
+      collateralPoolId,
+      wadD
     );
+    adjustPosition(address(manager), cdp, collateralValue, drawDebtShare, tokenAdapter, data);
     // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
-    moveStablecoin(manager, cdp, address(this), toRad(wadD));
+    moveStablecoin(address(manager), cdp, address(this), toRad(wadD));
     // Allows adapter to access to proxy's Alpaca Stablecoin balance in the bookKeeper
-    if (IBookKeeper(bookKeeper).can(address(this), address(stablecoinAdapter)) == 0) {
-      IBookKeeper(bookKeeper).hope(stablecoinAdapter);
+    if (IBookKeeper(manager.bookKeeper()).can(address(this), address(stablecoinAdapter)) == 0) {
+      IBookKeeper(manager.bookKeeper()).hope(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wadD, abi.encode(0));
@@ -666,7 +668,17 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     bytes calldata data
   ) public returns (uint256 cdp) {
     cdp = open(manager, collateralPoolId, address(this));
-    lockTokenAndDraw(manager, stabilityFeeCollector, tokenAdapter, stablecoinAdapter, cdp, amtC, wadD, transferFrom, data);
+    lockTokenAndDraw(
+      IManager(manager),
+      stabilityFeeCollector,
+      tokenAdapter,
+      stablecoinAdapter,
+      cdp,
+      amtC,
+      wadD,
+      transferFrom,
+      data
+    );
   }
 
   function wipeAndFreeBNB(
@@ -682,19 +694,13 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     // Deposits Alpaca Stablecoin amount into the bookKeeper
     stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, wadD);
     // Paybacks debt to the CDP and unlocks WBNB amount from it
-    adjustPosition(
-      manager,
-      cdp,
-      -toInt(wadC),
-      _getWipeDebtShare(
-        IManager(manager).bookKeeper(),
-        IBookKeeper(IManager(manager).bookKeeper()).stablecoin(positionAddress),
-        positionAddress,
-        IManager(manager).collateralPools(cdp)
-      ),
-      bnbAdapter,
-      data
+    int256 wipeDebtShare = _getWipeDebtShare(
+      IManager(manager).bookKeeper(),
+      IBookKeeper(IManager(manager).bookKeeper()).stablecoin(positionAddress),
+      positionAddress,
+      IManager(manager).collateralPools(cdp)
     );
+    adjustPosition(manager, cdp, -toInt(wadC), wipeDebtShare, bnbAdapter, data);
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wadC, bnbAdapter, data);
     // Withdraws WBNB amount to proxy address as a token
@@ -750,19 +756,13 @@ contract AlpacaStablecoinProxyActions is OwnableUpgradeable, PausableUpgradeable
     stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, wadD);
     uint256 wadC = convertTo18(tokenAdapter, amtC);
     // Paybacks debt to the CDP and unlocks token amount from it
-    adjustPosition(
-      manager,
-      cdp,
-      -toInt(wadC),
-      _getWipeDebtShare(
-        IManager(manager).bookKeeper(),
-        IBookKeeper(IManager(manager).bookKeeper()).stablecoin(positionAddress),
-        positionAddress,
-        IManager(manager).collateralPools(cdp)
-      ),
-      tokenAdapter,
-      data
+    int256 wipeDebtShare = _getWipeDebtShare(
+      IManager(manager).bookKeeper(),
+      IBookKeeper(IManager(manager).bookKeeper()).stablecoin(positionAddress),
+      positionAddress,
+      IManager(manager).collateralPools(cdp)
     );
+    adjustPosition(manager, cdp, -toInt(wadC), wipeDebtShare, tokenAdapter, data);
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wadC, tokenAdapter, data);
     // Withdraws token amount to the user's wallet as a token
