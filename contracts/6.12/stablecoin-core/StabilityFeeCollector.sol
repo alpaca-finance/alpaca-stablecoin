@@ -163,10 +163,7 @@ contract StabilityFeeCollector is
     bytes32 what,
     uint256 data
   ) external auth {
-    require(
-      now == collateralPools[collateralPool].lastAccumulationTime,
-      "StabilityFeeCollector/lastAccumulationTime-not-updated"
-    );
+    _collect(collateralPool);
     if (what == "stabilityFeeRate") collateralPools[collateralPool].stabilityFeeRate = data;
     else revert("StabilityFeeCollector/file-unrecognized-param");
   }
@@ -183,6 +180,10 @@ contract StabilityFeeCollector is
 
   // --- Stability Fee Collection ---
   function collect(bytes32 collateralPool) external override nonReentrant returns (uint256 rate) {
+    _collect(collateralPool);
+  }
+
+  function _collect(bytes32 collateralPool) internal returns (uint256 rate) {
     require(now >= collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
     (, uint256 prev, , , ) = bookKeeper.collateralPools(collateralPool);
     rate = rmul(
