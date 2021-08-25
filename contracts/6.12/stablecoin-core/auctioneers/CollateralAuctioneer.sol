@@ -31,6 +31,8 @@ import "../../interfaces/IPriceOracle.sol";
 import "../../interfaces/ILiquidationEngine.sol";
 import "../../interfaces/ICalculator.sol";
 import "../../interfaces/IFlashLendingCallee.sol";
+import "../../interfaces/IManager.sol";
+import "../../interfaces/IGenericTokenAdapter.sol";
 
 contract CollateralAuctioneer is
   OwnableUpgradeable,
@@ -65,6 +67,8 @@ contract CollateralAuctioneer is
   address public systemDebtEngine; // Recipient of dai raised in auctions
   IPriceOracle public priceOracle; // Collateral price module
   ICalculator public calc; // Current price calculator
+  IManager public cdpManager; // CDP Manager which interacts with the protocol
+  IGenericTokenAdapter public adapter;
 
   uint256 public startingPriceBuffer; // Multiplicative factor to increase starting price                  [ray]
   uint256 public auctionTimeLimit; // Time elapsed before auction reset                                 [seconds]
@@ -137,7 +141,9 @@ contract CollateralAuctioneer is
     address _bookKeeper,
     address priceOracle_,
     address liquidationEngine_,
-    bytes32 collateralPoolId_
+    bytes32 collateralPoolId_,
+    address cdpManager_,
+    address adapter_
   ) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
@@ -148,6 +154,8 @@ contract CollateralAuctioneer is
     priceOracle = IPriceOracle(priceOracle_);
     liquidationEngine = ILiquidationEngine(liquidationEngine_);
     collateralPoolId = collateralPoolId_;
+    cdpManager = IManager(cdpManager_);
+    adapter = IGenericTokenAdapter(adapter_);
     startingPriceBuffer = RAY;
     wards[msg.sender] = 1;
     emit Rely(msg.sender);
@@ -188,6 +196,8 @@ contract CollateralAuctioneer is
     else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
     else if (what == "systemDebtEngine") systemDebtEngine = data;
     else if (what == "calc") calc = ICalculator(data);
+    else if (what == "cdpManager") cdpManager = IManager(data);
+    else if (what == "adapter") adapter = IGenericTokenAdapter(data);
     else revert("CollateralAuctioneer/file-unrecognized-param");
     emit File(what, data);
   }
@@ -282,6 +292,13 @@ contract CollateralAuctioneer is
       prize = add(_liquidatorTip, wmul(debt, _liquidatorBountyRate));
       bookKeeper.mintUnbackedStablecoin(systemDebtEngine, liquidatorAddress, prize);
     }
+
+    // Handle Farmable Token upon liquidation
+    address positionOwner = cdpManager.mapPositionHandlerToOwner(positionAddress);
+    if(positionOwner == address(0)) positionOwner = positionAddress; // If CDP Owner is not foudn from CDP Manager, this means the positionAddress is actually the EOA address
+    // 1. Harvest the rewards of this CDP owner and distribute to the CDP Owner
+    // 2. Confiscate and move the rewards and the staked collateral to this address, they will be distributed to the bidder later
+    adapter.onMoveCollateral(positionAddress, address(this), collateralAmount, abi.encode(positionOwner));
 
     emit Kick(id, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize);
   }
@@ -407,6 +424,9 @@ contract CollateralAuctioneer is
 
       // Send collateral to collateralRecipient
       bookKeeper.moveCollateral(collateralPoolId, address(this), collateralRecipient, slice);
+      // Handle Farmable Token
+      // Distribute the confisacted rewards and staked collateral to the bidder
+      adapter.onMoveCollateral(address(this), collateralRecipient, slice, data);
 
       // Do external call (if data is defined) but to be
       // extremely careful we don't allow to do it to the two
@@ -431,6 +451,7 @@ contract CollateralAuctioneer is
       _remove(id);
     } else if (debt == 0) {
       bookKeeper.moveCollateral(collateralPoolId, address(this), positionAddress, collateralAmount);
+      adapter.onMoveCollateral(address(this), positionAddress, collateralAmount, abi.encode(0));
       _remove(id);
     } else {
       sales[id].debt = debt;

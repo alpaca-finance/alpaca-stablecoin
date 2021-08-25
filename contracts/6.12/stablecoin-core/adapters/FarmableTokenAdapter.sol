@@ -159,6 +159,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
   }
 
   function harvest(address from, address to) internal {
+    if(from == address(0) || to == address(0)) return; // If invalid address, do not harvest to avoid confusion in the reward accounting.
     if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(harvestedRewards(), totalShare));
 
     uint256 last = rewardDebts[from];
