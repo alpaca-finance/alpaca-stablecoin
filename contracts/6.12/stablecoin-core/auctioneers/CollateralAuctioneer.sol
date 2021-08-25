@@ -52,7 +52,7 @@ contract CollateralAuctioneer is
     emit Deny(positionAddress);
   }
 
-  modifier auth {
+  modifier auth() {
     require(wards[msg.sender] == 1, "CollateralAuctioneer/not-authorized");
     _;
   }
@@ -93,7 +93,7 @@ contract CollateralAuctioneer is
   // 1: no new startAuction()
   // 2: no new startAuction() or redo()
   // 3: no new startAuction(), redo(), or take()
-  uint256 public stopped = 0;
+  uint256 public stopped;
 
   // --- Events ---
   event Rely(address indexed positionAddress);
@@ -150,11 +150,12 @@ contract CollateralAuctioneer is
     collateralPoolId = collateralPoolId_;
     startingPriceBuffer = RAY;
     wards[msg.sender] = 1;
+    stopped = 0;
     emit Rely(msg.sender);
   }
 
   // --- Synchronization ---
-  modifier lock {
+  modifier lock() {
     require(locked == 0, "CollateralAuctioneer/system-locked");
     locked = 1;
     _;
