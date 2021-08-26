@@ -10,6 +10,7 @@
     "test": "hardhat test --no-compile",
     "testnet": "hardhat console --no-compile --network testnet",
     "test:exponentialdecrease": "hardhat test --no-compile ./test/units/calculators/ExponentialDecrease.test.ts",
+    "test:tokenadapter": "hardhat test --no-compile ./test/units/adapter/TokenAdapter.test.ts",
     "test:stabilityfeecollector": "hardhat test --no-compile ./test/stablecoin-core/StabilityFeeCollector.test.ts",
     "coverage": "hardhat coverage",
     "solhint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
