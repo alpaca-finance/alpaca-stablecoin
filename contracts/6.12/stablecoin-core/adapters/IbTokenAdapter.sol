@@ -23,6 +23,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../../interfaces/IFairLaunch.sol";
 import "../../interfaces/ITimeLock.sol";
 import "../../interfaces/IShield.sol";
+import "../../utils/SafeToken.sol";
 
 import "./FarmableTokenAdapter.sol";
 
@@ -34,6 +35,8 @@ contract IbTokenAdapter is
   ReentrancyGuardUpgradeable,
   FarmableTokenAdapter
 {
+  using SafeToken for address;
+
   IFairLaunch public fairlaunch;
   IShield public shield;
   ITimeLock public timelock;
@@ -83,7 +86,7 @@ contract IbTokenAdapter is
   }
 
   function initApproval() public {
-    collateralToken.approve(address(fairlaunch), type(uint256).max);
+    address(collateralToken).safeApprove(address(fairlaunch), type(uint256).max);
   }
 
   // Ignore collateralTokens that have been directly transferred
