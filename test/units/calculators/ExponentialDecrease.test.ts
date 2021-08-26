@@ -3,22 +3,12 @@ import { Signer, BigNumber, Wallet } from "ethers"
 import chai from "chai"
 import { MockProvider, solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import {
-  BookKeeper__factory,
-  CDPManager,
-  CDPManager__factory,
-  BookKeeper,
-  ExponentialDecrease__factory,
-  ExponentialDecrease,
-} from "../../../typechain"
-import { smockit, MockContract } from "@eth-optimism/smock"
+import { ExponentialDecrease__factory, ExponentialDecrease } from "../../../typechain"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
-import { assert, Console } from "console"
 import * as AssertHelpers from "../../helper/assert"
 
 chai.use(solidity)
 const { expect } = chai
-const { AddressZero } = ethers.constants
 const { parseEther, formatBytes32String } = ethers.utils
 
 type fixture = {
@@ -45,35 +35,12 @@ describe("ExponentialDecrease", () => {
   let bob: Signer
   let dev: Signer
 
-  // Account Addresses
-  let deployerAddress: string
-  let aliceAddress: string
-  let bobAddress: string
-  let devAddress: string
-
   // Contracts
   let exponentialDecrease: ExponentialDecrease
-  let exponentialDecreaseAsAlice: ExponentialDecrease
-  let exponentialDecreaseAsBob: ExponentialDecrease
 
   beforeEach(async () => {
     ;({ exponentialDecrease } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
-    ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
-      deployer.getAddress(),
-      alice.getAddress(),
-      bob.getAddress(),
-      dev.getAddress(),
-    ])
-
-    exponentialDecreaseAsAlice = ExponentialDecrease__factory.connect(
-      exponentialDecrease.address,
-      alice
-    ) as ExponentialDecrease
-    exponentialDecreaseAsBob = ExponentialDecrease__factory.connect(
-      exponentialDecrease.address,
-      bob
-    ) as ExponentialDecrease
   })
 
   describe("#price()", () => {
