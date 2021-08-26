@@ -78,7 +78,7 @@ describe("ExponentialDecrease", () => {
 
   describe("#price()", () => {
     context("when starting price is 50 wad, 1% decrease at 0 second", () => {
-      it("should be success", async () => {
+      it("should calculate the price correctly", async () => {
         await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1).sub(parseEther("10000000")))
         const price = await exponentialDecrease.price(WeiPerWad.mul(50), 0)
         expect(price).to.be.equal(WeiPerWad.mul(50))
@@ -86,7 +86,7 @@ describe("ExponentialDecrease", () => {
     })
 
     context("when starting price is 50 wad, 1% decrease at 1 second", () => {
-      it("should be success", async () => {
+      it("should calculate the price correctly", async () => {
         await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1).sub(parseEther("10000000")))
         const price = await exponentialDecrease.price(WeiPerWad.mul(50), 1)
         expect(price).to.be.equal(WeiPerWad.mul(495).div(10))
@@ -94,7 +94,7 @@ describe("ExponentialDecrease", () => {
     })
 
     context("when starting price is 50 wad, 1% decrease at 2 second", () => {
-      it("should be success", async () => {
+      it("should calculate the price correctly", async () => {
         await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1).sub(parseEther("10000000")))
         const price = await exponentialDecrease.price(WeiPerWad.mul(50), 2)
         expect(price).to.be.equal(WeiPerWad.mul(49005).div(1000))
@@ -102,7 +102,7 @@ describe("ExponentialDecrease", () => {
     })
 
     context("when starting price is 50 wad, 1% decrease at 3 second", () => {
-      it("should be success", async () => {
+      it("should calculate the price correctly", async () => {
         await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1).sub(parseEther("10000000")))
         const price = await exponentialDecrease.price(WeiPerWad.mul(50), 3)
         expect(price).to.be.equal(WeiPerWad.mul(4851495).div(100000))
@@ -110,7 +110,7 @@ describe("ExponentialDecrease", () => {
     })
 
     context("when starting price is 50 wad, 100% decrease at 1 second", () => {
-      it("should be success", async () => {
+      it("should calculate the price correctly", async () => {
         await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1).sub(parseEther("1000000000")))
         const price = await exponentialDecrease.price(WeiPerWad.mul(50), 1)
         expect(price).to.be.equal(0)
@@ -118,7 +118,7 @@ describe("ExponentialDecrease", () => {
     })
 
     context("when starting price is 50, 1.123456789E27% decrease and ExpDecrease every second in 1 min", () => {
-      it("should be success", async () => {
+      it("should calculate the price correctly", async () => {
         await exponentialDecrease.file(
           formatBytes32String("cut"),
           WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
@@ -132,7 +132,7 @@ describe("ExponentialDecrease", () => {
     })
 
     context("when starting price is 50, 2.123456789E27% decrease and ExpDecrease every second in 1 min", () => {
-      it("should be success", async () => {
+      it("should calculate the price correctly", async () => {
         await exponentialDecrease.file(
           formatBytes32String("cut"),
           WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
@@ -146,7 +146,7 @@ describe("ExponentialDecrease", () => {
     })
 
     context("when starting price is 50, 1.123456789E27% decrease and ExpDecrease every 5 second in 1 min", () => {
-      it("should be success", async () => {
+      it("should calculate the price correctly", async () => {
         await exponentialDecrease.file(
           formatBytes32String("cut"),
           WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
@@ -160,7 +160,7 @@ describe("ExponentialDecrease", () => {
     })
 
     context("when starting price is 50, 2.123456789E27% decrease and ExpDecrease every 5 second in 1 min", () => {
-      it("should be success", async () => {
+      it("should calculate the price correctly", async () => {
         await exponentialDecrease.file(
           formatBytes32String("cut"),
           WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
@@ -176,13 +176,12 @@ describe("ExponentialDecrease", () => {
     context(
       "when starting low price is 0.0000000001 wad, 1.123456789E27% decrease and ExpDecrease every second in 1 min",
       () => {
-        it("should be success", async () => {
+        it("should calculate the price correctly", async () => {
           await exponentialDecrease.file(
             formatBytes32String("cut"),
             WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
           )
           let price: BigNumber = WeiPerWad.div(1000000000)
-          console.log("price ", price.toString())
           for (let second = 0; second < 60; second++) {
             price = await exponentialDecrease.price(price, 1)
           }
@@ -194,13 +193,12 @@ describe("ExponentialDecrease", () => {
     context(
       "when starting low price is 0.0000000001 wad, 2.123456789E27% decrease and ExpDecrease every 5 second in 1 min",
       () => {
-        it("should be success", async () => {
+        it("should calculate the price correctly", async () => {
           await exponentialDecrease.file(
             formatBytes32String("cut"),
             WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
           )
           let price: BigNumber = WeiPerWad.div(1000000000)
-          console.log("price ", price.toString())
           for (let second = 0; second < 60; second++) {
             price = await exponentialDecrease.price(price, 1)
           }
@@ -212,13 +210,12 @@ describe("ExponentialDecrease", () => {
     context(
       "when starting low price is 0.0000000001 wad, 1.123456789E27% decrease and ExpDecrease every 5 second in 1 min",
       () => {
-        it("should be success", async () => {
+        it("should calculate the price correctly", async () => {
           await exponentialDecrease.file(
             formatBytes32String("cut"),
             WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
           )
           let price: BigNumber = WeiPerWad.div(1000000000)
-          console.log("price ", price.toString())
           for (let second = 0; second < 60; second += 5) {
             price = await exponentialDecrease.price(price, 1)
           }
@@ -230,13 +227,12 @@ describe("ExponentialDecrease", () => {
     context(
       "when starting low price is 0.0000000001 wad, 2.123456789E27% decrease and ExpDecrease every 5 second in 1 min",
       () => {
-        it("should be success", async () => {
+        it("should calculate the price correctly", async () => {
           await exponentialDecrease.file(
             formatBytes32String("cut"),
             WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
           )
           let price: BigNumber = WeiPerWad.div(1000000000)
-          console.log("price ", price.toString())
           for (let second = 0; second < 60; second += 5) {
             price = await exponentialDecrease.price(price, 1)
           }
