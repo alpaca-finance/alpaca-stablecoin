@@ -3,15 +3,15 @@ pragma solidity 0.6.12;
 interface IManager {
   function mapPositionHandlerToOwner(address) external view returns (address);
 
-  function cdpCan(
+  function ownerWhitelist(
     address,
     uint256,
     address
-  ) external view returns (uint256);
+  ) external view returns (bool);
 
   function collateralPools(uint256) external view returns (bytes32);
 
-  function owns(uint256) external view returns (address);
+  function owners(uint256) external view returns (address);
 
   function positions(uint256) external view returns (address);
 
@@ -21,13 +21,13 @@ interface IManager {
 
   function give(uint256, address) external;
 
-  function cdpAllow(
+  function allowManagePosition(
     uint256,
     address,
-    uint256
+    bool
   ) external;
 
-  function migrationAllow(address, uint256) external;
+  function allowMigratePosition(address, bool) external;
 
   function adjustPosition(
     uint256,
@@ -51,9 +51,9 @@ interface IManager {
     uint256
   ) external;
 
-  function quit(uint256, address) external;
+  function exportPosition(uint256, address) external;
 
-  function enter(address, uint256) external;
+  function importPosition(address, uint256) external;
 
-  function shift(uint256, uint256) external;
+  function movePosition(uint256, uint256) external;
 }
