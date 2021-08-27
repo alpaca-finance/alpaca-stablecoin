@@ -158,7 +158,7 @@ describe("ExponentialDecrease", () => {
     )
 
     context(
-      "when starting low price is 0.0000000001 wad, 2.123456789E27% decrease and ExpDecrease every 5 second in 1 min",
+      "when starting low price is 0.0000000001 wad, 2.123456789E27% decrease and ExpDecrease every second in 1 min",
       () => {
         it("should calculate the price correctly", async () => {
           await exponentialDecrease.file(
