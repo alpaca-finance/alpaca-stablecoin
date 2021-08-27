@@ -44,180 +44,271 @@ describe("StairstepExponentialDecrease", () => {
   })
 
   describe("#price()", () => {
-    context("when starting price is 50 wad, 1% decrease at 0 second", () => {
-      it("should calculate the price correctly", async () => {
-        await stairstepExponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("10000000"))
-        )
-        await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
-        const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 0)
-        expect(price).to.be.equal(WeiPerWad.mul(50))
-      })
-    })
+    context("when starting price is 50 wad", () => {
+      context("when cut% is 0%", () => {
+        context("and step is 1", () => {
+          context("at 0 second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(formatBytes32String("cut"), 0) // 100%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 0)
+              expect(price).to.be.equal(WeiPerWad.mul(50))
+            })
+          })
 
-    context("when starting price is 50 wad, 1% decrease at 1 second", () => {
-      it("should calculate the price correctly", async () => {
-        await stairstepExponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("10000000"))
-        )
-        await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
-        const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
-        expect(price).to.be.equal(WeiPerWad.mul(495).div(10))
-      })
-    })
-
-    context("when starting price is 50 wad, 1% decrease at 2 second", () => {
-      it("should calculate the price correctly", async () => {
-        await stairstepExponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("10000000"))
-        )
-        await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
-        const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 2)
-        expect(price).to.be.equal(WeiPerWad.mul(49005).div(1000))
-      })
-    })
-
-    context("when starting price is 50 wad, 1% decrease at 3 second", () => {
-      it("should calculate the price correctly", async () => {
-        await stairstepExponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("10000000"))
-        )
-        await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
-        const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 3)
-        expect(price).to.be.equal(WeiPerWad.mul(4851495).div(100000))
-      })
-    })
-
-    context("when starting price is 50 wad, 100% decrease at 1 second", () => {
-      it("should calculate the price correctly", async () => {
-        await stairstepExponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("1000000000"))
-        )
-        await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
-        const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
-        expect(price).to.be.equal(0)
-      })
-    })
-
-    context("when starting price is 50, 1.123456789E27% decrease and ExpDecrease every second in 1 min", () => {
-      it("should calculate the price correctly", async () => {
-        await stairstepExponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
-        )
-        await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
-        const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
-
-        AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("25384375980898602822").toString())
-      })
-    })
-
-    context("when starting price is 50, 2.123456789E27% decrease and ExpDecrease every second in 1 min", () => {
-      it("should calculate the price correctly", async () => {
-        await stairstepExponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
-        )
-        await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
-        const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
-
-        AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("13793909126329075412").toString())
-      })
-    })
-
-    context("when starting price is 50, 1.123456789E27% decrease and ExpDecrease every 5 second in 1 min", () => {
-      it("should calculate the price correctly", async () => {
-        await stairstepExponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
-        )
-        await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
-        const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
-
-        AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("43660560004238132022").toString())
-      })
-    })
-
-    context("when starting price is 50, 2.123456789E27% decrease and ExpDecrease every 5 second in 1 min", () => {
-      it("should calculate the price correctly", async () => {
-        await stairstepExponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
-        )
-        await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
-        const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
-
-        AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("38646794298032588398").toString())
-      })
-    })
-
-    context(
-      "when starting low price is 0.0000000001 wad, 1.123456789E27% decrease and ExpDecrease every second in 1 min",
-      () => {
-        it("should calculate the price correctly", async () => {
-          await stairstepExponentialDecrease.file(
-            formatBytes32String("cut"),
-            WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
-          )
-          await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
-          const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 60)
-
-          AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("507687497").toString())
+          context("at 1st second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(formatBytes32String("cut"), 0) // 100%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
+              expect(price).to.be.equal(0)
+            })
+          })
         })
-      }
-    )
+      })
+    })
 
-    context(
-      "when starting low price is 0.0000000001 wad, 2.123456789E27% decrease and ExpDecrease every second in 1 min",
-      () => {
-        it("should calculate the price correctly", async () => {
-          await stairstepExponentialDecrease.file(
-            formatBytes32String("cut"),
-            WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
-          )
-          await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
-          const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 60)
+    context("when starting price is 50 wad", () => {
+      context("when cut% is 1%", () => {
+        context("and step is 1", () => {
+          context("at 0 second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.sub(parseEther("10000000"))) // 99%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 0)
+              expect(price).to.be.equal(WeiPerWad.mul(50))
+            })
+          })
 
-          AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("275878167").toString())
+          context("at 1st second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.sub(parseEther("10000000"))) // 99%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
+              expect(price).to.be.equal(WeiPerWad.mul(495).div(10))
+            })
+          })
+
+          context("at 2nd second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.sub(parseEther("10000000"))) // 99%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 2)
+              expect(price).to.be.equal(WeiPerWad.mul(49005).div(1000))
+            })
+          })
         })
-      }
-    )
+      })
+    })
 
-    context(
-      "when starting low price is 0.0000000001 wad, 1.123456789E27% decrease and ExpDecrease every 5 second in 1 min",
-      () => {
-        it("should calculate the price correctly", async () => {
-          await stairstepExponentialDecrease.file(
-            formatBytes32String("cut"),
-            WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
-          )
-          await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
-          const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 60)
+    context("when starting price is 50 wad", () => {
+      context("when cut% is 100%", () => {
+        context("and step is 1", () => {
+          context("at 0 second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1000000000"))
+              ) // 0%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 0)
+              expect(price).to.be.equal(WeiPerWad.mul(50))
+            })
+          })
 
-          AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("873211194").toString())
+          context("at 1st second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1000000000"))
+              ) // 0%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
+              expect(price).to.be.equal(0)
+            })
+          })
         })
-      }
-    )
+      })
+    })
 
-    context(
-      "when starting low price is 0.0000000001 wad, 2.123456789E27% decrease and ExpDecrease every 5 second in 1 min",
-      () => {
-        it("should calculate the price correctly", async () => {
-          await stairstepExponentialDecrease.file(
-            formatBytes32String("cut"),
-            WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
-          )
-          await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
-          const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 60)
+    context("when starting price is 50 wad", () => {
+      context("when cut% is 1.123456789%", () => {
+        context("and step is 1", () => {
+          context("at 1st second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1123456789").div(100))
+              ) // 98.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
+              expect(price).to.be.equal(BigNumber.from("49438271605500000000").toString())
+            })
+          })
 
-          AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("772935882").toString())
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1123456789").div(100))
+              ) // 98.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
+              expect(price).to.be.equal(BigNumber.from("25384375980898602842").toString())
+            })
+          })
         })
-      }
-    )
+      })
+    })
+
+    context("when starting price is 50 wad", () => {
+      context("when cut% is 2.123456789%", () => {
+        context("and step is 1", () => {
+          context("at 1st second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("2123456789").div(100))
+              ) // 97.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
+              expect(price).to.be.equal(BigNumber.from("48938271605500000000").toString())
+            })
+          })
+
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("2123456789").div(100))
+              ) // 97.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
+              expect(price).to.be.equal(BigNumber.from("13793909126329075429").toString())
+            })
+          })
+        })
+      })
+    })
+
+    context("when starting price is 50 wad", () => {
+      context("when cut% is 1.123456789%", () => {
+        context("and step is 5", () => {
+          context("at 1st second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1123456789").div(100))
+              ) // 98.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
+              expect(price).to.be.equal(WeiPerWad.mul(50))
+            })
+          })
+
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1123456789").div(100))
+              ) // 98.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
+              expect(price).to.be.equal(BigNumber.from("43660560004238132027").toString())
+            })
+          })
+        })
+      })
+    })
+
+    context("when starting price is 50 wad", () => {
+      context("when cut% is 2.123456789%", () => {
+        context("and step is 5", () => {
+          context("at 1st second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("2123456789").div(100))
+              ) // 97.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
+              expect(price).to.be.equal(WeiPerWad.mul(50))
+            })
+          })
+
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("2123456789").div(100))
+              ) // 97.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
+              expect(price).to.be.equal(BigNumber.from("38646794298032588404").toString())
+            })
+          })
+        })
+      })
+    })
+
+    context("when starting price is 0.0000000001 wad", () => {
+      context("when cut% is 1.123456789%", () => {
+        context("and step is 1", () => {
+          context("at 1st second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1123456789").div(100))
+              ) // 98.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 1)
+              expect(price).to.be.equal(BigNumber.from("988765432").toString())
+            })
+          })
+
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1123456789").div(100))
+              ) // 98.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 60)
+              expect(price).to.be.equal(BigNumber.from("507687519").toString())
+            })
+          })
+        })
+      })
+    })
+
+    context("when starting price is 0.0000000001 wad", () => {
+      context("when cut% is 2.123456789%", () => {
+        context("and step is 1", () => {
+          context("at 1st second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("2123456789").div(100))
+              ) // 97.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 1)
+              expect(price).to.be.equal(BigNumber.from("978765432").toString())
+            })
+          })
+
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("2123456789").div(100))
+              ) // 97.876543211%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 60)
+              expect(price).to.be.equal(BigNumber.from("275878182").toString())
+            })
+          })
+        })
+      })
+    })
   })
 })
