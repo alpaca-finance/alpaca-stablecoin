@@ -92,11 +92,11 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   }
 
   function _safeAdd(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x + y) >= x, "overflow");
+    require((z = x + y) >= x, "add overflow");
   }
 
   function _safeSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x - y) <= x, "overflow");
+    require((z = x - y) <= x, "sub overflow");
   }
 
   function _safeToInt(uint256 x) internal pure returns (int256 y) {
