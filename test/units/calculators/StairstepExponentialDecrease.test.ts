@@ -102,6 +102,36 @@ describe("StairstepExponentialDecrease", () => {
     })
 
     context("when starting price is 50 wad", () => {
+      context("when cut% is 99%", () => {
+        context("and step is 1", () => {
+          context("at 0 second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("990000000"))
+              ) // 1%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 0)
+              expect(price).to.be.equal(WeiPerWad.mul(50))
+            })
+          })
+
+          context("at 1st second", () => {
+            it("should calculate the price correctly", async () => {
+              await stairstepExponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("990000000"))
+              ) // 1%
+              await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
+              const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
+              expect(price).to.be.equal(BigNumber.from("500000000000000000").toString())
+            })
+          })
+        })
+      })
+    })
+
+    context("when starting price is 50 wad", () => {
       context("when cut% is 100%", () => {
         context("and step is 1", () => {
           context("at 0 second", () => {
