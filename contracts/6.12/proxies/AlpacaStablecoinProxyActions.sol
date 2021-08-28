@@ -232,7 +232,7 @@ contract AlpacaStablecoinProxyActions is Common {
     address manager,
     uint256 posID,
     address user,
-    bool ok
+    uint256 ok
   ) public {
     IManager(manager).allowManagePosition(posID, user, ok);
   }
@@ -244,7 +244,7 @@ contract AlpacaStablecoinProxyActions is Common {
   function allowMigratePosition(
     address manager,
     address user,
-    bool ok
+    uint256 ok
   ) public {
     IManager(manager).allowMigratePosition(user, ok);
   }
@@ -493,7 +493,7 @@ contract AlpacaStablecoinProxyActions is Common {
     bytes32 collateralPoolId = IManager(manager).collateralPools(posID);
 
     address own = IManager(manager).owners(posID);
-    if (own == address(this) || IManager(manager).ownerWhitelist(own, posID, address(this)) == true) {
+    if (own == address(this) || IManager(manager).ownerWhitelist(own, posID, address(this)) == 1) {
       // Deposits Alpaca Stablecoin amount into the bookKeeper
       stablecoinAdapter_deposit(stablecoinAdapter, positionAddress, wad, data);
       // Paybacks debt to the CDP
@@ -550,7 +550,7 @@ contract AlpacaStablecoinProxyActions is Common {
     (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress);
 
     address own = IManager(manager).owners(posID);
-    if (own == address(this) || IManager(manager).ownerWhitelist(own, posID, address(this)) == true) {
+    if (own == address(this) || IManager(manager).ownerWhitelist(own, posID, address(this)) == 1) {
       // Deposits Alpaca Stablecoin amount into the bookKeeper
       stablecoinAdapter_deposit(
         stablecoinAdapter,

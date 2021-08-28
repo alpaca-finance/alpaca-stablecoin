@@ -10,6 +10,7 @@ import "../interfaces/IManager.sol";
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IGenericTokenAdapter.sol";
 
+/// @title PositionManager is a contract for manging positions
 contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IManager {
   /// @dev Address of a BookKeeper
   address public override bookKeeper;
@@ -35,9 +36,9 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   mapping(address => uint256) public ownerPositionCount;
 
   /// @dev Mapping of owner => whitelisted address that can manage owner's position
-  mapping(address => mapping(uint256 => mapping(address => bool))) public override ownerWhitelist;
+  mapping(address => mapping(uint256 => mapping(address => uint256))) public override ownerWhitelist;
   /// @dev Mapping of owner => whitelisted address that can migrate position
-  mapping(address => mapping(address => bool)) public migrationWhitelist;
+  mapping(address => mapping(address => uint256)) public migrationWhitelist;
 
   struct List {
     uint256 prev;
@@ -45,8 +46,8 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   }
 
   event NewPosition(address indexed usr, address indexed own, uint256 indexed posId);
-  event AllowManagePosition(address indexed caller, uint256 indexed posId, address owner, address user, bool ok);
-  event AllowMigratePosition(address indexed caller, address user, bool ok);
+  event AllowManagePosition(address indexed caller, uint256 indexed posId, address owner, address user, uint256 ok);
+  event AllowMigratePosition(address indexed caller, address user, uint256 ok);
   event ExportPosition(
     uint256 indexed posId,
     address source,
@@ -65,17 +66,14 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
 
   /// @dev Require that the caller must be position's owner or owner whitelist
   modifier onlyOwnerAllowed(uint256 posId) {
-    require(
-      msg.sender == owners[posId] || ownerWhitelist[owners[posId]][posId][msg.sender] == true,
-      "owner not allowed"
-    );
+    require(msg.sender == owners[posId] || ownerWhitelist[owners[posId]][posId][msg.sender] == 1, "owner not allowed");
     _;
   }
 
   /// @dev Require that the caller must be allowed to migrate position to the migrant address
   modifier onlyMigrationAllowed(address migrantAddress) {
     require(
-      msg.sender == migrantAddress || migrationWhitelist[migrantAddress][msg.sender] == true,
+      msg.sender == migrantAddress || migrationWhitelist[migrantAddress][msg.sender] == 1,
       "migration not allowed"
     );
     _;
@@ -107,11 +105,11 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   /// @dev Allow/disallow a user to manage the position
   /// @param posId The position id
   /// @param user The address to be allowed for managing the position
-  /// @param ok Ok flag to allow/disallow
+  /// @param ok Ok flag to allow/disallow. 1 for allow and 0 for disallow.
   function allowManagePosition(
     uint256 posId,
     address user,
-    bool ok
+    uint256 ok
   ) public override onlyOwnerAllowed(posId) {
     ownerWhitelist[owners[posId]][posId][user] = ok;
     emit AllowManagePosition(msg.sender, posId, owners[posId], user, ok);
@@ -120,7 +118,7 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   /// @dev Allow/disallow a user to importPosition/exportPosition from/to msg.sender
   /// @param user The address of user that will be allowed to do such an action to msg.sender
   /// @param ok Ok flag to allow/disallow
-  function allowMigratePosition(address user, bool ok) public override {
+  function allowMigratePosition(address user, uint256 ok) public override {
     migrationWhitelist[msg.sender][user] = ok;
     emit AllowMigratePosition(msg.sender, user, ok);
   }

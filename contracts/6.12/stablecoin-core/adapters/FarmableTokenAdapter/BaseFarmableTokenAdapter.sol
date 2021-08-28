@@ -1,54 +1,55 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (C) 2021 Dai Foundation
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "../../interfaces/IBookKeeper.sol";
-import "../../interfaces/IToken.sol";
-import "../../interfaces/IFarmableTokenAdapter.sol";
-import "../../interfaces/IGenericTokenAdapter.sol";
-import "../../interfaces/IManager.sol";
-import "../../utils/SafeToken.sol";
 
-// receives tokens and shares them among holders
-contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, ReentrancyGuardUpgradeable {
+import "../../../interfaces/IBookKeeper.sol";
+import "../../../interfaces/IToken.sol";
+import "../../../interfaces/IFarmableTokenAdapter.sol";
+import "../../../interfaces/IGenericTokenAdapter.sol";
+import "../../../interfaces/IManager.sol";
+import "../../../utils/SafeToken.sol";
+
+/// @title BaseFarmableTokenAdapter is the base for adapters that receives tokens which can be farmed in other places
+/// and shares yields among depositors. Hence, higher capital effciency!
+contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, ReentrancyGuardUpgradeable {
   using SafeToken for address;
 
-  mapping(address => uint256) whitelist;
-  uint256 live;
+  uint256 internal constant WAD = 10**18;
+  uint256 internal constant RAY = 10**27;
 
-  IBookKeeper public bookKeeper; // cdp engine
-  bytes32 public override collateralPoolId; // collateral type
-  IToken public override collateralToken; // collateral token
-  uint256 public override decimals; // collateralToken decimals
-  IToken public rewardToken; // rewhitelist token
+  /// @dev Mapping of whitelisted address that can pause FarmableTokenAdapter
+  mapping(address => uint256) public whitelist;
+  uint256 public live;
 
-  uint256 public accRewardPerShare; // rewards per collateralToken    [ray]
-  uint256 public totalShare; // total collateralTokens       [wad]
-  uint256 public accRewardBalance; // crop balance     [wad]
+  /// @dev Book Keeper instance
+  IBookKeeper public bookKeeper;
+  /// @dev Collateral Pool ID
+  bytes32 public override collateralPoolId;
+  /// @dev Token that is used for collateral
+  IToken public override collateralToken;
+  /// @dev The decimals of collateralToken
+  uint256 public override decimals;
+  /// @dev The token that will get after collateral has been staked
+  IToken public rewardToken;
 
-  mapping(address => uint256) public rewardDebts; // rewardDebt per user  [wad]
-  mapping(address => uint256) public stake; // collateralTokens per user   [wad]
+  /// @dev Rewards per collateralToken in ray
+  uint256 public accRewardPerShare;
+  /// @dev Total CollateralTokens that has been staked in wad
+  uint256 public totalShare;
+  /// @dev Accummulate reward balance in wad
+  uint256 public accRewardBalance;
+
+  /// @dev Mapping of user => rewardDebts
+  mapping(address => uint256) public rewardDebts;
+  /// @dev Mapping of user => collteralTokens that he is staking
+  mapping(address => uint256) public stake;
 
   uint256 internal to18ConversionFactor;
   uint256 internal toTokenConversionFactor;
 
-  // --- Events ---
+  /// @notice Events
   event Deposit(uint256 val);
   event Withdraw(uint256 val);
   event Flee();
@@ -61,6 +62,39 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
     _;
   }
 
+  function __FarmableTokenAdapter_init(
+    address _bookKeeper,
+    bytes32 _collateralPoolId,
+    address _collateralToken,
+    address _rewardToken
+  ) internal initializer {
+    __FarmableTokenAdapter_init_unchained(_bookKeeper, _collateralPoolId, _collateralToken, _rewardToken);
+  }
+
+  function __FarmableTokenAdapter_init_unchained(
+    address _bookKeeper,
+    bytes32 _collateralPoolId,
+    address _collateralToken,
+    address _rewardToken
+  ) internal initializer {
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
+
+    whitelist[msg.sender] = 1;
+    emit Rely(msg.sender);
+
+    live = 1;
+
+    bookKeeper = IBookKeeper(_bookKeeper);
+    collateralPoolId = _collateralPoolId;
+    collateralToken = IToken(_collateralToken);
+    decimals = collateralToken.decimals();
+    require(decimals <= 18, "FarmableToken/decimals > 18");
+
+    to18ConversionFactor = 10**(18 - decimals);
+    toTokenConversionFactor = 10**decimals;
+    rewardToken = IToken(_rewardToken);
+  }
+
   function rely(address usr) external override auth {
     whitelist[usr] = 1;
     emit Rely(msg.sender);
@@ -69,36 +103,6 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
   function deny(address usr) external override auth {
     whitelist[usr] = 0;
     emit Deny(msg.sender);
-  }
-
-  function __FarmableTokenAdapter_init(
-    address _bookKeeper,
-    bytes32 collateralPoolId_,
-    address collateralToken_,
-    address rewardToken_
-  ) internal initializer {
-    __FarmableTokenAdapter_init_unchained(_bookKeeper, collateralPoolId_, collateralToken_, rewardToken_);
-  }
-
-  function __FarmableTokenAdapter_init_unchained(
-    address _bookKeeper,
-    bytes32 collateralPoolId_,
-    address collateralToken_,
-    address rewardToken_
-  ) internal initializer {
-    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
-    whitelist[msg.sender] = 1;
-    emit Rely(msg.sender);
-    live = 1;
-    bookKeeper = IBookKeeper(_bookKeeper);
-    collateralPoolId = collateralPoolId_;
-    collateralToken = IToken(collateralToken_);
-    uint256 decimals_ = IToken(collateralToken_).decimals();
-    require(decimals_ <= 18);
-    decimals = decimals_;
-    to18ConversionFactor = 10**(18 - decimals_);
-    toTokenConversionFactor = 10**decimals_;
-    rewardToken = IToken(rewardToken_);
   }
 
   function add(uint256 x, uint256 y) public pure returns (uint256 z) {
@@ -117,8 +121,6 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
     z = add(x, sub(y, 1)) / y;
   }
 
-  uint256 constant WAD = 10**18;
-
   function wmul(uint256 x, uint256 y) public pure returns (uint256 z) {
     z = mul(x, y) / WAD;
   }
@@ -130,8 +132,6 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
   function wdivup(uint256 x, uint256 y) public pure returns (uint256 z) {
     z = divup(mul(x, WAD), y);
   }
-
-  uint256 constant RAY = 10**27;
 
   function rmul(uint256 x, uint256 y) public pure returns (uint256 z) {
     z = mul(x, y) / RAY;
@@ -145,46 +145,63 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
     z = mul(x, RAY) / y;
   }
 
-  // Net Asset Valuation [wad]
-  function nav() public view virtual returns (uint256) {
-    uint256 _nav = collateralToken.balanceOf(address(this));
-    return mul(_nav, to18ConversionFactor);
+  /// @dev Return Net Asset Valuation in wad
+  function netAssetValuation() public view virtual returns (uint256) {
+    uint256 balance = collateralToken.balanceOf(address(this));
+    return mul(balance, to18ConversionFactor);
   }
 
-  // Net Assets per Share [wad]
-  function nps() public view returns (uint256) {
+  /// @dev Return Net Assets per Share in wad
+  function netAssetperShare() public view returns (uint256) {
     if (totalShare == 0) return WAD;
-    else return wdiv(nav(), totalShare);
+    else return wdiv(netAssetValuation(), totalShare);
   }
 
-  function harvestedRewards() internal virtual returns (uint256) {
+  /// @dev Return the amount of rewards that is harvested.
+  /// Expect that the adapter which inherited BaseFarmableTokenAdapter
+  /// override this _harvest and perform actual harvest before return
+  function _harvest() internal view returns (uint256) {
     return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
   }
 
+  /// @dev Harvest rewards for "from" and send to "to"
+  /// @param from The position address that is owned and staked the collateral tokens
+  /// @param to The address to receive the yields
   function harvest(address from, address to) internal {
-    if(from == address(0) || to == address(0)) return; // If invalid address, do not harvest to avoid confusion in the reward accounting.
-    if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(harvestedRewards(), totalShare));
+    // If invalid address, do not harvest to avoid confusion in the reward accounting.
+    if (from == address(0) || to == address(0)) return;
+    // 1. Perform actual harvest. Calculate the new accRewardPerShare.
+    if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvest(), totalShare));
 
-    uint256 last = rewardDebts[from];
-    uint256 curr = rmul(stake[from], accRewardPerShare);
-    if (curr > last) address(rewardToken).safeTransfer(to, curr - last);
+    // 2. Calculate the rewards that "to" should get by:
+    // stake[from] * accRewardPerShare (rewards that each share should get) - rewardDebts (what already paid)
+    uint256 rewardDebt = rewardDebts[from];
+    uint256 rewards = rmul(stake[from], accRewardPerShare);
+    if (rewards > rewardDebt) address(rewardToken).safeTransfer(to, sub(rewards, rewardDebt));
+
+    // 3. Update accRewardBalance
     accRewardBalance = rewardToken.balanceOf(address(this));
   }
 
+  /// @dev Harvest rewardTokens and distribute to user, deposit collateral tokens to staking contract
+  /// ,and update BookKeeper
+  /// @param positionAddress The position address to be updated
+  /// @param val The amount to be deposited
+  /// @param data The extra data information pass along to this adapter
   function deposit(
     address positionAddress,
     uint256 val,
     bytes calldata data
   ) public payable virtual override {
-    require(live == 1, "FarmableToken/not-live");
-    (address usr, bytes memory ext) = abi.decode(data, (address, bytes));
-    harvest(positionAddress, usr);
+    require(live == 1, "FarmableToken/not live");
+    address user = abi.decode(data, (address));
+    harvest(positionAddress, user);
     if (val > 0) {
-      uint256 wad = wdiv(mul(val, to18ConversionFactor), nps());
+      uint256 wad = wdiv(mul(val, to18ConversionFactor), netAssetperShare());
 
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
-      require(int256(wad) > 0);
+      require(int256(wad) > 0, "FarmableToken/wad overflow");
 
       address(collateralToken).safeTransferFrom(msg.sender, address(this), val);
       bookKeeper.addCollateral(collateralPoolId, positionAddress, int256(wad));
@@ -284,4 +301,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reentranc
   function cage() public virtual override auth {
     live = 0;
   }
+
+  /// @dev Gap for adding new variables later
+  uint256[49] private __gap;
 }

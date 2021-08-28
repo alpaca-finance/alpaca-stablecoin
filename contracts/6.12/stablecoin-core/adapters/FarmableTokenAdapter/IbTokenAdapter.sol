@@ -1,39 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (C) 2021 Dai Foundation
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "../../interfaces/IFairLaunch.sol";
-import "../../interfaces/ITimeLock.sol";
-import "../../interfaces/IShield.sol";
-import "../../utils/SafeToken.sol";
 
-import "./FarmableTokenAdapter.sol";
+import "../../../interfaces/IFairLaunch.sol";
+import "../../../interfaces/ITimeLock.sol";
+import "../../../interfaces/IShield.sol";
+import "../../../utils/SafeToken.sol";
 
-// IbTokenAdapter for Fairlaunch V1
+import "./BaseFarmableTokenAdapter.sol";
+
+/// @title IbTokenAdapter is tha adapter that inherited BaseFarmableTokenAdapter.
+/// It receives Alpaca's ibTOKEN from users and deposit in Alpaca's FairLaunch.
+/// Hence, users will still earn ALPACA rewards while holding a position
 contract IbTokenAdapter is
   OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
-  FarmableTokenAdapter
+  BaseFarmableTokenAdapter
 {
   using SafeToken for address;
 
@@ -69,7 +57,12 @@ contract IbTokenAdapter is
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
-    FarmableTokenAdapter.__FarmableTokenAdapter_init(_bookKeeper, collateralPoolId_, collateralToken_, rewardToken_);
+    BaseFarmableTokenAdapter.__FarmableTokenAdapter_init(
+      _bookKeeper,
+      collateralPoolId_,
+      collateralToken_,
+      rewardToken_
+    );
 
     // Sanity checks
     (address lpToken, uint256 allocPoint, , , ) = IFairLaunch(fairlaunch_).poolInfo(pid_);

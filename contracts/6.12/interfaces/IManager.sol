@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.6.12;
 
 interface IManager {
@@ -7,7 +8,7 @@ interface IManager {
     address,
     uint256,
     address
-  ) external view returns (bool);
+  ) external view returns (uint256);
 
   function collateralPools(uint256) external view returns (bytes32);
 
@@ -24,10 +25,10 @@ interface IManager {
   function allowManagePosition(
     uint256,
     address,
-    bool
+    uint256
   ) external;
 
-  function allowMigratePosition(address, bool) external;
+  function allowMigratePosition(address, uint256) external;
 
   function adjustPosition(
     uint256,
