@@ -968,4 +968,334 @@ describe("BookKeeper", () => {
       })
     })
   })
+
+  describe("#movePosition", () => {
+    context("when alice move position to bob", () => {
+      context("when alice and bob don't allow to managing own position", () => {
+        it("should be revert", async () => {
+          // initialize BNB colleteral pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+          // set pool debt ceiling 10 rad
+          await bookKeeper["file(bytes32,bytes32,uint256)"](
+            formatBytes32String("BNB"),
+            formatBytes32String("debtCeiling"),
+            WeiPerRad.mul(10)
+          )
+          // set price with safety margin 1 ray
+          await bookKeeper["file(bytes32,bytes32,uint256)"](
+            formatBytes32String("BNB"),
+            formatBytes32String("priceWithSafetyMargin"),
+            WeiPerRay
+          )
+          // set position debt floor 1 rad
+          await bookKeeper["file(bytes32,bytes32,uint256)"](
+            formatBytes32String("BNB"),
+            formatBytes32String("debtFloor"),
+            WeiPerRad.mul(1)
+          )
+          // set total debt ceiling 10 rad
+          await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+
+          // add collateral to 10 BNB
+          await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
+
+          // alice lock collateral 10 BNB
+          await bookKeeperAsAlice.adjustPosition(
+            formatBytes32String("BNB"),
+            aliceAddress,
+            aliceAddress,
+            aliceAddress,
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(2)
+          )
+
+          await expect(
+            bookKeeperAsAlice.movePosition(
+              formatBytes32String("BNB"),
+              aliceAddress,
+              bobAddress,
+              WeiPerWad.mul(5),
+              WeiPerWad.mul(1)
+            )
+          ).to.be.revertedWith("BookKeeper/not-allowed")
+        })
+      })
+      context("when bob allow alice to manage a position", () => {
+        context("when after moving alice position was not safe", () => {
+          it("should be revert", async () => {
+            // initialize BNB colleteral pool
+            await bookKeeper.init(formatBytes32String("BNB"))
+            // set pool debt ceiling 10 rad
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("debtCeiling"),
+              WeiPerRad.mul(10)
+            )
+            // set price with safety margin 1 ray
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("priceWithSafetyMargin"),
+              WeiPerRay
+            )
+            // set position debt floor 1 rad
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("debtFloor"),
+              WeiPerRad.mul(1)
+            )
+            // set total debt ceiling 10 rad
+            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+
+            // add collateral to 10 BNB
+            await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
+
+            // alice lock collateral 10 BNB
+            await bookKeeperAsAlice.adjustPosition(
+              formatBytes32String("BNB"),
+              aliceAddress,
+              aliceAddress,
+              aliceAddress,
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(2)
+            )
+
+            // bob allow alice to manage a position
+            await bookKeeperAsBob.hope(aliceAddress)
+
+            await expect(
+              bookKeeperAsAlice.movePosition(
+                formatBytes32String("BNB"),
+                aliceAddress,
+                bobAddress,
+                WeiPerWad.mul(10),
+                WeiPerWad.mul(0)
+              )
+            ).to.be.revertedWith("BookKeeper/not-safe-src")
+          })
+        })
+        context("when after moving bob position was not safe", () => {
+          it("should be revert", async () => {
+            // initialize BNB colleteral pool
+            await bookKeeper.init(formatBytes32String("BNB"))
+            // set pool debt ceiling 10 rad
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("debtCeiling"),
+              WeiPerRad.mul(10)
+            )
+            // set price with safety margin 1 ray
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("priceWithSafetyMargin"),
+              WeiPerRay
+            )
+            // set position debt floor 1 rad
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("debtFloor"),
+              WeiPerRad.mul(1)
+            )
+            // set total debt ceiling 10 rad
+            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+
+            // add collateral to 10 BNB
+            await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
+
+            // alice lock collateral 10 BNB
+            await bookKeeperAsAlice.adjustPosition(
+              formatBytes32String("BNB"),
+              aliceAddress,
+              aliceAddress,
+              aliceAddress,
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(2)
+            )
+
+            // bob allow alice to manage a position
+            await bookKeeperAsBob.hope(aliceAddress)
+
+            await expect(
+              bookKeeperAsAlice.movePosition(
+                formatBytes32String("BNB"),
+                aliceAddress,
+                bobAddress,
+                WeiPerWad.mul(0),
+                WeiPerWad.mul(2)
+              )
+            ).to.be.revertedWith("BookKeeper/not-safe-dst")
+          })
+        })
+        context("when after moving alice position was not enough debt", () => {
+          it("should be revert", async () => {
+            // initialize BNB colleteral pool
+            await bookKeeper.init(formatBytes32String("BNB"))
+            // set pool debt ceiling 10 rad
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("debtCeiling"),
+              WeiPerRad.mul(10)
+            )
+            // set price with safety margin 1 ray
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("priceWithSafetyMargin"),
+              WeiPerRay
+            )
+            // set position debt floor 1 rad
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("debtFloor"),
+              WeiPerRad.mul(2)
+            )
+            // set total debt ceiling 10 rad
+            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+
+            // add collateral to 10 BNB
+            await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
+
+            // alice lock collateral 10 BNB
+            await bookKeeperAsAlice.adjustPosition(
+              formatBytes32String("BNB"),
+              aliceAddress,
+              aliceAddress,
+              aliceAddress,
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(2)
+            )
+
+            // bob allow alice to manage a position
+            await bookKeeperAsBob.hope(aliceAddress)
+
+            await expect(
+              bookKeeperAsAlice.movePosition(
+                formatBytes32String("BNB"),
+                aliceAddress,
+                bobAddress,
+                WeiPerWad.mul(5),
+                WeiPerWad.mul(1)
+              )
+            ).to.be.revertedWith("BookKeeper/debtFloor-src")
+          })
+        })
+        context("when after moving bob position was not enough debt", () => {
+          it("should be revert", async () => {
+            // initialize BNB colleteral pool
+            await bookKeeper.init(formatBytes32String("BNB"))
+            // set pool debt ceiling 10 rad
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("debtCeiling"),
+              WeiPerRad.mul(10)
+            )
+            // set price with safety margin 1 ray
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("priceWithSafetyMargin"),
+              WeiPerRay
+            )
+            // set position debt floor 1 rad
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("debtFloor"),
+              WeiPerRad.mul(2)
+            )
+            // set total debt ceiling 10 rad
+            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+
+            // add collateral to 10 BNB
+            await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
+
+            // alice lock collateral 10 BNB
+            await bookKeeperAsAlice.adjustPosition(
+              formatBytes32String("BNB"),
+              aliceAddress,
+              aliceAddress,
+              aliceAddress,
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(3)
+            )
+
+            // bob allow alice to manage a position
+            await bookKeeperAsBob.hope(aliceAddress)
+
+            await expect(
+              bookKeeperAsAlice.movePosition(
+                formatBytes32String("BNB"),
+                aliceAddress,
+                bobAddress,
+                WeiPerWad.mul(5),
+                WeiPerWad.mul(1)
+              )
+            ).to.be.revertedWith("BookKeeper/debtFloor-dst")
+          })
+        })
+        context("when alice and bob positions are safe", () => {
+          it("should be able to call movePosition", async () => {
+            // initialize BNB colleteral pool
+            await bookKeeper.init(formatBytes32String("BNB"))
+            // set pool debt ceiling 10 rad
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("debtCeiling"),
+              WeiPerRad.mul(10)
+            )
+            // set price with safety margin 1 ray
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("priceWithSafetyMargin"),
+              WeiPerRay
+            )
+            // set position debt floor 1 rad
+            await bookKeeper["file(bytes32,bytes32,uint256)"](
+              formatBytes32String("BNB"),
+              formatBytes32String("debtFloor"),
+              WeiPerRad.mul(1)
+            )
+            // set total debt ceiling 10 rad
+            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+
+            // add collateral to 10 BNB
+            await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
+
+            // alice lock collateral 10 BNB
+            await bookKeeperAsAlice.adjustPosition(
+              formatBytes32String("BNB"),
+              aliceAddress,
+              aliceAddress,
+              aliceAddress,
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(2)
+            )
+
+            // bob allow alice to manage a position
+            await bookKeeperAsBob.hope(aliceAddress)
+
+            const positionAliceBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
+            expect(positionAliceBefore.lockedCollateral).to.be.equal(WeiPerWad.mul(10))
+            expect(positionAliceBefore.debtShare).to.be.equal(WeiPerWad.mul(2))
+
+            const positionBobBefore = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
+            expect(positionBobBefore.lockedCollateral).to.be.equal(0)
+            expect(positionBobBefore.debtShare).to.be.equal(0)
+
+            await bookKeeperAsAlice.movePosition(
+              formatBytes32String("BNB"),
+              aliceAddress,
+              bobAddress,
+              WeiPerWad.mul(5),
+              WeiPerWad.mul(1)
+            )
+
+            const positionAliceAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
+            expect(positionAliceAfter.lockedCollateral).to.be.equal(WeiPerWad.mul(5))
+            expect(positionAliceAfter.debtShare).to.be.equal(WeiPerWad.mul(1))
+
+            const positionBobAfter = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
+            expect(positionBobAfter.lockedCollateral).to.be.equal(WeiPerWad.mul(5))
+            expect(positionBobAfter.debtShare).to.be.equal(WeiPerWad.mul(1))
+          })
+        })
+      })
+    })
+  })
 })
