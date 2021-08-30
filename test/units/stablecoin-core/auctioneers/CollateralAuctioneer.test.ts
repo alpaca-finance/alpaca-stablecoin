@@ -723,4 +723,80 @@ describe("CollateralAuctioneer", () => {
       })
     })
   })
+
+  describe("#take()", () => {
+    const startAuctionWithDefaultParams = async () => {
+      const debt = WeiPerRad.mul(120000) // 120000 AUSD (rad)
+      const collateralAmount = WeiPerWad.mul(2) // 2 BTCB (wad)
+      const stableCoinReferencePrice = WeiPerRay // stableCoinReferencePrice is default 1 RAY
+      const priceValue = WeiPerWad.mul(45000) // 45000 AUSD/BTCB
+
+      // start an auction
+      await startAuction(priceValue, stableCoinReferencePrice, debt, collateralAmount)
+    }
+
+    const startAuction = async (
+      priceValue: BigNumber,
+      stableCoinReferencePrice: BigNumber,
+      debt: BigNumber,
+      collateralAmount: BigNumber
+    ) => {
+      mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
+      mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+      mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
+
+      await collateralAuctioneer.startAuction(debt, collateralAmount, positionAddress, liquidatorAddress)
+
+      mockedPriceFeed.smocked.peek.reset()
+      mockedPriceOracle.smocked.collateralPools.reset()
+      mockedPriceOracle.smocked.stableCoinReferencePrice.reset()
+    }
+    context("when circuit breaker is activated (stopped > 2)", () => {
+      it("should revert", async () => {
+        await startAuctionWithDefaultParams()
+        await collateralAuctioneer["file(bytes32,uint256)"](formatBytes32String("stopped"), 3)
+        await expect(
+          collateralAuctioneer.take(1, WeiPerWad.mul(2), WeiPerRay.mul(46000), aliceAddress, "0x")
+        ).to.be.revertedWith("CollateralAuctioneer/stopped-incorrect")
+      })
+    })
+    context("when given auction id has not been started yet", () => {
+      it("should revert", async () => {
+        await expect(
+          collateralAuctioneer.take(1, WeiPerWad.mul(2), WeiPerRay.mul(46000), aliceAddress, "0x")
+        ).to.be.revertedWith("CollateralAuctioneer/not-running-auction")
+      })
+    })
+    context("when given auction id needs reset", () => {
+      it("should revert, as it cannot be taken", async () => {
+        // config the auction time limit to be zero to force it done
+        await collateralAuctioneer["file(bytes32,uint256)"](formatBytes32String("auctionTimeLimit"), Zero)
+        await startAuctionWithDefaultParams()
+
+        // set calculator and mock some price
+        await collateralAuctioneer["file(bytes32,address)"](formatBytes32String("calc"), mockedLinearDecrease.address)
+        mockedLinearDecrease.smocked.price.will.return.with(WeiPerRay.mul(45000))
+
+        await expect(
+          collateralAuctioneer.take(1, WeiPerWad.mul(2), WeiPerRay.mul(46000), aliceAddress, "0x")
+        ).to.be.revertedWith("CollateralAuctioneer/needs-reset")
+      })
+    })
+    context("when given maxPrice is lower than the actual price calculated", () => {
+      it("should revert", async () => {
+        // config the auction time limit to be forver to force it not done
+        await collateralAuctioneer["file(bytes32,uint256)"](formatBytes32String("auctionTimeLimit"), MaxUint256)
+        await startAuctionWithDefaultParams()
+
+        // set calculator and mock the price to be 45000
+        await collateralAuctioneer["file(bytes32,address)"](formatBytes32String("calc"), mockedLinearDecrease.address)
+        mockedLinearDecrease.smocked.price.will.return.with(WeiPerRay.mul(45000))
+
+        // try input maxPrice with 44000
+        await expect(
+          collateralAuctioneer.take(1, WeiPerWad.mul(2), WeiPerRay.mul(44000), aliceAddress, "0x")
+        ).to.be.revertedWith("CollateralAuctioneer/too-expensive")
+      })
+    })
+  })
 })
