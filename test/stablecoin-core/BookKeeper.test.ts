@@ -126,4 +126,68 @@ describe("BookKeeper", () => {
       })
     })
   })
+
+  describe("#moveCollateral", () => {
+    context("when the caller is not the owner", () => {
+      it("should be revert", async () => {
+        // bob call move collateral from alice to bob
+        await await expect(
+          bookKeeperAsBob.moveCollateral(formatBytes32String("BNB"), aliceAddress, bobAddress, WeiPerWad)
+        ).to.be.revertedWith("BookKeeper/not-allowed")
+      })
+
+      context("when alice allow bob to move collateral", () => {
+        it("should be able to call moveCollateral", async () => {
+          // add collateral 1 BNB to alice
+          await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad)
+
+          const collateralTokenAliceBefore = await bookKeeper.collateralToken(formatBytes32String("BNB"), aliceAddress)
+          expect(collateralTokenAliceBefore).to.be.equal(WeiPerWad)
+          const collateralTokenBobBefore = await bookKeeper.collateralToken(formatBytes32String("BNB"), bobAddress)
+          expect(collateralTokenBobBefore).to.be.equal(0)
+
+          // alice allow bob to move collateral
+          await bookKeeperAsAlice.hope(bobAddress)
+
+          // bob call move collateral from alice to bob
+          await bookKeeperAsBob.moveCollateral(formatBytes32String("BNB"), aliceAddress, bobAddress, WeiPerWad)
+
+          const collateralTokenAliceAfter = await bookKeeper.collateralToken(formatBytes32String("BNB"), aliceAddress)
+          expect(collateralTokenAliceAfter).to.be.equal(0)
+          const collateralTokenBobAfter = await bookKeeper.collateralToken(formatBytes32String("BNB"), bobAddress)
+          expect(collateralTokenBobAfter).to.be.equal(WeiPerWad)
+        })
+      })
+    })
+
+    context("when the caller is the owner", () => {
+      context("when alice doesn't have enough collateral", () => {
+        it("shold be revert", async () => {
+          // alice call move collateral from alice to bob
+          await expect(
+            bookKeeperAsAlice.moveCollateral(formatBytes32String("BNB"), aliceAddress, bobAddress, WeiPerWad)
+          ).to.be.reverted
+        })
+      })
+      context("when alice has enough collateral", () => {
+        it("should be able to call moveCollateral", async () => {
+          // add collateral 1 BNB to alice
+          await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad)
+
+          const collateralTokenAliceBefore = await bookKeeper.collateralToken(formatBytes32String("BNB"), aliceAddress)
+          expect(collateralTokenAliceBefore).to.be.equal(WeiPerWad)
+          const collateralTokenBobBefore = await bookKeeper.collateralToken(formatBytes32String("BNB"), bobAddress)
+          expect(collateralTokenBobBefore).to.be.equal(0)
+
+          // move collateral 1 BNB from alice to bob
+          await bookKeeperAsAlice.moveCollateral(formatBytes32String("BNB"), aliceAddress, bobAddress, WeiPerWad)
+
+          const collateralTokenAliceAfter = await bookKeeper.collateralToken(formatBytes32String("BNB"), aliceAddress)
+          expect(collateralTokenAliceAfter).to.be.equal(0)
+          const collateralTokenBobAfter = await bookKeeper.collateralToken(formatBytes32String("BNB"), bobAddress)
+          expect(collateralTokenBobAfter).to.be.equal(WeiPerWad)
+        })
+      })
+    })
+  })
 })
