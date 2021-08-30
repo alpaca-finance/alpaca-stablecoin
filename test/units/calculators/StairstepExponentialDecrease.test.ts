@@ -52,7 +52,7 @@ describe("StairstepExponentialDecrease", () => {
               await stairstepExponentialDecrease.file(formatBytes32String("cut"), 0) // 100%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 0)
-              expect(price).to.be.equal(WeiPerWad.mul(50))
+              expect(price).to.be.equal(WeiPerWad.mul(50)) // 50 wad
             })
           })
 
@@ -61,7 +61,7 @@ describe("StairstepExponentialDecrease", () => {
               await stairstepExponentialDecrease.file(formatBytes32String("cut"), 0) // 100%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
-              expect(price).to.be.equal(0)
+              expect(price).to.be.equal(0) // 0 wad
             })
           })
         })
@@ -74,7 +74,7 @@ describe("StairstepExponentialDecrease", () => {
               await stairstepExponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.sub(parseEther("10000000"))) // 99%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 0)
-              expect(price).to.be.equal(WeiPerWad.mul(50))
+              expect(price).to.be.equal(WeiPerWad.mul(50)) // 50 wad
             })
           })
 
@@ -83,7 +83,7 @@ describe("StairstepExponentialDecrease", () => {
               await stairstepExponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.sub(parseEther("10000000"))) // 99%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
-              expect(price).to.be.equal(WeiPerWad.mul(495).div(10))
+              expect(price).to.be.equal(WeiPerWad.mul(495).div(10)) // 49.5 wad
             })
           })
 
@@ -92,7 +92,7 @@ describe("StairstepExponentialDecrease", () => {
               await stairstepExponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.sub(parseEther("10000000"))) // 99%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 2)
-              expect(price).to.be.equal(WeiPerWad.mul(49005).div(1000))
+              expect(price).to.be.equal(WeiPerWad.mul(49005).div(1000)) // 49.005 wad
             })
           })
         })
@@ -108,7 +108,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 1%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 0)
-              expect(price).to.be.equal(WeiPerWad.mul(50))
+              expect(price).to.be.equal(WeiPerWad.mul(50)) // 50 wad
             })
           })
 
@@ -120,7 +120,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 1%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
-              expect(price).to.be.equal(BigNumber.from("500000000000000000").toString())
+              expect(price).to.be.equal(BigNumber.from("500000000000000000").toString()) // 0.5 wad
             })
           })
         })
@@ -136,7 +136,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 0%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 0)
-              expect(price).to.be.equal(WeiPerWad.mul(50))
+              expect(price).to.be.equal(WeiPerWad.mul(50)) // 50 wad
             })
           })
 
@@ -148,7 +148,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 0%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
-              expect(price).to.be.equal(0)
+              expect(price).to.be.equal(0) // 0 wad
             })
           })
         })
@@ -164,7 +164,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 98.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
-              expect(price).to.be.equal(BigNumber.from("49438271605500000000").toString())
+              expect(price).to.be.equal(BigNumber.from("49438271605500000000").toString()) // 49.4382716055 wad
             })
           })
 
@@ -176,7 +176,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 98.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
-              expect(price).to.be.equal(BigNumber.from("25384375980898602842").toString())
+              expect(price).to.be.equal(BigNumber.from("25384375980898602842").toString()) // 25.384375980898602842 wad
             })
           })
         })
@@ -190,7 +190,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 98.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
-              expect(price).to.be.equal(WeiPerWad.mul(50))
+              expect(price).to.be.equal(WeiPerWad.mul(50)) // 50 wad
             })
           })
 
@@ -202,7 +202,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 98.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
-              expect(price).to.be.equal(BigNumber.from("43660560004238132027").toString())
+              expect(price).to.be.equal(BigNumber.from("43660560004238132027").toString()) // 43.660560004238132027 wad
             })
           })
         })
@@ -218,7 +218,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 97.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
-              expect(price).to.be.equal(BigNumber.from("48938271605500000000").toString())
+              expect(price).to.be.equal(BigNumber.from("48938271605500000000").toString()) // 48.9382716055 wad
             })
           })
 
@@ -230,7 +230,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 97.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
-              expect(price).to.be.equal(BigNumber.from("13793909126329075429").toString())
+              expect(price).to.be.equal(BigNumber.from("13793909126329075429").toString()) // 13.793909126329075429 wad
             })
           })
         })
@@ -244,7 +244,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 97.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 1)
-              expect(price).to.be.equal(WeiPerWad.mul(50))
+              expect(price).to.be.equal(WeiPerWad.mul(50)) // 50 wad
             })
           })
 
@@ -256,7 +256,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 97.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 5)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.mul(50), 60)
-              expect(price).to.be.equal(BigNumber.from("38646794298032588404").toString())
+              expect(price).to.be.equal(BigNumber.from("38646794298032588404").toString()) // 38.646794298032588404 wad
             })
           })
         })
@@ -274,7 +274,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 98.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 1)
-              expect(price).to.be.equal(BigNumber.from("988765432").toString())
+              expect(price).to.be.equal(BigNumber.from("988765432").toString()) // 0.000000000988765432 wad
             })
           })
 
@@ -286,7 +286,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 98.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 60)
-              expect(price).to.be.equal(BigNumber.from("507687519").toString())
+              expect(price).to.be.equal(BigNumber.from("507687519").toString()) // 0.000000000507687519 wad
             })
           })
         })
@@ -302,7 +302,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 97.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 1)
-              expect(price).to.be.equal(BigNumber.from("978765432").toString())
+              expect(price).to.be.equal(BigNumber.from("978765432").toString()) // 0.000000000978765432 wad
             })
           })
 
@@ -314,7 +314,7 @@ describe("StairstepExponentialDecrease", () => {
               ) // 97.876543211%
               await stairstepExponentialDecrease.file(formatBytes32String("step"), 1)
               const price = await stairstepExponentialDecrease.price(WeiPerWad.div(1000000000), 60)
-              expect(price).to.be.equal(BigNumber.from("275878182").toString())
+              expect(price).to.be.equal(BigNumber.from("275878182").toString()) // 0.000000000275878182 wad
             })
           })
         })
