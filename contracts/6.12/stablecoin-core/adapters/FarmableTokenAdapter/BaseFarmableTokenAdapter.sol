@@ -52,13 +52,13 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
   /// @notice Events
   event Deposit(uint256 val);
   event Withdraw(uint256 val);
-  event Flee();
-  event MoveRewards(address indexed src, address indexed dst, uint256 wad);
+  event EmergencyWithdaraw();
+  event MoveStake(address indexed src, address indexed dst, uint256 wad);
   event Rely(address indexed usr);
   event Deny(address indexed usr);
 
   modifier auth() {
-    require(whitelist[msg.sender] == 1, "FarmableToken/not-authed");
+    require(whitelist[msg.sender] == 1, "BaseFarmableToken/not-authed");
     _;
   }
 
@@ -88,7 +88,7 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
     collateralPoolId = _collateralPoolId;
     collateralToken = IToken(_collateralToken);
     decimals = collateralToken.decimals();
-    require(decimals <= 18, "FarmableToken/decimals > 18");
+    require(decimals <= 18, "BaseFarmableToken/decimals > 18");
 
     to18ConversionFactor = 10**(18 - decimals);
     toTokenConversionFactor = 10**decimals;
@@ -183,119 +183,151 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
     accRewardBalance = rewardToken.balanceOf(address(this));
   }
 
-  /// @dev Harvest rewardTokens and distribute to user, deposit collateral tokens to staking contract
-  /// ,and update BookKeeper
+  /// @dev Harvest rewardTokens and distribute to user,
+  /// deposit collateral tokens to staking contract, and update BookKeeper
   /// @param positionAddress The position address to be updated
-  /// @param val The amount to be deposited
+  /// @param amount The amount to be deposited
   /// @param data The extra data information pass along to this adapter
   function deposit(
     address positionAddress,
-    uint256 val,
+    uint256 amount,
     bytes calldata data
   ) public payable virtual override {
-    require(live == 1, "FarmableToken/not live");
+    require(live == 1, "BaseFarmableToken/not live");
     address user = abi.decode(data, (address));
     harvest(positionAddress, user);
-    if (val > 0) {
-      uint256 wad = wdiv(mul(val, to18ConversionFactor), netAssetperShare());
+    if (amount > 0) {
+      uint256 wad = wdiv(mul(amount, to18ConversionFactor), netAssetperShare());
 
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
-      require(int256(wad) > 0, "FarmableToken/wad overflow");
+      require(int256(wad) > 0, "BaseFarmableToken/wad overflow");
 
-      address(collateralToken).safeTransferFrom(msg.sender, address(this), val);
+      address(collateralToken).safeTransferFrom(msg.sender, address(this), amount);
       bookKeeper.addCollateral(collateralPoolId, positionAddress, int256(wad));
 
       totalShare = add(totalShare, wad);
       stake[positionAddress] = add(stake[positionAddress], wad);
     }
     rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
-    emit Deposit(val);
+
+    emit Deposit(amount);
   }
 
+  /// @dev Harvest rewardTokens and distribute to user,
+  /// withdraw collateral tokens from staking contract, and update BookKeeper
+  /// @param positionAddress The position address to be updated
+  /// @param amount The amount to be deposited
+  /// @param data The extra data information pass along to this adapter
   function withdraw(
     address positionAddress,
-    uint256 val,
+    uint256 amount,
     bytes calldata data
   ) public virtual override {
-    (address usr, bytes memory ext) = abi.decode(data, (address, bytes));
+    address usr = abi.decode(data, (address));
     harvest(positionAddress, usr);
-    if (val > 0) {
-      uint256 wad = wdivup(mul(val, to18ConversionFactor), nps());
+    if (amount > 0) {
+      uint256 wad = wdivup(mul(amount, to18ConversionFactor), netAssetperShare());
 
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
-      require(int256(wad) > 0);
+      require(int256(wad) > 0, "BaseFarmableToken/wad overflow");
 
-      address(collateralToken).safeTransfer(usr, val);
+      address(collateralToken).safeTransfer(usr, amount);
       bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(wad));
 
       totalShare = sub(totalShare, wad);
       stake[positionAddress] = sub(stake[positionAddress], wad);
     }
     rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
-    emit Withdraw(val);
+
+    emit Withdraw(amount);
   }
 
-  function emergencyWithdraw(address positionAddress, address usr) public virtual {
+  /// @dev EMERGENCY ONLY. Withdraw collateralTokens from staking contract without caring rewards
+  /// @param positionAddress The positionAddress to do emergency withdraw
+  /// @param user The address to received collateralTokens
+  function emergencyWithdraw(address positionAddress, address user) public virtual {
     uint256 wad = bookKeeper.collateralToken(collateralPoolId, positionAddress);
-    require(wad <= 2**255);
-    uint256 val = wmul(wmul(wad, nps()), toTokenConversionFactor);
+    require(wad <= 2**255, "BaseFarmableTokenAdapter/wad overflow");
+    uint256 val = wmul(wmul(wad, netAssetperShare()), toTokenConversionFactor);
 
-    address(collateralToken).safeTransfer(usr, val);
+    address(collateralToken).safeTransfer(user, val);
     bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(wad));
 
     totalShare = sub(totalShare, wad);
     stake[positionAddress] = sub(stake[positionAddress], wad);
     rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
 
-    emit Flee();
+    emit EmergencyWithdaraw();
   }
 
-  function moveRewards(
-    address src,
-    address dst,
+  /// @dev Move wad amount of staked balance from source to destination.
+  /// Can only be moved if underlaying assets make sense.
+  /// @param source The address to be moved staked balance from
+  /// @param destination The address to be moved staked balance to
+  /// @param wad The amount of staked balance to be moved
+  function moveStake(
+    address source,
+    address destination,
     uint256 wad,
-    bytes calldata data
+    bytes calldata /* data */
   ) public override {
-    uint256 ss = stake[src];
-    stake[src] = sub(ss, wad);
-    stake[dst] = add(stake[dst], wad);
+    // 1. Update collateral tokens for source and destination
+    uint256 stakedAmount = stake[source];
+    stake[source] = sub(stakedAmount, wad);
+    stake[destination] = add(stake[destination], wad);
 
-    uint256 cs = rewardDebts[src];
-    uint256 drewardDebt = mul(cs, wad) / ss;
+    // 2. Update source's rewardDebt due to collateral tokens have
+    // moved from source to destination. Hence, rewardDebt should be updated.
+    // dRewardDebt is how many rewards has been paid for that wad.
+    uint256 rewardDebt = rewardDebts[source];
+    uint256 dRewardDebt = mul(rewardDebt, wad) / stakedAmount;
 
-    // safe since drewardDebts <= rewardDebts[src]
-    rewardDebts[src] = cs - drewardDebt;
-    rewardDebts[dst] = add(rewardDebts[dst], drewardDebt);
+    // 3. Update rewardDebts for both source and destination
+    // Safe since dRewardDebt <= rewardDebts[source]
+    rewardDebts[source] = rewardDebt - dRewardDebt;
+    rewardDebts[destination] = add(rewardDebts[destination], dRewardDebt);
 
-    (uint256 lockedCollateral, ) = bookKeeper.positions(collateralPoolId, src);
-    require(stake[src] >= add(bookKeeper.collateralToken(collateralPoolId, src), lockedCollateral));
-    (lockedCollateral, ) = bookKeeper.positions(collateralPoolId, dst);
-    require(stake[dst] <= add(bookKeeper.collateralToken(collateralPoolId, dst), lockedCollateral));
+    // 4. Sanity check.
+    // - stake[source] must more than or equal to collateral + lockedCollateral that source has
+    // to prevent a case where someone try to steal stake from source
+    // - stake[destination] must less than or eqal to collateral + lockedCollateral that destination has
+    // to prevent destination from claim stake > actual collateral that he has
+    (uint256 lockedCollateral, ) = bookKeeper.positions(collateralPoolId, source);
+    require(
+      stake[source] >= add(bookKeeper.collateralToken(collateralPoolId, source), lockedCollateral),
+      "BaseFarmableTokenAdapter/stake[source] < collateralTokens + lockedCollateral"
+    );
+    (lockedCollateral, ) = bookKeeper.positions(collateralPoolId, destination);
+    require(
+      stake[destination] <= add(bookKeeper.collateralToken(collateralPoolId, destination), lockedCollateral),
+      "BaseFarmableTokenAdapter/stake[destination] > collateralTokens + lockedCollateral"
+    );
 
-    emit MoveRewards(src, dst, wad);
+    emit MoveStake(source, destination, wad);
   }
 
+  /// @dev Hook function when PositionManager adjust position.
   function onAdjustPosition(
-    address src,
-    address dst,
+    address source,
+    address destination,
     int256 collateralValue,
-    int256 debtShare,
+    int256, /* debtShare */
     bytes calldata data
   ) external override nonReentrant {
     uint256 unsignedCollateralValue = collateralValue < 0 ? uint256(-collateralValue) : uint256(collateralValue);
-    moveRewards(src, dst, unsignedCollateralValue, data);
+    moveStake(source, destination, unsignedCollateralValue, data);
   }
 
   function onMoveCollateral(
-    address src,
-    address dst,
+    address source,
+    address destination,
     uint256 wad,
     bytes calldata data
   ) external override nonReentrant {
-    deposit(src, 0, data);
-    moveRewards(src, dst, wad, data);
+    deposit(source, 0, data);
+    moveStake(source, destination, wad, data);
   }
 
   function cage() public virtual override auth {
