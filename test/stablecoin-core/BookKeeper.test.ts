@@ -1541,4 +1541,79 @@ describe("BookKeeper", () => {
       })
     })
   })
+
+  describe("#accrueStabilityFee", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(
+          bookKeeperAsAlice.accrueStabilityFee(formatBytes32String("BNB"), deployerAddress, WeiPerRay)
+        ).to.be.revertedWith("BookKeeper/not-authorized")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when bookkeeper does not live", () => {
+        it("should be revert", async () => {
+          bookKeeper.cage()
+
+          await expect(
+            bookKeeper.accrueStabilityFee(formatBytes32String("BNB"), deployerAddress, WeiPerRay)
+          ).to.be.revertedWith("BookKeeper/not-live")
+        })
+      })
+      context("when bookkeeper is live", () => {
+        it("should be able to call accrueStabilityFee", async () => {
+          // init BNB pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+          // set pool debt ceiling 10 rad
+          await bookKeeper["file(bytes32,bytes32,uint256)"](
+            formatBytes32String("BNB"),
+            formatBytes32String("debtCeiling"),
+            WeiPerRad.mul(10)
+          )
+          // set price with safety margin 1 ray
+          await bookKeeper["file(bytes32,bytes32,uint256)"](
+            formatBytes32String("BNB"),
+            formatBytes32String("priceWithSafetyMargin"),
+            WeiPerRay
+          )
+          // set position debt floor 1 rad
+          await bookKeeper["file(bytes32,bytes32,uint256)"](
+            formatBytes32String("BNB"),
+            formatBytes32String("debtFloor"),
+            WeiPerRad.mul(1)
+          )
+          // set total debt ceiling 1 rad
+          await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad)
+
+          // add collateral to 1 BNB
+          await bookKeeper.addCollateral(formatBytes32String("BNB"), deployerAddress, WeiPerWad)
+          // adjust position
+          await bookKeeper.adjustPosition(
+            formatBytes32String("BNB"),
+            deployerAddress,
+            deployerAddress,
+            deployerAddress,
+            WeiPerWad,
+            WeiPerWad
+          )
+
+          const poolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+          expect(poolBefore.debtAccumulatedRate).to.be.equal(WeiPerRay)
+          const stablecoinDeployerBefore = await bookKeeper.stablecoin(deployerAddress)
+          expect(stablecoinDeployerBefore).to.be.equal(WeiPerRad)
+          const totalStablecoinIssuedBefore = await bookKeeper.totalStablecoinIssued()
+          expect(totalStablecoinIssuedBefore).to.be.equal(WeiPerRad)
+
+          await bookKeeper.accrueStabilityFee(formatBytes32String("BNB"), deployerAddress, WeiPerRay)
+
+          const poolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+          expect(poolAfter.debtAccumulatedRate).to.be.equal(WeiPerRay.mul(2))
+          const stablecoinDeployerAfter = await bookKeeper.stablecoin(deployerAddress)
+          expect(stablecoinDeployerAfter).to.be.equal(WeiPerRad.mul(2))
+          const totalStablecoinIssuedAfter = await bookKeeper.totalStablecoinIssued()
+          expect(totalStablecoinIssuedAfter).to.be.equal(WeiPerRad.mul(2))
+        })
+      })
+    })
+  })
 })
