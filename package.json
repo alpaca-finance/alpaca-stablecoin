@@ -9,12 +9,9 @@
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
     "test": "hardhat test --no-compile",
     "testnet": "hardhat console --no-compile --network testnet",
-<<<<<<< HEAD
     "test:bookkeeper": "hardhat test --no-compile ./test/stablecoin-core/BookKeeper.test.ts",
-=======
     "test:exponentialdecrease": "hardhat test --no-compile ./test/units/calculators/ExponentialDecrease.test.ts",
     "test:tokenadapter": "hardhat test --no-compile ./test/units/adapter/TokenAdapter.test.ts",
->>>>>>> main
     "test:stabilityfeecollector": "hardhat test --no-compile ./test/stablecoin-core/StabilityFeeCollector.test.ts",
     "test:lineardecrease": "hardhat test --no-compile ./test/units/calculators/LinearDecrease.test.ts",
     "coverage": "hardhat coverage",
