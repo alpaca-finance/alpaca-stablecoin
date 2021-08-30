@@ -1475,4 +1475,40 @@ describe("BookKeeper", () => {
       })
     })
   })
+
+  describe("#mintUnbackedStablecoin", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(
+          bookKeeperAsAlice.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
+        ).to.be.revertedWith("BookKeeper/not-authorized")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when mint unbacked stable coin", () => {
+        it("should be able to call mintUnbackedStablecoin", async () => {
+          const systemBadDebtBefore = await bookKeeper.systemBadDebt(deployerAddress)
+          expect(systemBadDebtBefore).to.be.equal(0)
+          const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
+          expect(stablecoinAliceBefore).to.be.equal(0)
+          const totalUnbackedStablecoinBefore = await bookKeeper.totalUnbackedStablecoin()
+          expect(totalUnbackedStablecoinBefore).to.be.equal(0)
+          const totalStablecoinIssuedBefore = await bookKeeper.totalStablecoinIssued()
+          expect(totalStablecoinIssuedBefore).to.be.equal(0)
+
+          //  mint 1 rad to alice
+          await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
+
+          const systemBadDebtAfter = await bookKeeper.systemBadDebt(deployerAddress)
+          expect(systemBadDebtAfter).to.be.equal(WeiPerRad)
+          const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
+          expect(stablecoinAliceAfter).to.be.equal(WeiPerRad)
+          const totalUnbackedStablecoinAfter = await bookKeeper.totalUnbackedStablecoin()
+          expect(totalUnbackedStablecoinAfter).to.be.equal(WeiPerRad)
+          const totalStablecoinIssuedAfter = await bookKeeper.totalStablecoinIssued()
+          expect(totalStablecoinIssuedAfter).to.be.equal(WeiPerRad)
+        })
+      })
+    })
+  })
 })
