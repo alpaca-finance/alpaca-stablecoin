@@ -3,24 +3,12 @@ import { Signer, BigNumber, Wallet } from "ethers"
 import chai from "chai"
 import { MockProvider, solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import {
-  BookKeeper,
-  BookKeeper__factory,
-  CollateralAuctioneer,
-  CollateralAuctioneer__factory,
-  PriceOracle,
-  PriceOracle__factory,
-  LiquidationEngine,
-  LiquidationEngine__factory,
-  IPriceFeed,
-  IPriceFeed__factory,
-  MockPriceFeed__factory,
-} from "../../../../typechain"
+import { CollateralAuctioneer, CollateralAuctioneer__factory } from "../../../../typechain"
 import { smockit, MockContract, smoddit, ModifiableContract } from "@eth-optimism/smock"
 import { WeiPerBln, WeiPerRad, WeiPerRay, WeiPerWad } from "../../../helper/unit"
-import { zeroAddress } from "ethereumjs-util"
-import { AddressOne, AddressTwo } from "../../../helper/address"
+import { AddressOne } from "../../../helper/address"
 import { formatBytes32BigNumber } from "../../../helper/format"
+import { increase } from "../../../helper/time"
 
 chai.use(solidity)
 const { expect } = chai
@@ -34,6 +22,7 @@ type fixture = {
   mockedPriceOracle: MockContract
   mockedLiquidationEngine: MockContract
   mockedPriceFeed: MockContract
+  mockedLinearDecrease: MockContract
 }
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
@@ -50,6 +39,9 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
 
   // Deploy mocked PriceFeed
   const mockedPriceFeed = await smockit(await ethers.getContractFactory("MockPriceFeed", deployer))
+
+  // Deploy mocked LinearDecrease
+  const mockedLinearDecrease = await smockit(await ethers.getContractFactory("LinearDecrease", deployer))
 
   // Deploy CollateralAuctioneer
   const CollateralAuctioneer = (await ethers.getContractFactory(
@@ -72,6 +64,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     mockedLiquidationEngine.address,
     formatBytes32String("BTCB")
   )
+  await modifiableCollateralAuctioneer.deployed()
 
   return {
     collateralAuctioneer,
@@ -80,6 +73,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     mockedPriceOracle,
     mockedLiquidationEngine,
     mockedPriceFeed,
+    mockedLinearDecrease,
   }
 }
 
@@ -106,6 +100,7 @@ describe("CollateralAuctioneer", () => {
   let mockedPriceOracle: MockContract
   let mockedLiquidationEngine: MockContract
   let mockedPriceFeed: MockContract
+  let mockedLinearDecrease: MockContract
   let collateralAuctioneerAsAlice: CollateralAuctioneer
   let collateralAuctioneerAsBob: CollateralAuctioneer
 
@@ -117,6 +112,7 @@ describe("CollateralAuctioneer", () => {
       mockedPriceOracle,
       mockedLiquidationEngine,
       mockedPriceFeed,
+      mockedLinearDecrease,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, liquidator] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, liquidatorAddress] = await Promise.all([
@@ -314,6 +310,415 @@ describe("CollateralAuctioneer", () => {
           expect(sale.collateralAmount).to.be.equal(collateralAmount)
           expect(sale.positionAddress).to.be.equal(positionAddress)
           expect(sale.startingPrice).to.be.equal(startingPrice)
+        })
+      })
+    })
+  })
+
+  describe("#redo()", () => {
+    const startAuctionWithDefaultParams = async () => {
+      const debt = WeiPerRad.mul(120000) // 120000 AUSD (rad)
+      const collateralAmount = WeiPerWad.mul(2) // 2 BTCB (wad)
+      const stableCoinReferencePrice = WeiPerRay // stableCoinReferencePrice is default 1 RAY
+      const priceValue = WeiPerWad.mul(45000) // 45000 AUSD/BTCB
+
+      // start an auction
+      await startAuction(priceValue, stableCoinReferencePrice, debt, collateralAmount)
+    }
+
+    const startAuction = async (
+      priceValue: BigNumber,
+      stableCoinReferencePrice: BigNumber,
+      debt: BigNumber,
+      collateralAmount: BigNumber
+    ) => {
+      mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
+      mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+      mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
+
+      await collateralAuctioneer.startAuction(debt, collateralAmount, positionAddress, liquidatorAddress)
+
+      mockedPriceFeed.smocked.peek.reset()
+      mockedPriceOracle.smocked.collateralPools.reset()
+      mockedPriceOracle.smocked.stableCoinReferencePrice.reset()
+    }
+
+    context("when caller is not authorized", () => {
+      it("should revert", async () => {
+        // TODO: add test cases after we implement ACL
+      })
+    })
+    context("when circuit breaker is activated (stopped > 1)", () => {
+      it("should revert", async () => {
+        await startAuctionWithDefaultParams()
+        await collateralAuctioneer["file(bytes32,uint256)"](formatBytes32String("stopped"), 2)
+        await expect(collateralAuctioneer.redo(1, liquidatorAddress)).to.be.revertedWith(
+          "CollateralAuctioneer/stopped-incorrect"
+        )
+
+        await collateralAuctioneer["file(bytes32,uint256)"](formatBytes32String("stopped"), 3)
+        await expect(collateralAuctioneer.redo(1, liquidatorAddress)).to.be.revertedWith(
+          "CollateralAuctioneer/stopped-incorrect"
+        )
+      })
+    })
+
+    context("when given auction id has not been started yet", () => {
+      it("should revert", async () => {
+        await expect(collateralAuctioneer.redo(1, liquidatorAddress)).to.be.revertedWith(
+          "CollateralAuctioneer/not-running-auction"
+        )
+      })
+    })
+
+    context("when given auction id has not done yet", () => {
+      context("when price has not drop to the reset threshold yet", () => {
+        it("should revert", async () => {
+          await startAuctionWithDefaultParams()
+
+          // config the auction time limit to be forver
+          await collateralAuctioneer["file(bytes32,uint256)"](formatBytes32String("auctionTimeLimit"), MaxUint256)
+          // config price threshold to be 50%
+          await collateralAuctioneer["file(bytes32,uint256)"](
+            formatBytes32String("priceDropBeforeReset"),
+            WeiPerRay.div(2) // 50%
+          )
+          await collateralAuctioneer["file(bytes32,address)"](formatBytes32String("calc"), mockedLinearDecrease.address)
+
+          // set the price to be a little bit above threshold, then it should revert
+          mockedLinearDecrease.smocked.price.will.return.with(WeiPerRay.mul(22501))
+          await expect(collateralAuctioneer.redo(1, liquidatorAddress)).to.be.revertedWith(
+            "CollateralAuctioneer/cannot-reset"
+          )
+
+          // set the price to be a little bit below threshold, then it should able to redo
+          mockedLinearDecrease.smocked.price.will.return.with(WeiPerRay.mul(22499))
+          await expect(collateralAuctioneer.redo(1, liquidatorAddress)).not.to.be.reverted
+        })
+      })
+      context("when timestamp has not reach auction time limit yet", () => {
+        it("should revert before 3 seconds", async () => {
+          await startAuctionWithDefaultParams()
+
+          // Set auctionTimeLimit 9 seconds
+          await collateralAuctioneer["file(bytes32,uint256)"](formatBytes32String("auctionTimeLimit"), One.mul(9))
+          await collateralAuctioneer["file(bytes32,address)"](formatBytes32String("calc"), mockedLinearDecrease.address)
+
+          // start mocking for redo()
+          mockedLinearDecrease.smocked.price.will.return.with(One)
+
+          // redo should fail
+          await expect(collateralAuctioneer.redo(1, liquidatorAddress)).to.be.revertedWith(
+            "CollateralAuctioneer/cannot-reset"
+          )
+          // wait for 3 sec (+some await time), redo should still failt
+          // await new Promise((r) => setTimeout(r, 1000))
+          await increase(One.mul(3))
+          await expect(collateralAuctioneer.redo(1, liquidatorAddress)).to.be.revertedWith(
+            "CollateralAuctioneer/cannot-reset"
+          )
+
+          // wait for 6 secs, it should not revert
+          await increase(One.mul(6))
+          await expect(collateralAuctioneer.redo(1, liquidatorAddress)).not.to.be.reverted
+        })
+      })
+    })
+
+    context("when starting price is calculated as 0", () => {
+      context("when fed price = 0", () => {
+        it("should revert", async () => {
+          await startAuctionWithDefaultParams()
+
+          const stableCoinReferencePrice = WeiPerRay // stableCoinReferencePrice is default 1 RAY
+          const priceValue = Zero
+
+          mockedLinearDecrease.smocked.price.will.return.with(One)
+
+          mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
+          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+          mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
+
+          await collateralAuctioneer["file(bytes32,address)"](formatBytes32String("calc"), mockedLinearDecrease.address)
+
+          await expect(collateralAuctioneer.redo(1, liquidatorAddress)).to.be.revertedWith(
+            "CollateralAuctioneer/zero-starting-price"
+          )
+        })
+      })
+
+      context("when startingPriceBuffer = 0", () => {
+        it("should revert", async () => {
+          await startAuctionWithDefaultParams()
+
+          const stableCoinReferencePrice = WeiPerRay // stableCoinReferencePrice is default 1 RAY
+          const priceValue = WeiPerWad.mul(45000) // 45000 AUSD/BTCB
+
+          mockedLinearDecrease.smocked.price.will.return.with(One)
+
+          mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
+          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+          mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
+
+          await collateralAuctioneer["file(bytes32,address)"](formatBytes32String("calc"), mockedLinearDecrease.address)
+
+          // force set startingPriceBuffer = 0
+          await collateralAuctioneer["file(bytes32,uint256)"](formatBytes32String("startingPriceBuffer"), Zero)
+
+          await expect(collateralAuctioneer.redo(1, liquidatorAddress)).to.be.revertedWith(
+            "CollateralAuctioneer/zero-starting-price"
+          )
+        })
+      })
+    })
+
+    context("when parameters are valid", () => {
+      context("when liquidatorTip and liquidatorBountyRate is not set", () => {
+        it("should start auction properly without booking the prize", async () => {
+          const debt = WeiPerRad.mul(120000) // 120000 AUSD (rad)
+          const collateralAmount = WeiPerWad.mul(2) // 2 BTCB (wad)
+          const startingPriceBuffer = WeiPerRay // startingPriceBuffer is default 1 RAY
+          const stableCoinReferencePrice = WeiPerRay // stableCoinReferencePrice is default 1 RAY
+          const priceValue = WeiPerWad.mul(45000) // 45000 AUSD/BTCB
+          // fedPrice = rdiv(mul(price, BLN), priceOracle.stableCoinReferencePrice())
+          //          = (45000 RAY * 1 BLN) / (1 RAY / 1 RAY)
+          const fedPrice = priceValue.mul(WeiPerBln).mul(WeiPerRay).div(stableCoinReferencePrice)
+          // startingPrice = fedPrice * startingPriceBuffer
+          //               = (45000 RAY * 1 BLN) * 1 RAY / 1 RAY
+          const startingPrice = fedPrice.mul(startingPriceBuffer).div(WeiPerRay)
+          const prize = Zero
+
+          // start an auction
+          {
+            mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
+            mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+            mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
+
+            await collateralAuctioneer.startAuction(debt, collateralAmount, positionAddress, liquidatorAddress)
+
+            mockedPriceFeed.smocked.peek.reset()
+            mockedPriceOracle.smocked.collateralPools.reset()
+            mockedPriceOracle.smocked.stableCoinReferencePrice.reset()
+          }
+
+          // start mocking for redo()
+          mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
+          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+          mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
+          mockedLinearDecrease.smocked.price.will.return.with(fedPrice)
+
+          await collateralAuctioneer["file(bytes32,address)"](formatBytes32String("calc"), mockedLinearDecrease.address)
+
+          await collateralAuctioneer.redo(1, liquidatorAddress)
+
+          const { calls: collateralPoolsCalls } = mockedPriceOracle.smocked.collateralPools
+          expect(collateralPoolsCalls.length).to.be.equal(1)
+          expect(collateralPoolsCalls[0][0]).to.be.equal(formatBytes32String("BTCB"))
+
+          const { calls: peekCalls } = mockedPriceFeed.smocked.peek
+          expect(peekCalls.length).to.be.equal(1)
+
+          const { calls: stableCoinReferencePriceCalls } = mockedPriceOracle.smocked.stableCoinReferencePrice
+          expect(stableCoinReferencePriceCalls.length).to.be.equal(1)
+
+          const { calls: linearDecreasePriceCalls } = mockedLinearDecrease.smocked.price
+          expect(linearDecreasePriceCalls.length).to.be.equal(1)
+          expect(linearDecreasePriceCalls[0][0]).to.be.equal(startingPrice)
+
+          const id = await collateralAuctioneer.kicks()
+          expect(id).to.be.equal(1)
+
+          const activePosId = await collateralAuctioneer.active(0)
+          expect(activePosId).to.be.equal(id)
+
+          const sale = await collateralAuctioneer.sales(id)
+          expect(sale.pos).to.be.equal(0)
+          expect(sale.debt).to.be.equal(debt)
+          expect(sale.collateralAmount).to.be.equal(collateralAmount)
+          expect(sale.positionAddress).to.be.equal(positionAddress)
+          expect(sale.startingPrice).to.be.equal(startingPrice)
+        })
+      })
+      context("when liquidatorTip and liquidatorBountyRate is set", () => {
+        it("should start auction properly without booking the prize", async () => {
+          const debt = WeiPerRad.mul(120000) // 120000 AUSD (rad)
+          const collateralAmount = WeiPerWad.mul(2) // 2 BTCB (wad)
+          const startingPriceBuffer = WeiPerRay // startingPriceBuffer is default 1 RAY
+          const stableCoinReferencePrice = WeiPerRay // stableCoinReferencePrice is default 1 RAY
+          const priceValue = WeiPerWad.mul(45000) // 45000 AUSD/BTCB
+          // fedPrice = rdiv(mul(price, BLN), priceOracle.stableCoinReferencePrice())
+          //          = (45000 RAY * 1 BLN) / (1 RAY / 1 RAY)
+          const fedPrice = priceValue.mul(WeiPerBln).mul(WeiPerRay).div(stableCoinReferencePrice)
+          // startingPrice = fedPrice * startingPriceBuffer
+          //               = (45000 RAY * 1 BLN) * 1 RAY / 1 RAY
+          const startingPrice = fedPrice.mul(startingPriceBuffer).div(WeiPerRay)
+          const liquidatorBountyRate = parseEther("0.05") // 5%
+          const liquidatorTip = WeiPerRad.mul(100) // 100 AUSD
+          // prize = liquidatorTip + (debt * bountyRate)
+          //       = 100 RAD + (120000 RAD * 0.05 WAD)
+          const prize = liquidatorTip.add(debt.mul(parseEther("0.05")).div(WeiPerWad))
+
+          // start an auction
+          {
+            mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
+            mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+            mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
+
+            await collateralAuctioneer.startAuction(debt, collateralAmount, positionAddress, liquidatorAddress)
+
+            mockedPriceFeed.smocked.peek.reset()
+            mockedPriceOracle.smocked.collateralPools.reset()
+            mockedPriceOracle.smocked.stableCoinReferencePrice.reset()
+          }
+
+          // start mocking for redo()
+          mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
+          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+          mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
+          mockedLinearDecrease.smocked.price.will.return.with(fedPrice)
+          mockedBookKeeper.smocked.mintUnbackedStablecoin.will.return.with()
+
+          // set liquidatorBountyRate 5%
+          await collateralAuctioneer["file(bytes32,uint256)"](
+            formatBytes32String("liquidatorBountyRate"),
+            liquidatorBountyRate
+          )
+          // set liquidatorTip to 100 AUSD
+          await collateralAuctioneer["file(bytes32,uint256)"](formatBytes32String("liquidatorTip"), liquidatorTip)
+          await collateralAuctioneer["file(bytes32,address)"](formatBytes32String("calc"), mockedLinearDecrease.address)
+
+          await collateralAuctioneer.redo(1, liquidatorAddress)
+
+          await expect(collateralAuctioneer.redo(1, liquidatorAddress))
+            .to.emit(collateralAuctioneer, "Redo")
+            .withArgs(One, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize)
+
+          const { calls: collateralPoolsCalls } = mockedPriceOracle.smocked.collateralPools
+          expect(collateralPoolsCalls.length).to.be.equal(1)
+          expect(collateralPoolsCalls[0][0]).to.be.equal(formatBytes32String("BTCB"))
+
+          const { calls: peekCalls } = mockedPriceFeed.smocked.peek
+          expect(peekCalls.length).to.be.equal(1)
+
+          const { calls: stableCoinReferencePriceCalls } = mockedPriceOracle.smocked.stableCoinReferencePrice
+          expect(stableCoinReferencePriceCalls.length).to.be.equal(1)
+
+          const { calls: linearDecreasePriceCalls } = mockedLinearDecrease.smocked.price
+          expect(linearDecreasePriceCalls.length).to.be.equal(1)
+          expect(linearDecreasePriceCalls[0][0]).to.be.equal(startingPrice)
+
+          const { calls: mintUnbackedStablecoinCalls } = mockedBookKeeper.smocked.mintUnbackedStablecoin
+          expect(mintUnbackedStablecoinCalls.length).to.be.equal(1)
+          expect(mintUnbackedStablecoinCalls[0].from).to.be.equal(AddressZero)
+          expect(mintUnbackedStablecoinCalls[0].to).to.be.equal(liquidatorAddress)
+          expect(mintUnbackedStablecoinCalls[0].rad).to.be.equal(prize)
+
+          const id = await collateralAuctioneer.kicks()
+          expect(id).to.be.equal(1)
+
+          const activePosId = await collateralAuctioneer.active(0)
+          expect(activePosId).to.be.equal(id)
+
+          const sale = await collateralAuctioneer.sales(id)
+          expect(sale.pos).to.be.equal(0)
+          expect(sale.debt).to.be.equal(debt)
+          expect(sale.collateralAmount).to.be.equal(collateralAmount)
+          expect(sale.positionAddress).to.be.equal(positionAddress)
+          expect(sale.startingPrice).to.be.equal(startingPrice)
+        })
+        context("but remaining debt value is higher than debt or collateral value (mocked as MaxUint)", () => {
+          it("should start auction properly without booking the prize", async () => {
+            const debt = WeiPerRad.mul(120000) // 120000 AUSD (rad)
+            const collateralAmount = WeiPerWad.mul(2) // 2 BTCB (wad)
+            const startingPriceBuffer = WeiPerRay // startingPriceBuffer is default 1 RAY
+            const stableCoinReferencePrice = WeiPerRay // stableCoinReferencePrice is default 1 RAY
+            const priceValue = WeiPerWad.mul(45000) // 45000 AUSD/BTCB
+            // fedPrice = rdiv(mul(price, BLN), priceOracle.stableCoinReferencePrice())
+            //          = (45000 RAY * 1 BLN) / (1 RAY / 1 RAY)
+            const fedPrice = priceValue.mul(WeiPerBln).mul(WeiPerRay).div(stableCoinReferencePrice)
+            // startingPrice = fedPrice * startingPriceBuffer
+            //               = (45000 RAY * 1 BLN) * 1 RAY / 1 RAY
+            const startingPrice = fedPrice.mul(startingPriceBuffer).div(WeiPerRay)
+            const liquidatorBountyRate = parseEther("0.05") // 5%
+            const liquidatorTip = WeiPerRad.mul(100) // 100 AUSD
+
+            const prize = Zero
+
+            // start an auction
+            {
+              mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
+              mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+              mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
+
+              await modifiableCollateralAuctioneer.startAuction(
+                debt,
+                collateralAmount,
+                positionAddress,
+                liquidatorAddress
+              )
+
+              mockedPriceFeed.smocked.peek.reset()
+              mockedPriceOracle.smocked.collateralPools.reset()
+              mockedPriceOracle.smocked.stableCoinReferencePrice.reset()
+            }
+
+            // start mocking for redo()
+            mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
+            mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+            mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
+            mockedLinearDecrease.smocked.price.will.return.with(fedPrice)
+            // mockedBookKeeper.smocked.mintUnbackedStablecoin.will.return.with()
+
+            // set liquidatorBountyRate 5%
+            await modifiableCollateralAuctioneer["file(bytes32,uint256)"](
+              formatBytes32String("liquidatorBountyRate"),
+              liquidatorBountyRate
+            )
+            // set liquidatorTip to 100 AUSD
+            await modifiableCollateralAuctioneer["file(bytes32,uint256)"](
+              formatBytes32String("liquidatorTip"),
+              liquidatorTip
+            )
+            await modifiableCollateralAuctioneer["file(bytes32,address)"](
+              formatBytes32String("calc"),
+              mockedLinearDecrease.address
+            )
+
+            // force set minimumRemainingDebt
+            await modifiableCollateralAuctioneer.smodify.put({
+              minimumRemainingDebt: MaxUint256.toHexString(),
+            })
+            await expect(modifiableCollateralAuctioneer.redo(1, liquidatorAddress))
+              .to.emit(modifiableCollateralAuctioneer, "Redo")
+              .withArgs(One, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize)
+
+            const { calls: collateralPoolsCalls } = mockedPriceOracle.smocked.collateralPools
+            expect(collateralPoolsCalls.length).to.be.equal(1)
+            expect(collateralPoolsCalls[0][0]).to.be.equal(formatBytes32String("BTCB"))
+
+            const { calls: peekCalls } = mockedPriceFeed.smocked.peek
+            expect(peekCalls.length).to.be.equal(1)
+
+            const { calls: stableCoinReferencePriceCalls } = mockedPriceOracle.smocked.stableCoinReferencePrice
+            expect(stableCoinReferencePriceCalls.length).to.be.equal(1)
+
+            const { calls: linearDecreasePriceCalls } = mockedLinearDecrease.smocked.price
+            expect(linearDecreasePriceCalls.length).to.be.equal(1)
+            expect(linearDecreasePriceCalls[0][0]).to.be.equal(startingPrice)
+
+            const id = await modifiableCollateralAuctioneer.kicks()
+            expect(id).to.be.equal(1)
+
+            const activePosId = await modifiableCollateralAuctioneer.active(0)
+            expect(activePosId).to.be.equal(id)
+
+            const sale = await modifiableCollateralAuctioneer.sales(id)
+            expect(sale.pos).to.be.equal(0)
+            expect(sale.debt).to.be.equal(debt)
+            expect(sale.collateralAmount).to.be.equal(collateralAmount)
+            expect(sale.positionAddress).to.be.equal(positionAddress)
+            expect(sale.startingPrice).to.be.equal(startingPrice)
+          })
         })
       })
     })
