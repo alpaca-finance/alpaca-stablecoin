@@ -23,6 +23,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "hardhat/console.sol";
 
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IAuctioneer.sol";
@@ -304,13 +305,17 @@ contract CollateralAuctioneer is
     // and compute current price [ray]
     (bool done, ) = status(auctionStartBlock, startingPrice);
     require(done, "CollateralAuctioneer/cannot-reset");
-
+    console.log("d", done);
     uint256 debt = sales[id].debt;
     uint256 collateralAmount = sales[id].collateralAmount;
     sales[id].auctionStartBlock = uint96(block.timestamp);
 
     uint256 feedPrice = getFeedPrice();
+    console.log(feedPrice);
+
     startingPrice = rmul(feedPrice, startingPriceBuffer);
+    console.log("p", startingPrice, feedPrice, startingPriceBuffer);
+
     require(startingPrice > 0, "CollateralAuctioneer/zero-starting-price");
     sales[id].startingPrice = startingPrice;
 
