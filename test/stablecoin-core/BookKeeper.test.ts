@@ -190,4 +190,66 @@ describe("BookKeeper", () => {
       })
     })
   })
+
+  describe("#moveStablecoin", () => {
+    context("when the caller is not the owner", () => {
+      it("should be revert", async () => {
+        // bob call move stablecoin from alice to bob
+        await await expect(bookKeeperAsBob.moveStablecoin(aliceAddress, bobAddress, WeiPerRad)).to.be.revertedWith(
+          "BookKeeper/not-allowed"
+        )
+      })
+
+      context("when alice allow bob to move collateral", () => {
+        it("should be able to call moveStablecoin", async () => {
+          // mint 1 rad to alice
+          await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
+
+          const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
+          expect(stablecoinAliceBefore).to.be.equal(WeiPerRad)
+          const stablecoinBobBefore = await bookKeeper.stablecoin(bobAddress)
+          expect(stablecoinBobBefore).to.be.equal(0)
+
+          // alice allow bob to move stablecoin
+          await bookKeeperAsAlice.hope(bobAddress)
+
+          // bob call move stablecoin from alice to bob
+          await bookKeeperAsBob.moveStablecoin(aliceAddress, bobAddress, WeiPerRad)
+
+          const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
+          expect(stablecoinAliceAfter).to.be.equal(0)
+          const stablecoinBobAfter = await bookKeeper.stablecoin(bobAddress)
+          expect(stablecoinBobAfter).to.be.equal(WeiPerRad)
+        })
+      })
+    })
+
+    context("when the caller is the owner", () => {
+      context("when alice doesn't have enough stablecoin", () => {
+        it("shold be revert", async () => {
+          // alice call move stablecoin from alice to bob
+          await expect(bookKeeperAsAlice.moveStablecoin(aliceAddress, bobAddress, WeiPerRad)).to.be.reverted
+        })
+      })
+      context("when alice has enough stablecoin", () => {
+        it("should be able to call moveStablecoin", async () => {
+          // mint 1 rad to alice
+          await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
+
+          const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
+          expect(stablecoinAliceBefore).to.be.equal(WeiPerRad)
+          const stablecoinBobBefore = await bookKeeper.stablecoin(bobAddress)
+          expect(stablecoinBobBefore).to.be.equal(0)
+
+          // alice call move stablecoin from alice to bob
+          await bookKeeperAsAlice.moveStablecoin(aliceAddress, bobAddress, WeiPerRad)
+
+          const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
+          expect(stablecoinAliceAfter).to.be.equal(0)
+          const stablecoinBobAfter = await bookKeeper.stablecoin(bobAddress)
+          expect(stablecoinBobAfter).to.be.equal(WeiPerRad)
+        })
+      })
+    })
+  })
 })
