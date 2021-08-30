@@ -81,4 +81,49 @@ describe("BookKeeper", () => {
       })
     })
   })
+
+  describe("#addCollateral", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(
+          bookKeeperAsAlice.addCollateral(formatBytes32String("BNB"), deployerAddress, WeiPerWad)
+        ).to.be.revertedWith("BookKeeper/not-authorized")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when collateral to add is positive", () => {
+        it("should be able to call addCollateral", async () => {
+          // init BNB collateral pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+
+          const collateralTokenBefore = await bookKeeper.collateralToken(formatBytes32String("BNB"), deployerAddress)
+          expect(collateralTokenBefore).to.be.equal(0)
+
+          await bookKeeper.addCollateral(formatBytes32String("BNB"), deployerAddress, WeiPerWad)
+
+          const collateralTokenAfter = await bookKeeper.collateralToken(formatBytes32String("BNB"), deployerAddress)
+          expect(collateralTokenAfter).to.be.equal(WeiPerWad)
+        })
+      })
+
+      context("when collateral to add is negative", () => {
+        it("should be able to call addCollateral", async () => {
+          // init BNB collateral pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+
+          // add collateral 1 BNB
+          await bookKeeper.addCollateral(formatBytes32String("BNB"), deployerAddress, WeiPerWad)
+
+          const collateralTokenBefore = await bookKeeper.collateralToken(formatBytes32String("BNB"), deployerAddress)
+          expect(collateralTokenBefore).to.be.equal(WeiPerWad)
+
+          // add collateral -1 BNB
+          await bookKeeper.addCollateral(formatBytes32String("BNB"), deployerAddress, WeiPerWad.mul(-1))
+
+          const collateralTokenAfter = await bookKeeper.collateralToken(formatBytes32String("BNB"), deployerAddress)
+          expect(collateralTokenAfter).to.be.equal(0)
+        })
+      })
+    })
+  })
 })
