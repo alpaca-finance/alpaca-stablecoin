@@ -1511,4 +1511,34 @@ describe("BookKeeper", () => {
       })
     })
   })
+
+  describe("#settleSystemBadDebt", () => {
+    context("when settle system bad debt", () => {
+      it("should be able to call settleSystemBadDebt", async () => {
+        //  mint 1 rad to deployer
+        await bookKeeper.mintUnbackedStablecoin(deployerAddress, deployerAddress, WeiPerRad)
+
+        const systemBadDebtBefore = await bookKeeper.systemBadDebt(deployerAddress)
+        expect(systemBadDebtBefore).to.be.equal(WeiPerRad)
+        const stablecoinDeployerBefore = await bookKeeper.stablecoin(deployerAddress)
+        expect(stablecoinDeployerBefore).to.be.equal(WeiPerRad)
+        const totalUnbackedStablecoinBefore = await bookKeeper.totalUnbackedStablecoin()
+        expect(totalUnbackedStablecoinBefore).to.be.equal(WeiPerRad)
+        const totalStablecoinIssuedBefore = await bookKeeper.totalStablecoinIssued()
+        expect(totalStablecoinIssuedBefore).to.be.equal(WeiPerRad)
+
+        // settle system bad debt 1 rad
+        await bookKeeper.settleSystemBadDebt(WeiPerRad)
+
+        const systemBadDebtAfter = await bookKeeper.systemBadDebt(deployerAddress)
+        expect(systemBadDebtAfter).to.be.equal(0)
+        const stablecoinDeployerAfter = await bookKeeper.stablecoin(deployerAddress)
+        expect(stablecoinDeployerAfter).to.be.equal(0)
+        const totalUnbackedStablecoinAfter = await bookKeeper.totalUnbackedStablecoin()
+        expect(totalUnbackedStablecoinAfter).to.be.equal(0)
+        const totalStablecoinIssuedAfter = await bookKeeper.totalStablecoinIssued()
+        expect(totalStablecoinIssuedAfter).to.be.equal(0)
+      })
+    })
+  })
 })
