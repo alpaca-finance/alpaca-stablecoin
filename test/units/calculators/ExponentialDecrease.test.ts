@@ -44,168 +44,206 @@ describe("ExponentialDecrease", () => {
   })
 
   describe("#price()", () => {
-    context("when starting price is 50 wad, 1% decrease at 0 second", () => {
-      it("should calculate the price correctly", async () => {
-        await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1).sub(parseEther("10000000")))
-        const price = await exponentialDecrease.price(WeiPerWad.mul(50), 0)
-        expect(price).to.be.equal(WeiPerWad.mul(50))
-      })
-    })
-
-    context("when starting price is 50 wad, 1% decrease at 1 second", () => {
-      it("should calculate the price correctly", async () => {
-        await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1).sub(parseEther("10000000")))
-        const price = await exponentialDecrease.price(WeiPerWad.mul(50), 1)
-        expect(price).to.be.equal(WeiPerWad.mul(495).div(10))
-      })
-    })
-
-    context("when starting price is 50 wad, 1% decrease at 2 second", () => {
-      it("should calculate the price correctly", async () => {
-        await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1).sub(parseEther("10000000")))
-        const price = await exponentialDecrease.price(WeiPerWad.mul(50), 2)
-        expect(price).to.be.equal(WeiPerWad.mul(49005).div(1000))
-      })
-    })
-
-    context("when starting price is 50 wad, 1% decrease at 3 second", () => {
-      it("should calculate the price correctly", async () => {
-        await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1).sub(parseEther("10000000")))
-        const price = await exponentialDecrease.price(WeiPerWad.mul(50), 3)
-        expect(price).to.be.equal(WeiPerWad.mul(4851495).div(100000))
-      })
-    })
-
-    context("when starting price is 50 wad, 100% decrease at 1 second", () => {
-      it("should calculate the price correctly", async () => {
-        await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.mul(1).sub(parseEther("1000000000")))
-        const price = await exponentialDecrease.price(WeiPerWad.mul(50), 1)
-        expect(price).to.be.equal(0)
-      })
-    })
-
-    context("when starting price is 50, 1.123456789E27% decrease and ExpDecrease every second in 1 min", () => {
-      it("should calculate the price correctly", async () => {
-        await exponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
-        )
-        let price: BigNumber = WeiPerWad.mul(50)
-        for (let second = 0; second < 60; second++) {
-          price = await exponentialDecrease.price(price, 1)
-        }
-        AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("25384375980898602822").toString())
-      })
-    })
-
-    context("when starting price is 50, 2.123456789E27% decrease and ExpDecrease every second in 1 min", () => {
-      it("should calculate the price correctly", async () => {
-        await exponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
-        )
-        let price: BigNumber = WeiPerWad.mul(50)
-        for (let second = 0; second < 60; second++) {
-          price = await exponentialDecrease.price(price, 1)
-        }
-        AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("13793909126329075412").toString())
-      })
-    })
-
-    context("when starting price is 50, 1.123456789E27% decrease and ExpDecrease every 5 second in 1 min", () => {
-      it("should calculate the price correctly", async () => {
-        await exponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
-        )
-        let price: BigNumber = WeiPerWad.mul(50)
-        for (let second = 0; second < 60; second += 5) {
-          price = await exponentialDecrease.price(price, 1)
-        }
-        AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("43660560004238132022").toString())
-      })
-    })
-
-    context("when starting price is 50, 2.123456789E27% decrease and ExpDecrease every 5 second in 1 min", () => {
-      it("should calculate the price correctly", async () => {
-        await exponentialDecrease.file(
-          formatBytes32String("cut"),
-          WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
-        )
-        let price: BigNumber = WeiPerWad.mul(50)
-        for (let second = 0; second < 60; second += 5) {
-          price = await exponentialDecrease.price(price, 1)
-        }
-        AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("38646794298032588398").toString())
-      })
-    })
-
-    context(
-      "when starting low price is 0.0000000001 wad, 1.123456789E27% decrease and ExpDecrease every second in 1 min",
-      () => {
-        it("should calculate the price correctly", async () => {
-          await exponentialDecrease.file(
-            formatBytes32String("cut"),
-            WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
-          )
-          let price: BigNumber = WeiPerWad.div(1000000000)
-          for (let second = 0; second < 60; second++) {
-            price = await exponentialDecrease.price(price, 1)
-          }
-          AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("507687497").toString())
+    context("when starting price is 50 wad", () => {
+      context("and cut% is 0%", () => {
+        context("at 0 second", () => {
+          it("should calculate the price correctly", async () => {
+            await exponentialDecrease.file(formatBytes32String("cut"), 0) // 100%
+            const price = await exponentialDecrease.price(WeiPerWad.mul(50), 0)
+            expect(price).to.be.equal(WeiPerWad.mul(50))
+          })
         })
-      }
-    )
 
-    context(
-      "when starting low price is 0.0000000001 wad, 2.123456789E27% decrease and ExpDecrease every 5 second in 1 min",
-      () => {
-        it("should calculate the price correctly", async () => {
-          await exponentialDecrease.file(
-            formatBytes32String("cut"),
-            WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
-          )
-          let price: BigNumber = WeiPerWad.div(1000000000)
-          for (let second = 0; second < 60; second++) {
-            price = await exponentialDecrease.price(price, 1)
-          }
-          AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("275878167").toString())
+        context("at 1st second", () => {
+          it("should calculate the price correctly", async () => {
+            await exponentialDecrease.file(formatBytes32String("cut"), 0) // 100%
+            const price = await exponentialDecrease.price(WeiPerWad.mul(50), 1)
+            expect(price).to.be.equal(0)
+          })
         })
-      }
-    )
+      })
 
-    context(
-      "when starting low price is 0.0000000001 wad, 1.123456789E27% decrease and ExpDecrease every 5 second in 1 min",
-      () => {
-        it("should calculate the price correctly", async () => {
-          await exponentialDecrease.file(
-            formatBytes32String("cut"),
-            WeiPerRay.mul(1).sub(parseEther("1123456789").div(100))
-          )
-          let price: BigNumber = WeiPerWad.div(1000000000)
-          for (let second = 0; second < 60; second += 5) {
-            price = await exponentialDecrease.price(price, 1)
-          }
-          AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("873211194").toString())
+      context("and cut% is 1%", () => {
+        context("at 0 second", () => {
+          it("should calculate the price correctly", async () => {
+            await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.sub(parseEther("10000000"))) // 99%
+            const price = await exponentialDecrease.price(WeiPerWad.mul(50), 0)
+            expect(price).to.be.equal(WeiPerWad.mul(50))
+          })
         })
-      }
-    )
 
-    context(
-      "when starting low price is 0.0000000001 wad, 2.123456789E27% decrease and ExpDecrease every 5 second in 1 min",
-      () => {
-        it("should calculate the price correctly", async () => {
-          await exponentialDecrease.file(
-            formatBytes32String("cut"),
-            WeiPerRay.mul(1).sub(parseEther("2123456789").div(100))
-          )
-          let price: BigNumber = WeiPerWad.div(1000000000)
-          for (let second = 0; second < 60; second += 5) {
-            price = await exponentialDecrease.price(price, 1)
-          }
-          AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("772935882").toString())
+        context("at 1st second", () => {
+          it("should calculate the price correctly", async () => {
+            await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.sub(parseEther("10000000"))) // 99%
+            const price = await exponentialDecrease.price(WeiPerWad.mul(50), 1)
+            expect(price).to.be.equal(WeiPerWad.mul(495).div(10))
+          })
         })
-      }
-    )
+
+        context("at 2nd second", () => {
+          it("should calculate the price correctly", async () => {
+            await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.sub(parseEther("10000000"))) // 99%
+            const price = await exponentialDecrease.price(WeiPerWad.mul(50), 2)
+            expect(price).to.be.equal(WeiPerWad.mul(49005).div(1000))
+          })
+        })
+      })
+
+      context("and cut% is 100%", () => {
+        context("at 0 second", () => {
+          it("should calculate the price correctly", async () => {
+            await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.sub(parseEther("1000000000"))) // 100%
+            const price = await exponentialDecrease.price(WeiPerWad.mul(50), 0)
+            expect(price).to.be.equal(WeiPerWad.mul(50))
+          })
+        })
+
+        context("at 1st second", () => {
+          it("should calculate the price correctly", async () => {
+            await exponentialDecrease.file(formatBytes32String("cut"), WeiPerRay.sub(parseEther("1000000000"))) // 100%
+            const price = await exponentialDecrease.price(WeiPerWad.mul(50), 1)
+            expect(price).to.be.equal(0)
+          })
+        })
+      })
+
+      context("and cut% is 1.123456789%", () => {
+        context("and decrease every second", () => {
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await exponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1123456789").div(100))
+              )
+              let price: BigNumber = WeiPerWad.mul(50)
+              for (let second = 0; second < 60; second++) {
+                price = await exponentialDecrease.price(price, 1)
+              }
+              AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("25384375980898602822").toString())
+            })
+          })
+        })
+
+        context("and decrease every 5th second", () => {
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await exponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1123456789").div(100))
+              )
+              let price: BigNumber = WeiPerWad.mul(50)
+              for (let second = 0; second < 60; second += 5) {
+                price = await exponentialDecrease.price(price, 1)
+              }
+              AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("43660560004238132022").toString())
+            })
+          })
+        })
+      })
+
+      context("and cut% is 2.123456789%", () => {
+        context("and decrease every second", () => {
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await exponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("2123456789").div(100))
+              )
+              let price: BigNumber = WeiPerWad.mul(50)
+              for (let second = 0; second < 60; second++) {
+                price = await exponentialDecrease.price(price, 1)
+              }
+              AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("13793909126329075412").toString())
+            })
+          })
+        })
+
+        context("and decrease every 5th second", () => {
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await exponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("2123456789").div(100))
+              )
+              let price: BigNumber = WeiPerWad.mul(50)
+              for (let second = 0; second < 60; second += 5) {
+                price = await exponentialDecrease.price(price, 1)
+              }
+              AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("38646794298032588398").toString())
+            })
+          })
+        })
+      })
+    })
+
+    context("when starting price is 0.0000000001 wad", () => {
+      context("and cut% is 1.123456789%", () => {
+        context("and decrease every second", () => {
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await exponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1123456789").div(100))
+              )
+              let price: BigNumber = WeiPerWad.div(1000000000)
+              for (let second = 0; second < 60; second++) {
+                price = await exponentialDecrease.price(price, 1)
+              }
+              AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("507687497").toString())
+            })
+          })
+        })
+
+        context("and decrease every 5th second", () => {
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await exponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("1123456789").div(100))
+              )
+              let price: BigNumber = WeiPerWad.div(1000000000)
+              for (let second = 0; second < 60; second += 5) {
+                price = await exponentialDecrease.price(price, 1)
+              }
+              AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("873211194").toString())
+            })
+          })
+        })
+      })
+
+      context("and cut% is 2.123456789%", () => {
+        context("and decrease every second", () => {
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await exponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("2123456789").div(100))
+              )
+              let price: BigNumber = WeiPerWad.div(1000000000)
+              for (let second = 0; second < 60; second++) {
+                price = await exponentialDecrease.price(price, 1)
+              }
+              AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("275878167").toString())
+            })
+          })
+        })
+
+        context("and decrease every 5th second", () => {
+          context("at 60th second", () => {
+            it("should calculate the price correctly", async () => {
+              await exponentialDecrease.file(
+                formatBytes32String("cut"),
+                WeiPerRay.sub(parseEther("2123456789").div(100))
+              )
+              let price: BigNumber = WeiPerWad.div(1000000000)
+              for (let second = 0; second < 60; second += 5) {
+                price = await exponentialDecrease.price(price, 1)
+              }
+              AssertHelpers.assertAlmostEqual(price.toString(), BigNumber.from("772935882").toString())
+            })
+          })
+        })
+      })
+    })
   })
 })
