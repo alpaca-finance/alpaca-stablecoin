@@ -12,6 +12,7 @@
     "test:exponentialdecrease": "hardhat test --no-compile ./test/units/calculators/ExponentialDecrease.test.ts",
     "test:tokenadapter": "hardhat test --no-compile ./test/units/adapter/TokenAdapter.test.ts",
     "test:stabilityfeecollector": "hardhat test --no-compile ./test/stablecoin-core/StabilityFeeCollector.test.ts",
+    "test:priceoracle": "hardhat test --no-compile ./test/stablecoin-core/PriceOracle.test.ts",
     "test:lineardecrease": "hardhat test --no-compile ./test/units/calculators/LinearDecrease.test.ts",
     "coverage": "hardhat coverage",
     "solhint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
