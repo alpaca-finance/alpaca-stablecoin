@@ -6,7 +6,7 @@ import "@openzeppelin/test-helpers"
 import { CollateralAuctioneer, CollateralAuctioneer__factory } from "../../../../typechain"
 import { smockit, MockContract, smoddit, ModifiableContract } from "@eth-optimism/smock"
 import { WeiPerBln, WeiPerRad, WeiPerRay, WeiPerWad } from "../../../helper/unit"
-import { AddressOne } from "../../../helper/address"
+import { AddressOne, AddressTwo } from "../../../helper/address"
 import { formatBytes32BigNumber } from "../../../helper/format"
 import { increase } from "../../../helper/time"
 
@@ -92,6 +92,7 @@ describe("CollateralAuctioneer", () => {
 
   // Other addresses
   const positionAddress = AddressOne
+  const systemDebtEngineAddress = AddressTwo
 
   // Contracts
   let collateralAuctioneer: CollateralAuctioneer
@@ -796,6 +797,51 @@ describe("CollateralAuctioneer", () => {
         await expect(
           collateralAuctioneer.take(1, WeiPerWad.mul(2), WeiPerRay.mul(44000), aliceAddress, "0x")
         ).to.be.revertedWith("CollateralAuctioneer/too-expensive")
+      })
+    })
+
+    context("when all params are valid", () => {
+      context("when alice wants to buy the entire postion", () => {
+        it("should be done successfully and correctly", async () => {
+          // config the auction time limit to be forver to force it not done
+          await collateralAuctioneer["file(bytes32,uint256)"](formatBytes32String("auctionTimeLimit"), MaxUint256)
+          await startAuctionWithDefaultParams()
+
+          const price = WeiPerRay.mul(45000)
+          mockedLinearDecrease.smocked.price.will.return.with(price)
+          mockedBookKeeper.smocked.moveCollateral.will.return.with()
+          mockedBookKeeper.smocked.moveStablecoin.will.return.with()
+          mockedLiquidationEngine.smocked.removeRepaidDebtFromAuction.will.return.with()
+          await collateralAuctioneer["file(bytes32,address)"](formatBytes32String("calc"), mockedLinearDecrease.address)
+          await collateralAuctioneer["file(bytes32,address)"](
+            formatBytes32String("systemDebtEngine"),
+            systemDebtEngineAddress
+          )
+          console.log()
+          await collateralAuctioneer.take(1, MaxUint256, WeiPerRay.mul(46000), aliceAddress, "0x")
+
+          const { calls: priceCalls } = mockedLinearDecrease.smocked.price
+          expect(priceCalls.length).to.be.equal(1)
+
+          const { calls: movemoveCollateralCalls } = mockedBookKeeper.smocked.moveCollateral
+          expect(movemoveCollateralCalls.length).to.be.equal(1)
+          expect(movemoveCollateralCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BTCB"))
+          expect(movemoveCollateralCalls[0].src).to.be.equal(collateralAuctioneer.address)
+          expect(movemoveCollateralCalls[0].dst).to.be.equal(aliceAddress)
+          expect(movemoveCollateralCalls[0].wad).to.be.equal(WeiPerWad.mul(2))
+
+          const { calls: moveStablecoinCalls } = mockedBookKeeper.smocked.moveStablecoin
+          expect(moveStablecoinCalls.length).to.be.equal(1)
+          expect(moveStablecoinCalls[0].src).to.be.equal(deployerAddress)
+          expect(moveStablecoinCalls[0].dst).to.be.equal(systemDebtEngineAddress)
+          expect(moveStablecoinCalls[0].rad).to.be.equal(WeiPerWad.mul(2).mul(price))
+
+          const { calls: removeRepaidDebtFromAuctionCalls } =
+            mockedLiquidationEngine.smocked.removeRepaidDebtFromAuction
+          expect(removeRepaidDebtFromAuctionCalls.length).to.be.equal(1)
+          expect(removeRepaidDebtFromAuctionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BTCB"))
+          expect(removeRepaidDebtFromAuctionCalls[0].rad).to.be.equal(WeiPerRad.mul(120000))
+        })
       })
     })
   })

@@ -23,7 +23,6 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "hardhat/console.sol";
 
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IAuctioneer.sol";
@@ -116,7 +115,7 @@ contract CollateralAuctioneer is
     uint256 indexed id,
     uint256 maxPrice,
     uint256 price,
-    uint256 owe,
+    uint256 stableCoinAmountToBePaid,
     uint256 debt,
     uint256 collateralAmount,
     address indexed positionAddress
@@ -305,16 +304,13 @@ contract CollateralAuctioneer is
     // and compute current price [ray]
     (bool done, ) = status(auctionStartBlock, startingPrice);
     require(done, "CollateralAuctioneer/cannot-reset");
-    console.log("d", done);
     uint256 debt = sales[id].debt;
     uint256 collateralAmount = sales[id].collateralAmount;
     sales[id].auctionStartBlock = uint96(block.timestamp);
 
     uint256 feedPrice = getFeedPrice();
-    console.log(feedPrice);
 
     startingPrice = rmul(feedPrice, startingPriceBuffer);
-    console.log("p", startingPrice, feedPrice, startingPriceBuffer);
 
     require(startingPrice > 0, "CollateralAuctioneer/zero-starting-price");
     sales[id].startingPrice = startingPrice;
@@ -377,42 +373,50 @@ contract CollateralAuctioneer is
 
     uint256 collateralAmount = sales[id].collateralAmount;
     uint256 debt = sales[id].debt;
-    uint256 owe;
+    uint256 stableCoinAmountToBePaid;
 
     {
       // Purchase as much as possible, up to collateralAmountToBuy
-      uint256 slice = min(collateralAmount, collateralAmountToBuy); // slice <= collateralAmount
+      uint256 collateralAmountToBeTaken = min(collateralAmount, collateralAmountToBuy); // collateralAmountToBeTaken <= collateralAmount
 
-      // DAI needed to buy a slice of this sale
-      owe = mul(slice, price);
+      // DAI needed to buy a collateralAmountToBeTaken of this sale
+      stableCoinAmountToBePaid = mul(collateralAmountToBeTaken, price);
 
       // Don't collect more than debt of DAI
-      if (owe > debt) {
+      if (stableCoinAmountToBePaid > debt) {
+        // take entire position (or even overtake)
         // Total debt will be paid
-        owe = debt; // owe' <= owe
-        // Adjust slice
-        slice = owe / price; // slice' = owe' / price <= owe / price == slice <= collateralAmount
-      } else if (owe < debt && slice < collateralAmount) {
-        // If slice == collateralAmount => auction completed => debtFloor doesn't matter
+        stableCoinAmountToBePaid = debt; // stableCoinAmountToBePaid' <= stableCoinAmountToBePaid
+        // Adjust collateralAmountToBeTaken
+        collateralAmountToBeTaken = stableCoinAmountToBePaid / price;
+        // (collateralAmountToBeTaken' = stableCoinAmountToBePaid' / price) <= (stableCoinAmountToBePaid / price) == (collateralAmountToBeTaken) <= collateralAmount
+      } else if (stableCoinAmountToBePaid < debt && collateralAmountToBeTaken < collateralAmount) {
+        // partial take position
         uint256 _minimumRemainingDebt = minimumRemainingDebt;
-        if (debt - owe < _minimumRemainingDebt) {
-          // safe as owe < debt
+        if (debt - stableCoinAmountToBePaid < _minimumRemainingDebt) {
+          // safe as stableCoinAmountToBePaid < debt
           // If debt <= minimumRemainingDebt, buyers have to take the entire collateralAmount.
           require(debt > _minimumRemainingDebt, "CollateralAuctioneer/no-partial-purchase");
           // Adjust amount to pay
-          owe = debt - _minimumRemainingDebt; // owe' <= owe
-          // Adjust slice
-          slice = owe / price; // slice' = owe' / price < owe / price == slice < collateralAmount
+          stableCoinAmountToBePaid = debt - _minimumRemainingDebt; // stableCoinAmountToBePaid' <= stableCoinAmountToBePaid
+          // Adjust collateralAmountToBeTaken
+          collateralAmountToBeTaken = stableCoinAmountToBePaid / price;
+          // (collateralAmountToBeTaken' = stableCoinAmountToBePaid' / price) < (stableCoinAmountToBePaid / price) == (collateralAmountToBeTaken) < (collateralAmount)
         }
       }
+      //else {
+      // stableCoinAmountToBePaid == debt || collateralAmountToBeTaken == collateralAmount
+      // If collateralAmountToBeTaken == collateralAmount => auction completed => debtFloor doesn't matter
+      // so there is nothing to calculate
+      //}
 
       // Calculate remaining debt after operation
-      debt = debt - owe; // safe since owe <= debt
+      debt = debt - stableCoinAmountToBePaid; // safe since stableCoinAmountToBePaid <= debt
       // Calculate remaining collateralAmount after operation
-      collateralAmount = collateralAmount - slice;
+      collateralAmount = collateralAmount - collateralAmountToBeTaken;
 
       // Send collateral to collateralRecipient
-      bookKeeper.moveCollateral(collateralPoolId, address(this), collateralRecipient, slice);
+      bookKeeper.moveCollateral(collateralPoolId, address(this), collateralRecipient, collateralAmountToBeTaken);
 
       // Do external call (if data is defined) but to be
       // extremely careful we don't allow to do it to the two
@@ -423,14 +427,22 @@ contract CollateralAuctioneer is
         collateralRecipient != address(bookKeeper) &&
         collateralRecipient != address(liquidationEngine_)
       ) {
-        IFlashLendingCallee(collateralRecipient).flashLendingCall(msg.sender, owe, slice, data);
+        IFlashLendingCallee(collateralRecipient).flashLendingCall(
+          msg.sender,
+          stableCoinAmountToBePaid,
+          collateralAmountToBeTaken,
+          data
+        );
       }
 
       // Get DAI from caller
-      bookKeeper.moveStablecoin(msg.sender, systemDebtEngine, owe);
+      bookKeeper.moveStablecoin(msg.sender, systemDebtEngine, stableCoinAmountToBePaid);
 
       // Removes Dai out for liquidation from accumulator
-      liquidationEngine_.removeRepaidDebtFromAuction(collateralPoolId, collateralAmount == 0 ? debt + owe : owe);
+      liquidationEngine_.removeRepaidDebtFromAuction(
+        collateralPoolId,
+        collateralAmount == 0 ? debt + stableCoinAmountToBePaid : stableCoinAmountToBePaid
+      );
     }
 
     if (collateralAmount == 0) {
@@ -443,7 +455,7 @@ contract CollateralAuctioneer is
       sales[id].collateralAmount = collateralAmount;
     }
 
-    emit Take(id, maxPrice, price, owe, debt, collateralAmount, positionAddress);
+    emit Take(id, maxPrice, price, stableCoinAmountToBePaid, debt, collateralAmount, positionAddress);
   }
 
   function _remove(uint256 id) internal {

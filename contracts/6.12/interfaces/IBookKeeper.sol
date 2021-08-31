@@ -77,7 +77,7 @@ interface IBookKeeper {
     bytes32 collateralPoolId,
     address src,
     address dst,
-    uint256 rad
+    uint256 wad
   ) external;
 
   function confiscatePosition(
