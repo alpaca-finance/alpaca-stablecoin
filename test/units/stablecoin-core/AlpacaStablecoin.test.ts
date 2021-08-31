@@ -269,13 +269,8 @@ describe("AlpacaStablecoin", () => {
     })
     context("", () => {
       it("should be revert", async () => {
-        const result = await signDaiPermit(alice, alpacaStablecoin.address, bobAddress, bobAddress)
-        console.log("deployerAddress", deployerAddress)
-        console.log("aliceAddress", aliceAddress)
-        console.log("bobAddress", bobAddress)
-
-        console.log("tokenAddress", alpacaStablecoin.address)
-        await alpacaStablecoinAsAlice.permit(aliceAddress, bobAddress, 0, 0, true, result.v, result.r, result.s)
+        const result = await signDaiPermit(alice, alpacaStablecoin.address, aliceAddress, bobAddress)
+        await alpacaStablecoinAsAlice.permit(result.holder, result.spender, result.nonce, result.expiry, true, result.v, result.r, result.s)
       })
     })
   })
