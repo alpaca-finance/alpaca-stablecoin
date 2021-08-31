@@ -64,8 +64,8 @@ describe("PriceOracle", () => {
   })
 
   describe("#poke()", () => {
-    context("when vat is 1", () => {
-      context("and price safe margin is 0", () => {
+    context("when price from price feed is 1", () => {
+      context("and price with safety margin is 0", () => {
         it("should be success", async () => {
           mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(One), false])
           await priceOracle["file(bytes32,bytes32,address)"](
@@ -90,7 +90,7 @@ describe("PriceOracle", () => {
         })
       })
 
-      context("and price safe margin is 10^43", () => {
+      context("and price with safety margin is 10^43", () => {
         it("should be success", async () => {
           mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(One), true])
           await priceOracle["file(bytes32,bytes32,address)"](
@@ -110,11 +110,7 @@ describe("PriceOracle", () => {
           mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"].will.return.with()
           await expect(priceOracle.poke(formatBytes32String("BNB")))
             .to.emit(priceOracle, "Poke")
-            .withArgs(
-              formatBytes32String("BNB"),
-              formatBytes32BigNumber(One),
-              BigNumber.from("10000000000000000000000000000000000000000000")
-            )
+            .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(One), BigNumber.from("10").pow("43"))
 
           const { calls: peek } = mockedPriceFeed.smocked.peek
           const { calls: file } = mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"]
@@ -123,11 +119,11 @@ describe("PriceOracle", () => {
           expect(file.length).to.be.equal(1)
           expect(file[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
           expect(file[0].what).to.be.equal(formatBytes32String("priceWithSafetyMargin"))
-          expect(file[0].data).to.be.equal(BigNumber.from("10000000000000000000000000000000000000000000"))
+          expect(file[0].data).to.be.equal(BigNumber.from("10").pow("43"))
         })
       })
 
-      context("and price safe margin is 9.31322574615478515625 * 10^53", () => {
+      context("and price with safety margin is 9.31322574615478515625 * 10^53", () => {
         it("should be success", async () => {
           mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(One), true])
           await priceOracle["file(bytes32,bytes32,address)"](
@@ -150,7 +146,7 @@ describe("PriceOracle", () => {
             .withArgs(
               formatBytes32String("BNB"),
               formatBytes32BigNumber(One),
-              BigNumber.from("931322574615478515625000000000000000000000000000000000")
+              BigNumber.from("931322574615478515625").mul(BigNumber.from("10").pow("33"))
             )
 
           const { calls: peek } = mockedPriceFeed.smocked.peek
@@ -160,13 +156,13 @@ describe("PriceOracle", () => {
           expect(file.length).to.be.equal(1)
           expect(file[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
           expect(file[0].what).to.be.equal(formatBytes32String("priceWithSafetyMargin"))
-          expect(file[0].data).to.be.equal(BigNumber.from("931322574615478515625000000000000000000000000000000000"))
+          expect(file[0].data).to.be.equal(BigNumber.from("931322574615478515625").mul(BigNumber.from("10").pow("33")))
         })
       })
     })
 
-    context("when vat is 7 * 10^11", () => {
-      context("and price safe margin is 0", () => {
+    context("when price from price feed is 7 * 10^11", () => {
+      context("and price with safety margin is 0", () => {
         it("should be success", async () => {
           mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(BigNumber.from("700000000000")), false])
           await priceOracle["file(bytes32,bytes32,address)"](
@@ -191,7 +187,7 @@ describe("PriceOracle", () => {
         })
       })
 
-      context("and price safe margin is 7 * 10^54", () => {
+      context("and price with safety margin is 7 * 10^54", () => {
         it("should be success", async () => {
           mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(BigNumber.from("700000000000")), true])
           await priceOracle["file(bytes32,bytes32,address)"](
@@ -214,7 +210,7 @@ describe("PriceOracle", () => {
             .withArgs(
               formatBytes32String("BNB"),
               formatBytes32BigNumber(BigNumber.from("700000000000")),
-              BigNumber.from("7000000000000000000000000000000000000000000000000000000")
+              BigNumber.from("7").mul(BigNumber.from("10").pow("54"))
             )
 
           const { calls: peek } = mockedPriceFeed.smocked.peek
@@ -224,7 +220,7 @@ describe("PriceOracle", () => {
           expect(file.length).to.be.equal(1)
           expect(file[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
           expect(file[0].what).to.be.equal(formatBytes32String("priceWithSafetyMargin"))
-          expect(file[0].data).to.be.equal(BigNumber.from("7000000000000000000000000000000000000000000000000000000"))
+          expect(file[0].data).to.be.equal(BigNumber.from("7").mul(BigNumber.from("10").pow("54")))
         })
       })
     })
