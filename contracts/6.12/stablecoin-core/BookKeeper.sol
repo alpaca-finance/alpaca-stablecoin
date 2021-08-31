@@ -24,9 +24,11 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
 
-// FIXME: This contract was altered compared to the production version.
-// It doesn't use LibNote anymore.
-// New deployments of this contract will need to include custom events (TO DO).
+/// @title BookKeeper
+/// @author Alpaca Fin Corporation
+/** @notice A contract which acts as a book keeper of the Alpaca Stablecoin protocol. 
+    It has the ability to move collateral token and stablecoin with in the accounting state variable. 
+**/
 
 contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
@@ -47,16 +49,27 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     _;
   }
 
+  /// @dev This is the mapping which stores the consent or allowance to adjust positions by the position addresses. 
+  /// @param address The position address
+  /// @param address The allowance delegate address
+  /// @param uint256 true (1) means allowed or false (0) means not allowed 
   mapping(address => mapping(address => uint256)) public override can;
 
+  /// @dev This function will give an allowance to the `usr` address to adjust the position address who is the caller.
+  /// @param usr The address to be allowed to adjust position
   function hope(address usr) external override {
     can[msg.sender][usr] = 1;
   }
 
+  /// @dev This function will revoke an allowance from the `usr` address to adjust the position address who is the caller.
+  /// @param usr The address to be revoked from adjusting position
   function nope(address usr) external override {
     can[msg.sender][usr] = 0;
   }
 
+  /// @dev This function will check if the `usr` address is allowed to adjust the checking position address (`bit`).
+  /// @param bit The position address to be checked
+  /// @param usr The address to be revoked from adjusting position
   function wish(address bit, address usr) internal view returns (bool) {
     return either(bit == usr, can[bit][usr] == 1);
   }
