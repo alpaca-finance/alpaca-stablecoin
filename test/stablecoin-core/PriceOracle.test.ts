@@ -73,8 +73,11 @@ describe("PriceOracle", () => {
             formatBytes32String("priceFeed"),
             mockedPriceFeed.address
           )
+
           mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"].will.return.with()
-          await priceOracle.poke(formatBytes32String("BNB"))
+          await expect(priceOracle.poke(formatBytes32String("BNB")))
+            .to.emit(priceOracle, "Poke")
+            .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(One), 0)
 
           const { calls: peek } = mockedPriceFeed.smocked.peek
           const { calls: file } = mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"]
@@ -84,10 +87,6 @@ describe("PriceOracle", () => {
           expect(file[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
           expect(file[0].what).to.be.equal(formatBytes32String("priceWithSafetyMargin"))
           expect(file[0].data).to.be.equal(BigNumber.from("0"))
-
-          await expect(priceOracle.poke(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "Poke")
-            .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(One), 0)
         })
       })
 
@@ -109,7 +108,13 @@ describe("PriceOracle", () => {
           await priceOracle["file(bytes32,uint256)"](formatBytes32String("stableCoinReferencePrice"), 10 ** 10)
 
           mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"].will.return.with()
-          await priceOracle.poke(formatBytes32String("BNB"))
+          await expect(priceOracle.poke(formatBytes32String("BNB")))
+            .to.emit(priceOracle, "Poke")
+            .withArgs(
+              formatBytes32String("BNB"),
+              formatBytes32BigNumber(One),
+              BigNumber.from("10000000000000000000000000000000000000000000")
+            )
 
           const { calls: peek } = mockedPriceFeed.smocked.peek
           const { calls: file } = mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"]
@@ -119,14 +124,6 @@ describe("PriceOracle", () => {
           expect(file[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
           expect(file[0].what).to.be.equal(formatBytes32String("priceWithSafetyMargin"))
           expect(file[0].data).to.be.equal(BigNumber.from("10000000000000000000000000000000000000000000"))
-
-          await expect(priceOracle.poke(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "Poke")
-            .withArgs(
-              formatBytes32String("BNB"),
-              formatBytes32BigNumber(One),
-              BigNumber.from("10000000000000000000000000000000000000000000")
-            )
         })
       })
 
@@ -148,7 +145,13 @@ describe("PriceOracle", () => {
           await priceOracle["file(bytes32,uint256)"](formatBytes32String("stableCoinReferencePrice"), 2 ** 10)
 
           mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"].will.return.with()
-          await priceOracle.poke(formatBytes32String("BNB"))
+          await expect(priceOracle.poke(formatBytes32String("BNB")))
+            .to.emit(priceOracle, "Poke")
+            .withArgs(
+              formatBytes32String("BNB"),
+              formatBytes32BigNumber(One),
+              BigNumber.from("931322574615478515625000000000000000000000000000000000")
+            )
 
           const { calls: peek } = mockedPriceFeed.smocked.peek
           const { calls: file } = mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"]
@@ -158,14 +161,6 @@ describe("PriceOracle", () => {
           expect(file[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
           expect(file[0].what).to.be.equal(formatBytes32String("priceWithSafetyMargin"))
           expect(file[0].data).to.be.equal(BigNumber.from("931322574615478515625000000000000000000000000000000000"))
-
-          await expect(priceOracle.poke(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "Poke")
-            .withArgs(
-              formatBytes32String("BNB"),
-              formatBytes32BigNumber(One),
-              BigNumber.from("931322574615478515625000000000000000000000000000000000")
-            )
         })
       })
     })
@@ -179,8 +174,11 @@ describe("PriceOracle", () => {
             formatBytes32String("priceFeed"),
             mockedPriceFeed.address
           )
+
           mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"].will.return.with()
-          await priceOracle.poke(formatBytes32String("BNB"))
+          await expect(priceOracle.poke(formatBytes32String("BNB")))
+            .to.emit(priceOracle, "Poke")
+            .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(BigNumber.from("700000000000")), 0)
 
           const { calls: peek } = mockedPriceFeed.smocked.peek
           const { calls: file } = mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"]
@@ -190,10 +188,6 @@ describe("PriceOracle", () => {
           expect(file[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
           expect(file[0].what).to.be.equal(formatBytes32String("priceWithSafetyMargin"))
           expect(file[0].data).to.be.equal(BigNumber.from("0"))
-
-          await expect(priceOracle.poke(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "Poke")
-            .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(BigNumber.from("700000000000")), 0)
         })
       })
 
@@ -215,7 +209,13 @@ describe("PriceOracle", () => {
           await priceOracle["file(bytes32,uint256)"](formatBytes32String("stableCoinReferencePrice"), 10 ** 10)
 
           mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"].will.return.with()
-          await priceOracle.poke(formatBytes32String("BNB"))
+          await expect(priceOracle.poke(formatBytes32String("BNB")))
+            .to.emit(priceOracle, "Poke")
+            .withArgs(
+              formatBytes32String("BNB"),
+              formatBytes32BigNumber(BigNumber.from("700000000000")),
+              BigNumber.from("7000000000000000000000000000000000000000000000000000000")
+            )
 
           const { calls: peek } = mockedPriceFeed.smocked.peek
           const { calls: file } = mockedBookKeeper.smocked["file(bytes32,bytes32,uint256)"]
@@ -225,14 +225,6 @@ describe("PriceOracle", () => {
           expect(file[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
           expect(file[0].what).to.be.equal(formatBytes32String("priceWithSafetyMargin"))
           expect(file[0].data).to.be.equal(BigNumber.from("7000000000000000000000000000000000000000000000000000000"))
-
-          await expect(priceOracle.poke(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "Poke")
-            .withArgs(
-              formatBytes32String("BNB"),
-              formatBytes32BigNumber(BigNumber.from("700000000000")),
-              BigNumber.from("7000000000000000000000000000000000000000000000000000000")
-            )
         })
       })
     })
