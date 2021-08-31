@@ -157,10 +157,14 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
     else return wdiv(netAssetValuation(), totalShare);
   }
 
+  function pendingRewards(address positionAddress) external view returns (uint256) {
+    return sub(rmul(stake[positionAddress], accRewardPerShare), rewardDebts[positionAddress]);
+  }
+
   /// @dev Return the amount of rewards that is harvested.
   /// Expect that the adapter which inherited BaseFarmableTokenAdapter
   /// override this _harvest and perform actual harvest before return
-  function _harvest() internal view returns (uint256) {
+  function _harvest() internal virtual returns (uint256) {
     return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
   }
 
@@ -224,8 +228,8 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
     uint256 amount,
     bytes calldata data
   ) public virtual override {
-    address usr = abi.decode(data, (address));
-    harvest(positionAddress, usr);
+    address user = abi.decode(data, (address));
+    harvest(positionAddress, user);
     if (amount > 0) {
       uint256 wad = wdivup(mul(amount, to18ConversionFactor), netAssetperShare());
 
@@ -233,7 +237,7 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
       // Also enforces a non-zero wad
       require(int256(wad) > 0, "BaseFarmableToken/wad overflow");
 
-      address(collateralToken).safeTransfer(usr, amount);
+      address(collateralToken).safeTransfer(user, amount);
       bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(wad));
 
       totalShare = sub(totalShare, wad);
@@ -244,7 +248,7 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
     emit Withdraw(amount);
   }
 
-  /// @dev EMERGENCY ONLY. Withdraw collateralTokens from staking contract without caring rewards
+  /// @dev EMERGENCY ONLY. Withdraw collateralTokens from staking contract without invoking _harvest
   /// @param positionAddress The positionAddress to do emergency withdraw
   /// @param user The address to received collateralTokens
   function emergencyWithdraw(address positionAddress, address user) public virtual {
