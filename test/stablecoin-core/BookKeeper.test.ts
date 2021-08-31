@@ -286,7 +286,7 @@ describe("BookKeeper", () => {
       })
     })
 
-    context("when call adjustPosition(lock, fee)", () => {
+    context("when call adjustPosition(lock, free)", () => {
       context("when call adjustPosition(lock)", () => {
         context("when alice call but bob is collateral owner", () => {
           it("should be revert", async () => {
@@ -402,14 +402,14 @@ describe("BookKeeper", () => {
           })
         })
       })
-      context("when call adjustPosition(fee)", () => {
+      context("when call adjustPosition(free)", () => {
         context("when alice call and alice is collateral owner", () => {
           context("when alice doesn't have enough lock collateral in position", () => {
             it("should be revert", async () => {
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
 
-              // fee collateral
+              // free collateral
               await expect(
                 bookKeeperAsAlice.adjustPosition(
                   formatBytes32String("BNB"),
@@ -423,11 +423,11 @@ describe("BookKeeper", () => {
             })
           })
           context("when alice has enough lock collateral in position", () => {
-            it("should be able to call adjustPosition(fee)", async () => {
+            it("should be able to call adjustPosition(free)", async () => {
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
 
-              // add collateral to bob 10 BNB
+              // add collateral to alice 10 BNB
               await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
 
               // lock collateral
@@ -448,7 +448,7 @@ describe("BookKeeper", () => {
               )
               expect(collateralTokenAliceBefore).to.be.equal(0)
 
-              // fee collateral
+              // free collateral
               await bookKeeperAsAlice.adjustPosition(
                 formatBytes32String("BNB"),
                 aliceAddress,
@@ -474,7 +474,7 @@ describe("BookKeeper", () => {
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
 
-              // fee collateral
+              // free collateral
               await expect(
                 bookKeeperAsAlice.adjustPosition(
                   formatBytes32String("BNB"),
@@ -488,11 +488,11 @@ describe("BookKeeper", () => {
             })
           })
           context("when alice has enough lock collateral in position", () => {
-            it("should be able to call adjustPosition(fee)", async () => {
+            it("should be able to call adjustPosition(free)", async () => {
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
 
-              // add collateral to bob 10 BNB
+              // add collateral to alice 10 BNB
               await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
 
               // lock collateral
@@ -510,7 +510,7 @@ describe("BookKeeper", () => {
               const collateralTokenBobBefore = await bookKeeper.collateralToken(formatBytes32String("BNB"), bobAddress)
               expect(collateralTokenBobBefore).to.be.equal(0)
 
-              // fee collateral
+              // free collateral
               await bookKeeperAsAlice.adjustPosition(
                 formatBytes32String("BNB"),
                 aliceAddress,
@@ -971,7 +971,7 @@ describe("BookKeeper", () => {
 
   describe("#movePosition", () => {
     context("when alice move position to bob", () => {
-      context("when alice and bob don't allow to managing own position", () => {
+      context("when alice and bob don't allow anyone else to manage the position", () => {
         it("should be revert", async () => {
           // initialize BNB colleteral pool
           await bookKeeper.init(formatBytes32String("BNB"))
@@ -1358,11 +1358,11 @@ describe("BookKeeper", () => {
             expect(positionBefore.debtShare).to.be.equal(WeiPerWad)
             const collateralPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
             expect(collateralPoolBefore.totalDebtShare).to.be.equal(WeiPerWad)
-            const collateralTokenCreaditorBefore = await bookKeeper.collateralToken(
+            const collateralTokenCreditorBefore = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
               deployerAddress
             )
-            expect(collateralTokenCreaditorBefore).to.be.equal(0)
+            expect(collateralTokenCreditorBefore).to.be.equal(0)
             const systemBadDebtDebtorBefore = await bookKeeper.systemBadDebt(deployerAddress)
             expect(systemBadDebtDebtorBefore).to.be.equal(0)
             const totalUnbackedStablecoinBefore = await bookKeeper.totalUnbackedStablecoin()
@@ -1383,11 +1383,11 @@ describe("BookKeeper", () => {
             expect(positionAfter.debtShare).to.be.equal(0)
             const collateralPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
             expect(collateralPoolAfter.totalDebtShare).to.be.equal(0)
-            const collateralTokenCreaditorAfter = await bookKeeper.collateralToken(
+            const collateralTokenCreditorAfter = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
               deployerAddress
             )
-            expect(collateralTokenCreaditorAfter).to.be.equal(WeiPerWad)
+            expect(collateralTokenCreditorAfter).to.be.equal(WeiPerWad)
             const systemBadDebtDebtorAfter = await bookKeeper.systemBadDebt(deployerAddress)
             expect(systemBadDebtDebtorAfter).to.be.equal(WeiPerRad)
             const totalUnbackedStablecoinAfter = await bookKeeper.totalUnbackedStablecoin()
@@ -1436,11 +1436,11 @@ describe("BookKeeper", () => {
             expect(positionBefore.debtShare).to.be.equal(WeiPerWad.mul(2))
             const collateralPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
             expect(collateralPoolBefore.totalDebtShare).to.be.equal(WeiPerWad.mul(2))
-            const collateralTokenCreaditorBefore = await bookKeeper.collateralToken(
+            const collateralTokenCreditorBefore = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
               deployerAddress
             )
-            expect(collateralTokenCreaditorBefore).to.be.equal(0)
+            expect(collateralTokenCreditorBefore).to.be.equal(0)
             const systemBadDebtDebtorBefore = await bookKeeper.systemBadDebt(deployerAddress)
             expect(systemBadDebtDebtorBefore).to.be.equal(0)
             const totalUnbackedStablecoinBefore = await bookKeeper.totalUnbackedStablecoin()
@@ -1461,11 +1461,11 @@ describe("BookKeeper", () => {
             expect(positionAfter.debtShare).to.be.equal(WeiPerWad)
             const collateralPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
             expect(collateralPoolAfter.totalDebtShare).to.be.equal(WeiPerWad)
-            const collateralTokenCreaditorAfter = await bookKeeper.collateralToken(
+            const collateralTokenCreditorAfter = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
               deployerAddress
             )
-            expect(collateralTokenCreaditorAfter).to.be.equal(WeiPerWad)
+            expect(collateralTokenCreditorAfter).to.be.equal(WeiPerWad)
             const systemBadDebtDebtorAfter = await bookKeeper.systemBadDebt(deployerAddress)
             expect(systemBadDebtDebtorAfter).to.be.equal(WeiPerRad)
             const totalUnbackedStablecoinAfter = await bookKeeper.totalUnbackedStablecoin()
