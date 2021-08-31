@@ -1,10 +1,10 @@
 import { ethers, upgrades, waffle } from "hardhat"
-import { Signer, BigNumber } from "ethers"
+import { Signer } from "ethers"
 import chai from "chai"
 import { MockProvider, solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
 import { AlpacaStablecoin__factory, AlpacaStablecoin } from "../../../typechain"
-import { smockit, MockContract } from "@eth-optimism/smock"
+import { signDaiPermit } from "eth-permit"
 
 import * as TimeHelpers from "../../helper/time"
 import * as AssertHelpers from "../../helper/assert"
@@ -25,7 +25,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   // Deploy mocked BookKeeper
   const AlpacaStablecoin = (await ethers.getContractFactory("AlpacaStablecoin", deployer)) as AlpacaStablecoin__factory
-  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [99])) as AlpacaStablecoin
+  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [31337])) as AlpacaStablecoin
   await alpacaStablecoin.deployed()
 
   return { alpacaStablecoin }
@@ -246,6 +246,36 @@ describe("AlpacaStablecoin", () => {
           const totalSupplyAfter = await alpacaStablecoin.totalSupply()
           expect(totalSupplyAfter).to.be.equal(WeiPerWad.mul(90))
         })
+      })
+    })
+  })
+
+  context("#permit", () => {
+    context("when holder is address0", () => {
+      it("should be revert", async () => {
+        await expect(
+          alpacaStablecoinAsAlice.permit(
+            AddressZero,
+            aliceAddress,
+            0,
+            0,
+            true,
+            0,
+            formatBytes32String(""),
+            formatBytes32String("")
+          )
+        ).to.be.revertedWith("AlpacaStablecoin/invalid-address-0")
+      })
+    })
+    context("", () => {
+      it("should be revert", async () => {
+        const result = await signDaiPermit(alice, alpacaStablecoin.address, bobAddress, bobAddress)
+        console.log("deployerAddress", deployerAddress)
+        console.log("aliceAddress", aliceAddress)
+        console.log("bobAddress", bobAddress)
+
+        console.log("tokenAddress", alpacaStablecoin.address)
+        await alpacaStablecoinAsAlice.permit(aliceAddress, bobAddress, 0, 0, true, result.v, result.r, result.s)
       })
     })
   })
