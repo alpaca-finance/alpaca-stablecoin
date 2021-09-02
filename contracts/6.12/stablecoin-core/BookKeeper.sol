@@ -76,7 +76,7 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
 
   // --- Data ---
   struct CollateralPool {
-    uint256 totalDebtShare; // Total debt sgare of Alpaca Stablecoin of this collateral pool              [wad]
+    uint256 totalDebtShare; // Total debt share of Alpaca Stablecoin of this collateral pool              [wad]
     uint256 debtAccumulatedRate; // Accumulated rates (equivalent to ibToken Price)                       [ray]
     uint256 priceWithSafetyMargin; // Price with safety margin (taken into account the Collateral Ratio)  [ray]
     uint256 debtCeiling; // Debt ceiling of this collateral pool                                          [rad]
