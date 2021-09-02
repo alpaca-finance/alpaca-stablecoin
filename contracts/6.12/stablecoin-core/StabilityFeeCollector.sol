@@ -180,7 +180,7 @@ contract StabilityFeeCollector is
 
   // --- Stability Fee Collection ---
   function collect(bytes32 collateralPool) external override nonReentrant returns (uint256 rate) {
-    _collect(collateralPool);
+    rate = _collect(collateralPool);
   }
 
   function _collect(bytes32 collateralPool) internal returns (uint256 rate) {
