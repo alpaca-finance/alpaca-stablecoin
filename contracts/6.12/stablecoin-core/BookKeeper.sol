@@ -55,47 +55,47 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   /// @param uint256 true (1) means allowed or false (0) means not allowed 
   mapping(address => mapping(address => uint256)) public override can;
 
-  /// @dev This function will give an allowance to the `usr` address to adjust the position address who is the caller.
+  /// @dev Give an allowance to the `usr` address to adjust the position address who is the caller.
   /// @param usr The address to be allowed to adjust position
   function hope(address usr) external override {
     can[msg.sender][usr] = 1;
   }
 
-  /// @dev This function will revoke an allowance from the `usr` address to adjust the position address who is the caller.
+  /// @dev Revoke an allowance from the `usr` address to adjust the position address who is the caller.
   /// @param usr The address to be revoked from adjusting position
   function nope(address usr) external override {
     can[msg.sender][usr] = 0;
   }
 
-  /// @dev This function will check if the `usr` address is allowed to adjust the checking position address (`bit`).
-  /// @param bit The position address to be checked
-  /// @param usr The address to be revoked from adjusting position
+  /// @dev Check if the `usr` address is allowed to adjust the position address (`bit`).
+  /// @param bit The position address
+  /// @param usr The address to be checked for permission
   function wish(address bit, address usr) internal view returns (bool) {
     return either(bit == usr, can[bit][usr] == 1);
   }
 
   // --- Data ---
   struct CollateralPool {
-    uint256 totalDebtShare; // Total Normalised Debt     [wad]
-    uint256 debtAccumulatedRate; // Accumulated Rates         [ray]
-    uint256 priceWithSafetyMargin; // Price with Safety Margin  [ray]
-    uint256 debtCeiling; // Debt Ceiling              [rad]
-    uint256 debtFloor; // Position Debt Floor            [rad]
+    uint256 totalDebtShare; // Total debt sgare of Alpaca Stablecoin of this collateral pool              [wad]
+    uint256 debtAccumulatedRate; // Accumulated rates (equivalent to ibToken Price)                       [ray]
+    uint256 priceWithSafetyMargin; // Price with safety margin (taken into account the Collateral Ratio)  [ray]
+    uint256 debtCeiling; // Debt ceiling of this collateral pool                                          [rad]
+    uint256 debtFloor; // Position debt floor of this collateral pool                                     [rad]
   }
   struct Position {
-    uint256 lockedCollateral; // Locked Collateral  [wad]
-    uint256 debtShare; // Normalised Debt    [wad]
+    uint256 lockedCollateral; // Locked collateral inside this position (used for minting)                  [wad]
+    uint256 debtShare; // The debt share of this position or the share amount of minted Alpaca Stablecoin   [wad]
   }
 
-  mapping(bytes32 => CollateralPool) public override collateralPools;
-  mapping(bytes32 => mapping(address => Position)) public override positions;
-  mapping(bytes32 => mapping(address => uint256)) public override collateralToken; // [wad]
-  mapping(address => uint256) public override stablecoin; // [rad]
-  mapping(address => uint256) public override systemBadDebt; // [rad]
+  mapping(bytes32 => CollateralPool) public override collateralPools; // mapping of all collateral pool by its unique name in string
+  mapping(bytes32 => mapping(address => Position)) public override positions; // mapping of all positions by collateral pool id and position address
+  mapping(bytes32 => mapping(address => uint256)) public override collateralToken; // the accounting of collateral token which is deposited into the protocol [wad]
+  mapping(address => uint256) public override stablecoin; // the accounting of the stablecoin that is deposited or has not been withdrawn from the protocol [rad]
+  mapping(address => uint256) public override systemBadDebt; // the bad debt of the system from late liquidation [rad]
 
-  uint256 public override totalStablecoinIssued; // Total stable coin Issued    [rad]
-  uint256 public totalUnbackedStablecoin; // Total Unbacked stable coin  [rad]
-  uint256 public totalDebtCeiling; // Total Debt Ceiling  [rad]
+  uint256 public override totalStablecoinIssued; // Total stable coin issued or total stalbecoin in circulation   [rad]
+  uint256 public totalUnbackedStablecoin; // Total unbacked stable coin  [rad]
+  uint256 public totalDebtCeiling; // Total debt ceiling  [rad]
   uint256 public live; // Active Flag
 
   // --- Init ---
@@ -168,6 +168,10 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   }
 
   // --- Fungibility ---
+  /// @dev Add or remove collateral token balance to an address within the accounting of the protocol
+  /// @param collateralPoolId The collateral pool id
+  /// @param usr The target address
+  /// @param wad The collateral amount in [wad]
   function addCollateral(
     bytes32 collateralPoolId,
     address usr,
@@ -176,6 +180,11 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     collateralToken[collateralPoolId][usr] = add(collateralToken[collateralPoolId][usr], wad);
   }
 
+  /// @dev Move a balance of collateral token from a source address to a destination address within the accounting of the protocol
+  /// @param collateralPoolId the collateral pool id
+  /// @param src The source address
+  /// @param dst The destination address
+  /// @param wad The collateral amount in [wad]
   function moveCollateral(
     bytes32 collateralPoolId,
     address src,
@@ -187,6 +196,10 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     collateralToken[collateralPoolId][dst] = add(collateralToken[collateralPoolId][dst], wad);
   }
 
+  /// @dev Move a balance of stablecoin from a source address to a destination address within the accounting of the protocol
+  /// @param src The source address
+  /// @param dst The destination address
+  /// @param wad The stablecoin amount in [wad]
   function moveStablecoin(
     address src,
     address dst,
@@ -210,6 +223,13 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   }
 
   // --- CDP Manipulation ---
+  /// @dev Adjust a position on the target position address to perform locking/unlocking of collateral and minting/repaying of stablecoin
+  /// @param collateralPoolId Collateral pool id
+  /// @param positionAddress Address of the position
+  /// @param collateralOwner The payer/receiver of the collateral token, the collateral token must already be deposited into the protocol in case of locking the collateral
+  /// @param stablecoinOwner The payer/receiver of the stablecoin, the stablecoin must already be deposited into the protocol in case of repaying debt
+  /// @param collateralValue The value of the collateral to lock/unlock
+  /// @param debtShare The debt share of stalbecoin to mint/repay. Please pay attention that this is a debt share not debt value.
   function adjustPosition(
     bytes32 collateralPoolId,
     address positionAddress,
@@ -278,6 +298,12 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   }
 
   // --- CDP Fungibility ---
+  /// @dev Move the collateral or stablecoin debt inside a position to another position
+  /// @param collateralPoolId Collateral pool id
+  /// @param src Source address of the position
+  /// @param dst Destination address of the position
+  /// @param collateralValue The value of the locked collateral to be moved
+  /// @param debtShare The debt share of stalbecoin to be moved
   function movePosition(
     bytes32 collateralPoolId,
     address src,
@@ -310,6 +336,18 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   }
 
   // --- CDP Confiscation ---
+  /** @dev Confiscate position from the owner for the position to be liquidated.
+      The position will be confiscated of collateral in which these collateral will be sold through a liquidation process to repay the stablecoin debt.
+      The confiscated collateral will be seized by the Auctioneer contracts and will be moved to the corresponding liquidator addresses upon later.
+      The stablecoin debt will be mark up on the SystemDebtEngine contract first. This would signify that the system currently has a bad debt of this amount. 
+      But it will be cleared later on from a successful liquidation. If this debt is not fully liquidated, the remaining debt will stay inside SystemDebtEngine as bad debt.
+  **/
+  /// @param collateralPoolId Collateral pool id
+  /// @param positionAddress The position address
+  /// @param collateralCreditor The address which will temporarily own the collateral of the liquidated position; this will always be the Auctioneer
+  /// @param stablecoinDebtor The address which will be the one to be in debt for the amount of stablecoin debt of the liquidated position, this will always be the SystemDebtEngine
+  /// @param collateralValue The amount of collateral to be confiscated
+  /// @param debtShare The debt share to be confiscated
   function confiscatePosition(
     bytes32 collateralPoolId,
     address positionAddress,
@@ -336,6 +374,12 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   }
 
   // --- Settlement ---
+  /** @dev Settle the system bad debt of the caller.
+      This function will always be called by the SystemDebtEngine which will be the contract that always incur the system debt.
+      By executing this function, the SystemDebtEngine must have enough stablecoin which will come from the Surplus of the protocol.
+      A successful `settleSystemBadDebt` would remove the bad debt from the system.
+  **/
+  /// @param rad the amount of stablecoin to be used to settle bad debt [rad]
   function settleSystemBadDebt(uint256 rad) external override {
     address u = msg.sender;
     systemBadDebt[u] = sub(systemBadDebt[u], rad);
@@ -344,6 +388,10 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     totalStablecoinIssued = sub(totalStablecoinIssued, rad);
   }
 
+  /// @dev Mint unbacked stablecoin without any collateral to be used for incentives and flash mint.
+  /// @param from The address which will be the one who incur bad debt (will always be SystemDebtEngine here)
+  /// @param to The address which will receive the minted stablecoin
+  /// @param rad The amount of stablecoin to be minted
   function mintUnbackedStablecoin(
     address from,
     address to,
@@ -356,6 +404,15 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   }
 
   // --- Rates ---
+  /** @dev Accrue stability fee or the mint interest rate.
+      This function will always be called only by the StabilityFeeCollector contract.
+      `debtAccumulatedRate` of a collateral pool is the exchange rate of the stablecoin minted from that pool (think of it like ibToken price from Lending Vault).
+      The higher the `debtAccumulatedRate` means the minter of the stablecoin will beed to pay back the debt with higher amount.
+      The point of Stability Fee is to collect a surplus amount from minters and this is technically done by incrementing the `debtAccumulatedRate` overtime.
+  **/
+  /// @param collateralPoolId Collateral pool id
+  /// @param u The address which will receive the surplus from Stability Fee. This will always be SystemDebtEngine who will use the surplus to settle bad debt.
+  /// @param debtAccumulatedRate The difference value of `debtAccumulatedRate` which will be added to the current value of `debtAccumulatedRate`.
   function accrueStabilityFee(
     bytes32 collateralPoolId,
     address u,
