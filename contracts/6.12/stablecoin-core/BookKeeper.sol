@@ -28,7 +28,7 @@ import "../interfaces/IBookKeeper.sol";
 /// @author Alpaca Fin Corporation
 /** @notice A contract which acts as a book keeper of the Alpaca Stablecoin protocol. 
     It has the ability to move collateral token and stablecoin with in the accounting state variable. 
-**/
+*/
 
 contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
   // --- Auth ---
@@ -341,7 +341,7 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
       The confiscated collateral will be seized by the Auctioneer contracts and will be moved to the corresponding liquidator addresses upon later.
       The stablecoin debt will be mark up on the SystemDebtEngine contract first. This would signify that the system currently has a bad debt of this amount. 
       But it will be cleared later on from a successful liquidation. If this debt is not fully liquidated, the remaining debt will stay inside SystemDebtEngine as bad debt.
-  **/
+  */
   /// @param collateralPoolId Collateral pool id
   /// @param positionAddress The position address
   /// @param collateralCreditor The address which will temporarily own the collateral of the liquidated position; this will always be the Auctioneer
@@ -378,7 +378,7 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
       This function will always be called by the SystemDebtEngine which will be the contract that always incur the system debt.
       By executing this function, the SystemDebtEngine must have enough stablecoin which will come from the Surplus of the protocol.
       A successful `settleSystemBadDebt` would remove the bad debt from the system.
-  **/
+  */
   /// @param rad the amount of stablecoin to be used to settle bad debt [rad]
   function settleSystemBadDebt(uint256 rad) external override {
     address u = msg.sender;
@@ -409,7 +409,7 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
       `debtAccumulatedRate` of a collateral pool is the exchange rate of the stablecoin minted from that pool (think of it like ibToken price from Lending Vault).
       The higher the `debtAccumulatedRate` means the minter of the stablecoin will beed to pay back the debt with higher amount.
       The point of Stability Fee is to collect a surplus amount from minters and this is technically done by incrementing the `debtAccumulatedRate` overtime.
-  **/
+  */
   /// @param collateralPoolId Collateral pool id
   /// @param u The address which will receive the surplus from Stability Fee. This will always be SystemDebtEngine who will use the surplus to settle bad debt.
   /// @param debtAccumulatedRate The difference value of `debtAccumulatedRate` which will be added to the current value of `debtAccumulatedRate`.
