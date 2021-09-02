@@ -317,7 +317,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     `snip` is used with the Liquidation 2.0 Dutch Auction of MakerDAO.
   */
   /// @param collateralPoolId Collateral pool id
-  /// @param urn Position address
+  /// @param id Auction sale id
   function snip(bytes32 collateralPoolId, uint256 id) external {
     require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
 

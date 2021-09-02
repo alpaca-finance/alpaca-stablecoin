@@ -110,8 +110,9 @@ contract IbTokenAdapter is
   }
 
   /// @dev Deposit token into the system from the caller to be used as collateral
+  /// @param positionAddress The position address
   /// @param usr The source address which is holding the collateral token
-  /// @param wad The amount of collateral to be deposited [wad]
+  /// @param val The amount of collateral to be deposited [wad]
   function deposit(
     address positionAddress,
     address usr,
@@ -122,8 +123,9 @@ contract IbTokenAdapter is
   }
 
   /// @dev Withdraw token from the system to the caller
+  /// @param urn The position address
   /// @param usr The destination address to receive collateral token
-  /// @param wad The amount of collateral to be withdrawn [wad]
+  /// @param val The amount of collateral to be withdrawn [wad]
   function withdraw(
     address urn,
     address usr,

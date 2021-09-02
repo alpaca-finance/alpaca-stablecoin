@@ -180,8 +180,9 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
   }
 
   /// @dev Deposit token into the system from the caller to be used as collateral
+  /// @param positionAddress The position address
   /// @param usr The source address which is holding the collateral token
-  /// @param wad The amount of collateral to be deposited [wad]
+  /// @param val The amount of collateral to be deposited [wad]
   function deposit(
     address positionAddress,
     address usr,
@@ -208,8 +209,9 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
   }
 
   /// @dev Withdraw token from the system to the caller
+  /// @param positionAddress The position address
   /// @param usr The destination address to receive collateral token
-  /// @param wad The amount of collateral to be withdrawn [wad]
+  /// @param val The amount of collateral to be withdrawn [wad]
   function withdraw(
     address positionAddress,
     address usr,
@@ -234,7 +236,7 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
   }
 
   /// @dev Withdraw the collateral token without caring about rewards in case something wrong happen with the rewads
-  /// @param urn The position address
+  /// @param positionAddress The position address
   /// @param usr The destination address to receive collateral token
   function emergencyWithdraw(address positionAddress, address usr) public virtual {
     uint256 wad = bookKeeper.collateralToken(collateralPoolId, positionAddress);
