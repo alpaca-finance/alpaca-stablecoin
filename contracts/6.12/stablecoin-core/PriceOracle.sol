@@ -49,12 +49,12 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   // --- Data ---
   struct CollateralPool {
     IPriceFeed priceFeed; // Price Feed
-    uint256 liquidationRatio; // Liquidation ratio [ray]
+    uint256 liquidationRatio; // Liquidation ratio or Collateral ratio [ray]
   }
 
   mapping(bytes32 => CollateralPool) public override collateralPools;
 
-  IBookKeeper public vat; // CDP Engine
+  IBookKeeper public bookKeeper;
   uint256 public override stableCoinReferencePrice; // ref per dai [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
 
   uint256 public live;
@@ -62,18 +62,18 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   // --- Events ---
   event Poke(
     bytes32 poolId,
-    bytes32 val, // [wad]
-    uint256 spot // [ray]
+    bytes32 rawPrice, // Raw price from price feed [wad]
+    uint256 priceWithSafetyMargin // Price with safety margin [ray]
   );
 
   // --- Init ---
-  function initialize(address vat_) external initializer {
+  function initialize(address bookKeeper_) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
     wards[msg.sender] = 1;
-    vat = IBookKeeper(vat_);
+    bookKeeper = IBookKeeper(bookKeeper_);
     stableCoinReferencePrice = ONE;
     live = 1;
   }
@@ -117,13 +117,15 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   }
 
   // --- Update value ---
+  /// @dev Update the latest price with safety margin of the collateral pool to the BookKeeper
+  /// @param poolId Collateral pool id
   function poke(bytes32 poolId) external {
-    (bytes32 val, bool has) = collateralPools[poolId].priceFeed.peek();
-    uint256 priceWithSafetyMargin = has
-      ? rdiv(rdiv(mul(uint256(val), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
+    (bytes32 rawPrice, bool hasPrice) = collateralPools[poolId].priceFeed.peek();
+    uint256 priceWithSafetyMargin = hasPrice
+      ? rdiv(rdiv(mul(uint256(rawPrice), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
       : 0;
-    vat.file(poolId, "priceWithSafetyMargin", priceWithSafetyMargin);
-    emit Poke(poolId, val, priceWithSafetyMargin);
+    bookKeeper.file(poolId, "priceWithSafetyMargin", priceWithSafetyMargin);
+    emit Poke(poolId, rawPrice, priceWithSafetyMargin);
   }
 
   function cage() external override auth {
