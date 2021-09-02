@@ -22,7 +22,11 @@ import "../../interfaces/IToken.sol";
 import "../../interfaces/IFarmableTokenAdapter.sol";
 import "../../utils/SafeToken.sol";
 
-// receives tokens and shares them among holders
+/// @title FarmableTokenAdapter
+/// @author Alpaca Fin Corporation
+/** @notice An adapter which has the ability to farm the collateral on behalf of the collateral owner.
+    The yield from the farming will be distributed back to the collateral owner to increase the capital efficiency of the collateral during the lockup.
+*/
 contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
   using SafeToken for address;
 
@@ -30,14 +34,14 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
   uint256 live;
 
   IBookKeeper public bookKeeper; // cdp engine
-  bytes32 public override collateralPoolId; // collateral type
+  bytes32 public override collateralPoolId; // collateral poold id
   IToken public override collateralToken; // collateral token
   uint256 public decimals; // collateralToken decimals
-  IToken public rewardToken; // rewhitelist token
+  IToken public rewardToken; // reward token
 
-  uint256 public accRewardPerShare; // rewards per collateralToken    [ray]
-  uint256 public totalShare; // total collateralTokens       [wad]
-  uint256 public accRewardBalance; // crop balance     [wad]
+  uint256 public accRewardPerShare; // Accumulated reward token per one share of collateral    [ray]
+  uint256 public totalShare; // Total share of collateral token      [wad]
+  uint256 public accRewardBalance; // Accumulated reward balance     [wad]
 
   mapping(address => uint256) public rewardDebts; // rewardDebt per user  [wad]
   mapping(address => uint256) public stake; // collateralTokens per user   [wad]
@@ -142,21 +146,30 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
   }
 
   // Net Asset Valuation [wad]
+  /// @dev Return the net asset value of this adapter which will be equal to the amount of collateral token deposited in this adapter
   function nav() public view virtual returns (uint256) {
     uint256 _nav = collateralToken.balanceOf(address(this));
     return mul(_nav, to18ConversionFactor);
   }
 
   // Net Assets per Share [wad]
+  /** @dev Return the net asset per share which is (nav / totalShare).
+      The `share` amount will always be calculated in respect of the accumulated rewards to prevent new depositors to take up the portion of the existing depositors.
+      Therefore, `nps` is a measure which tell us how much collateral balance is in one share.
+  */
   function nps() public view returns (uint256) {
     if (totalShare == 0) return WAD;
     else return wdiv(nav(), totalShare);
   }
 
+  /// @dev Return the token amount of the harvested reward
   function harvestedRewards() internal virtual returns (uint256) {
     return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
   }
 
+  /// @dev Harvest the reward from farming and distribute the caller according to the caller's shares
+  /// @param from The position address of the caller
+  /// @param to The caller address which will receive the reward token
   function harvest(address from, address to) internal {
     if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(harvestedRewards(), totalShare));
 
@@ -166,6 +179,9 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
     accRewardBalance = rewardToken.balanceOf(address(this));
   }
 
+  /// @dev Deposit token into the system from the caller to be used as collateral
+  /// @param usr The source address which is holding the collateral token
+  /// @param wad The amount of collateral to be deposited [wad]
   function deposit(
     address positionAddress,
     address usr,
@@ -191,6 +207,9 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
     emit Deposit(val);
   }
 
+  /// @dev Withdraw token from the system to the caller
+  /// @param usr The destination address to receive collateral token
+  /// @param wad The amount of collateral to be withdrawn [wad]
   function withdraw(
     address positionAddress,
     address usr,
@@ -214,6 +233,9 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
     emit Withdraw(val);
   }
 
+  /// @dev Withdraw the collateral token without caring about rewards in case something wrong happen with the rewads
+  /// @param urn The position address
+  /// @param usr The destination address to receive collateral token
   function emergencyWithdraw(address positionAddress, address usr) public virtual {
     uint256 wad = bookKeeper.collateralToken(collateralPoolId, positionAddress);
     require(wad <= 2**255);
@@ -229,6 +251,14 @@ contract FarmableTokenAdapter is Initializable, IFarmableTokenAdapter {
     emit Flee();
   }
 
+  /** @dev Move the staking collateral balance and reward debt from one address to another address inside the system.
+      The reward debt and the staking balance of any addresses must always reflect the collateral balance.
+      If not, it would not be possible to withdraw the collateral token due to this discrepancy in the accounting.
+      It is also crucial to correctly track the share of reward tokens for each position address.
+  */
+  /// @param src Source address
+  /// @param dst Destination address
+  /// @param wad The amount of collateral token to be moved
   function moveRewards(
     address src,
     address dst,
