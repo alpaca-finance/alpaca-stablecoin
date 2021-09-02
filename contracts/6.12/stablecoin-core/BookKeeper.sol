@@ -50,19 +50,19 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   }
 
   /// @dev This is the mapping which stores the consent or allowance to adjust positions by the position addresses. 
-  /// @param address The position address
-  /// @param address The allowance delegate address
-  /// @param uint256 true (1) means allowed or false (0) means not allowed 
+  /// @dev `address` The position address
+  /// @dev `address` The allowance delegate address
+  /// @dev `uint256` true (1) means allowed or false (0) means not allowed 
   mapping(address => mapping(address => uint256)) public override can;
 
   /// @dev Give an allowance to the `usr` address to adjust the position address who is the caller.
-  /// @param usr The address to be allowed to adjust position
+  /// @dev `usr` The address to be allowed to adjust position
   function hope(address usr) external override {
     can[msg.sender][usr] = 1;
   }
 
   /// @dev Revoke an allowance from the `usr` address to adjust the position address who is the caller.
-  /// @param usr The address to be revoked from adjusting position
+  /// @dev `usr` The address to be revoked from adjusting position
   function nope(address usr) external override {
     can[msg.sender][usr] = 0;
   }
@@ -199,7 +199,7 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   /// @dev Move a balance of stablecoin from a source address to a destination address within the accounting of the protocol
   /// @param src The source address
   /// @param dst The destination address
-  /// @param wad The stablecoin amount in [wad]
+  /// @param rad The stablecoin amount in [rad]
   function moveStablecoin(
     address src,
     address dst,
