@@ -46,8 +46,8 @@ import "../../utils/SafeToken.sol";
 
     Adapters need to implement two basic methods:
 
-      - `deposit`: enter collateral into the system
-      - `withdraw`: remove collateral from the system
+      - `deposit`: enter token into the system
+      - `withdraw`: remove token from the system
 
 */
 
@@ -105,7 +105,7 @@ contract TokenAdapter is
   }
 
   /// @dev Deposit token into the system from the caller to be used as collateral
-  /// @param usr The target address or position address where the collateral would reside in the accounting of the system
+  /// @param usr The source address which is holding the collateral token
   /// @param wad The amount of collateral to be deposited [wad]
   function deposit(address usr, uint256 wad) external payable override nonReentrant {
     require(live == 1, "TokenAdapter/not-live");
@@ -117,7 +117,7 @@ contract TokenAdapter is
   }
 
   /// @dev Withdraw token from the system to the caller
-  /// @param usr The target address or position address where the collateral token is residing
+  /// @param usr The destination address to receive collateral token
   /// @param wad The amount of collateral to be withdrawn [wad]
   function withdraw(address usr, uint256 wad) external override nonReentrant {
     require(wad <= 2**255, "TokenAdapter/overflow");
