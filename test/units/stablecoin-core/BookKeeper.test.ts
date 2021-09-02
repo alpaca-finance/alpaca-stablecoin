@@ -3,8 +3,8 @@ import { Signer } from "ethers"
 import chai from "chai"
 import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import { BookKeeper__factory, BookKeeper } from "../../typechain"
-import { WeiPerRad, WeiPerRay, WeiPerWad } from "../helper/unit"
+import { BookKeeper__factory, BookKeeper } from "../../../typechain"
+import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 
 chai.use(solidity)
 const { expect } = chai
