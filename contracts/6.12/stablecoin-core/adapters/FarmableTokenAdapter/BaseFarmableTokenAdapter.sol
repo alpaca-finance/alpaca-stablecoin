@@ -34,11 +34,11 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
   /// @dev The token that will get after collateral has been staked
   IToken public rewardToken;
 
-  /// @dev Rewards per collateralToken in ray
+  /// @dev Rewards per collateralToken in RAY
   uint256 public accRewardPerShare;
-  /// @dev Total CollateralTokens that has been staked in wad
+  /// @dev Total CollateralTokens that has been staked in WAD
   uint256 public totalShare;
-  /// @dev Accummulate reward balance in wad
+  /// @dev Accummulate reward balance in WAD
   uint256 public accRewardBalance;
 
   /// @dev Mapping of user => rewardDebts
@@ -157,8 +157,14 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
     else return wdiv(netAssetValuation(), totalShare);
   }
 
-  function pendingRewards(address positionAddress) external view returns (uint256) {
-    return sub(rmul(stake[positionAddress], accRewardPerShare), rewardDebts[positionAddress]);
+  /// @dev Return the amount of rewards to be harvested for a giving position address
+  /// @param positionAddress The position address
+  /// @param pending The pending rewards from staking contract
+  function _pendingRewards(address positionAddress, uint256 pending) internal view returns (uint256) {
+    if (totalShare == 0) return 0;
+    uint256 toBeHarvested = sub(add(pending, rewardToken.balanceOf(address(this))), accRewardBalance);
+    uint256 pendingAccRewardPerShare = add(accRewardPerShare, rdiv(toBeHarvested, totalShare));
+    return sub(rmul(stake[positionAddress], pendingAccRewardPerShare), rewardDebts[positionAddress]);
   }
 
   /// @dev Return the amount of rewards that is harvested.
@@ -236,6 +242,7 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
       require(int256(wad) > 0, "BaseFarmableToken/wad overflow");
+      require(stake[positionAddress] >= wad, "BaseFarmableToken/insufficient staked amount");
 
       address(collateralToken).safeTransfer(user, amount);
       bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(wad));

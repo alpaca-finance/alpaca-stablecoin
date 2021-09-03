@@ -8,6 +8,7 @@
     "test:case": "mocha --require hardhat/register --extension ts -g",
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
     "test": "hardhat test --no-compile",
+    "test:integrations:ibTokenAdapter": "hardhat test --no-compile ./test/integrations/stablecoin-core/adapters/FarmableTokenAdapter/IbTokenAdapter.test.ts",
     "testnet": "hardhat console --no-compile --network testnet",
     "coverage": "hardhat coverage",
     "solhint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",

@@ -10,3 +10,7 @@ import { ethers } from "hardhat"
 export const WeiPerWad = ethers.constants.WeiPerEther
 export const WeiPerRay = BigNumber.from(`1${"0".repeat(27)}`)
 export const WeiPerRad = BigNumber.from(`1${"0".repeat(45)}`)
+
+export function weiToRay(input: BigNumber): BigNumber {
+  return BigNumber.from(input.mul(WeiPerRay).div(WeiPerWad))
+}

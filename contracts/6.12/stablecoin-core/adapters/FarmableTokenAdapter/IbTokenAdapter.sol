@@ -1,4 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
+
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -6,12 +18,14 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-import "../../../interfaces/IFairLaunch.sol";
+import "../../../interfaces/IAlpacaFairLaunch.sol";
 import "../../../interfaces/ITimeLock.sol";
 import "../../../interfaces/IShield.sol";
 import "../../../utils/SafeToken.sol";
 
 import "./BaseFarmableTokenAdapter.sol";
+
+import "hardhat/console.sol";
 
 /// @title IbTokenAdapter is the adapter that inherited BaseFarmableTokenAdapter.
 /// It receives Alpaca's ibTOKEN from users and deposit in Alpaca's FairLaunch.
@@ -26,7 +40,7 @@ contract IbTokenAdapter is
   using SafeToken for address;
 
   /// @dev The Alpaca's Fairlaunch contract
-  IFairLaunch public fairlaunch;
+  IAlpacaFairLaunch public fairlaunch;
   /// @dev The Alpaca's Shield contract
   IShield public shield;
   /// @dev The Timelock that owns Shield
@@ -60,14 +74,13 @@ contract IbTokenAdapter is
     );
 
     // 2. Sanity checks
-    (address lpToken, uint256 allocPoint, , , ) = IFairLaunch(_fairlaunch).poolInfo(_pid);
-    require(lpToken == _collateralToken, "IbTokenAdapter/pid-does-not-match-collateralToken");
-    require(IFairLaunch(_fairlaunch).alpaca() == _rewardToken, "IbTokenAdapter/rewardToken-does-not-match-sushi");
-    require(allocPoint > 0, "IbTokenAdapter/pool-not-active");
-    require(IFairLaunch(_fairlaunch).owner() == _shield, "IbTokenAdapter/shield-mismatch");
-    require(IShield(_shield).owner() == _timelock, "IbTokenAdapter/owner-mismatch");
+    (address stakeToken, , , , ) = IAlpacaFairLaunch(_fairlaunch).poolInfo(_pid);
+    require(stakeToken == _collateralToken, "IbTokenAdapter/collateralToken-not-match");
+    require(IAlpacaFairLaunch(_fairlaunch).alpaca() == _rewardToken, "IbTokenAdapter/reward-token-not-match");
+    require(IAlpacaFairLaunch(_fairlaunch).owner() == _shield, "IbTokenAdapter/shield-not-match");
+    require(IShield(_shield).owner() == _timelock, "IbTokenAdapter/timelock-not-match");
 
-    fairlaunch = IFairLaunch(_fairlaunch);
+    fairlaunch = IAlpacaFairLaunch(_fairlaunch);
     shield = IShield(_shield);
     timelock = ITimeLock(_timelock);
     pid = _pid;
@@ -84,9 +97,16 @@ contract IbTokenAdapter is
   function _harvest() internal override returns (uint256) {
     if (live == 1) {
       // Withdraw all rewards
-      fairlaunch.withdraw(address(this), pid, 0);
+      (uint256 stakedBalance, , , ) = fairlaunch.userInfo(pid, address(this));
+      if (stakedBalance > 0) fairlaunch.withdraw(address(this), pid, 0);
     }
     return super._harvest();
+  }
+
+  /// @dev For FE to query pending rewards of a given positionAddress
+  /// @param positionAddress The address that you want to check pending ALPACA
+  function pendingRewards(address positionAddress) external view returns (uint256) {
+    return super._pendingRewards(positionAddress, fairlaunch.pendingAlpaca(pid, address(this)));
   }
 
   /// @dev Harvest and deposit received ibToken to FairLaunch
