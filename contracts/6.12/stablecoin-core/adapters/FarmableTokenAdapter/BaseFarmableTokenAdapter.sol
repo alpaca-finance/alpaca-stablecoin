@@ -152,7 +152,7 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
   }
 
   /// @dev Return Net Assets per Share in wad
-  function netAssetperShare() public view returns (uint256) {
+  function netAssetPerShare() public view returns (uint256) {
     if (totalShare == 0) return WAD;
     else return wdiv(netAssetValuation(), totalShare);
   }
@@ -207,7 +207,7 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
     address user = abi.decode(data, (address));
     harvest(positionAddress, user);
     if (amount > 0) {
-      uint256 wad = wdiv(mul(amount, to18ConversionFactor), netAssetperShare());
+      uint256 wad = wdiv(mul(amount, to18ConversionFactor), netAssetPerShare());
 
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
@@ -237,7 +237,7 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
     address user = abi.decode(data, (address));
     harvest(positionAddress, user);
     if (amount > 0) {
-      uint256 wad = wdivup(mul(amount, to18ConversionFactor), netAssetperShare());
+      uint256 wad = wdivup(mul(amount, to18ConversionFactor), netAssetPerShare());
 
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
@@ -257,13 +257,13 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
 
   /// @dev EMERGENCY ONLY. Withdraw collateralTokens from staking contract without invoking _harvest
   /// @param positionAddress The positionAddress to do emergency withdraw
-  /// @param user The address to received collateralTokens
-  function emergencyWithdraw(address positionAddress, address user) public virtual {
+  /// @param to The address to received collateralTokens
+  function emergencyWithdraw(address positionAddress, address to) public virtual {
     uint256 wad = bookKeeper.collateralToken(collateralPoolId, positionAddress);
     require(wad <= 2**255, "BaseFarmableTokenAdapter/wad overflow");
-    uint256 val = wmul(wmul(wad, netAssetperShare()), toTokenConversionFactor);
+    uint256 val = wmul(wmul(wad, netAssetPerShare()), toTokenConversionFactor);
 
-    address(collateralToken).safeTransfer(user, val);
+    address(collateralToken).safeTransfer(to, val);
     bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(wad));
 
     totalShare = sub(totalShare, wad);

@@ -13,10 +13,8 @@ import {
   AlpacaToken__factory,
   FairLaunch__factory,
   Shield__factory,
-  Timelock__factory,
   BEP20,
   Shield,
-  Timelock,
   AlpacaToken,
   FairLaunch,
 } from "../../../../../typechain"
@@ -34,7 +32,6 @@ type fixture = {
   bookKeeper: BookKeeper
   ibDUMMY: BEP20
   shield: Shield
-  timelock: Timelock
   alpacaToken: AlpacaToken
   fairLaunch: FairLaunch
 }
@@ -70,14 +67,11 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   const shield = await Shield.deploy(deployer.address, fairLaunch.address)
   await shield.deployed()
 
-  const Timelock = (await ethers.getContractFactory("Timelock", deployer)) as Timelock__factory
-  const timelock = await Timelock.deploy(deployer.address, 86400)
-  await timelock.deployed()
-
   // Config Alpaca's FairLaunch
+  // Assuming Deployer is timelock for easy testing
   await fairLaunch.addPool(1, ibDUMMY.address, true)
   await fairLaunch.transferOwnership(shield.address)
-  await shield.transferOwnership(timelock.address)
+  await shield.transferOwnership(await deployer.getAddress())
   await alpacaToken.transferOwnership(fairLaunch.address)
 
   const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
@@ -89,7 +83,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     fairLaunch.address,
     0,
     shield.address,
-    timelock.address,
+    await deployer.getAddress(),
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
@@ -100,7 +94,6 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     bookKeeper,
     ibDUMMY,
     shield,
-    timelock,
     alpacaToken,
     fairLaunch,
   }
@@ -124,7 +117,6 @@ describe("IbTokenAdapter", () => {
   let bookKeeper: BookKeeper
   let ibDUMMY: BEP20
   let shield: Shield
-  let timelock: Timelock
   let alpacaToken: AlpacaToken
   let fairLaunch: FairLaunch
 
@@ -136,7 +128,7 @@ describe("IbTokenAdapter", () => {
   let ibDUMMYasBob: BEP20
 
   beforeEach(async () => {
-    ;({ ibTokenAdapter, bookKeeper, ibDUMMY, shield, timelock, alpacaToken, fairLaunch } = await waffle.loadFixture(
+    ;({ ibTokenAdapter, bookKeeper, ibDUMMY, shield, alpacaToken, fairLaunch } = await waffle.loadFixture(
       loadFixtureHandler
     ))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
@@ -167,7 +159,7 @@ describe("IbTokenAdapter", () => {
             fairLaunch.address,
             0,
             shield.address,
-            timelock.address,
+            deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/collateralToken-not-match")
       })
@@ -185,7 +177,7 @@ describe("IbTokenAdapter", () => {
             fairLaunch.address,
             0,
             shield.address,
-            timelock.address,
+            deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/reward-token-not-match")
       })
@@ -203,7 +195,7 @@ describe("IbTokenAdapter", () => {
             fairLaunch.address,
             0,
             deployerAddress,
-            timelock.address,
+            deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/shield-not-match")
       })
@@ -221,7 +213,7 @@ describe("IbTokenAdapter", () => {
             fairLaunch.address,
             0,
             shield.address,
-            deployerAddress,
+            shield.address,
           ])
         ).to.be.revertedWith("IbTokenAdapter/timelock-not-match")
       })
@@ -235,9 +227,72 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.fairlaunch()).to.be.eq(fairLaunch.address)
         expect(await ibTokenAdapter.pid()).to.be.eq(0)
         expect(await ibTokenAdapter.shield()).to.be.eq(shield.address)
-        expect(await ibTokenAdapter.timelock()).to.be.eq(timelock.address)
+        expect(await ibTokenAdapter.timelock()).to.be.eq(deployerAddress)
         expect(await ibTokenAdapter.whitelist(deployerAddress)).to.be.bignumber.eq(1)
         expect(await ibTokenAdapter.decimals()).to.be.eq(18)
+      })
+    })
+  })
+
+  describe("#netAssetValuation", async () => {
+    context("when all collateral tokens are deposited by deposit function", async () => {
+      it("should return the correct net asset valuation", async () => {
+        await ibDUMMYasAlice.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+        await ibTokenAdapterAsAlice.deposit(
+          aliceAddress,
+          ethers.utils.parseEther("1"),
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+        )
+
+        expect(await ibTokenAdapter.netAssetValuation()).to.be.eq(ethers.utils.parseEther("1"))
+      })
+    })
+
+    context("when some one directly transfer collateral tokens to IbTokenAdapter", async () => {
+      it("should only recognized collateral tokens from deposit function", async () => {
+        await ibDUMMYasAlice.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+        await ibTokenAdapterAsAlice.deposit(
+          aliceAddress,
+          ethers.utils.parseEther("1"),
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+        )
+
+        await ibDUMMYasBob.transfer(ibTokenAdapter.address, ethers.utils.parseEther("88"))
+
+        expect(await ibDUMMY.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("88"))
+        expect(await ibTokenAdapter.netAssetValuation()).to.be.eq(ethers.utils.parseEther("1"))
+      })
+    })
+  })
+
+  describe("#netAssetPerShare", async () => {
+    context("when all collateral tokens are deposited by deposit function", async () => {
+      it("should return the correct net asset per share", async () => {
+        await ibDUMMYasAlice.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+        await ibTokenAdapterAsAlice.deposit(
+          aliceAddress,
+          ethers.utils.parseEther("1"),
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+        )
+
+        // Expect netAssetPerShare = 1 as share = asset
+        expect(await ibTokenAdapter.netAssetPerShare()).to.be.eq(ethers.utils.parseEther("1"))
+      })
+    })
+
+    context("when some one directly transfer collateral tokens to IbTokenAdapter", async () => {
+      it("should only recognized collateral tokens from deposit function", async () => {
+        await ibDUMMYasAlice.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+        await ibTokenAdapterAsAlice.deposit(
+          aliceAddress,
+          ethers.utils.parseEther("1"),
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+        )
+
+        await ibDUMMYasBob.transfer(ibTokenAdapter.address, ethers.utils.parseEther("88"))
+
+        expect(await ibDUMMY.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("88"))
+        expect(await ibTokenAdapter.netAssetPerShare()).to.be.eq(ethers.utils.parseEther("1"))
       })
     })
   })
@@ -554,6 +609,45 @@ describe("IbTokenAdapter", () => {
     })
   })
 
+  describe("#emergencyWithdraw", async () => {
+    context("when all states are normal", async () => {
+      it("should work", async () => {
+        // Assuming Alice is the first one to deposit hence no rewards to be harvested yet
+        await ibDUMMYasAlice.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+        await ibTokenAdapterAsAlice.deposit(
+          aliceAddress,
+          ethers.utils.parseEther("1"),
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+        )
+
+        expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
+        expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("1"))
+        expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(0)
+        expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
+        expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
+        expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
+
+        // Alice feels in-secure, so she does emergencyWithdraw
+        // The following conditions must be satisfied:
+        // - Alice should get here 1 ibDUMMY back
+        // - Alice shouldn't be paid by any ALPACA
+        // - Alice's state should be reset
+        let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
+        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress, aliceAddress)
+        let aliceIbDUMMYafter = await ibDUMMY.balanceOf(aliceAddress)
+
+        expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
+        expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("100"))
+        expect(await fairLaunch.pendingAlpaca(0, ibTokenAdapter.address)).to.be.eq(0)
+        expect(await ibTokenAdapter.totalShare()).to.be.eq(0)
+        expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(0)
+        expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
+        expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(0)
+        expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
+      })
+    })
+  })
+
   describe("#pendingRewards", async () => {
     context("when IbTokenAdapter doesn't has any collateralTokens", async () => {
       it("should returns 0 pending ALPACA", async () => {
@@ -705,5 +799,153 @@ describe("IbTokenAdapter", () => {
     })
   })
 
-  describe("#cage", async () => {})
+  describe("#cage/#uncage", async () => {
+    context("when whitelist cage", async () => {
+      it("should put IbTokenAdapter live = 0", async () => {
+        await ibTokenAdapter.cage()
+        expect(await ibTokenAdapter.live()).to.be.eq(0)
+      })
+    })
+
+    context("when non-whitelist cage", async () => {
+      context("when assumptions still valid", async () => {
+        it("should revert", async () => {
+          await expect(ibTokenAdapterAsAlice.cage()).to.be.revertedWith("IbTokenAdapter/not-authorized")
+        })
+      })
+
+      context("when shield's owner is changed", async () => {
+        it("should put IbTokenAdapter live = 0", async () => {
+          await shield.transferOwnership(bobAddress)
+          await ibTokenAdapterAsAlice.cage()
+          expect(await ibTokenAdapter.live()).to.be.eq(0)
+        })
+      })
+    })
+
+    context("when uncage live IbTokenAdapter", async () => {
+      it("should revert", async () => {
+        await expect(ibTokenAdapter.uncage()).to.be.revertedWith("IbTokenAdapter/not-caged")
+      })
+    })
+
+    context("when cage and uncage", async () => {
+      it("should resume operations perfectly", async () => {
+        // Assuming Alice is the first one to deposit hence no rewards to be harvested yet
+        await ibDUMMYasAlice.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+        await ibTokenAdapterAsAlice.deposit(
+          aliceAddress,
+          ethers.utils.parseEther("1"),
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+        )
+
+        expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
+        expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("1"))
+        expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(0)
+        expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
+        expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
+        expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
+
+        // Bob join the party with 4 ibDUMMY! 2 Blocks have been passed.
+        // IbTokenAdapter should earned 200 ALPACA
+        await ibDUMMYasBob.approve(ibTokenAdapter.address, ethers.utils.parseEther("4"))
+        await ibTokenAdapterAsBob.deposit(
+          bobAddress,
+          ethers.utils.parseEther("4"),
+          ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress])
+        )
+
+        expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("200"))
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(0)
+        expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("5"))
+        expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("200")))
+        expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(ethers.utils.parseEther("200"))
+        expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
+        expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
+        expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(ethers.utils.parseEther("4"))
+        expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(ethers.utils.parseEther("800"))
+
+        // Move 1 block so IbTokenAdapter make 100 ALPACA. However this portion
+        // won't be added as IbTokenAdapter cage before it get harvested.
+        await advanceBlock()
+
+        // Cage IbTokenAdapter
+        await ibTokenAdapter.cage()
+        expect(await ibTokenAdapter.live()).to.be.eq(0)
+
+        // Now Alice withdraw her position. Only 200 ALPACA has been harvested from FairLaunch.
+        // IbTokenAdapter is caged. Staked collateralTokens have been emergencyWithdraw from FairLaunch.
+        // The following conditions must be satisfy:
+        // - Alice pending rewards must be 200 ALPACA
+        // - Bob pending rewards must be 0 ALPACA as all rewards after Bob deposited hasn't been harvested.
+        // - Alice should get 200 ALPACA that is harvested before cage (when Bob deposited)
+        // - Alice should get 1 ibDUMMY back.
+        expect(await ibTokenAdapter.pendingRewards(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
+        expect(await ibTokenAdapter.pendingRewards(bobAddress)).to.be.eq(0)
+
+        let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
+        await ibTokenAdapterAsAlice.withdraw(
+          aliceAddress,
+          ethers.utils.parseEther("1"),
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+        )
+        let aliceIbDUMMYafter = await ibDUMMY.balanceOf(aliceAddress)
+
+        expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
+        expect(await fairLaunch.pendingAlpaca(0, ibTokenAdapter.address)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
+        expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("4"))
+        expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("200")))
+        expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
+        expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(0)
+        expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
+        expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(ethers.utils.parseEther("4"))
+        expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(ethers.utils.parseEther("800"))
+
+        await ibTokenAdapter.uncage()
+        expect(await ibTokenAdapter.live()).to.be.eq(1)
+
+        // Move 1 block from where IbTokenAdapter get uncaged.
+        // Hence IbTokenAdapter should earned 100 ALPACA.
+        // The following conditions must be satisfy:
+        // - IbTokenAdapter must has 100 pending ALPACA
+        // - Alice pending rewards must be 100 ALPACA
+        // - Bob pending rewards must be 0 ALPACA
+        await advanceBlock()
+        expect(await fairLaunch.pendingAlpaca(0, ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("100"))
+        expect(await ibTokenAdapter.pendingRewards(aliceAddress)).to.be.eq(0)
+        expect(await ibTokenAdapter.pendingRewards(bobAddress)).to.be.eq(ethers.utils.parseEther("100"))
+
+        // Now Bob withdraw his position. Only 100 ALPACA has been harvested from FairLaunch.
+        // Another 100 ALPACA is pending for IbTokenAdapter to harvest.
+        // The following conditions must be satisfy:
+        // - Bob should get 200 ALPACA as 2 blocks passed.
+        // - Bob pending rewards must be 0 ALPACA as all rewards are harvested.
+        // - Bob should get 4 ibDUMMY back.
+        // - Alice's ALPACA should remain the same.
+        let bobIbDUMMYbefore = await ibDUMMY.balanceOf(bobAddress)
+        await ibTokenAdapterAsBob.withdraw(
+          bobAddress,
+          ethers.utils.parseEther("4"),
+          ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress])
+        )
+        let bobIbDUMMYafter = await ibDUMMY.balanceOf(bobAddress)
+
+        expect(bobIbDUMMYafter.sub(bobIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("4"))
+        expect(await fairLaunch.pendingAlpaca(0, ibTokenAdapter.address)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
+        expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(ethers.utils.parseEther("200"))
+        expect(await ibTokenAdapter.totalShare()).to.be.eq(0)
+        expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("250")))
+        expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
+        expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(0)
+        expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
+        expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(0)
+        expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(0)
+      })
+    })
+  })
 })

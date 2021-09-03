@@ -138,12 +138,12 @@ contract IbTokenAdapter is
   }
 
   /// @dev EMERGENCY ONLY. Withdraw ibToken from FairLaunch with invoking "_harvest"
-  function emergencyWithdraw(address positionAddress, address user) public override nonReentrant {
+  function emergencyWithdraw(address positionAddress, address to) public override nonReentrant {
     if (live == 1) {
       uint256 val = bookKeeper.collateralToken(collateralPoolId, positionAddress);
       fairlaunch.withdraw(address(this), pid, val);
     }
-    super.emergencyWithdraw(positionAddress, user);
+    super.emergencyWithdraw(positionAddress, to);
   }
 
   /// @dev Pause ibTokenAdapter when assumptions change
@@ -154,10 +154,7 @@ contract IbTokenAdapter is
     // - msg.sender is whitelisted to do so
     // - FairLaunch's owner has been changed
     // - Shield's owner has been changed
-    require(
-      whitelist[msg.sender] == 1 || fairlaunch.owner() != address(shield) || shield.owner() != address(timelock),
-      "IbTokenAdapter/not-authorized"
-    );
+    require(whitelist[msg.sender] == 1 || shield.owner() != address(timelock), "IbTokenAdapter/not-authorized");
 
     _cage();
   }
@@ -168,6 +165,7 @@ contract IbTokenAdapter is
   }
 
   function uncage() external auth {
+    require(live == 0, "IbTokenAdapter/not-caged");
     fairlaunch.deposit(address(this), pid, totalShare);
     live = 1;
   }
