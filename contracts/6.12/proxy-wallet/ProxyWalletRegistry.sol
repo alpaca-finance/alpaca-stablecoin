@@ -24,6 +24,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import "./ProxyWallet.sol";
+import "./ProxyWalletFactory.sol";
 
 // This Registry deploys new proxy instances through ProxyWalletFactory.build(address) and keeps a registry of owner => proxy
 contract ProxyWalletRegistry is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
