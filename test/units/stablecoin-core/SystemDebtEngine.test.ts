@@ -1,5 +1,5 @@
 import { ethers, upgrades, waffle } from "hardhat"
-import { Signer } from "ethers"
+import { BigNumber, Signer } from "ethers"
 import chai from "chai"
 import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
@@ -92,7 +92,13 @@ describe("SystemDebtEngine", () => {
     })
     context("when parameters are valid", () => {
       it("should be able to call cage", async () => {
+        const liveBefore = await systemDebtEngine.live()
+        expect(liveBefore).to.be.equal(1)
+
         await systemDebtEngine.cage()
+
+        const liveAfter = await systemDebtEngine.live()
+        expect(liveAfter).to.be.equal(0)
       })
     })
     context("when SystemDebtEngine doesn't live", () => {
