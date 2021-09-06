@@ -3,13 +3,13 @@ import { Signer, BigNumber } from "ethers"
 import chai from "chai"
 import { MockProvider, solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import { PriceOracle, PriceOracle__factory } from "../../typechain"
+import { PriceOracle, PriceOracle__factory } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 
-import * as TimeHelpers from "../helper/time"
-import * as AssertHelpers from "../helper/assert"
-import * as UnitHelpers from "../helper/unit"
-import { formatBytes32BigNumber } from "../helper/format"
+import * as TimeHelpers from "../../helper/time"
+import * as AssertHelpers from "../../helper/assert"
+import * as UnitHelpers from "../../helper/unit"
+import { formatBytes32BigNumber } from "../../helper/format"
 
 chai.use(solidity)
 const { expect } = chai
