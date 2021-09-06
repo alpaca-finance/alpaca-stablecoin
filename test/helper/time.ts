@@ -49,12 +49,13 @@ export async function advanceBlockTo(block: number) {
 
   if (block <= latestBlock) {
     throw new Error("input block exceeds current block")
-  if (block <= latestBlock){
-    throw new Error('input block exceeds current block')
-  }
+    if (block <= latestBlock) {
+      throw new Error("input block exceeds current block")
+    }
 
-  while (block > latestBlock) {
-    await advanceBlock()
-    latestBlock++
+    while (block > latestBlock) {
+      await advanceBlock()
+      latestBlock++
+    }
   }
 }
