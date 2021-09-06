@@ -41,7 +41,7 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     wards[guy] = 0;
   }
 
-  modifier auth {
+  modifier auth() {
     require(wards[msg.sender] == 1, "Spotter/not-authorized");
     _;
   }
@@ -119,10 +119,9 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   // --- Update value ---
   function poke(bytes32 poolId) external {
     (bytes32 val, bool has) = collateralPools[poolId].priceFeed.peek();
-    uint256 priceWithSafetyMargin =
-      has
-        ? rdiv(rdiv(mul(uint256(val), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
-        : 0;
+    uint256 priceWithSafetyMargin = has
+      ? rdiv(rdiv(mul(uint256(val), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
+      : 0;
     vat.file(poolId, "priceWithSafetyMargin", priceWithSafetyMargin);
     emit Poke(poolId, val, priceWithSafetyMargin);
   }
