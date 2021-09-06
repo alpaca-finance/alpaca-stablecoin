@@ -81,13 +81,15 @@ describe("TokenAdapter", () => {
     context("when the token adapter is inactive", () => {
       it("should revert", async () => {
         await tokenAdapter.cage()
-        await expect(tokenAdapter.deposit(aliceAddress, WeiPerWad.mul(1))).to.be.revertedWith("TokenAdapter/not-live")
+        await expect(tokenAdapter.deposit(aliceAddress, WeiPerWad.mul(1), "0x")).to.be.revertedWith(
+          "TokenAdapter/not-live"
+        )
       })
     })
 
     context("when wad input is overflow (> MaxInt256)", () => {
       it("should revert", async () => {
-        await expect(tokenAdapter.deposit(aliceAddress, ethers.constants.MaxUint256)).to.be.revertedWith(
+        await expect(tokenAdapter.deposit(aliceAddress, ethers.constants.MaxUint256, "0x")).to.be.revertedWith(
           "TokenAdapter/overflow"
         )
       })
@@ -95,9 +97,7 @@ describe("TokenAdapter", () => {
 
     context("when transfer fail", () => {
       it("should revert", async () => {
-        await expect(tokenAdapter.deposit(aliceAddress, WeiPerWad.mul(1))).to.be.revertedWith(
-          "TokenAdapter/failed-transfer"
-        )
+        await expect(tokenAdapter.deposit(aliceAddress, WeiPerWad.mul(1), "0x")).to.be.revertedWith("!safeTransferFrom")
       })
     })
 
@@ -105,7 +105,7 @@ describe("TokenAdapter", () => {
       it("should be able to call bookkeeper.addCollateral() correctly", async () => {
         mockedBookKeeper.smocked.addCollateral.will.return.with()
         mockedToken.smocked.transferFrom.will.return.with(true)
-        await tokenAdapter.deposit(aliceAddress, WeiPerWad.mul(1))
+        await tokenAdapter.deposit(aliceAddress, WeiPerWad.mul(1), "0x")
 
         const { calls: addCollateral } = mockedBookKeeper.smocked.addCollateral
         const { calls: transferFrom } = mockedToken.smocked.transferFrom
@@ -125,7 +125,7 @@ describe("TokenAdapter", () => {
   describe("#withdraw()", () => {
     context("when wad input is overflow (> MaxInt256)", () => {
       it("should revert", async () => {
-        await expect(tokenAdapter.withdraw(aliceAddress, ethers.constants.MaxUint256)).to.be.revertedWith(
+        await expect(tokenAdapter.withdraw(aliceAddress, ethers.constants.MaxUint256, "0x")).to.be.revertedWith(
           "TokenAdapter/overflow"
         )
       })
@@ -133,9 +133,7 @@ describe("TokenAdapter", () => {
 
     context("when transfer fail", () => {
       it("should revert", async () => {
-        await expect(tokenAdapter.withdraw(aliceAddress, WeiPerWad.mul(1))).to.be.revertedWith(
-          "TokenAdapter/failed-transfer"
-        )
+        await expect(tokenAdapter.withdraw(aliceAddress, WeiPerWad.mul(1), "0x")).to.be.revertedWith("!safeTransfer")
       })
     })
 
@@ -143,7 +141,7 @@ describe("TokenAdapter", () => {
       it("should be able to call bookkeeper.addCollateral() correctly", async () => {
         mockedBookKeeper.smocked.addCollateral.will.return.with()
         mockedToken.smocked.transfer.will.return.with(true)
-        await tokenAdapter.withdraw(aliceAddress, WeiPerWad.mul(1))
+        await tokenAdapter.withdraw(aliceAddress, WeiPerWad.mul(1), "0x")
 
         const { calls: addCollateral } = mockedBookKeeper.smocked.addCollateral
         const { calls: transfer } = mockedToken.smocked.transfer
