@@ -15,6 +15,7 @@
     "test:stairstepexponentialdecrease": "hardhat test --no-compile ./test/units/calculators/StairstepExponentialDecrease.test.ts",
     "test:tokenadapter": "hardhat test --no-compile ./test/units/adapter/TokenAdapter.test.ts",
     "test:stabilityfeecollector": "hardhat test --no-compile ./test/units/stablecoin-core/StabilityFeeCollector.test.ts",
+    "test:liquidationengine": "hardhat test --no-compile ./test/units/stablecoin-core/LiquidationEngine.test.ts",
     "test:alpacastablecoin": "hardhat test --no-compile ./test/units/stablecoin-core/AlpacaStablecoin.test.ts",
     "test:priceoracle": "hardhat test --no-compile ./test/units/stablecoin-core/PriceOracle.test.ts",
     "test:systemdebtengine": "hardhat test --no-compile ./test/units/stablecoin-core/SystemDebtEngine.test.ts",
