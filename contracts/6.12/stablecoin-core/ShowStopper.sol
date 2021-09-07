@@ -30,7 +30,6 @@ import "../interfaces/IAuctioneer.sol";
 import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IPriceOracle.sol";
-import "../interfaces/IStablecoinSavings.sol";
 import "../interfaces/ISystemDebtEngine.sol";
 
 /*
@@ -162,7 +161,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Deny(usr);
   }
 
-  modifier auth {
+  modifier auth() {
     require(wards[msg.sender] == 1, "End/not-authorized");
     _;
   }
@@ -171,7 +170,6 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   IBookKeeper public bookKeeper; // CDP Engine
   ILiquidationEngine public liquidationEngine;
   ISystemDebtEngine public systemDebtEngine; // Debt Engine
-  IStablecoinSavings public stablecoinSavings;
   IPriceOracle public priceOracle;
 
   uint256 public live; // Active Flag
@@ -264,7 +262,6 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     if (what == "bookKeeper") bookKeeper = IBookKeeper(data);
     else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
     else if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
-    else if (what == "stablecoinSavings") stablecoinSavings = IStablecoinSavings(data);
     else if (what == "priceOracle") priceOracle = IPriceOracle(data);
     else revert("End/file-unrecognized-param");
     emit File(what, data);
@@ -286,7 +283,6 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     liquidationEngine.cage();
     systemDebtEngine.cage();
     priceOracle.cage();
-    stablecoinSavings.cage();
     emit Cage();
   }
 
