@@ -134,7 +134,7 @@ contract PegStabilityModule is OwnableUpgradeable, PausableUpgradeable, AccessCo
   function sellToken(address usr, uint256 tokenAmount) external {
     uint256 tokenAmount18 = mul(tokenAmount, to18ConversionFactor);
     uint256 fee = mul(tokenAmount18, feeIn) / WAD;
-    uint256 ausdAmount = sub(tokenAmount18, fee);
+    uint256 stablecoinAmount = sub(tokenAmount18, fee);
     authTokenAdapter.deposit(address(this), tokenAmount, msg.sender);
     bookKeeper.adjustPosition(
       collateralPoolId,
@@ -145,7 +145,7 @@ contract PegStabilityModule is OwnableUpgradeable, PausableUpgradeable, AccessCo
       int256(tokenAmount18)
     );
     bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(fee, RAY));
-    stablecoinAdapter.withdraw(usr, ausdAmount);
+    stablecoinAdapter.withdraw(usr, stablecoinAmount);
 
     emit SellToken(usr, tokenAmount, fee);
   }
@@ -158,9 +158,9 @@ contract PegStabilityModule is OwnableUpgradeable, PausableUpgradeable, AccessCo
   function buyToken(address usr, uint256 tokenAmount) external {
     uint256 tokenAmount18 = mul(tokenAmount, to18ConversionFactor);
     uint256 fee = mul(tokenAmount18, feeOut) / WAD;
-    uint256 ausdAmount = add(tokenAmount18, fee);
-    require(stablecoin.transferFrom(msg.sender, address(this), ausdAmount), "PegStabilityModule/failed-transfer");
-    stablecoinAdapter.deposit(address(this), ausdAmount);
+    uint256 stablecoinAmount = add(tokenAmount18, fee);
+    require(stablecoin.transferFrom(msg.sender, address(this), stablecoinAmount), "PegStabilityModule/failed-transfer");
+    stablecoinAdapter.deposit(address(this), stablecoinAmount);
     bookKeeper.adjustPosition(
       collateralPoolId,
       address(this),
