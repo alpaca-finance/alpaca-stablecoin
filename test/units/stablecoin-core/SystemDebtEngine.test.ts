@@ -6,7 +6,7 @@ import "@openzeppelin/test-helpers"
 import { SystemDebtEngine, SystemDebtEngine__factory } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 
-import { WeiPerRad } from "../../helper/unit"
+import * as UnitHelpers from "../../helper/unit"
 
 chai.use(solidity)
 const { expect } = chai
@@ -44,40 +44,43 @@ describe("SystemDebtEngine", () => {
   let mockedBookKeeper: MockContract
 
   let systemDebtEngine: SystemDebtEngine
+  let systemDebtEngineAsAlice: SystemDebtEngine
 
   beforeEach(async () => {
     ;({ systemDebtEngine, mockedBookKeeper } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
+
+    systemDebtEngineAsAlice = SystemDebtEngine__factory.connect(systemDebtEngine.address, alice) as SystemDebtEngine
   })
 
   describe("#settleSystemBadDebt", () => {
     context("when insufficient surplus", () => {
       it("should be revert", async () => {
-        await expect(systemDebtEngine.settleSystemBadDebt(WeiPerRad)).to.be.revertedWith(
+        await expect(systemDebtEngine.settleSystemBadDebt(UnitHelpers.WeiPerRad)).to.be.revertedWith(
           "SystemDebtEngine/insufficient-surplus"
         )
       })
     })
     context("when insufficient debt", () => {
       it("should be revert", async () => {
-        mockedBookKeeper.smocked.stablecoin.will.return.with(WeiPerRad)
+        mockedBookKeeper.smocked.stablecoin.will.return.with(UnitHelpers.WeiPerRad)
 
-        await expect(systemDebtEngine.settleSystemBadDebt(WeiPerRad)).to.be.revertedWith(
+        await expect(systemDebtEngine.settleSystemBadDebt(UnitHelpers.WeiPerRad)).to.be.revertedWith(
           "SystemDebtEngine/insufficient-debt"
         )
       })
     })
     context("when parameters are valid", () => {
       it("should be able to call settleSystemBadDebt", async () => {
-        mockedBookKeeper.smocked.stablecoin.will.return.with(WeiPerRad)
-        mockedBookKeeper.smocked.systemBadDebt.will.return.with(WeiPerRad)
+        mockedBookKeeper.smocked.stablecoin.will.return.with(UnitHelpers.WeiPerRad)
+        mockedBookKeeper.smocked.systemBadDebt.will.return.with(UnitHelpers.WeiPerRad)
 
-        await systemDebtEngine.settleSystemBadDebt(WeiPerRad)
+        await systemDebtEngine.settleSystemBadDebt(UnitHelpers.WeiPerRad)
 
         const { calls } = mockedBookKeeper.smocked.settleSystemBadDebt
         expect(calls.length).to.be.equal(1)
-        expect(calls[0].rad).to.be.equal(WeiPerRad)
+        expect(calls[0].rad).to.be.equal(UnitHelpers.WeiPerRad)
       })
     })
   })
@@ -106,6 +109,23 @@ describe("SystemDebtEngine", () => {
         await systemDebtEngine.cage()
 
         await expect(systemDebtEngine.cage()).to.be.revertedWith("SystemDebtEngine/not-live")
+      })
+    })
+  })
+
+  describe("#setSurplusBuffer", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(systemDebtEngineAsAlice.setSurplusBuffer(UnitHelpers.WeiPerRad)).to.be.revertedWith(
+          "SystemDebtEngine/not-authorized"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setSurplusBuffer", async () => {
+        await expect(systemDebtEngine.setSurplusBuffer(UnitHelpers.WeiPerRad))
+          .to.emit(systemDebtEngine, "SetSurplusBuffer")
+          .withArgs(deployerAddress, UnitHelpers.WeiPerRad)
       })
     })
   })
