@@ -225,6 +225,48 @@ describe("ShowStopper", () => {
           await expect(showStopper["cage(bytes32)"](formatBytes32String("BNB"))).to.be.revertedWith("End/still-live")
         })
       })
+
+      context("cage price is already defined", () => {
+        it("should be revert", async () => {
+          expect(await showStopper.live()).to.be.equal(1)
+
+          mockedBookKeeper.smocked.cage.will.return.with()
+          mockedLiquidationEngine.smocked.cage.will.return.with()
+          mockedSystemDebtEngine.smocked.cage.will.return.with()
+          mockedPriceOracle.smocked.cage.will.return.with()
+
+          await showStopper["file(bytes32,address)"](formatBytes32String("bookKeeper"), mockedBookKeeper.address)
+          await showStopper["file(bytes32,address)"](
+            formatBytes32String("liquidationEngine"),
+            mockedLiquidationEngine.address
+          )
+          await showStopper["file(bytes32,address)"](
+            formatBytes32String("systemDebtEngine"),
+            mockedSystemDebtEngine.address
+          )
+          await showStopper["file(bytes32,address)"](formatBytes32String("priceOracle"), mockedPriceOracle.address)
+          await showStopper["cage()"]()
+
+          mockedBookKeeper.smocked.collateralPools.will.return.with([
+            UnitHelpers.WeiPerWad,
+            BigNumber.from(0),
+            BigNumber.from(0),
+            BigNumber.from(0),
+            BigNumber.from(0),
+          ])
+          mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, BigNumber.from(0)])
+          mockedPriceFeed.smocked.read.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
+          mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
+
+          await showStopper["cage(bytes32)"](formatBytes32String("BNB"))
+
+          await expect(showStopper["cage(bytes32)"](formatBytes32String("BNB"))).to.be.revertedWith(
+            "End/cagePrice-collateralPoolId-already-defined"
+          )
+
+          expect(await showStopper.live()).to.be.equal(0)
+        })
+      })
     })
   })
 
