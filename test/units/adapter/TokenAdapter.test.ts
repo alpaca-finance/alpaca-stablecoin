@@ -15,8 +15,7 @@ type fixture = {
 }
 chai.use(solidity)
 const { expect } = chai
-const { AddressZero, WeiPerEther } = ethers.constants
-const { parseEther, formatBytes32String } = ethers.utils
+const { formatBytes32String } = ethers.utils
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
