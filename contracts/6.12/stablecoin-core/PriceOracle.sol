@@ -54,7 +54,7 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
 
   mapping(bytes32 => CollateralPool) public override collateralPools;
 
-  IBookKeeper public vat; // CDP Engine
+  IBookKeeper public bookKeeper; // CDP Engine
   uint256 public override stableCoinReferencePrice; // ref per dai [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
 
   uint256 public live;
@@ -67,13 +67,13 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   );
 
   // --- Init ---
-  function initialize(address vat_) external initializer {
+  function initialize(address _bookKeeper) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
     wards[msg.sender] = 1;
-    vat = IBookKeeper(vat_);
+    bookKeeper = IBookKeeper(_bookKeeper);
     stableCoinReferencePrice = ONE;
     live = 1;
   }
@@ -122,7 +122,7 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     uint256 priceWithSafetyMargin = has
       ? rdiv(rdiv(mul(uint256(val), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
       : 0;
-    vat.setPriceWithSafetyMargin(poolId, priceWithSafetyMargin);
+    bookKeeper.setPriceWithSafetyMargin(poolId, priceWithSafetyMargin);
     emit Poke(poolId, val, priceWithSafetyMargin);
   }
 

@@ -140,21 +140,25 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   function setTotalDebtCeiling(uint256 _data) external override auth {
     require(live == 1, "BookKeeper/not-live");
     totalDebtCeiling = _data;
+    emit SetTotalDebtCeiling(msg.sender, _data);
   }
 
   function setPriceWithSafetyMargin(bytes32 _collateralPoolId, uint256 _data) external override auth {
     require(live == 1, "BookKeeper/not-live");
     collateralPools[_collateralPoolId].priceWithSafetyMargin = _data;
+    emit SetPriceWithSafetyMargin(msg.sender, _collateralPoolId, _data);
   }
 
   function setDebtCeiling(bytes32 _collateralPoolId, uint256 _data) external override auth {
     require(live == 1, "BookKeeper/not-live");
     collateralPools[_collateralPoolId].debtCeiling = _data;
+    emit SetDebtCeiling(msg.sender, _collateralPoolId, _data);
   }
 
   function setDebtFloor(bytes32 _collateralPoolId, uint256 _data) external override auth {
     require(live == 1, "BookKeeper/not-live");
     collateralPools[_collateralPoolId].debtFloor = _data;
+    emit SetDebtFloor(msg.sender, _collateralPoolId, _data);
   }
 
   function cage() external override auth {

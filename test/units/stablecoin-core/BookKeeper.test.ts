@@ -1436,4 +1436,124 @@ describe("BookKeeper", () => {
       })
     })
   })
+
+  describe("#setTotalDebtCeiling", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(bookKeeperAsAlice.setTotalDebtCeiling(WeiPerRad)).to.be.revertedWith("BookKeeper/not-authorized")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when bookkeeper does not live", () => {
+        it("should be revert", async () => {
+          bookKeeper.cage()
+
+          await expect(bookKeeper.setTotalDebtCeiling(WeiPerRad)).to.be.revertedWith("BookKeeper/not-live")
+        })
+      })
+      context("when bookkeeper is live", () => {
+        it("should be able to call setTotalDebtCeiling", async () => {
+          // init BNB pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+          // set total debt ceiling 1 rad
+          await expect(bookKeeper.setTotalDebtCeiling(WeiPerRad))
+            .to.emit(bookKeeper, "SetTotalDebtCeiling")
+            .withArgs(deployerAddress, WeiPerRad)
+        })
+      })
+    })
+  })
+
+  describe("#setPriceWithSafetyMargin", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(
+          bookKeeperAsAlice.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+        ).to.be.revertedWith("BookKeeper/not-authorized")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when bookkeeper does not live", () => {
+        it("should be revert", async () => {
+          bookKeeper.cage()
+
+          await expect(bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
+            "BookKeeper/not-live"
+          )
+        })
+      })
+      context("when bookkeeper is live", () => {
+        it("should be able to call setPriceWithSafetyMargin", async () => {
+          // init BNB pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+          // set total debt ceiling 1 rad
+          await expect(bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay))
+            .to.emit(bookKeeper, "SetPriceWithSafetyMargin")
+            .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
+        })
+      })
+    })
+  })
+
+  describe("#setDebtCeiling", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(bookKeeperAsAlice.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
+          "BookKeeper/not-authorized"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when bookkeeper does not live", () => {
+        it("should be revert", async () => {
+          bookKeeper.cage()
+
+          await expect(bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
+            "BookKeeper/not-live"
+          )
+        })
+      })
+      context("when bookkeeper is live", () => {
+        it("should be able to call setDebtCeiling", async () => {
+          // init BNB pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+          // set total debt ceiling 1 rad
+          await expect(bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay))
+            .to.emit(bookKeeper, "SetDebtCeiling")
+            .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
+        })
+      })
+    })
+  })
+
+  describe("#setDebtFloor", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(bookKeeperAsAlice.setDebtFloor(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
+          "BookKeeper/not-authorized"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when bookkeeper does not live", () => {
+        it("should be revert", async () => {
+          bookKeeper.cage()
+
+          await expect(bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
+            "BookKeeper/not-live"
+          )
+        })
+      })
+      context("when bookkeeper is live", () => {
+        it("should be able to call setDebtFloor", async () => {
+          // init BNB pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+          // set total debt ceiling 1 rad
+          await expect(bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRay))
+            .to.emit(bookKeeper, "SetDebtFloor")
+            .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
+        })
+      })
+    })
+  })
 })
