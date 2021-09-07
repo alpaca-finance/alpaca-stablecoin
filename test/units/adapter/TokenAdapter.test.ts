@@ -95,9 +95,7 @@ describe("TokenAdapter", () => {
 
     context("when transfer fail", () => {
       it("should revert", async () => {
-        await expect(tokenAdapter.deposit(aliceAddress, WeiPerWad.mul(1))).to.be.revertedWith(
-          "TokenAdapter/failed-transfer"
-        )
+        await expect(tokenAdapter.deposit(aliceAddress, WeiPerWad.mul(1))).to.be.revertedWith("!safeTransferFrom")
       })
     })
 
@@ -133,9 +131,7 @@ describe("TokenAdapter", () => {
 
     context("when transfer fail", () => {
       it("should revert", async () => {
-        await expect(tokenAdapter.withdraw(aliceAddress, WeiPerWad.mul(1))).to.be.revertedWith(
-          "TokenAdapter/failed-transfer"
-        )
+        await expect(tokenAdapter.withdraw(aliceAddress, WeiPerWad.mul(1))).to.be.revertedWith("!safeTransfer")
       })
     })
 
