@@ -90,30 +90,26 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   }
 
   // --- Administration ---
-  function file(
-    bytes32 poolId,
-    bytes32 what,
-    address priceFeed_
-  ) external auth {
+  event SetStableCoinReferencePrice(address indexed caller, uint256 data);
+  event SetPriceFeed(address indexed caller, bytes32 poolId, address priceFeed);
+  event SetLiquidationRatio(address indexed caller, bytes32 poolId, uint256 data);
+
+  function setStableCoinReferencePrice(uint256 _data) external override auth {
     require(live == 1, "Spotter/not-live");
-    if (what == "priceFeed") collateralPools[poolId].priceFeed = IPriceFeed(priceFeed_);
-    else revert("Spotter/file-unrecognized-param");
+    stableCoinReferencePrice = _data;
+    emit SetStableCoinReferencePrice(msg.sender, _data);
   }
 
-  function file(bytes32 what, uint256 data) external auth {
+  function setPriceFeed(bytes32 _poolId, address _priceFeed) external override auth {
     require(live == 1, "Spotter/not-live");
-    if (what == "stableCoinReferencePrice") stableCoinReferencePrice = data;
-    else revert("Spotter/file-unrecognized-param");
+    collateralPools[_poolId].priceFeed = IPriceFeed(_priceFeed);
+    emit SetPriceFeed(msg.sender, _poolId, _priceFeed);
   }
 
-  function file(
-    bytes32 poolId,
-    bytes32 what,
-    uint256 data
-  ) external auth {
+  function setLiquidationRatio(bytes32 _poolId, uint256 _data) external override auth {
     require(live == 1, "Spotter/not-live");
-    if (what == "liquidationRatio") collateralPools[poolId].liquidationRatio = data;
-    else revert("Spotter/file-unrecognized-param");
+    collateralPools[_poolId].liquidationRatio = _data;
+    emit SetLiquidationRatio(msg.sender, _poolId, _data);
   }
 
   // --- Update value ---
