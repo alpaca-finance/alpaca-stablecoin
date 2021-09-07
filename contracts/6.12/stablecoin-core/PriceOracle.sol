@@ -122,7 +122,7 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     uint256 priceWithSafetyMargin = has
       ? rdiv(rdiv(mul(uint256(val), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
       : 0;
-    vat.file(poolId, "priceWithSafetyMargin", priceWithSafetyMargin);
+    vat.setPriceWithSafetyMargin(poolId, priceWithSafetyMargin);
     emit Poke(poolId, val, priceWithSafetyMargin);
   }
 
