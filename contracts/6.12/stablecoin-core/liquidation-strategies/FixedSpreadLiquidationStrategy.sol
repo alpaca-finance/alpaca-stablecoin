@@ -12,14 +12,15 @@ import "../../interfaces/IAuctioneer.sol";
 import "../../interfaces/IPriceFeed.sol";
 import "../../interfaces/IPriceOracle.sol";
 import "../../interfaces/ILiquidationEngine.sol";
-import "../../interfaces/ICalculator.sol";
+import "../../interfaces/ILiquidationStrategy.sol";
 import "../../interfaces/IFlashLendingCallee.sol";
 
 contract FixedSpreadLiquidationStrategy is
   OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  ILiquidationStrategy
 {
   struct CollateralPool {
     uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation [wad]
@@ -32,16 +33,15 @@ contract FixedSpreadLiquidationStrategy is
   ILiquidationEngine public liquidationEngine; // Liquidation module
   address public systemDebtEngine; // Recipient of dai raised in auctions
   IPriceOracle public priceOracle; // Collateral price module
-  mapping(bytes32 => CollateralPool) public override collateralPools;
+  mapping(bytes32 => CollateralPool) public collateralPools;
 
   event FixedSpreadLiquidate(
     bytes32 indexed collateralPoolId,
-    uint256 positionDebtShare,
-    uint256 positionCollateralAmount,
+    uint256 debtValueToRepay,
+    uint256 collateralAmountToBeLiquidatedWithIncentive,
     address indexed positionAddress,
     address indexed liquidatorAddress,
-    uint256 debtShareToRepay,
-    address indexed collateralRecipient
+    address collateralRecipient
   );
 
   // --- Init ---
@@ -120,7 +120,7 @@ contract FixedSpreadLiquidationStrategy is
     uint256 debtShareToRepay, // [wad]
     address collateralRecipient, // Receiver of collateral and external call address
     bytes calldata data // Data to pass in external call; if length 0, no call is done
-  ) external returns (uint256 id) {
+  ) external override {
     // Input validation
     require(positionDebtShare > 0, "CollateralAuctioneer/zero-debt");
     require(positionCollateralAmount > 0, "CollateralAuctioneer/zero-collateralAmount");
@@ -129,7 +129,7 @@ contract FixedSpreadLiquidationStrategy is
     // 1. Check if Close Factor is not exceeded
     CollateralPool memory collateralPool = collateralPools[collateralPoolId];
     require(
-      collateralPool.closeFactor > 0 &&
+      collateralPool.closeFactorBps > 0 &&
         wdiv(mul(positionDebtShare, collateralPool.closeFactorBps), 10000) >= debtShareToRepay
     );
 
@@ -138,19 +138,9 @@ contract FixedSpreadLiquidationStrategy is
     require(currentCollateralPrice > 0, "CollateralAuctioneer/zero-starting-price");
 
     // 3. Calculate collateral amount to be liquidated according to the current price and liquidator incentive
-    (, uint256 debtAccumulatedRate, , , uint256 debtFloor) = bookKeeper.collateralPools(collateralPoolId);
+    (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
     uint256 debtValueToRepay = mul(debtShareToRepay, debtAccumulatedRate);
-    uint256 collateralAmountToBeLiquidatedWithoutIncentive = wdiv(debtValueToRepay, currentCollateralPrice);
-    uint256 liquidatorIncentiveFees = wdiv(
-      mul(collateralAmountToBeLiquidatedWithoutIncentive, collateralPool.liquidatorIncentiveBps),
-      10000
-    );
-    uint256 treasuryFees = wdiv(mul(collateralAmountToBeLiquidatedWithoutIncentive, collateralPool.treasuryFeesBps), 10000);
-
-    uint256 collateralAmountToBeLiquidatedWithIncentive = add(
-      add(collateralAmountToBeLiquidatedWithoutIncentive, liquidatorIncentiveFees),
-      treasuryFees
-    );
+    uint256 collateralAmountToBeLiquidatedWithIncentive = 0;
 
     // 4. Confiscate position and give the collateral to the `collateralRecipient` address
     bookKeeper.confiscatePosition(
@@ -168,15 +158,11 @@ contract FixedSpreadLiquidationStrategy is
       collateralRecipient,
       collateralAmountToBeLiquidatedWithIncentive
     );
-
     // 5. Do external call (if data is defined) but to be
     // extremely careful we don't allow to do it to the two
     // contracts which the CollateralAuctioneer needs to be authorized
-    ILiquidationEngine liquidationEngine_ = liquidationEngine;
     if (
-      data.length > 0 &&
-      collateralRecipient != address(bookKeeper) &&
-      collateralRecipient != address(liquidationEngine_)
+      data.length > 0 && collateralRecipient != address(bookKeeper) && collateralRecipient != address(liquidationEngine)
     ) {
       IFlashLendingCallee(collateralRecipient).flashLendingCall(
         msg.sender,

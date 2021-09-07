@@ -205,46 +205,9 @@ contract LiquidationEngine is
           mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate),
         "LiquidationEngine/not-unsafe"
       );
-
-      // 2. Calculate maximum possible debt share that could be liquidated according to the close factor
-      maxDebtShareToBeLiquidated = mul(positionDebtShare, collateralPool.closeFactor);
-
-      // 3. Check if the `debtShareToRepay` exceeds `maxDebtShareToBeLiquidated`
-      require(debtShareToRepay <= maxDebtShareToBeLiquidated, "LiquidationEngine/repay-too-large");
     }
-    uint256 collateralAmountToBeLiquidated = mul(positionLockedCollateral, debtShareToRepay) / positionDebtShare;
 
-    require(collateralAmountToBeLiquidated > 0, "LiquidationEngine/null-auction");
-    require(
-      maxDebtShareToBeLiquidated <= 2**255 && collateralAmountToBeLiquidated <= 2**255,
-      "LiquidationEngine/overflow"
-    );
-
-    bookKeeper.confiscatePosition(
-      collateralPoolId,
-      positionAddress,
-      address(this),
-      address(systemDebtEngine),
-      -int256(collateralAmountToBeLiquidated),
-      -int256(debtShareToRepay)
-    );
-
-    // id = IAuctioneer(mcollateralPool.auctioneer).startAuction({
-    //   debt: debtValueToBeLiquidatedWithPenalty,
-    //   collateralAmount: collateralAmountToBeLiquidated,
-    //   positionAddress: positionAddress,
-    //   liquidatorAddress: liquidatorAddress
-    // });
-
-    // emit StartLiquidation(
-    //   collateralPoolId,
-    //   positionAddress,
-    //   collateralAmountToBeLiquidated,
-    //   debtShareToBeLiquidated,
-    //   debtValueToBeLiquidatedWithoutPenalty,
-    //   mcollateralPool.auctioneer,
-    //   id
-    // );
+    
   }
 
   function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override auth {

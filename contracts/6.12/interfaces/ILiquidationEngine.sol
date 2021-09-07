@@ -5,14 +5,7 @@ interface ILiquidationEngine {
 
   function removeRepaidDebtFromAuction(bytes32, uint256) external;
 
-  function collateralPools(bytes32)
-    external
-    returns (
-      address strategy,
-      uint256 closeFactor,
-      uint256 liquidatorIncentiveBps,
-      uint256 treasuryFeesBps
-    );
+  function collateralPools(bytes32) external returns (address);
 
   function cage() external;
 }

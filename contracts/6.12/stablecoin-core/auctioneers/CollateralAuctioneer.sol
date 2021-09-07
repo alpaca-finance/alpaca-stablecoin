@@ -52,7 +52,7 @@ contract CollateralAuctioneer is
     emit Deny(positionAddress);
   }
 
-  modifier auth {
+  modifier auth() {
     require(wards[msg.sender] == 1, "CollateralAuctioneer/not-authorized");
     _;
   }
@@ -154,7 +154,7 @@ contract CollateralAuctioneer is
   }
 
   // --- Synchronization ---
-  modifier lock {
+  modifier lock() {
     require(locked == 0, "CollateralAuctioneer/system-locked");
     locked = 1;
     _;
@@ -493,8 +493,8 @@ contract CollateralAuctioneer is
 
   // Public function to update the cached debtFloor*liquidationPenalty value.
   function updateMinimumRemainingDebt() external nonReentrant {
-    (, , , , uint256 _debtFloor) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId);
-    minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPoolId));
+    // (, , , , uint256 _debtFloor) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId);
+    // minimumRemainingDebt = wmul(_debtFloor, liquidationEngine.liquidationPenalty(collateralPoolId));
   }
 
   // Cancel an auction during Emergency Shutdown or via governance action.

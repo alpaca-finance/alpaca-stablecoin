@@ -162,7 +162,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Deny(usr);
   }
 
-  modifier auth {
+  modifier auth() {
     require(wards[msg.sender] == 1, "End/not-authorized");
     _;
   }
@@ -300,30 +300,30 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Cage(collateralPoolId);
   }
 
-  function snip(bytes32 collateralPoolId, uint256 id) external {
-    require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
+  // function snip(bytes32 collateralPoolId, uint256 id) external {
+  //   require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
 
-    (address _auctioneer, , , ) = liquidationEngine.collateralPools(collateralPoolId);
-    IAuctioneer auctioneer = IAuctioneer(_auctioneer);
-    (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
-    (, uint256 tab, uint256 lot, address usr, , ) = auctioneer.sales(id);
+  //   (address _auctioneer, , , ) = liquidationEngine.collateralPools(collateralPoolId);
+  //   IAuctioneer auctioneer = IAuctioneer(_auctioneer);
+  //   (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
+  //   (, uint256 tab, uint256 lot, address usr, , ) = auctioneer.sales(id);
 
-    bookKeeper.mintUnbackedStablecoin(address(systemDebtEngine), address(systemDebtEngine), tab);
-    auctioneer.yank(id);
+  //   bookKeeper.mintUnbackedStablecoin(address(systemDebtEngine), address(systemDebtEngine), tab);
+  //   auctioneer.yank(id);
 
-    uint256 debtShare = tab / debtAccumulatedRate;
-    totalDebtShare[collateralPoolId] = add(totalDebtShare[collateralPoolId], debtShare);
-    require(int256(lot) >= 0 && int256(debtShare) >= 0, "End/overflow");
-    bookKeeper.confiscatePosition(
-      collateralPoolId,
-      usr,
-      address(this),
-      address(systemDebtEngine),
-      int256(lot),
-      int256(debtShare)
-    );
-    emit Snip(collateralPoolId, id, usr, tab, lot, debtShare);
-  }
+  //   uint256 debtShare = tab / debtAccumulatedRate;
+  //   totalDebtShare[collateralPoolId] = add(totalDebtShare[collateralPoolId], debtShare);
+  //   require(int256(lot) >= 0 && int256(debtShare) >= 0, "End/overflow");
+  //   bookKeeper.confiscatePosition(
+  //     collateralPoolId,
+  //     usr,
+  //     address(this),
+  //     address(systemDebtEngine),
+  //     int256(lot),
+  //     int256(debtShare)
+  //   );
+  //   emit Snip(collateralPoolId, id, usr, tab, lot, debtShare);
+  // }
 
   function skim(bytes32 collateralPoolId, address urn) external {
     require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
