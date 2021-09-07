@@ -28,6 +28,14 @@ contract FixedSpreadLiquidationStrategy is
     uint256 treasuryFeesBps; // Percentage (BPS) of how much additional collateral will be transferred to the treasury
   }
 
+  struct LiquidationInfo {
+    uint256 debtValueToRepay;
+    uint256 collateralAmountToLiquidate;
+    uint256 liquidatorIncentiveFees;
+    uint256 treasuryFees;
+    uint256 collateralAmountToLiquidateWithAllFees;
+  }
+
   // --- Data ---
   IBookKeeper public bookKeeper; // Core CDP Engine
   ILiquidationEngine public liquidationEngine; // Liquidation module
@@ -38,7 +46,9 @@ contract FixedSpreadLiquidationStrategy is
   event FixedSpreadLiquidate(
     bytes32 indexed collateralPoolId,
     uint256 debtValueToRepay,
-    uint256 collateralAmountToBeLiquidatedWithIncentive,
+    uint256 collateralAmountToLiquidate,
+    uint256 liquidatorIncentiveFees,
+    uint256 treasuryFees,
     address indexed positionAddress,
     address indexed liquidatorAddress,
     address collateralRecipient
@@ -107,8 +117,36 @@ contract FixedSpreadLiquidationStrategy is
   function getFeedPrice(bytes32 collateralPoolId) internal returns (uint256 feedPrice) {
     (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
     (bytes32 val, bool has) = priceFeed.peek();
-    require(has, "CollateralAuctioneer/invalid-price");
+    require(has, "FixedSpreadLiquidationStrategy/invalid-price");
     feedPrice = rdiv(mul(uint256(val), BLN), priceOracle.stableCoinReferencePrice());
+  }
+
+  function calculateLiquidationInfo(
+    bytes32 collateralPoolId,
+    uint256 debtShareToRepay,
+    uint256 currentCollateralPrice,
+    uint256 positionCollateralAmount
+  ) internal returns (LiquidationInfo memory info) {
+    (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
+    info.debtValueToRepay = mul(debtShareToRepay, debtAccumulatedRate);
+    info.collateralAmountToLiquidate = wdiv(info.debtValueToRepay, currentCollateralPrice);
+    info.liquidatorIncentiveFees = wdiv(
+      mul(info.collateralAmountToLiquidate, collateralPools[collateralPoolId].liquidatorIncentiveBps),
+      10000
+    );
+    info.treasuryFees = wdiv(
+      mul(info.collateralAmountToLiquidate, collateralPools[collateralPoolId].treasuryFeesBps),
+      10000
+    );
+    info.collateralAmountToLiquidateWithAllFees = add(
+      add(info.collateralAmountToLiquidate, info.liquidatorIncentiveFees),
+      info.treasuryFees
+    );
+
+    require(
+      info.collateralAmountToLiquidateWithAllFees <= positionCollateralAmount,
+      "FixedSpreadLiquidationStrategy/liquidate-too-much"
+    );
   }
 
   function execute(
@@ -122,9 +160,9 @@ contract FixedSpreadLiquidationStrategy is
     bytes calldata data // Data to pass in external call; if length 0, no call is done
   ) external override {
     // Input validation
-    require(positionDebtShare > 0, "CollateralAuctioneer/zero-debt");
-    require(positionCollateralAmount > 0, "CollateralAuctioneer/zero-collateralAmount");
-    require(positionAddress != address(0), "CollateralAuctioneer/zero-positionAddress");
+    require(positionDebtShare > 0, "FixedSpreadLiquidationStrategy/zero-debt");
+    require(positionCollateralAmount > 0, "FixedSpreadLiquidationStrategy/zero-collateralAmount");
+    require(positionAddress != address(0), "FixedSpreadLiquidationStrategy/zero-positionAddress");
 
     // 1. Check if Close Factor is not exceeded
     CollateralPool memory collateralPool = collateralPools[collateralPoolId];
@@ -135,50 +173,60 @@ contract FixedSpreadLiquidationStrategy is
 
     // 2. Get current collateral price from Oracle
     uint256 currentCollateralPrice = getFeedPrice(collateralPoolId);
-    require(currentCollateralPrice > 0, "CollateralAuctioneer/zero-starting-price");
+    require(currentCollateralPrice > 0, "FixedSpreadLiquidationStrategy/zero-starting-price");
 
     // 3. Calculate collateral amount to be liquidated according to the current price and liquidator incentive
-    (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
-    uint256 debtValueToRepay = mul(debtShareToRepay, debtAccumulatedRate);
-    uint256 collateralAmountToBeLiquidatedWithIncentive = 0;
+    LiquidationInfo memory info = calculateLiquidationInfo(
+      collateralPoolId,
+      debtShareToRepay,
+      currentCollateralPrice,
+      positionCollateralAmount
+    );
 
-    // 4. Confiscate position and give the collateral to the `collateralRecipient` address
+    // 4. Confiscate position
     bookKeeper.confiscatePosition(
       collateralPoolId,
       positionAddress,
       address(this),
       address(systemDebtEngine),
-      -int256(collateralAmountToBeLiquidatedWithIncentive),
+      -int256(info.collateralAmountToLiquidateWithAllFees),
       -int256(debtShareToRepay)
     );
 
+    // 5. Give the collateral to the collateralRecipient
     bookKeeper.moveCollateral(
       collateralPoolId,
       address(this),
       collateralRecipient,
-      collateralAmountToBeLiquidatedWithIncentive
+      add(info.collateralAmountToLiquidate, info.liquidatorIncentiveFees)
     );
-    // 5. Do external call (if data is defined) but to be
+
+    // 6. Give the treasury fees to System Debt Engine to be stored as system surplus
+    bookKeeper.moveCollateral(collateralPoolId, address(this), systemDebtEngine, info.treasuryFees);
+
+    // 7. Do external call (if data is defined) but to be
     // extremely careful we don't allow to do it to the two
-    // contracts which the CollateralAuctioneer needs to be authorized
+    // contracts which the FixedSpreadLiquidationStrategy needs to be authorized
     if (
       data.length > 0 && collateralRecipient != address(bookKeeper) && collateralRecipient != address(liquidationEngine)
     ) {
       IFlashLendingCallee(collateralRecipient).flashLendingCall(
         msg.sender,
-        debtValueToRepay,
-        collateralAmountToBeLiquidatedWithIncentive,
+        info.debtValueToRepay,
+        add(info.collateralAmountToLiquidate, info.liquidatorIncentiveFees),
         data
       );
     }
 
-    // 6. Get Alpaca Stablecoin from the liquidator for debt repayment
-    bookKeeper.moveStablecoin(msg.sender, systemDebtEngine, debtValueToRepay);
+    // 8. Get Alpaca Stablecoin from the liquidator for debt repayment
+    bookKeeper.moveStablecoin(msg.sender, systemDebtEngine, info.debtValueToRepay);
 
     emit FixedSpreadLiquidate(
       collateralPoolId,
-      debtValueToRepay,
-      collateralAmountToBeLiquidatedWithIncentive,
+      info.debtValueToRepay,
+      info.collateralAmountToLiquidate,
+      info.liquidatorIncentiveFees,
+      info.treasuryFees,
       positionAddress,
       liquidatorAddress,
       collateralRecipient
