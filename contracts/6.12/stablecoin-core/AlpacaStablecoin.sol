@@ -17,37 +17,21 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "../interfaces/IStablecoin.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract AlpacaStablecoin is IStablecoin, OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
-  // --- Auth ---
-  mapping(address => uint256) public wards;
-
-  function rely(address guy) external auth {
-    wards[guy] = 1;
-  }
-
-  function deny(address guy) external auth {
-    wards[guy] = 0;
-  }
-
-  modifier auth {
-    require(wards[msg.sender] == 1, "AlpacaStablecoin/not-authorized");
-    _;
-  }
+contract AlpacaStablecoin is IStablecoin, AccessControl {
+  bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
   // --- ERC20 Data ---
-  string public constant name = "Alpaca USD Stablecoin";
-  string public constant symbol = "AUSD";
+  string public name; // Alpaca USD Stablecoin
+  string public symbol; // AUSD
   string public constant version = "1";
-  uint256 public constant override decimals = 18;
+  uint256 public override decimals = 18;
   uint256 public totalSupply;
 
   mapping(address => uint256) public override balanceOf;
@@ -71,21 +55,27 @@ contract AlpacaStablecoin is IStablecoin, OwnableUpgradeable, PausableUpgradeabl
   // bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address holder,address spender,uint256 nonce,uint256 expiry,bool allowed)");
   bytes32 public constant PERMIT_TYPEHASH = 0xea2aa0a1be11a07ed86d755c93467f4f82362b452371d1ba94d1715123511acb;
 
-  function initialize(uint256 chainId_) external initializer {
-    OwnableUpgradeable.__Ownable_init();
-    PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
+  constructor(
+    string memory _name,
+    string memory _symbol,
+    uint256 _chainId
+  ) public {
+    name = _name;
+    symbol = _symbol;
 
-    wards[msg.sender] = 1;
     DOMAIN_SEPARATOR = keccak256(
       abi.encode(
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
         keccak256(bytes(name)),
         keccak256(bytes(version)),
-        chainId_,
+        _chainId,
         address(this)
       )
     );
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
   }
 
   // --- Token ---
@@ -109,7 +99,9 @@ contract AlpacaStablecoin is IStablecoin, OwnableUpgradeable, PausableUpgradeabl
     return true;
   }
 
-  function mint(address usr, uint256 wad) external override auth {
+  function mint(address usr, uint256 wad) external override {
+    require(hasRole(MINTER_ROLE, msg.sender), "!minterRole");
+
     balanceOf[usr] = add(balanceOf[usr], wad);
     totalSupply = add(totalSupply, wad);
     emit Transfer(address(0), usr, wad);
@@ -160,14 +152,13 @@ contract AlpacaStablecoin is IStablecoin, OwnableUpgradeable, PausableUpgradeabl
     bytes32 r,
     bytes32 s
   ) external {
-    bytes32 digest =
-      keccak256(
-        abi.encodePacked(
-          "\x19\x01",
-          DOMAIN_SEPARATOR,
-          keccak256(abi.encode(PERMIT_TYPEHASH, holder, spender, nonce, expiry, allowed))
-        )
-      );
+    bytes32 digest = keccak256(
+      abi.encodePacked(
+        "\x19\x01",
+        DOMAIN_SEPARATOR,
+        keccak256(abi.encode(PERMIT_TYPEHASH, holder, spender, nonce, expiry, allowed))
+      )
+    );
 
     require(holder != address(0), "AlpacaStablecoin/invalid-address-0");
     require(holder == ecrecover(digest, v, r, s), "AlpacaStablecoin/invalid-permit");
