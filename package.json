@@ -23,6 +23,7 @@
     "test:alpacastablecoin": "hardhat test --no-compile ./test/units/stablecoin-core/AlpacaStablecoin.test.ts",
     "test:liquidationengine": "hardhat test --no-compile ./test/units/stablecoin-core/LiquidationEngine.test.ts",
     "test:systemdebtengine": "hardhat test --no-compile ./test/units/stablecoin-core/SystemDebtEngine.test.ts",
+    "test:pegstabilitymodule": "hardhat test --no-compile ./test/units/stablecoin-core/PegStabilityModule.test.ts",
     "coverage": "hardhat coverage",
     "solhint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
     "prettier:solidity": "./node_modules/.bin/prettier --write contracts/**/*.sol"
