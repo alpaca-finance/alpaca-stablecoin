@@ -4,6 +4,4 @@ interface ISystemDebtEngine {
   function pushToBadDebtQueue(uint256) external;
 
   function cage() external;
-
-  function setSurplusBuffer(uint256) external;
 }

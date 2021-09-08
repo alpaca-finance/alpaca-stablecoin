@@ -109,7 +109,7 @@ contract SystemDebtEngine is
   // --- Administration ---
   event SetSurplusBuffer(address indexed caller, uint256 data);
 
-  function setSurplusBuffer(uint256 _data) external override auth {
+  function setSurplusBuffer(uint256 _data) external auth {
     surplusBuffer = _data;
     emit SetSurplusBuffer(msg.sender, _data);
   }

@@ -162,17 +162,17 @@ contract StabilityFeeCollector is
   event SetSystemDebtEngine(address indexed caller, address data);
   event SetStabilityFeeRate(address indexed caller, bytes32 poolId, uint256 data);
 
-  function setGlobalStabilityFeeRate(uint256 _data) external override auth {
+  function setGlobalStabilityFeeRate(uint256 _data) external auth {
     globalStabilityFeeRate = _data;
     emit SetGlobalStabilityFeeRate(msg.sender, _data);
   }
 
-  function setSystemDebtEngine(address _data) external override auth {
+  function setSystemDebtEngine(address _data) external auth {
     systemDebtEngine = _data;
     emit SetSystemDebtEngine(msg.sender, _data);
   }
 
-  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _data) external override auth {
+  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _data) external auth {
     collateralPools[_collateralPool].stabilityFeeRate = _data;
     emit SetStabilityFeeRate(msg.sender, _collateralPool, _data);
   }

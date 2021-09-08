@@ -94,19 +94,19 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   event SetPriceFeed(address indexed caller, bytes32 poolId, address priceFeed);
   event SetLiquidationRatio(address indexed caller, bytes32 poolId, uint256 data);
 
-  function setStableCoinReferencePrice(uint256 _data) external override auth {
+  function setStableCoinReferencePrice(uint256 _data) external auth {
     require(live == 1, "Spotter/not-live");
     stableCoinReferencePrice = _data;
     emit SetStableCoinReferencePrice(msg.sender, _data);
   }
 
-  function setPriceFeed(bytes32 _poolId, address _priceFeed) external override auth {
+  function setPriceFeed(bytes32 _poolId, address _priceFeed) external auth {
     require(live == 1, "Spotter/not-live");
     collateralPools[_poolId].priceFeed = IPriceFeed(_priceFeed);
     emit SetPriceFeed(msg.sender, _poolId, _priceFeed);
   }
 
-  function setLiquidationRatio(bytes32 _poolId, uint256 _data) external override auth {
+  function setLiquidationRatio(bytes32 _poolId, uint256 _data) external auth {
     require(live == 1, "Spotter/not-live");
     collateralPools[_poolId].liquidationRatio = _data;
     emit SetLiquidationRatio(msg.sender, _poolId, _data);

@@ -47,13 +47,7 @@ interface IBookKeeper {
     int256
   ) external;
 
-  function setTotalDebtCeiling(uint256) external;
-
   function setPriceWithSafetyMargin(bytes32, uint256) external;
-
-  function setDebtCeiling(bytes32, uint256) external;
-
-  function setDebtFloor(bytes32, uint256) external;
 
   function stablecoin(address) external view returns (uint256);
 
