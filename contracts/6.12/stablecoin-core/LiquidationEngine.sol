@@ -28,6 +28,7 @@ import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IAuctioneer.sol";
 import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/ISystemDebtEngine.sol";
+import "../interfaces/ILiquidationStrategy.sol";
 
 contract LiquidationEngine is
   OwnableUpgradeable,
@@ -184,7 +185,8 @@ contract LiquidationEngine is
     bytes32 collateralPoolId,
     address positionAddress,
     address liquidatorAddress,
-    uint256 debtShareToRepay
+    uint256 debtShareToRepay,
+    bytes calldata data
   ) external nonReentrant returns (uint256 id) {
     require(live == 1, "LiquidationEngine/not-live");
 
@@ -193,7 +195,6 @@ contract LiquidationEngine is
       positionAddress
     );
     CollateralPool memory mcollateralPool = collateralPools[collateralPoolId];
-    uint256 maxDebtShareToBeLiquidated;
     uint256 debtAccumulatedRate;
     uint256 debtFloor;
     {
@@ -207,7 +208,17 @@ contract LiquidationEngine is
       );
     }
 
-    
+    (address collateralRecipient, bytes memory ext) = abi.decode(data, (address, bytes));
+    ILiquidationStrategy(mcollateralPool.strategy).execute(
+      collateralPoolId,
+      positionDebtShare,
+      positionLockedCollateral,
+      positionAddress,
+      liquidatorAddress,
+      debtShareToRepay,
+      collateralRecipient,
+      ext
+    );
   }
 
   function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override auth {
