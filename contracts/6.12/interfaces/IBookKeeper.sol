@@ -47,13 +47,7 @@ interface IBookKeeper {
     int256
   ) external;
 
-  function file(bytes32, uint256) external;
-
-  function file(
-    bytes32,
-    bytes32,
-    uint256
-  ) external;
+  function setPriceWithSafetyMargin(bytes32, uint256) external;
 
   function stablecoin(address) external view returns (uint256);
 

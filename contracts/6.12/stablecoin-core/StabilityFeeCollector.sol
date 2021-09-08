@@ -49,7 +49,7 @@ contract StabilityFeeCollector is
     whitelist[usr] = 0;
   }
 
-  modifier auth {
+  modifier auth() {
     require(whitelist[msg.sender] == 1, "StabilityFeeCollector/not-authorized");
     _;
   }
@@ -84,51 +84,51 @@ contract StabilityFeeCollector is
   ) internal pure returns (uint256 z) {
     assembly {
       switch x
+      case 0 {
+        switch n
         case 0 {
-          switch n
-            case 0 {
-              z := b
-            }
-            default {
-              z := 0
-            }
+          z := b
         }
         default {
-          switch mod(n, 2)
-            case 0 {
-              z := b
-            }
-            default {
-              z := x
-            }
-          let half := div(b, 2) // for rounding.
-          for {
-            n := div(n, 2)
-          } n {
-            n := div(n, 2)
-          } {
-            let xx := mul(x, x)
-            if iszero(eq(div(xx, x), x)) {
+          z := 0
+        }
+      }
+      default {
+        switch mod(n, 2)
+        case 0 {
+          z := b
+        }
+        default {
+          z := x
+        }
+        let half := div(b, 2) // for rounding.
+        for {
+          n := div(n, 2)
+        } n {
+          n := div(n, 2)
+        } {
+          let xx := mul(x, x)
+          if iszero(eq(div(xx, x), x)) {
+            revert(0, 0)
+          }
+          let xxRound := add(xx, half)
+          if lt(xxRound, xx) {
+            revert(0, 0)
+          }
+          x := div(xxRound, b)
+          if mod(n, 2) {
+            let zx := mul(z, x)
+            if and(iszero(iszero(x)), iszero(eq(div(zx, x), z))) {
               revert(0, 0)
             }
-            let xxRound := add(xx, half)
-            if lt(xxRound, xx) {
+            let zxRound := add(zx, half)
+            if lt(zxRound, zx) {
               revert(0, 0)
             }
-            x := div(xxRound, b)
-            if mod(n, 2) {
-              let zx := mul(z, x)
-              if and(iszero(iszero(x)), iszero(eq(div(zx, x), z))) {
-                revert(0, 0)
-              }
-              let zxRound := add(zx, half)
-              if lt(zxRound, zx) {
-                revert(0, 0)
-              }
-              z := div(zxRound, b)
-            }
+            z := div(zxRound, b)
           }
         }
+      }
     }
   }
 
@@ -158,24 +158,23 @@ contract StabilityFeeCollector is
     i.lastAccumulationTime = now;
   }
 
-  function file(
-    bytes32 collateralPool,
-    bytes32 what,
-    uint256 data
-  ) external auth {
-    _collect(collateralPool);
-    if (what == "stabilityFeeRate") collateralPools[collateralPool].stabilityFeeRate = data;
-    else revert("StabilityFeeCollector/file-unrecognized-param");
+  event SetGlobalStabilityFeeRate(address indexed caller, uint256 data);
+  event SetSystemDebtEngine(address indexed caller, address data);
+  event SetStabilityFeeRate(address indexed caller, bytes32 poolId, uint256 data);
+
+  function setGlobalStabilityFeeRate(uint256 _data) external auth {
+    globalStabilityFeeRate = _data;
+    emit SetGlobalStabilityFeeRate(msg.sender, _data);
   }
 
-  function file(bytes32 what, uint256 data) external auth {
-    if (what == "globalStabilityFeeRate") globalStabilityFeeRate = data;
-    else revert("StabilityFeeCollector/file-unrecognized-param");
+  function setSystemDebtEngine(address _data) external auth {
+    systemDebtEngine = _data;
+    emit SetSystemDebtEngine(msg.sender, _data);
   }
 
-  function file(bytes32 what, address data) external auth {
-    if (what == "systemDebtEngine") systemDebtEngine = data;
-    else revert("StabilityFeeCollector/file-unrecognized-param");
+  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _data) external auth {
+    collateralPools[_collateralPool].stabilityFeeRate = _data;
+    emit SetStabilityFeeRate(msg.sender, _collateralPool, _data);
   }
 
   // --- Stability Fee Collection ---
