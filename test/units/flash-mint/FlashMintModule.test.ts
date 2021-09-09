@@ -59,20 +59,84 @@ describe("FlashMintModule", () => {
   // Accounts
   let deployer: Signer
   let alice: Signer
-  let bob: Signer
-  let dev: Signer
+
+  // Account Addresses
+  let deployerAddress: string
+  let aliceAddress: string
 
   // Contracts
-  let flashMintModule: FlashMintModule
   let mockAlpacaStablecoin: MockContract
   let mockERC20: MockContract
   let mockMyFashLoan: MockContract
   let mockBookKeeper: MockContract
   let mockStablecoinAdapter: MockContract
 
+  let flashMintModule: FlashMintModule
+  let flashMintModuleAsAlice: FlashMintModule
+
   beforeEach(async () => {
     ;({ flashMintModule, mockAlpacaStablecoin, mockMyFashLoan, mockERC20, mockBookKeeper, mockStablecoinAdapter } =
       await waffle.loadFixture(loadFixtureHandler))
+    ;[deployer, alice] = await ethers.getSigners()
+    ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
+
+    flashMintModuleAsAlice = FlashMintModule__factory.connect(flashMintModule.address, alice) as FlashMintModule
+  })
+  describe("#setMax", () => {
+    context("when the caller is not the owner", () => {
+      it("should be revert", async () => {
+        await expect(flashMintModuleAsAlice.setMax(WeiPerWad.mul(100))).to.be.revertedWith("!ownerRole")
+      })
+    })
+    context("when the caller is the owner", () => {
+      it("should be able setMax", async () => {
+        const maxBefore = await flashMintModule.max()
+        expect(maxBefore).to.be.equal(0)
+
+        await expect(flashMintModule.setMax(WeiPerWad.mul(100)))
+          .to.be.emit(flashMintModule, "SetMax")
+          .withArgs(WeiPerWad.mul(100))
+
+        const maxAfter = await flashMintModule.max()
+        expect(maxAfter).to.be.equal(WeiPerWad.mul(100))
+      })
+    })
+  })
+  describe("#setToll", () => {
+    context("when the caller is not the owner", () => {
+      it("should be revert", async () => {
+        await expect(flashMintModuleAsAlice.setToll(WeiPerWad.div(10))).to.be.revertedWith("!ownerRole")
+      })
+    })
+    context("when the caller is the owner", () => {
+      it("should be able setToll", async () => {
+        const maxBefore = await flashMintModule.toll()
+        expect(maxBefore).to.be.equal(0)
+
+        await expect(flashMintModule.setToll(WeiPerWad.div(10)))
+          .to.be.emit(flashMintModule, "SetToll")
+          .withArgs(WeiPerWad.div(10))
+
+        const maxAfter = await flashMintModule.toll()
+        expect(maxAfter).to.be.equal(WeiPerWad.div(10))
+      })
+    })
+  })
+  describe("#flashFee", () => {
+    context("when token invalid", () => {
+      it("should be revert", async () => {
+        expect(flashMintModule.flashFee(mockERC20.address, WeiPerWad.mul(10))).to.be.revertedWith(
+          "FlashMintModule/token-unsupported"
+        )
+      })
+    })
+    context("when token valid", () => {
+      it("should be able to call flashFee", async () => {
+        flashMintModule.setToll(WeiPerWad.div(10))
+        const fee = await flashMintModule.flashFee(mockAlpacaStablecoin.address, WeiPerWad.mul(10))
+        expect(fee).to.be.equal(WeiPerWad)
+      })
+    })
   })
   describe("#flashLoan", () => {
     context("when invalid token", () => {
