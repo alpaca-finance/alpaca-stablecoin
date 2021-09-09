@@ -3,12 +3,17 @@ import { Signer, BigNumber } from "ethers"
 import chai from "chai"
 import { MockProvider, solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import { BookKeeper__factory, BookKeeper, StabilityFeeCollector__factory, StabilityFeeCollector } from "../../typechain"
+import {
+  BookKeeper__factory,
+  BookKeeper,
+  StabilityFeeCollector__factory,
+  StabilityFeeCollector,
+} from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 
-import * as TimeHelpers from "../helper/time"
-import * as AssertHelpers from "../helper/assert"
-import * as UnitHelpers from "../helper/unit"
+import * as TimeHelpers from "../../helper/time"
+import * as AssertHelpers from "../../helper/assert"
+import * as UnitHelpers from "../../helper/unit"
 
 chai.use(solidity)
 const { expect } = chai
@@ -94,9 +99,8 @@ describe("StabilityFeeCollector", () => {
         // rate ~ 1% annually
         // r^31536000 = 1.01
         // r =~ 1000000000315522921573372069...
-        await stabilityFeeCollector["file(bytes32,bytes32,uint256)"](
+        await stabilityFeeCollector.setStabilityFeeRate(
           formatBytes32String("BNB"),
-          formatBytes32String("stabilityFeeRate"),
           BigNumber.from("1000000000315522921573372069")
         )
 
@@ -125,6 +129,74 @@ describe("StabilityFeeCollector", () => {
           calls[0].debtAccumulatedRate.toString(),
           BigNumber.from("10000000000000000000000000").toString()
         )
+      })
+    })
+  })
+
+  describe("#setGlobalStabilityFeeRate", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(stabilityFeeCollectorAsAlice.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad)).to.be.revertedWith(
+          "StabilityFeeCollector/not-authorized"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setGlobalStabilityFeeRate", async () => {
+        // init BNB pool
+        await stabilityFeeCollector.init(formatBytes32String("BNB"))
+
+        await expect(stabilityFeeCollector.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad))
+          .to.emit(stabilityFeeCollector, "SetGlobalStabilityFeeRate")
+          .withArgs(deployerAddress, UnitHelpers.WeiPerWad)
+      })
+    })
+  })
+
+  describe("#setSystemDebtEngine", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(stabilityFeeCollectorAsAlice.setSystemDebtEngine(mockedBookKeeper.address)).to.be.revertedWith(
+          "StabilityFeeCollector/not-authorized"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setSystemDebtEngine", async () => {
+        // init BNB pool
+        await stabilityFeeCollector.init(formatBytes32String("BNB"))
+
+        await expect(stabilityFeeCollector.setSystemDebtEngine(mockedBookKeeper.address))
+          .to.emit(stabilityFeeCollector, "SetSystemDebtEngine")
+          .withArgs(deployerAddress, mockedBookKeeper.address)
+      })
+    })
+  })
+
+  describe("#setStabilityFeeRate", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(
+          stabilityFeeCollectorAsAlice.setStabilityFeeRate(
+            formatBytes32String("BNB"),
+            BigNumber.from("1000000000315522921573372069")
+          )
+        ).to.be.revertedWith("StabilityFeeCollector/not-authorized")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setStabilityFeeRate", async () => {
+        // init BNB pool
+        await stabilityFeeCollector.init(formatBytes32String("BNB"))
+
+        await expect(
+          stabilityFeeCollector.setStabilityFeeRate(
+            formatBytes32String("BNB"),
+            BigNumber.from("1000000000315522921573372069")
+          )
+        )
+          .to.emit(stabilityFeeCollector, "SetStabilityFeeRate")
+          .withArgs(deployerAddress, formatBytes32String("BNB"), BigNumber.from("1000000000315522921573372069"))
       })
     })
   })

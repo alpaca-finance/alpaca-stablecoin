@@ -44,7 +44,7 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     whitelist[usr] = 0;
   }
 
-  modifier auth {
+  modifier auth() {
     require(whitelist[msg.sender] == 1, "BookKeeper/not-authorized");
     _;
   }
@@ -145,22 +145,33 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     collateralPools[collateralPoolId].debtAccumulatedRate = 10**27;
   }
 
-  function file(bytes32 what, uint256 data) external override auth {
+  event SetTotalDebtCeiling(address indexed caller, uint256 data);
+  event SetPriceWithSafetyMargin(address indexed caller, bytes32 collateralPoolId, uint256 data);
+  event SetDebtCeiling(address indexed caller, bytes32 collateralPoolId, uint256 data);
+  event SetDebtFloor(address indexed caller, bytes32 collateralPoolId, uint256 data);
+
+  function setTotalDebtCeiling(uint256 _data) external auth {
     require(live == 1, "BookKeeper/not-live");
-    if (what == "totalDebtCeiling") totalDebtCeiling = data;
-    else revert("BookKeeper/file-unrecognized-param");
+    totalDebtCeiling = _data;
+    emit SetTotalDebtCeiling(msg.sender, _data);
   }
 
-  function file(
-    bytes32 collateralPoolId,
-    bytes32 what,
-    uint256 data
-  ) external override auth {
+  function setPriceWithSafetyMargin(bytes32 _collateralPoolId, uint256 _data) external override auth {
     require(live == 1, "BookKeeper/not-live");
-    if (what == "priceWithSafetyMargin") collateralPools[collateralPoolId].priceWithSafetyMargin = data;
-    else if (what == "debtCeiling") collateralPools[collateralPoolId].debtCeiling = data;
-    else if (what == "debtFloor") collateralPools[collateralPoolId].debtFloor = data;
-    else revert("BookKeeper/file-unrecognized-param");
+    collateralPools[_collateralPoolId].priceWithSafetyMargin = _data;
+    emit SetPriceWithSafetyMargin(msg.sender, _collateralPoolId, _data);
+  }
+
+  function setDebtCeiling(bytes32 _collateralPoolId, uint256 _data) external auth {
+    require(live == 1, "BookKeeper/not-live");
+    collateralPools[_collateralPoolId].debtCeiling = _data;
+    emit SetDebtCeiling(msg.sender, _collateralPoolId, _data);
+  }
+
+  function setDebtFloor(bytes32 _collateralPoolId, uint256 _data) external auth {
+    require(live == 1, "BookKeeper/not-live");
+    collateralPools[_collateralPoolId].debtFloor = _data;
+    emit SetDebtFloor(msg.sender, _collateralPoolId, _data);
   }
 
   function cage() external override auth {

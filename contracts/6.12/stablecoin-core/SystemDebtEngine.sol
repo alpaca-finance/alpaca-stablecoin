@@ -55,7 +55,7 @@ contract SystemDebtEngine is
     whitelist[usr] = 0;
   }
 
-  modifier auth {
+  modifier auth() {
     require(whitelist[msg.sender] == 1, "SystemDebtEngine/not-authorized");
     _;
   }
@@ -111,22 +111,11 @@ contract SystemDebtEngine is
   }
 
   // --- Administration ---
-  function file(bytes32 what, uint256 data) external auth {
-    if (what == "badDebtAuctionDelay") badDebtAuctionDelay = data;
-    else if (what == "surplusAuctionFixedLotSize") surplusAuctionFixedLotSize = data;
-    else if (what == "badDebtFixedBidSize") badDebtFixedBidSize = data;
-    else if (what == "alpacaInitialLotSizeForBadDebt") alpacaInitialLotSizeForBadDebt = data;
-    else if (what == "surplusBuffer") surplusBuffer = data;
-    else revert("SystemDebtEngine/file-unrecognized-param");
-  }
+  event SetSurplusBuffer(address indexed caller, uint256 data);
 
-  function file(bytes32 what, address data) external auth {
-    if (what == "surplusAuctionHouse") {
-      bookKeeper.nope(address(surplusAuctionHouse));
-      surplusAuctionHouse = ISurplusAuctioneer(data);
-      bookKeeper.hope(data);
-    } else if (what == "badDebtAuctionHouse") badDebtAuctionHouse = IBadDebtAuctioneer(data);
-    else revert("SystemDebtEngine/file-unrecognized-param");
+  function setSurplusBuffer(uint256 _data) external auth {
+    surplusBuffer = _data;
+    emit SetSurplusBuffer(msg.sender, _data);
   }
 
   // Push to debt-queue
