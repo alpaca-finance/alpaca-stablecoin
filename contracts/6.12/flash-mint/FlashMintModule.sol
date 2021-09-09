@@ -16,7 +16,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
@@ -28,7 +27,6 @@ import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IBookKeeper.sol";
 
 contract FlashMintModule is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   IERC3156FlashLender,
@@ -37,7 +35,7 @@ contract FlashMintModule is
   // --- Auth ---
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
-  modifier auth {
+  modifier onlyOwner {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     _;
   }
@@ -57,8 +55,6 @@ contract FlashMintModule is
     keccak256("BookKeeperStablecoinFlashBorrower.onBookKeeperStablecoinFlashLoan");
 
   // --- Events ---
-  event Rely(address indexed usr);
-  event Deny(address indexed usr);
   event SetMax(uint256 data);
   event SetFeeRate(uint256 data);
   event FlashLoan(address indexed receiver, address token, uint256 amount, uint256 fee);
@@ -98,13 +94,13 @@ contract FlashMintModule is
   }
 
   // --- Administration ---
-  function setMax(uint256 data) external auth {
+  function setMax(uint256 data) external onlyOwner {
     // Add an upper limit of 10^27 Stablecoin to avoid breaking technical assumptions of Stablecoin << 2^256 - 1
     require((max = data) <= RAD, "FlashMintModule/ceiling-too-high");
     emit SetMax(data);
   }
 
-  function setFeeRate(uint256 data) external auth {
+  function setFeeRate(uint256 data) external onlyOwner {
     feeRate = data;
     emit SetFeeRate(data);
   }
