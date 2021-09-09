@@ -16,6 +16,7 @@
 
 pragma solidity 0.6.12;
 
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "../interfaces/IERC3156FlashLender.sol";
 import "../interfaces/IERC3156FlashBorrower.sol";
 import "../interfaces/IBookKeeperStablecoinFlashLender.sol";
@@ -23,21 +24,12 @@ import "../interfaces/IStablecoin.sol";
 import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IBookKeeper.sol";
 
-contract FlashMintModule is IERC3156FlashLender, IBookKeeperStablecoinFlashLender {
+contract FlashMintModule is IERC3156FlashLender, IBookKeeperStablecoinFlashLender, AccessControl {
   // --- Auth ---
-  function rely(address usr) external auth {
-    wards[usr] = 1;
-    emit Rely(usr);
-  }
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
-  function deny(address usr) external auth {
-    wards[usr] = 0;
-    emit Deny(usr);
-  }
-
-  mapping(address => uint256) public wards;
   modifier auth {
-    require(wards[msg.sender] == 1, "FlashMintModule/not-authorized");
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     _;
   }
 
@@ -72,8 +64,7 @@ contract FlashMintModule is IERC3156FlashLender, IBookKeeperStablecoinFlashLende
 
   // --- Init ---
   constructor(address stablecoinAdapter_, address systemDebtEngine_) public {
-    wards[msg.sender] = 1;
-    emit Rely(msg.sender);
+    _setupRole(OWNER_ROLE, msg.sender);
 
     IBookKeeper bookKeeper_ = bookKeeper = IBookKeeper(IStablecoinAdapter(stablecoinAdapter_).bookKeeper());
     stablecoinAdapter = IStablecoinAdapter(stablecoinAdapter_);
