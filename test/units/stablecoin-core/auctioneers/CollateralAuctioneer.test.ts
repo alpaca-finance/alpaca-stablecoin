@@ -23,6 +23,8 @@ type fixture = {
   mockedLiquidationEngine: MockContract
   mockedPriceFeed: MockContract
   mockedLinearDecrease: MockContract
+  mockedPositionManager: MockContract
+  mockedIbTokenAdapter: MockContract
 }
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
@@ -43,6 +45,12 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   // Deploy mocked LinearDecrease
   const mockedLinearDecrease = await smockit(await ethers.getContractFactory("LinearDecrease", deployer))
 
+  // Deploy mocked PositionManager
+  const mockedPositionManager = await smockit(await ethers.getContractFactory("PositionManager", deployer))
+
+  // Deploy mocked IbTokenAdapter
+  const mockedIbTokenAdapter = await smockit(await ethers.getContractFactory("IbTokenAdapter", deployer))
+
   // Deploy CollateralAuctioneer
   const CollateralAuctioneer = (await ethers.getContractFactory(
     "CollateralAuctioneer",
@@ -53,6 +61,8 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     mockedPriceOracle.address,
     mockedLiquidationEngine.address,
     formatBytes32String("BTCB"),
+    mockedPositionManager.address,
+    mockedIbTokenAdapter.address,
   ])) as CollateralAuctioneer
   await collateralAuctioneer.deployed()
 
@@ -62,7 +72,9 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     mockedBookKeeper.address,
     mockedPriceOracle.address,
     mockedLiquidationEngine.address,
-    formatBytes32String("BTCB")
+    formatBytes32String("BTCB"),
+    mockedPositionManager.address,
+    mockedIbTokenAdapter.address
   )
   await modifiableCollateralAuctioneer.deployed()
 
@@ -74,6 +86,8 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     mockedLiquidationEngine,
     mockedPriceFeed,
     mockedLinearDecrease,
+    mockedIbTokenAdapter,
+    mockedPositionManager,
   }
 }
 
@@ -102,6 +116,9 @@ describe("CollateralAuctioneer", () => {
   let mockedLiquidationEngine: MockContract
   let mockedPriceFeed: MockContract
   let mockedLinearDecrease: MockContract
+  let mockedPositionManager: MockContract
+  let mockedIbTokenAdapter: MockContract
+
   let collateralAuctioneerAsAlice: CollateralAuctioneer
   let collateralAuctioneerAsBob: CollateralAuctioneer
 
@@ -114,6 +131,8 @@ describe("CollateralAuctioneer", () => {
       mockedLiquidationEngine,
       mockedPriceFeed,
       mockedLinearDecrease,
+      mockedIbTokenAdapter,
+      mockedPositionManager,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, liquidator] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, liquidatorAddress] = await Promise.all([
@@ -230,6 +249,8 @@ describe("CollateralAuctioneer", () => {
           mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
 
+          mockedPositionManager.smocked.mapPositionHandlerToOwner.will.return.with(deployerAddress)
+
           await expect(collateralAuctioneer.startAuction(debt, collateralAmount, positionAddress, liquidatorAddress))
             .to.emit(collateralAuctioneer, "Kick")
             .withArgs(One, startingPrice, debt, collateralAmount, positionAddress, liquidatorAddress, prize)
@@ -243,6 +264,19 @@ describe("CollateralAuctioneer", () => {
 
           const { calls: stableCoinReferencePriceCalls } = mockedPriceOracle.smocked.stableCoinReferencePrice
           expect(stableCoinReferencePriceCalls.length).to.be.equal(1)
+
+          const { calls: positionManagerCalls } = mockedPositionManager.smocked.mapPositionHandlerToOwner
+          expect(positionManagerCalls.length).to.be.eq(1)
+          expect(positionManagerCalls[0][0]).to.be.eq(positionAddress)
+
+          const { calls: ibTokenAdapterCalls } = mockedIbTokenAdapter.smocked.onMoveCollateral
+          expect(ibTokenAdapterCalls.length).to.be.eq(1)
+          expect(ibTokenAdapterCalls[0].source).to.be.eq(positionAddress)
+          expect(ibTokenAdapterCalls[0].destination).to.be.eq(collateralAuctioneer.address)
+          expect(ibTokenAdapterCalls[0].wad).to.be.eq(collateralAmount)
+          expect(ibTokenAdapterCalls[0].data).to.be.eq(
+            ethers.utils.defaultAbiCoder.encode(["address"], [deployerAddress])
+          )
 
           const id = await collateralAuctioneer.kicks()
           expect(id).to.be.equal(1)

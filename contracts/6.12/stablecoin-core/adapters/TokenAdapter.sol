@@ -84,7 +84,7 @@ contract TokenAdapter is
 
   IBookKeeper public bookKeeper; // CDP Engine
   bytes32 public override collateralPoolId; // Collateral Type
-  IToken public override collateralToken;
+  address public override collateralToken;
   uint256 public override decimals;
   uint256 public live; // Active Flag
 
@@ -102,8 +102,8 @@ contract TokenAdapter is
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
-    collateralToken = IToken(collateralToken_);
-    decimals = collateralToken.decimals();
+    collateralToken = collateralToken_;
+    decimals = IToken(collateralToken).decimals();
   }
 
   function cage() external override auth {
