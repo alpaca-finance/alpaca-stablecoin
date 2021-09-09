@@ -7,7 +7,7 @@ contract MockPriceFeed is IPriceFeed {
     return 0;
   }
 
-  function peek() external override returns (bytes32, bool) {
+  function peek() external view override returns (bytes32, bool) {
     return (0, true);
   }
 }
