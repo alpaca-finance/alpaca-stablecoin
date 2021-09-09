@@ -36,6 +36,11 @@ contract LiquidationEngine is
   ReentrancyGuardUpgradeable,
   ILiquidationEngine
 {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant AUCTIONEER_ROLE = keccak256("AUCTIONEER_ROLE");
+  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
+
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
@@ -49,7 +54,7 @@ contract LiquidationEngine is
     emit Deny(usr);
   }
 
-  modifier auth {
+  modifier auth() {
     require(whitelist[msg.sender] == 1, "LiquidationEngine/not-authorized");
     _;
   }
@@ -103,6 +108,10 @@ contract LiquidationEngine is
     live = 1;
     whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -190,8 +199,10 @@ contract LiquidationEngine is
   ) external nonReentrant returns (uint256 id) {
     require(live == 1, "LiquidationEngine/not-live");
 
-    (uint256 positionLockedCollateral, uint256 positionDebtShare) =
-      bookKeeper.positions(collateralPoolId, positionAddress);
+    (uint256 positionLockedCollateral, uint256 positionDebtShare) = bookKeeper.positions(
+      collateralPoolId,
+      positionAddress
+    );
     CollateralPool memory mcollateralPool = collateralPools[collateralPoolId];
     uint256 debtShareToBeLiquidated;
     uint256 debtAccumulatedRate;
@@ -213,11 +224,10 @@ contract LiquidationEngine is
           mcollateralPool.liquidationMaxSize > mcollateralPool.stablecoinNeededForDebtRepay,
         "LiquidationEngine/liquidation-limit-hit"
       );
-      uint256 room =
-        min(
-          liquidationMaxSize - stablecoinNeededForDebtRepay,
-          mcollateralPool.liquidationMaxSize - mcollateralPool.stablecoinNeededForDebtRepay
-        );
+      uint256 room = min(
+        liquidationMaxSize - stablecoinNeededForDebtRepay,
+        mcollateralPool.liquidationMaxSize - mcollateralPool.stablecoinNeededForDebtRepay
+      );
 
       // uint256.max()/(RAD*WAD) = 115,792,089,237,316
       debtShareToBeLiquidated = min(
@@ -270,8 +280,10 @@ contract LiquidationEngine is
     {
       // Avoid stack too deep
       // This calcuation will overflow if debtShareToBeLiquidated*debtAccumulatedRate exceeds ~10^14
-      uint256 debtValueToBeLiquidatedWithPenalty =
-        mul(debtValueToBeLiquidatedWithoutPenalty, mcollateralPool.liquidationPenalty) / WAD;
+      uint256 debtValueToBeLiquidatedWithPenalty = mul(
+        debtValueToBeLiquidatedWithoutPenalty,
+        mcollateralPool.liquidationPenalty
+      ) / WAD;
       stablecoinNeededForDebtRepay = add(stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
       collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = add(
         mcollateralPool.stablecoinNeededForDebtRepay,
@@ -297,7 +309,8 @@ contract LiquidationEngine is
     );
   }
 
-  function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override auth {
+  function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override {
+    require(hasRole(AUCTIONEER_ROLE, msg.sender), "!auctioneerRole");
     stablecoinNeededForDebtRepay = sub(stablecoinNeededForDebtRepay, rad);
     collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = sub(
       collateralPools[collateralPoolId].stablecoinNeededForDebtRepay,
@@ -306,8 +319,23 @@ contract LiquidationEngine is
     emit RemoveRepaidDebtFromAuction(collateralPoolId, rad);
   }
 
-  function cage() external override auth {
+  function cage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!ownerRole or !showStopperRole"
+    );
     live = 0;
     emit Cage();
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    _unpause();
   }
 }

@@ -38,6 +38,9 @@ contract StabilityFeeCollector is
   ReentrancyGuardUpgradeable,
   IStabilityFeeCollector
 {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
@@ -74,6 +77,10 @@ contract StabilityFeeCollector is
 
     whitelist[msg.sender] = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -151,7 +158,9 @@ contract StabilityFeeCollector is
   }
 
   // --- Administration ---
-  function init(bytes32 collateralPool) external auth {
+  function init(bytes32 collateralPool) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+
     CollateralPool storage i = collateralPools[collateralPool];
     require(i.stabilityFeeRate == 0, "StabilityFeeCollector/collateralPool-already-init");
     i.stabilityFeeRate = ONE;
@@ -162,17 +171,20 @@ contract StabilityFeeCollector is
   event SetSystemDebtEngine(address indexed caller, address data);
   event SetStabilityFeeRate(address indexed caller, bytes32 poolId, uint256 data);
 
-  function setGlobalStabilityFeeRate(uint256 _data) external auth {
+  function setGlobalStabilityFeeRate(uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     globalStabilityFeeRate = _data;
     emit SetGlobalStabilityFeeRate(msg.sender, _data);
   }
 
-  function setSystemDebtEngine(address _data) external auth {
+  function setSystemDebtEngine(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     systemDebtEngine = _data;
     emit SetSystemDebtEngine(msg.sender, _data);
   }
 
-  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _data) external auth {
+  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     collateralPools[_collateralPool].stabilityFeeRate = _data;
     emit SetStabilityFeeRate(msg.sender, _collateralPool, _data);
   }
@@ -195,5 +207,16 @@ contract StabilityFeeCollector is
     );
     bookKeeper.accrueStabilityFee(collateralPool, systemDebtEngine, diff(rate, prev));
     collateralPools[collateralPool].lastAccumulationTime = now;
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    _unpause();
   }
 }

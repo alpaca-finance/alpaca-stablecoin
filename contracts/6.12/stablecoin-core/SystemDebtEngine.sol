@@ -39,6 +39,11 @@ contract SystemDebtEngine is
   ReentrancyGuardUpgradeable,
   ISystemDebtEngine
 {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant LIQUIDATION_ENGINE_ROLE = keccak256("LIQUIDATION_ENGINE_ROLE");
+  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
+
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
@@ -91,6 +96,10 @@ contract SystemDebtEngine is
     badDebtAuctionHouse = IBadDebtAuctioneer(badDebtAuctionHouse_);
     bookKeeper.hope(surplusAuctionHouse_);
     live = 1;
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -109,13 +118,15 @@ contract SystemDebtEngine is
   // --- Administration ---
   event SetSurplusBuffer(address indexed caller, uint256 data);
 
-  function setSurplusBuffer(uint256 _data) external auth {
+  function setSurplusBuffer(uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     surplusBuffer = _data;
     emit SetSurplusBuffer(msg.sender, _data);
   }
 
   // Push to debt-queue
-  function pushToBadDebtQueue(uint256 tab) external override auth {
+  function pushToBadDebtQueue(uint256 tab) external override {
+    require(hasRole(LIQUIDATION_ENGINE_ROLE, msg.sender), "!liquidationEngineRole");
     badDebtQueue[now] = add(badDebtQueue[now], tab);
     totalBadDebtValue = add(totalBadDebtValue, tab);
   }
@@ -170,7 +181,11 @@ contract SystemDebtEngine is
     id = surplusAuctionHouse.startAuction(surplusAuctionFixedLotSize, 0);
   }
 
-  function cage() external override auth {
+  function cage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!ownerRole or ! showStopperRole"
+    );
     require(live == 1, "SystemDebtEngine/not-live");
     live = 0;
     totalBadDebtValue = 0;
@@ -178,5 +193,16 @@ contract SystemDebtEngine is
     surplusAuctionHouse.cage(bookKeeper.stablecoin(address(surplusAuctionHouse)));
     badDebtAuctionHouse.cage();
     bookKeeper.settleSystemBadDebt(min(bookKeeper.stablecoin(address(this)), bookKeeper.systemBadDebt(address(this))));
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    _unpause();
   }
 }
