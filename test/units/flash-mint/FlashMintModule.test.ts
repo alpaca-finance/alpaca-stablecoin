@@ -47,10 +47,10 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
 
   // Deploy mocked FlashMintModule
   const FlashMintModule = (await ethers.getContractFactory("FlashMintModule", deployer)) as FlashMintModule__factory
-  const flashMintModule = (await FlashMintModule.deploy(
+  const flashMintModule = (await upgrades.deployProxy(FlashMintModule, [
     mockStablecoinAdapter.address,
-    mockSystemDebtEngine.address
-  )) as FlashMintModule
+    mockSystemDebtEngine.address,
+  ])) as FlashMintModule
 
   return { flashMintModule, mockAlpacaStablecoin, mockMyFashLoan, mockERC20, mockBookKeeper, mockStablecoinAdapter }
 }
@@ -102,22 +102,22 @@ describe("FlashMintModule", () => {
       })
     })
   })
-  describe("#setToll", () => {
+  describe("#setFeeRate", () => {
     context("when the caller is not the owner", () => {
       it("should be revert", async () => {
-        await expect(flashMintModuleAsAlice.setToll(WeiPerWad.div(10))).to.be.revertedWith("!ownerRole")
+        await expect(flashMintModuleAsAlice.setFeeRate(WeiPerWad.div(10))).to.be.revertedWith("!ownerRole")
       })
     })
     context("when the caller is the owner", () => {
-      it("should be able setToll", async () => {
-        const maxBefore = await flashMintModule.toll()
+      it("should be able setFeeRate", async () => {
+        const maxBefore = await flashMintModule.feeRate()
         expect(maxBefore).to.be.equal(0)
 
-        await expect(flashMintModule.setToll(WeiPerWad.div(10)))
-          .to.be.emit(flashMintModule, "SetToll")
+        await expect(flashMintModule.setFeeRate(WeiPerWad.div(10)))
+          .to.be.emit(flashMintModule, "SetFeeRate")
           .withArgs(WeiPerWad.div(10))
 
-        const maxAfter = await flashMintModule.toll()
+        const maxAfter = await flashMintModule.feeRate()
         expect(maxAfter).to.be.equal(WeiPerWad.div(10))
       })
     })
@@ -132,7 +132,7 @@ describe("FlashMintModule", () => {
     })
     context("when token valid", () => {
       it("should be able to call flashFee", async () => {
-        flashMintModule.setToll(WeiPerWad.div(10))
+        flashMintModule.setFeeRate(WeiPerWad.div(10))
         const fee = await flashMintModule.flashFee(mockAlpacaStablecoin.address, WeiPerWad.mul(10))
         expect(fee).to.be.equal(WeiPerWad)
       })
@@ -166,7 +166,7 @@ describe("FlashMintModule", () => {
     context("when callback failed", () => {
       it("should be revert", async () => {
         await flashMintModule.setMax(WeiPerWad.mul(100))
-        await flashMintModule.setToll(WeiPerWad.div(10))
+        await flashMintModule.setFeeRate(WeiPerWad.div(10))
         await expect(
           flashMintModule.flashLoan(
             mockMyFashLoan.address,
@@ -180,7 +180,7 @@ describe("FlashMintModule", () => {
     context("when parameters are valid", () => {
       it("should be able to call flashLoan", async () => {
         await flashMintModule.setMax(WeiPerWad.mul(100))
-        await flashMintModule.setToll(WeiPerWad.div(10))
+        await flashMintModule.setFeeRate(WeiPerWad.div(10))
         mockMyFashLoan.smocked.onFlashLoan.will.return.with(keccak256(toUtf8Bytes("ERC3156FlashBorrower.onFlashLoan")))
         await expect(
           flashMintModule.flashLoan(
@@ -235,7 +235,7 @@ describe("FlashMintModule", () => {
     context("when callback failed", () => {
       it("should be revert", async () => {
         await flashMintModule.setMax(WeiPerWad.mul(100))
-        await flashMintModule.setToll(WeiPerWad.div(10))
+        await flashMintModule.setFeeRate(WeiPerWad.div(10))
         await expect(
           flashMintModule.bookKeeperStablecoinFlashLoan(
             mockMyFashLoan.address,
@@ -248,7 +248,7 @@ describe("FlashMintModule", () => {
     context("when insufficient fee", () => {
       it("should be revert", async () => {
         await flashMintModule.setMax(WeiPerWad.mul(100))
-        await flashMintModule.setToll(WeiPerWad.div(10))
+        await flashMintModule.setFeeRate(WeiPerWad.div(10))
         mockMyFashLoan.smocked.onBookKeeperStablecoinFlashLoan.will.return.with(
           keccak256(toUtf8Bytes("BookKeeperStablecoinFlashBorrower.onBookKeeperStablecoinFlashLoan"))
         )

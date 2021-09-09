@@ -16,7 +16,10 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+
 import "../interfaces/IERC3156FlashLender.sol";
 import "../interfaces/IERC3156FlashBorrower.sol";
 import "../interfaces/IBookKeeperStablecoinFlashLender.sol";
@@ -24,7 +27,13 @@ import "../interfaces/IStablecoin.sol";
 import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IBookKeeper.sol";
 
-contract FlashMintModule is IERC3156FlashLender, IBookKeeperStablecoinFlashLender, AccessControl {
+contract FlashMintModule is
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  IERC3156FlashLender,
+  IBookKeeperStablecoinFlashLender
+{
   // --- Auth ---
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
@@ -34,13 +43,13 @@ contract FlashMintModule is IERC3156FlashLender, IBookKeeperStablecoinFlashLende
   }
 
   // --- Data ---
-  IBookKeeper public immutable bookKeeper;
-  IStablecoinAdapter public immutable stablecoinAdapter;
-  IStablecoin public immutable stablecoin;
-  address public immutable systemDebtEngine; // systemDebtEngine intentionally set immutable to save gas
+  IBookKeeper public bookKeeper;
+  IStablecoinAdapter public stablecoinAdapter;
+  IStablecoin public stablecoin;
+  address public systemDebtEngine; // systemDebtEngine intentionally set immutable to save gas
 
   uint256 public max; // Maximum borrowable stablecoin  [wad]
-  uint256 public toll; // Fee                     [wad = 100%]
+  uint256 public feeRate; // Fee                     [wad = 100%]
   uint256 private locked; // Reentrancy guard
 
   bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
@@ -51,7 +60,7 @@ contract FlashMintModule is IERC3156FlashLender, IBookKeeperStablecoinFlashLende
   event Rely(address indexed usr);
   event Deny(address indexed usr);
   event SetMax(uint256 data);
-  event SetToll(uint256 data);
+  event SetFeeRate(uint256 data);
   event FlashLoan(address indexed receiver, address token, uint256 amount, uint256 fee);
   event BookKeeperStablecoinFlashLoan(address indexed receiver, uint256 amount, uint256 fee);
 
@@ -63,7 +72,7 @@ contract FlashMintModule is IERC3156FlashLender, IBookKeeperStablecoinFlashLende
   }
 
   // --- Init ---
-  constructor(address stablecoinAdapter_, address systemDebtEngine_) public {
+  function initialize(address stablecoinAdapter_, address systemDebtEngine_) external initializer {
     _setupRole(OWNER_ROLE, msg.sender);
 
     IBookKeeper bookKeeper_ = bookKeeper = IBookKeeper(IStablecoinAdapter(stablecoinAdapter_).bookKeeper());
@@ -95,9 +104,9 @@ contract FlashMintModule is IERC3156FlashLender, IBookKeeperStablecoinFlashLende
     emit SetMax(data);
   }
 
-  function setToll(uint256 data) external auth {
-    toll = data;
-    emit SetToll(data);
+  function setFeeRate(uint256 data) external auth {
+    feeRate = data;
+    emit SetFeeRate(data);
   }
 
   // --- ERC 3156 Spec ---
@@ -112,7 +121,7 @@ contract FlashMintModule is IERC3156FlashLender, IBookKeeperStablecoinFlashLende
   function flashFee(address token, uint256 amount) external view override returns (uint256) {
     require(token == address(stablecoin), "FlashMintModule/token-unsupported");
 
-    return _mul(amount, toll) / WAD;
+    return _mul(amount, feeRate) / WAD;
   }
 
   function flashLoan(
@@ -125,7 +134,7 @@ contract FlashMintModule is IERC3156FlashLender, IBookKeeperStablecoinFlashLende
     require(amount <= max, "FlashMintModule/ceiling-exceeded");
 
     uint256 amt = _mul(amount, RAY);
-    uint256 fee = _mul(amount, toll) / WAD;
+    uint256 fee = _mul(amount, feeRate) / WAD;
     uint256 total = _add(amount, fee);
 
     bookKeeper.mintUnbackedStablecoin(address(this), address(this), amt);
@@ -154,7 +163,7 @@ contract FlashMintModule is IERC3156FlashLender, IBookKeeperStablecoinFlashLende
     require(amount <= _mul(max, RAY), "FlashMintModule/ceiling-exceeded");
 
     uint256 prev = bookKeeper.stablecoin(address(this));
-    uint256 fee = _mul(amount, toll) / WAD;
+    uint256 fee = _mul(amount, feeRate) / WAD;
 
     bookKeeper.mintUnbackedStablecoin(address(this), address(receiver), amount);
 
