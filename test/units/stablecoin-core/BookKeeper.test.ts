@@ -537,14 +537,10 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 1 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad)
 
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             await expect(
               bookKeeper.adjustPosition(
@@ -563,14 +559,10 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
 
             // set total debt ceiling 1 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad)
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad)
 
             await expect(
               bookKeeper.adjustPosition(
@@ -590,20 +582,12 @@ describe("BookKeeper", () => {
           // initialize BNB colleteral pool
           await bookKeeper.init(formatBytes32String("BNB"))
           // set pool debt ceiling 10 rad
-          await bookKeeper["file(bytes32,bytes32,uint256)"](
-            formatBytes32String("BNB"),
-            formatBytes32String("debtCeiling"),
-            WeiPerRad.mul(10)
-          )
+          await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
           // set price with safety margin 1 ray
-          await bookKeeper["file(bytes32,bytes32,uint256)"](
-            formatBytes32String("BNB"),
-            formatBytes32String("priceWithSafetyMargin"),
-            WeiPerRay
-          )
+          await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
 
           // set total debt ceiling 10 rad
-          await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+          await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
           await expect(
             bookKeeper.adjustPosition(
@@ -623,20 +607,12 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
 
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             // add collateral to 10 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), bobAddress, WeiPerWad.mul(10))
@@ -667,20 +643,12 @@ describe("BookKeeper", () => {
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
               // set pool debt ceiling 10 rad
-              await bookKeeper["file(bytes32,bytes32,uint256)"](
-                formatBytes32String("BNB"),
-                formatBytes32String("debtCeiling"),
-                WeiPerRad.mul(10)
-              )
+              await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
               // set price with safety margin 1 ray
-              await bookKeeper["file(bytes32,bytes32,uint256)"](
-                formatBytes32String("BNB"),
-                formatBytes32String("priceWithSafetyMargin"),
-                WeiPerRay
-              )
+              await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
 
               // set total debt ceiling 10 rad
-              await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+              await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
               // add collateral to 10 BNB
               await bookKeeper.addCollateral(formatBytes32String("BNB"), bobAddress, WeiPerWad.mul(10))
@@ -729,20 +697,12 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
 
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             // add collateral to 10 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -787,26 +747,14 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 20 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtFloor"),
-              WeiPerRad.mul(20)
-            )
+            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(20))
 
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             // add collateral to 10 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -841,20 +789,12 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
 
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             // add collateral to 10 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -909,25 +849,13 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 5 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtFloor"),
-              WeiPerRad.mul(5)
-            )
+            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(5))
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             // add collateral to 10 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -976,25 +904,13 @@ describe("BookKeeper", () => {
           // initialize BNB colleteral pool
           await bookKeeper.init(formatBytes32String("BNB"))
           // set pool debt ceiling 10 rad
-          await bookKeeper["file(bytes32,bytes32,uint256)"](
-            formatBytes32String("BNB"),
-            formatBytes32String("debtCeiling"),
-            WeiPerRad.mul(10)
-          )
+          await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
           // set price with safety margin 1 ray
-          await bookKeeper["file(bytes32,bytes32,uint256)"](
-            formatBytes32String("BNB"),
-            formatBytes32String("priceWithSafetyMargin"),
-            WeiPerRay
-          )
+          await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
           // set position debt floor 1 rad
-          await bookKeeper["file(bytes32,bytes32,uint256)"](
-            formatBytes32String("BNB"),
-            formatBytes32String("debtFloor"),
-            WeiPerRad.mul(1)
-          )
+          await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
           // set total debt ceiling 10 rad
-          await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+          await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
           // add collateral to 10 BNB
           await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -1026,25 +942,13 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtFloor"),
-              WeiPerRad.mul(1)
-            )
+            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             // add collateral to 10 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -1078,25 +982,13 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtFloor"),
-              WeiPerRad.mul(1)
-            )
+            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             // add collateral to 10 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -1130,25 +1022,13 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtFloor"),
-              WeiPerRad.mul(2)
-            )
+            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(2))
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             // add collateral to 10 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -1182,25 +1062,13 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtFloor"),
-              WeiPerRad.mul(2)
-            )
+            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(2))
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             // add collateral to 10 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -1234,25 +1102,13 @@ describe("BookKeeper", () => {
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtFloor"),
-              WeiPerRad.mul(1)
-            )
+            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             // add collateral to 10 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -1321,25 +1177,13 @@ describe("BookKeeper", () => {
             // init BNB pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtFloor"),
-              WeiPerRad.mul(1)
-            )
+            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 1 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad)
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad)
 
             // add collateral to 1 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad)
@@ -1399,25 +1243,13 @@ describe("BookKeeper", () => {
             // init BNB pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtCeiling"),
-              WeiPerRad.mul(10)
-            )
+            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("priceWithSafetyMargin"),
-              WeiPerRay
-            )
+            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper["file(bytes32,bytes32,uint256)"](
-              formatBytes32String("BNB"),
-              formatBytes32String("debtFloor"),
-              WeiPerRad.mul(1)
-            )
+            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 10 rad
-            await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad.mul(10))
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
             // add collateral to 2 BNB
             await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(2))
@@ -1565,25 +1397,13 @@ describe("BookKeeper", () => {
           // init BNB pool
           await bookKeeper.init(formatBytes32String("BNB"))
           // set pool debt ceiling 10 rad
-          await bookKeeper["file(bytes32,bytes32,uint256)"](
-            formatBytes32String("BNB"),
-            formatBytes32String("debtCeiling"),
-            WeiPerRad.mul(10)
-          )
+          await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
           // set price with safety margin 1 ray
-          await bookKeeper["file(bytes32,bytes32,uint256)"](
-            formatBytes32String("BNB"),
-            formatBytes32String("priceWithSafetyMargin"),
-            WeiPerRay
-          )
+          await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
           // set position debt floor 1 rad
-          await bookKeeper["file(bytes32,bytes32,uint256)"](
-            formatBytes32String("BNB"),
-            formatBytes32String("debtFloor"),
-            WeiPerRad.mul(1)
-          )
+          await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
           // set total debt ceiling 1 rad
-          await bookKeeper["file(bytes32,uint256)"](formatBytes32String("totalDebtCeiling"), WeiPerRad)
+          await bookKeeper.setTotalDebtCeiling(WeiPerRad)
 
           // add collateral to 1 BNB
           await bookKeeper.addCollateral(formatBytes32String("BNB"), deployerAddress, WeiPerWad)
@@ -1612,6 +1432,126 @@ describe("BookKeeper", () => {
           expect(stablecoinDeployerAfter).to.be.equal(WeiPerRad.mul(2))
           const totalStablecoinIssuedAfter = await bookKeeper.totalStablecoinIssued()
           expect(totalStablecoinIssuedAfter).to.be.equal(WeiPerRad.mul(2))
+        })
+      })
+    })
+  })
+
+  describe("#setTotalDebtCeiling", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(bookKeeperAsAlice.setTotalDebtCeiling(WeiPerRad)).to.be.revertedWith("BookKeeper/not-authorized")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when bookkeeper does not live", () => {
+        it("should be revert", async () => {
+          bookKeeper.cage()
+
+          await expect(bookKeeper.setTotalDebtCeiling(WeiPerRad)).to.be.revertedWith("BookKeeper/not-live")
+        })
+      })
+      context("when bookkeeper is live", () => {
+        it("should be able to call setTotalDebtCeiling", async () => {
+          // init BNB pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+          // set total debt ceiling 1 rad
+          await expect(bookKeeper.setTotalDebtCeiling(WeiPerRad))
+            .to.emit(bookKeeper, "SetTotalDebtCeiling")
+            .withArgs(deployerAddress, WeiPerRad)
+        })
+      })
+    })
+  })
+
+  describe("#setPriceWithSafetyMargin", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(
+          bookKeeperAsAlice.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+        ).to.be.revertedWith("BookKeeper/not-authorized")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when bookkeeper does not live", () => {
+        it("should be revert", async () => {
+          bookKeeper.cage()
+
+          await expect(bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
+            "BookKeeper/not-live"
+          )
+        })
+      })
+      context("when bookkeeper is live", () => {
+        it("should be able to call setPriceWithSafetyMargin", async () => {
+          // init BNB pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+          // set total debt ceiling 1 rad
+          await expect(bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay))
+            .to.emit(bookKeeper, "SetPriceWithSafetyMargin")
+            .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
+        })
+      })
+    })
+  })
+
+  describe("#setDebtCeiling", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(bookKeeperAsAlice.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
+          "BookKeeper/not-authorized"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when bookkeeper does not live", () => {
+        it("should be revert", async () => {
+          bookKeeper.cage()
+
+          await expect(bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
+            "BookKeeper/not-live"
+          )
+        })
+      })
+      context("when bookkeeper is live", () => {
+        it("should be able to call setDebtCeiling", async () => {
+          // init BNB pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+          // set total debt ceiling 1 rad
+          await expect(bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay))
+            .to.emit(bookKeeper, "SetDebtCeiling")
+            .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
+        })
+      })
+    })
+  })
+
+  describe("#setDebtFloor", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(bookKeeperAsAlice.setDebtFloor(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
+          "BookKeeper/not-authorized"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when bookkeeper does not live", () => {
+        it("should be revert", async () => {
+          bookKeeper.cage()
+
+          await expect(bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
+            "BookKeeper/not-live"
+          )
+        })
+      })
+      context("when bookkeeper is live", () => {
+        it("should be able to call setDebtFloor", async () => {
+          // init BNB pool
+          await bookKeeper.init(formatBytes32String("BNB"))
+          // set total debt ceiling 1 rad
+          await expect(bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRay))
+            .to.emit(bookKeeper, "SetDebtFloor")
+            .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
         })
       })
     })

@@ -1,7 +1,7 @@
-import { ethers, upgrades, waffle } from "hardhat"
+import { ethers, waffle } from "hardhat"
 import { Signer } from "ethers"
 import chai from "chai"
-import { MockProvider, solidity } from "ethereum-waffle"
+import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
 import { AlpacaStablecoin__factory, AlpacaStablecoin } from "../../../typechain"
 import { signDaiPermit } from "eth-permit"
@@ -22,7 +22,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   // Deploy mocked BookKeeper
   const AlpacaStablecoin = (await ethers.getContractFactory("AlpacaStablecoin", deployer)) as AlpacaStablecoin__factory
-  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [31337])) as AlpacaStablecoin
+  const alpacaStablecoin = await AlpacaStablecoin.deploy("Alpaca USD", "AUSD", "31337")
   await alpacaStablecoin.deployed()
 
   return { alpacaStablecoin }
@@ -67,6 +67,7 @@ describe("AlpacaStablecoin", () => {
       context("when alice has enough token", () => {
         context("when the caller is not the owner", async () => {
           it("should revert", async () => {
+            await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), deployerAddress)
             await alpacaStablecoin.mint(aliceAddress, WeiPerWad.mul(100))
             await expect(
               alpacaStablecoin.transferFrom(aliceAddress, bobAddress, WeiPerWad.mul(100))
@@ -75,6 +76,7 @@ describe("AlpacaStablecoin", () => {
           context("when Alice set allowance", () => {
             context("when allowance is not enough", () => {
               it("should revert", async () => {
+                await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), deployerAddress)
                 await alpacaStablecoin.mint(aliceAddress, WeiPerWad.mul(100))
                 await alpacaStablecoinAsAlice.approve(deployerAddress, WeiPerWad)
                 await expect(
@@ -84,6 +86,8 @@ describe("AlpacaStablecoin", () => {
             })
             context("when allowance is enough", () => {
               it("should be able to call transferFrom", async () => {
+                await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), deployerAddress)
+
                 await alpacaStablecoin.mint(aliceAddress, WeiPerWad.mul(100))
                 await alpacaStablecoinAsAlice.approve(deployerAddress, WeiPerWad.mul(100))
 
@@ -110,6 +114,7 @@ describe("AlpacaStablecoin", () => {
         })
         context("when the caller is the owner", () => {
           it("should be able to call transferFrom", async () => {
+            await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), deployerAddress)
             await alpacaStablecoin.mint(aliceAddress, WeiPerWad.mul(100))
 
             const alpacaStablecoinAliceBefore = await alpacaStablecoin.balanceOf(aliceAddress)
@@ -148,13 +153,12 @@ describe("AlpacaStablecoin", () => {
   context("#mint", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
-        await expect(alpacaStablecoinAsAlice.mint(aliceAddress, WeiPerWad.mul(100))).to.be.revertedWith(
-          "AlpacaStablecoin/not-authorized"
-        )
+        await expect(alpacaStablecoin.mint(aliceAddress, WeiPerWad.mul(100))).to.be.revertedWith("!minterRole")
       })
     })
     context("when the caller is the owner", async () => {
       it("should be able to call mint", async () => {
+        await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), deployerAddress)
         const alpacaStablecoinAliceBefore = await alpacaStablecoin.balanceOf(aliceAddress)
         expect(alpacaStablecoinAliceBefore).to.be.equal(0)
         const totalSupplyBefore = await alpacaStablecoin.totalSupply()
@@ -184,6 +188,7 @@ describe("AlpacaStablecoin", () => {
     context("when alice has enough token", () => {
       context("when the caller is not the owner", async () => {
         it("should revert", async () => {
+          await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), deployerAddress)
           await alpacaStablecoin.mint(aliceAddress, WeiPerWad.mul(100))
           await expect(alpacaStablecoin.burn(aliceAddress, WeiPerWad.mul(100))).to.be.revertedWith(
             "AlpacaStablecoin/insufficient-allowance"
@@ -192,6 +197,7 @@ describe("AlpacaStablecoin", () => {
         context("when Alice set allowance", () => {
           context("when allowance is not enough", () => {
             it("should revert", async () => {
+              await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), deployerAddress)
               await alpacaStablecoin.mint(aliceAddress, WeiPerWad.mul(100))
               await alpacaStablecoinAsAlice.approve(deployerAddress, WeiPerWad)
               await expect(alpacaStablecoin.burn(aliceAddress, WeiPerWad.mul(100))).to.be.revertedWith(
@@ -201,6 +207,7 @@ describe("AlpacaStablecoin", () => {
           })
           context("when allowance is enough", () => {
             it("should be able to call burn", async () => {
+              await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), deployerAddress)
               await alpacaStablecoin.mint(aliceAddress, WeiPerWad.mul(100))
               await alpacaStablecoinAsAlice.approve(deployerAddress, WeiPerWad.mul(100))
 
@@ -227,6 +234,7 @@ describe("AlpacaStablecoin", () => {
       })
       context("when the caller is the owner", () => {
         it("should be able to call burn", async () => {
+          await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), deployerAddress)
           await alpacaStablecoin.mint(aliceAddress, WeiPerWad.mul(100))
 
           const alpacaStablecoinAliceBefore = await alpacaStablecoin.balanceOf(aliceAddress)
