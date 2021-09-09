@@ -8,17 +8,21 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IVault.sol";
 
-contract IbTokenPriceFeed is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IPriceFeed {
+contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPriceFeed {
   using SafeMath for uint256;
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
   IPriceFeed public baseTokenSource;
   IVault public vault;
 
   // --- Init ---
   function initialize(address _vault, address _baseTokenSource) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+
+    // Grant the contract deployer OWNER role: it will be able
+    // to grant and revoke any roles afterward
+    _setupRole(OWNER_ROLE, msg.sender);
 
     vault = IVault(_vault);
     baseTokenSource = IPriceFeed(_baseTokenSource);

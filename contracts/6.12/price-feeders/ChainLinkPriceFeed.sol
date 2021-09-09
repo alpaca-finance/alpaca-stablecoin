@@ -8,16 +8,20 @@ import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
 
 import "../interfaces/IPriceFeed.sol";
 
-contract ChainLinkPriceFeed is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IPriceFeed {
+contract ChainLinkPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPriceFeed {
   using SafeMath for uint256;
 
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   AggregatorV3Interface public source;
 
   // --- Init ---
   function initialize(address _source) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+
+    // Grant the contract deployer OWNER role: it will be able
+    // to grant and revoke any roles afterward
+    _setupRole(OWNER_ROLE, msg.sender);
 
     source = AggregatorV3Interface(_source);
   }
