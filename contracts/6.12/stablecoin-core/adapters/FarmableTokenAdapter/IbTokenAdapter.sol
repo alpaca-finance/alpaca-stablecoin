@@ -25,7 +25,6 @@ import "../../../utils/SafeToken.sol";
 
 import "./BaseFarmableTokenAdapter.sol";
 
-import "hardhat/console.sol";
 
 /// @title IbTokenAdapter is the adapter that inherited BaseFarmableTokenAdapter.
 /// It receives Alpaca's ibTOKEN from users and deposit in Alpaca's FairLaunch.
