@@ -19,7 +19,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -35,7 +34,6 @@ import "../interfaces/IStabilityFeeCollector.sol";
 */
 
 contract StabilityFeeCollector is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
@@ -196,7 +194,7 @@ contract StabilityFeeCollector is
   */
   /// @param _collateralPool Collateral pool id
   /// @param _data the rate [ray]
-  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _data) external {
+  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _data) external whenNotPaused {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     collateralPools[_collateralPool].stabilityFeeRate = _data;
     emit SetStabilityFeeRate(msg.sender, _collateralPool, _data);
@@ -209,7 +207,7 @@ contract StabilityFeeCollector is
       the global and per-pool stability fee rates with respect to the last block that `collect` was called.
   */
   /// @param collateralPool Collateral pool id
-  function collect(bytes32 collateralPool) external override nonReentrant returns (uint256 rate) {
+  function collect(bytes32 collateralPool) external override whenNotPaused nonReentrant returns (uint256 rate) {
     rate = _collect(collateralPool);
   }
 

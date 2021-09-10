@@ -296,7 +296,7 @@ contract LiquidationEngine is
   /// @dev Remove debt from the system when it is already paid by the liquidator
   /// @param collateralPoolId Collateral pool id
   /// @param rad The debt value to be removed
-  function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override {
+  function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override whenNotPaused {
     require(hasRole(AUCTIONEER_ROLE, msg.sender), "!auctioneerRole");
     stablecoinNeededForDebtRepay = sub(stablecoinNeededForDebtRepay, rad);
     collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = sub(
@@ -309,7 +309,7 @@ contract LiquidationEngine is
   function cage() external override {
     require(
       hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
-      "!ownerRole or !showStopperRole"
+      "!(ownerRole or showStopperRole)"
     );
     live = 0;
     emit Cage();
@@ -317,12 +317,12 @@ contract LiquidationEngine is
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
     _unpause();
   }
 }

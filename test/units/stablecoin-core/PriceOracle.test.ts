@@ -281,7 +281,7 @@ describe("PriceOracle", () => {
   describe("#pause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(priceOracleAsAlice.pause()).to.be.revertedWith("!ownerRole or !govRole")
+        await expect(priceOracleAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
 
@@ -306,9 +306,11 @@ describe("PriceOracle", () => {
         await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), deployerAddress)
         await priceOracle.pause()
 
-        await expect(priceOracle.setStableCoinReferencePrice(10 ** 10))
-          .to.emit(priceOracle, "SetStableCoinReferencePrice")
-          .withArgs(deployerAddress, 10 ** 10)
+        mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(One), false])
+        await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
+
+        mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
+        await expect(priceOracle.poke(formatBytes32String("BNB"))).to.be.revertedWith("Pausable: paused")
       })
     })
   })
@@ -316,7 +318,7 @@ describe("PriceOracle", () => {
   describe("#unpause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(priceOracleAsAlice.unpause()).to.be.revertedWith("!ownerRole or !govRole")
+        await expect(priceOracleAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
 
@@ -348,9 +350,21 @@ describe("PriceOracle", () => {
         // unpause contract
         await priceOracle.unpause()
 
-        await expect(priceOracle.setStableCoinReferencePrice(10 ** 10))
-          .to.emit(priceOracle, "SetStableCoinReferencePrice")
-          .withArgs(deployerAddress, 10 ** 10)
+        mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(One), false])
+        await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
+
+        mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
+        await expect(priceOracle.poke(formatBytes32String("BNB")))
+          .to.emit(priceOracle, "Poke")
+          .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(One), 0)
+
+        const { calls: peek } = mockedPriceFeed.smocked.peek
+        const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
+        expect(peek.length).to.be.equal(1)
+
+        expect(setPriceWithSafetyMargin.length).to.be.equal(1)
+        expect(setPriceWithSafetyMargin[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(setPriceWithSafetyMargin[0]._data).to.be.equal(BigNumber.from("0"))
       })
     })
   })
@@ -358,7 +372,7 @@ describe("PriceOracle", () => {
   describe("#cage", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(priceOracleAsAlice.cage()).to.be.revertedWith("!ownerRole or !showStopperRole")
+        await expect(priceOracleAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
 

@@ -147,6 +147,8 @@ import "../interfaces/ISystemDebtEngine.sol";
 */
 
 contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
   ILiquidationEngine public liquidationEngine;
@@ -203,6 +205,10 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     live = 1;
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
     emit Rely(msg.sender);
   }
 
@@ -236,21 +242,45 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
   }
 
   // --- Administration ---
-  function file(bytes32 what, address data) external {
+  event SetBookKeeper(address indexed caller, address data);
+  event SetLiquidationEngine(address indexed caller, address data);
+  event SetSystemDebtEngine(address indexed caller, address data);
+  event SetPriceOracle(address indexed caller, address data);
+  event SetWait(address indexed caller, uint256 data);
+
+  function setBookKeeper(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "End/not-live");
-    if (what == "bookKeeper") bookKeeper = IBookKeeper(data);
-    else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
-    else if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
-    else if (what == "priceOracle") priceOracle = IPriceOracle(data);
-    else revert("End/file-unrecognized-param");
-    emit File(what, data);
+    bookKeeper = IBookKeeper(_data);
+    emit SetBookKeeper(msg.sender, _data);
   }
 
-  function file(bytes32 what, uint256 data) external {
+  function setLiquidationEngine(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "End/not-live");
-    if (what == "wait") wait = data;
-    else revert("End/file-unrecognized-param");
-    emit File(what, data);
+    liquidationEngine = ILiquidationEngine(_data);
+    emit SetLiquidationEngine(msg.sender, _data);
+  }
+
+  function setSystemDebtEngine(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(live == 1, "End/not-live");
+    systemDebtEngine = ISystemDebtEngine(_data);
+    emit SetSystemDebtEngine(msg.sender, _data);
+  }
+
+  function setPriceOracle(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(live == 1, "End/not-live");
+    priceOracle = IPriceOracle(_data);
+    emit SetPriceOracle(msg.sender, _data);
+  }
+
+  function setWait(uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(live == 1, "End/not-live");
+    wait = _data;
+    emit SetWait(msg.sender, _data);
   }
 
   // --- Settlement ---
@@ -262,6 +292,7 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
       - PriceOracle will be paused: no new price update, no liquidation trigger
    */
   function cage() external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "End/not-live");
     live = 0;
     when = block.timestamp;
@@ -275,6 +306,7 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
   /// @dev Set the cage price of the collateral pool with the latest price from the price oracle
   /// @param collateralPoolId Collateral pool id
   function cage(bytes32 collateralPoolId) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 0, "End/still-live");
     require(cagePrice[collateralPoolId] == 0, "End/cagePrice-collateralPoolId-already-defined");
     (totalDebtShare[collateralPoolId], , , , ) = bookKeeper.collateralPools(collateralPoolId);

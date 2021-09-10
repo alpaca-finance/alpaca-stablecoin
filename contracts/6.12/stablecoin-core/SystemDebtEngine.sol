@@ -46,23 +46,6 @@ contract SystemDebtEngine is
   bytes32 public constant LIQUIDATION_ENGINE_ROLE = keccak256("LIQUIDATION_ENGINE_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
-  // --- Auth ---
-  mapping(address => uint256) public whitelist;
-
-  function rely(address usr) external auth {
-    require(live == 1, "SystemDebtEngine/not-live");
-    whitelist[usr] = 1;
-  }
-
-  function deny(address usr) external auth {
-    whitelist[usr] = 0;
-  }
-
-  modifier auth() {
-    require(whitelist[msg.sender] == 1, "SystemDebtEngine/not-authorized");
-    _;
-  }
-
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
   ISurplusAuctioneer public surplusAuctionHouse; // Surplus Auction House
@@ -91,7 +74,6 @@ contract SystemDebtEngine is
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    whitelist[msg.sender] = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     surplusAuctionHouse = ISurplusAuctioneer(surplusAuctionHouse_);
     badDebtAuctionHouse = IBadDebtAuctioneer(badDebtAuctionHouse_);
@@ -119,21 +101,21 @@ contract SystemDebtEngine is
   // --- Administration ---
   event SetSurplusBuffer(address indexed caller, uint256 data);
 
-  function setSurplusBuffer(uint256 _data) external {
+  function setSurplusBuffer(uint256 _data) external whenNotPaused {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     surplusBuffer = _data;
     emit SetSurplusBuffer(msg.sender, _data);
   }
 
   // Push to debt-queue
-  function pushToBadDebtQueue(uint256 tab) external override {
+  function pushToBadDebtQueue(uint256 tab) external override whenNotPaused {
     require(hasRole(LIQUIDATION_ENGINE_ROLE, msg.sender), "!liquidationEngineRole");
     badDebtQueue[now] = add(badDebtQueue[now], tab);
     totalBadDebtValue = add(totalBadDebtValue, tab);
   }
 
   // Pop from debt-queue
-  function popFromBadDebtQueue(uint256 timestamp) external nonReentrant {
+  function popFromBadDebtQueue(uint256 timestamp) external whenNotPaused nonReentrant {
     require(add(timestamp, badDebtAuctionDelay) <= now, "SystemDebtEngine/badDebtAuctionDelay-not-finished");
     totalBadDebtValue = sub(totalBadDebtValue, badDebtQueue[timestamp]);
     badDebtQueue[timestamp] = 0;
@@ -145,7 +127,7 @@ contract SystemDebtEngine is
       The stablecoin held by SystemDebtEngine (which is the surplus) will be deducted to compensate the incurred bad debt.
   */
   /// @param rad The amount of bad debt to be settled. [rad]
-  function settleSystemBadDebt(uint256 rad) external nonReentrant {
+  function settleSystemBadDebt(uint256 rad) external whenNotPaused nonReentrant {
     require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
     require(
       rad <= sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
@@ -154,7 +136,7 @@ contract SystemDebtEngine is
     bookKeeper.settleSystemBadDebt(rad);
   }
 
-  function settleSystemBadDebtByAuction(uint256 rad) external nonReentrant {
+  function settleSystemBadDebtByAuction(uint256 rad) external whenNotPaused nonReentrant {
     require(rad <= totalBadDebtInAuction, "SystemDebtEngine/not-enough-ash");
     require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
     totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
@@ -162,7 +144,7 @@ contract SystemDebtEngine is
   }
 
   // Debt auction
-  function startBadDebtAuction() external nonReentrant returns (uint256 id) {
+  function startBadDebtAuction() external whenNotPaused nonReentrant returns (uint256 id) {
     require(
       badDebtFixedBidSize <=
         sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
@@ -174,7 +156,7 @@ contract SystemDebtEngine is
   }
 
   // Surplus auction
-  function startSurplusAuction() external nonReentrant returns (uint256 id) {
+  function startSurplusAuction() external whenNotPaused nonReentrant returns (uint256 id) {
     require(
       bookKeeper.stablecoin(address(this)) >=
         add(add(bookKeeper.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer),
@@ -190,7 +172,7 @@ contract SystemDebtEngine is
   function cage() external override {
     require(
       hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
-      "!ownerRole or ! showStopperRole"
+      "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "SystemDebtEngine/not-live");
     live = 0;
@@ -203,12 +185,12 @@ contract SystemDebtEngine is
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
     _unpause();
   }
 }

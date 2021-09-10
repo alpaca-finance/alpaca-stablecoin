@@ -109,7 +109,7 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
   // --- Update value ---
   /// @dev Update the latest price with safety margin of the collateral pool to the BookKeeper
   /// @param poolId Collateral pool id
-  function poke(bytes32 poolId) external {
+  function poke(bytes32 poolId) external whenNotPaused {
     (bytes32 rawPrice, bool hasPrice) = collateralPools[poolId].priceFeed.peek();
     uint256 priceWithSafetyMargin = hasPrice
       ? rdiv(rdiv(mul(uint256(rawPrice), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
@@ -121,19 +121,19 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
   function cage() external override {
     require(
       hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
-      "!ownerRole or !showStopperRole"
+      "!(ownerRole or showStopperRole)"
     );
     live = 0;
   }
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
     _unpause();
   }
 }

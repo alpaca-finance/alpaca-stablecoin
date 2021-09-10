@@ -384,7 +384,7 @@ describe("LiquidationEngine", () => {
     context("when the caller is not the owner", () => {
       it("should be revert", async () => {
         await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), deployerAddress)
-        await expect(liquidationEngineAsAlice.cage()).to.be.revertedWith("!ownerRole or !showStopperRole")
+        await expect(liquidationEngineAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
     context("when parameters are valid", () => {
@@ -405,7 +405,7 @@ describe("LiquidationEngine", () => {
   describe("#pause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(liquidationEngineAsAlice.pause()).to.be.revertedWith("!ownerRole or !govRole")
+        await expect(liquidationEngineAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
 
@@ -430,10 +430,57 @@ describe("LiquidationEngine", () => {
         await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), deployerAddress)
         await liquidationEngine.pause()
 
+        await liquidationEngine.grantRole(await liquidationEngine.AUCTIONEER_ROLE(), deployerAddress)
+
+        // mock contract
+        mockedBookKeeper.smocked.positions.will.return.with([
+          UnitHelpers.WeiPerWad.mul(10),
+          UnitHelpers.WeiPerWad.mul(10),
+        ])
+        mockedBookKeeper.smocked.collateralPools.will.return.with([
+          BigNumber.from(0),
+          UnitHelpers.WeiPerRay.mul(2),
+          UnitHelpers.WeiPerRay,
+          BigNumber.from(0),
+          BigNumber.from(0),
+        ])
+        mockedAuctioneer.smocked.collateralPoolId.will.return.with(formatBytes32String("BNB"))
+        mockedAuctioneer.smocked.startAuction.will.return.with(1)
+
+        // set systemDebtEngine
+        await liquidationEngine["file(bytes32,address)"](
+          formatBytes32String("systemDebtEngine"),
+          mockedSystemDebtEngine.address
+        )
+        // set auctioneer
+        await liquidationEngine["file(bytes32,bytes32,address)"](
+          formatBytes32String("BNB"),
+          formatBytes32String("auctioneer"),
+          mockedAuctioneer.address
+        )
+        // set liquidationMaxSize 100 rad
         await liquidationEngine["file(bytes32,uint256)"](
           formatBytes32String("liquidationMaxSize"),
-          UnitHelpers.WeiPerRad.mul(10)
+          UnitHelpers.WeiPerRad.mul(100)
         )
+        // set liquidationMaxSize pool 100 rad
+        await liquidationEngine["file(bytes32,bytes32,uint256)"](
+          formatBytes32String("BNB"),
+          formatBytes32String("liquidationMaxSize"),
+          UnitHelpers.WeiPerRad.mul(100)
+        )
+        // set liquidationPenalty 10 %
+        await liquidationEngine["file(bytes32,bytes32,uint256)"](
+          formatBytes32String("BNB"),
+          formatBytes32String("liquidationPenalty"),
+          UnitHelpers.WeiPerWad.add(UnitHelpers.WeiPerWad.div(10))
+        )
+
+        await liquidationEngine.startLiquidation(formatBytes32String("BNB"), aliceAddress, deployerAddress)
+
+        await expect(
+          liquidationEngine.removeRepaidDebtFromAuction(formatBytes32String("BNB"), UnitHelpers.WeiPerRad)
+        ).to.be.revertedWith("Pausable: paused")
       })
     })
   })
@@ -441,7 +488,7 @@ describe("LiquidationEngine", () => {
   describe("#unpause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(liquidationEngineAsAlice.unpause()).to.be.revertedWith("!ownerRole or !govRole")
+        await expect(liquidationEngineAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
 
@@ -473,10 +520,57 @@ describe("LiquidationEngine", () => {
         // unpause contract
         await liquidationEngine.unpause()
 
+        await liquidationEngine.grantRole(await liquidationEngine.AUCTIONEER_ROLE(), deployerAddress)
+
+        // mock contract
+        mockedBookKeeper.smocked.positions.will.return.with([
+          UnitHelpers.WeiPerWad.mul(10),
+          UnitHelpers.WeiPerWad.mul(10),
+        ])
+        mockedBookKeeper.smocked.collateralPools.will.return.with([
+          BigNumber.from(0),
+          UnitHelpers.WeiPerRay.mul(2),
+          UnitHelpers.WeiPerRay,
+          BigNumber.from(0),
+          BigNumber.from(0),
+        ])
+        mockedAuctioneer.smocked.collateralPoolId.will.return.with(formatBytes32String("BNB"))
+        mockedAuctioneer.smocked.startAuction.will.return.with(1)
+
+        // set systemDebtEngine
+        await liquidationEngine["file(bytes32,address)"](
+          formatBytes32String("systemDebtEngine"),
+          mockedSystemDebtEngine.address
+        )
+        // set auctioneer
+        await liquidationEngine["file(bytes32,bytes32,address)"](
+          formatBytes32String("BNB"),
+          formatBytes32String("auctioneer"),
+          mockedAuctioneer.address
+        )
+        // set liquidationMaxSize 100 rad
         await liquidationEngine["file(bytes32,uint256)"](
           formatBytes32String("liquidationMaxSize"),
-          UnitHelpers.WeiPerRad.mul(10)
+          UnitHelpers.WeiPerRad.mul(100)
         )
+        // set liquidationMaxSize pool 100 rad
+        await liquidationEngine["file(bytes32,bytes32,uint256)"](
+          formatBytes32String("BNB"),
+          formatBytes32String("liquidationMaxSize"),
+          UnitHelpers.WeiPerRad.mul(100)
+        )
+        // set liquidationPenalty 10 %
+        await liquidationEngine["file(bytes32,bytes32,uint256)"](
+          formatBytes32String("BNB"),
+          formatBytes32String("liquidationPenalty"),
+          UnitHelpers.WeiPerWad.add(UnitHelpers.WeiPerWad.div(10))
+        )
+
+        await liquidationEngine.startLiquidation(formatBytes32String("BNB"), aliceAddress, deployerAddress)
+
+        await expect(liquidationEngine.removeRepaidDebtFromAuction(formatBytes32String("BNB"), UnitHelpers.WeiPerRad))
+          .to.emit(liquidationEngine, "RemoveRepaidDebtFromAuction")
+          .withArgs(formatBytes32String("BNB"), UnitHelpers.WeiPerRad)
       })
     })
   })

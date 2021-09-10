@@ -39,14 +39,15 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
   bytes32 public constant STABILITY_FEE_COLLECTOR_ROLE = keccak256("STABILITY_FEE_COLLECTOR_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
   bytes32 public constant POSITION_MANAGER_ROLE = keccak256("POSITION_MANAGER_ROLE");
+  bytes32 public constant MINTABLE_ROLE = keccak256("MINTABLE_ROLE");
 
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
     _unpause();
   }
 
@@ -182,10 +183,10 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     emit SetDebtFloor(msg.sender, _collateralPoolId, _data);
   }
 
-  function cage() external override whenNotPaused {
+  function cage() external override {
     require(
       hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
-      "!ownerRole or !showStopperRole"
+      "!(ownerRole or showStopperRole)"
     );
     live = 0;
   }

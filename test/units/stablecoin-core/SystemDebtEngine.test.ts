@@ -89,7 +89,7 @@ describe("SystemDebtEngine", () => {
     context("when the caller is not the owner", () => {
       it("should be revert", async () => {
         await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), deployerAddress)
-        await expect(systemDebtEngineAsAlice.cage()).to.be.revertedWith("!ownerRole or ! showStopperRole")
+        await expect(systemDebtEngineAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
     context("when parameters are valid", () => {
@@ -135,7 +135,7 @@ describe("SystemDebtEngine", () => {
   describe("#pause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(systemDebtEngineAsAlice.pause()).to.be.revertedWith("!ownerRole or !govRole")
+        await expect(systemDebtEngineAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
 
@@ -160,9 +160,7 @@ describe("SystemDebtEngine", () => {
         await systemDebtEngine.grantRole(await systemDebtEngine.OWNER_ROLE(), deployerAddress)
         await systemDebtEngine.pause()
 
-        await expect(systemDebtEngine.setSurplusBuffer(UnitHelpers.WeiPerRad))
-          .to.emit(systemDebtEngine, "SetSurplusBuffer")
-          .withArgs(deployerAddress, UnitHelpers.WeiPerRad)
+        await expect(systemDebtEngine.setSurplusBuffer(UnitHelpers.WeiPerRad)).to.be.revertedWith("Pausable: paused")
       })
     })
   })
@@ -170,7 +168,7 @@ describe("SystemDebtEngine", () => {
   describe("#unpause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(systemDebtEngineAsAlice.unpause()).to.be.revertedWith("!ownerRole or !govRole")
+        await expect(systemDebtEngineAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
 

@@ -240,9 +240,7 @@ describe("StabilityFeeCollector", () => {
             formatBytes32String("BNB"),
             BigNumber.from("1000000000315522921573372069")
           )
-        )
-          .to.emit(stabilityFeeCollector, "SetStabilityFeeRate")
-          .withArgs(deployerAddress, formatBytes32String("BNB"), BigNumber.from("1000000000315522921573372069"))
+        ).to.be.revertedWith("Pausable: paused")
       })
     })
   })

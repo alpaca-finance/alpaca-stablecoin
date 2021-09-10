@@ -1773,7 +1773,7 @@ describe("BookKeeper", () => {
   describe("#pause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(bookKeeperAsAlice.pause()).to.be.revertedWith("!ownerRole or !govRole")
+        await expect(bookKeeperAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
 
@@ -1806,7 +1806,7 @@ describe("BookKeeper", () => {
   describe("#unpause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(bookKeeperAsAlice.unpause()).to.be.revertedWith("!ownerRole or !govRole")
+        await expect(bookKeeperAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
 
@@ -1848,7 +1848,7 @@ describe("BookKeeper", () => {
   describe("#cage", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(bookKeeperAsAlice.cage()).to.be.revertedWith("!ownerRole or !showStopperRole")
+        await expect(bookKeeperAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
 
