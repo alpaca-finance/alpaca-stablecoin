@@ -35,7 +35,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
   bytes32 public constant PRICE_ORACLE_ROLE = keccak256("PRICE_ORACLE_ROLE");
   bytes32 public constant ADAPTER_ROLE = keccak256("ADAPTER_ROLE");
   bytes32 public constant LIQUIDATION_ENGINE_ROLE = keccak256("LIQUIDATION_ENGINE_ROLE");
-  bytes32 public constant AUCTIONEER_ROLE = keccak256("AUCTIONEER_ROLE");
   bytes32 public constant STABILITY_FEE_COLLECTOR_ROLE = keccak256("STABILITY_FEE_COLLECTOR_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
   bytes32 public constant POSITION_MANAGER_ROLE = keccak256("POSITION_MANAGER_ROLE");
@@ -428,7 +427,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address to,
     uint256 rad
   ) external override whenNotPaused {
-    require(hasRole(AUCTIONEER_ROLE, msg.sender), "!auctioneerRole");
+    require(hasRole(MINTABLE_ROLE, msg.sender), "!mintableRole");
     systemBadDebt[from] = add(systemBadDebt[from], rad);
     stablecoin[to] = add(stablecoin[to], rad);
     totalUnbackedStablecoin = add(totalUnbackedStablecoin, rad);

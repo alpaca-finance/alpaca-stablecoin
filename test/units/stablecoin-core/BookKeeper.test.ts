@@ -230,7 +230,7 @@ describe("BookKeeper", () => {
       context("when alice allow bob to move collateral", () => {
         it("should be able to call moveStablecoin", async () => {
           // grant role access
-          await bookKeeper.grantRole(await bookKeeper.AUCTIONEER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
 
           // mint 1 rad to alice
           await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
@@ -264,7 +264,7 @@ describe("BookKeeper", () => {
       context("when alice has enough stablecoin", () => {
         it("should be able to call moveStablecoin", async () => {
           // grant role access
-          await bookKeeper.grantRole(await bookKeeper.AUCTIONEER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
 
           // mint 1 rad to alice
           await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
@@ -1489,7 +1489,7 @@ describe("BookKeeper", () => {
       it("should revert", async () => {
         await expect(
           bookKeeperAsAlice.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
-        ).to.be.revertedWith("!auctioneerRole")
+        ).to.be.revertedWith("!mintableRole")
       })
     })
     context("when the caller is the owner", async () => {
@@ -1505,7 +1505,7 @@ describe("BookKeeper", () => {
           expect(totalStablecoinIssuedBefore).to.be.equal(0)
 
           // grant role access
-          await bookKeeper.grantRole(await bookKeeper.AUCTIONEER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
 
           //  mint 1 rad to alice
           await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
@@ -1527,7 +1527,7 @@ describe("BookKeeper", () => {
     context("when settle system bad debt", () => {
       it("should be able to call settleSystemBadDebt", async () => {
         // grant role access
-        await bookKeeper.grantRole(await bookKeeper.AUCTIONEER_ROLE(), deployerAddress)
+        await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
 
         //  mint 1 rad to deployer
         await bookKeeper.mintUnbackedStablecoin(deployerAddress, deployerAddress, WeiPerRad)
