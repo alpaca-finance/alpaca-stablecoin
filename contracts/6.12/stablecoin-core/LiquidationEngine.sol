@@ -29,6 +29,12 @@ import "../interfaces/IAuctioneer.sol";
 import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/ISystemDebtEngine.sol";
 
+/// @title LiquidationEngine
+/// @author Alpaca Fin Corporation
+/** @notice A contract which is the manager for all of the liquidations of the protocol.
+    LiquidationEngine will be the interface for the liquidator to trigger any positions into the liquidation process.
+*/
+
 contract LiquidationEngine is
   OwnableUpgradeable,
   PausableUpgradeable,
@@ -58,8 +64,8 @@ contract LiquidationEngine is
   struct CollateralPool {
     address auctioneer; // Auctioneer contract
     uint256 liquidationPenalty; // Liquidation Penalty                                          [wad]
-    uint256 liquidationMaxSize; // Max DAI needed to cover debt+fees of active auctions per collateralPool [rad]
-    uint256 stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions per collateralPool [rad]
+    uint256 liquidationMaxSize; // The maximum amount of liquidated debt value to be put on auction for the collateral pool [rad]
+    uint256 stablecoinNeededForDebtRepay; // The current total amount of stablecoin needed to pay back the liquidated positions' debt for the collateral pool [rad]
   }
 
   IBookKeeper public bookKeeper; // CDP Engine
@@ -68,8 +74,8 @@ contract LiquidationEngine is
 
   ISystemDebtEngine public systemDebtEngine; // Debt Engine
   uint256 public live; // Active Flag
-  uint256 public liquidationMaxSize; // Max DAI needed to cover debt+fees of active auctions [rad]
-  uint256 public stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions [rad]
+  uint256 public liquidationMaxSize; // The maximum amount of liquidated debt value to be put on auction globally [rad]
+  uint256 public stablecoinNeededForDebtRepay; // The current total amount of stablecoin needed to pay back the liquidated positions' debt globally [rad]
 
   // --- Events ---
   event Rely(address indexed usr);
@@ -297,6 +303,9 @@ contract LiquidationEngine is
     );
   }
 
+  /// @dev Remove debt from the system when it is already paid by the liquidator
+  /// @param collateralPoolId Collateral pool id
+  /// @param rad The debt value to be removed
   function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override auth {
     stablecoinNeededForDebtRepay = sub(stablecoinNeededForDebtRepay, rad);
     collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = sub(

@@ -27,7 +27,12 @@ import "../../utils/SafeToken.sol";
 
 import "./FarmableTokenAdapter.sol";
 
-// IbTokenAdapter for Fairlaunch V1
+/// @title IbTokenAdapter
+/// @author Alpaca Fin Corporation
+/** @notice An implementation of `FarmableCollateralAdapter` which accepts ibToken of Alpaca Finance's Leveraged Yield Farming as collateral.
+    The ibTokens will be staked on behalf of users into the Alpaca Finance's staking pool to generate yield during the deposit of collateral.
+    The ALPACA rewards from the staking pool will be distributed to the collateral owner accordingly.
+*/
 contract IbTokenAdapter is
   OwnableUpgradeable,
   PausableUpgradeable,
@@ -85,15 +90,17 @@ contract IbTokenAdapter is
     pid = pid_;
   }
 
+  /// @dev Invoke the spending allowance execution between this contract and the staking pool contract
   function initApproval() public {
     address(collateralToken).safeApprove(address(fairlaunch), type(uint256).max);
   }
 
-  // Ignore collateralTokens that have been directly transferred
+  /// @dev Return the net asset value of this adapter which will be equal to the amount of collateral token deposited in this adapter
   function nav() public view override returns (uint256) {
     return totalShare;
   }
 
+  /// @dev Return the token amount of the harvested reward
   function harvestedRewards() internal override returns (uint256) {
     if (live == 1) {
       // withdraw of 0 will give us only the rewards
@@ -102,6 +109,10 @@ contract IbTokenAdapter is
     return super.harvestedRewards();
   }
 
+  /// @dev Deposit token into the system from the caller to be used as collateral
+  /// @param positionAddress The position address
+  /// @param usr The source address which is holding the collateral token
+  /// @param val The amount of collateral to be deposited [wad]
   function deposit(
     address positionAddress,
     address usr,
@@ -111,6 +122,10 @@ contract IbTokenAdapter is
     fairlaunch.deposit(address(this), pid, val);
   }
 
+  /// @dev Withdraw token from the system to the caller
+  /// @param urn The position address
+  /// @param usr The destination address to receive collateral token
+  /// @param val The amount of collateral to be withdrawn [wad]
   function withdraw(
     address urn,
     address usr,
@@ -122,6 +137,9 @@ contract IbTokenAdapter is
     super.withdraw(urn, usr, val);
   }
 
+  /// @dev Withdraw the collateral token without caring about rewards in case something wrong happen with the rewads
+  /// @param urn The position address
+  /// @param usr The destination address to receive collateral token
   function emergencyWithdraw(address urn, address usr) public override nonReentrant {
     if (live == 1) {
       uint256 val = bookKeeper.collateralToken(collateralPoolId, urn);

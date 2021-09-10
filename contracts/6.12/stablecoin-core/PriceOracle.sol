@@ -25,9 +25,11 @@ import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IPriceOracle.sol";
 
-// FIXME: This contract was altered compared to the production version.
-// It doesn't use LibNote anymore.
-// New deployments of this contract will need to include custom events (TO DO).
+/// @title PriceOracle
+/// @author Alpaca Fin Corporation
+/** @notice A contract which is the price oracle of the BookKeeper to keep all collateral pools updated with the latest price of the collateral.
+    The price oracle is important in reflecting the current state of the market price.
+*/
 
 contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IPriceOracle {
   // --- Auth ---
@@ -49,7 +51,7 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   // --- Data ---
   struct CollateralPool {
     IPriceFeed priceFeed; // Price Feed
-    uint256 liquidationRatio; // Liquidation ratio [ray]
+    uint256 liquidationRatio; // Liquidation ratio or Collateral ratio [ray]
   }
 
   mapping(bytes32 => CollateralPool) public override collateralPools;
@@ -62,8 +64,8 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   // --- Events ---
   event Poke(
     bytes32 poolId,
-    bytes32 val, // [wad]
-    uint256 spot // [ray]
+    bytes32 rawPrice, // Raw price from price feed [wad]
+    uint256 priceWithSafetyMargin // Price with safety margin [ray]
   );
 
   // --- Init ---
@@ -113,13 +115,15 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   }
 
   // --- Update value ---
+  /// @dev Update the latest price with safety margin of the collateral pool to the BookKeeper
+  /// @param poolId Collateral pool id
   function poke(bytes32 poolId) external {
-    (bytes32 val, bool has) = collateralPools[poolId].priceFeed.peek();
-    uint256 priceWithSafetyMargin = has
-      ? rdiv(rdiv(mul(uint256(val), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
+    (bytes32 rawPrice, bool hasPrice) = collateralPools[poolId].priceFeed.peek();
+    uint256 priceWithSafetyMargin = hasPrice
+      ? rdiv(rdiv(mul(uint256(rawPrice), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
       : 0;
     bookKeeper.setPriceWithSafetyMargin(poolId, priceWithSafetyMargin);
-    emit Poke(poolId, val, priceWithSafetyMargin);
+    emit Poke(poolId, rawPrice, priceWithSafetyMargin);
   }
 
   function cage() external override auth {

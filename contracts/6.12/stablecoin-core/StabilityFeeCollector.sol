@@ -27,9 +27,12 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IStabilityFeeCollector.sol";
 
-// FIXME: This contract was altered compared to the production version.
-// It doesn't use LibNote anymore.
-// New deployments of this contract will need to include custom events (TO DO).
+/// @title StabilityFeeCollector
+/// @author Alpaca Fin Corporation
+/** @notice A contract which acts as a collector for the stability fee.
+    The stability fee is a fee that is collected from the minter of Alpaca Stablecoin in a per-seconds basis.
+    The stability fee will be accumulated in the system as a surplus to settle any bad debt.
+*/
 
 contract StabilityFeeCollector is
   OwnableUpgradeable,
@@ -56,14 +59,14 @@ contract StabilityFeeCollector is
 
   // --- Data ---
   struct CollateralPool {
-    uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee contribution [ray]
-    uint256 lastAccumulationTime; // Time of last drip [unix epoch time]
+    uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee rate or mint interest rate [ray]
+    uint256 lastAccumulationTime; // Time of last call to `collect` [unix epoch time]
   }
 
   mapping(bytes32 => CollateralPool) public collateralPools;
-  IBookKeeper public bookKeeper; // CDP Engine
-  address public systemDebtEngine; // Debt Engine
-  uint256 public globalStabilityFeeRate; // Global, per-second stability fee contribution [ray]
+  IBookKeeper public bookKeeper;
+  address public systemDebtEngine;
+  uint256 public globalStabilityFeeRate; // Global, per-second stability fee rate [ray]
 
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
@@ -162,6 +165,8 @@ contract StabilityFeeCollector is
   event SetSystemDebtEngine(address indexed caller, address data);
   event SetStabilityFeeRate(address indexed caller, bytes32 poolId, uint256 data);
 
+  /// @dev Set the global stability fee rate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
+  /// @param _data Global stability fee rate [ray]
   function setGlobalStabilityFeeRate(uint256 _data) external auth {
     globalStabilityFeeRate = _data;
     emit SetGlobalStabilityFeeRate(msg.sender, _data);
@@ -172,12 +177,44 @@ contract StabilityFeeCollector is
     emit SetSystemDebtEngine(msg.sender, _data);
   }
 
+  /** @dev Set the stability fee rate of the collateral pool.
+      The rate to be set here is the `r` in:
+
+          r^N = APR
+
+      Where:
+        r = stability fee rate
+        N = Accumulation frequency which is per-second in this case; the value will be 60*60*24*365 = 31536000 to signify the number of seconds within a year.
+        APR = the annual percentage rate
+
+    For example, to achieve 0.5% APR for stability fee rate:
+
+          r^31536000 = 1.005
+
+    Find the 31536000th root of 1.005 and we will get:
+
+          r = 1.000000000158153903837946258002097...
+    
+    The rate is in [ray] format, so the actual value of `stabilityFeeRate` will be:
+
+          stabilityFeeRate = 1000000000158153903837946258 
+
+    The above `stabilityFeeRate` will be the value we will use in this contract.
+  */
+  /// @param _collateralPool Collateral pool id
+  /// @param _data the rate [ray]
   function setStabilityFeeRate(bytes32 _collateralPool, uint256 _data) external auth {
     collateralPools[_collateralPool].stabilityFeeRate = _data;
     emit SetStabilityFeeRate(msg.sender, _collateralPool, _data);
   }
 
   // --- Stability Fee Collection ---
+  /** @dev Collect the stability fee of the collateral pool.
+      This function could be called by anyone. 
+      It will update the `debtAccumulatedRate` of the specified collateral pool according to 
+      the global and per-pool stability fee rates with respect to the last block that `collect` was called.
+  */
+  /// @param collateralPool Collateral pool id
   function collect(bytes32 collateralPool) external override nonReentrant returns (uint256 rate) {
     rate = _collect(collateralPool);
   }

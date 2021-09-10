@@ -28,9 +28,13 @@ import "../interfaces/ISurplusAuctioneer.sol";
 import "../interfaces/IBadDebtAuctioneer.sol";
 import "../interfaces/ISystemDebtEngine.sol";
 
-// FIXME: This contract was altered compared to the production version.
-// It doesn't use LibNote anymore.
-// New deployments of this contract will need to include custom events (TO DO).
+/// @title SystemDebtEngine
+/// @author Alpaca Fin Corporation
+/** @notice A contract which manages the bad debt and the surplus of the system.
+    SystemDebtEngine will be the debitor or debtor when a position is liquidated. 
+    The debt recorded in the name of SystemDebtEngine will be considered as system bad debt unless it is cleared by liquidation.
+    The stability fee will be accrued and kept within SystemDebtEngine. As it is the debtor, therefore SystemDebtEngine should be the holder of the surplus and use it to settle the bad debt.
+*/
 
 contract SystemDebtEngine is
   OwnableUpgradeable,
@@ -61,11 +65,11 @@ contract SystemDebtEngine is
   ISurplusAuctioneer public surplusAuctionHouse; // Surplus Auction House
   IBadDebtAuctioneer public badDebtAuctionHouse; // Debt Auction House
 
-  mapping(uint256 => uint256) public badDebtQueue; // debt queue
-  uint256 public totalBadDebtValue; // Queued debt            [rad]
-  uint256 public totalBadDebtInAuction; // On-auction debt        [rad]
+  mapping(uint256 => uint256) public badDebtQueue; // Bad debt queue
+  uint256 public totalBadDebtValue; // Total value of the queued bad debt            [rad]
+  uint256 public totalBadDebtInAuction; // Total on-auction bad debt        [rad]
 
-  uint256 public badDebtAuctionDelay; // Flop delay             [seconds]
+  uint256 public badDebtAuctionDelay; // A delay before debt is considered bad debt            [seconds]
   uint256 public alpacaInitialLotSizeForBadDebt; // Flop initial lot size  [wad]
   uint256 public badDebtFixedBidSize; // Flop fixed bid size    [rad]
 
@@ -128,6 +132,11 @@ contract SystemDebtEngine is
   }
 
   // Debt settlement
+  /** @dev Settle system bad debt as SystemDebtEngine.
+      This function could be called by anyone to settle the system bad debt when there is available surplus.
+      The stablecoin held by SystemDebtEngine (which is the surplus) will be deducted to compensate the incurred bad debt.
+  */
+  /// @param rad The amount of bad debt to be settled. [rad]
   function settleSystemBadDebt(uint256 rad) external nonReentrant {
     require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
     require(
