@@ -70,6 +70,8 @@ contract ChainLinkPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IP
 
   function _isPriceFresh() internal view returns (bool) {
     (, , , uint256 lastUpdate, ) = source.latestRoundData();
+
+    // solhint-disable not-rely-on-time
     return lastUpdate >= now - priceLife;
   }
 
