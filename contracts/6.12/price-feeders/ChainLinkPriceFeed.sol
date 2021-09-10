@@ -1,7 +1,6 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
