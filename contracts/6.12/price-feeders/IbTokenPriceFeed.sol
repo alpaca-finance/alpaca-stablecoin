@@ -28,6 +28,40 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
     baseTokenSource = IPriceFeed(_baseTokenSource);
   }
 
+  modifier onlyOwner() {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    _;
+  }
+
+  event SetVault(address indexed caller, address vault);
+  event SetBaseTokenSource(address indexed caller, address source);
+
+  function setVault(address _vault) external onlyOwner {
+    vault = IVault(_vault);
+    emit SetVault(msg.sender, _vault);
+  }
+
+  function setBaseTokenSource(address _source) external onlyOwner {
+    baseTokenSource = IPriceFeed(_source);
+    emit SetBaseTokenSource(msg.sender, _source);
+  }
+
+  function pause() external onlyOwner {
+    _pause();
+  }
+
+  function unpause() external onlyOwner {
+    _unpause();
+  }
+
+  function read() external view override returns (bytes32) {
+    return _getPrice();
+  }
+
+  function peek() external view override returns (bytes32, bool) {
+    return (_getPrice(), _isPriceOk());
+  }
+
   function _getPrice() internal view returns (bytes32) {
     uint256 baseTokenPrice = uint256(baseTokenSource.read());
     uint256 price = baseTokenPrice.mul(vault.totalSupply()) / vault.totalToken();
@@ -40,11 +74,7 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
     return isFresh;
   }
 
-  function read() external view override returns (bytes32) {
-    return _getPrice();
-  }
-
-  function peek() external view override returns (bytes32, bool) {
-    return (_getPrice(), _isPriceFresh());
+  function _isPriceOk() internal view returns (bool) {
+    return _isPriceFresh() && !paused();
   }
 }

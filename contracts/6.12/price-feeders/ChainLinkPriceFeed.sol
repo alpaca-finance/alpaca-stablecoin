@@ -13,6 +13,7 @@ contract ChainLinkPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IP
 
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   AggregatorV3Interface public source;
+  uint256 public priceLife = 24; // [hour] how old the price is considered stale.
 
   // --- Init ---
   function initialize(address _source) external initializer {
@@ -26,6 +27,40 @@ contract ChainLinkPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IP
     source = AggregatorV3Interface(_source);
   }
 
+  modifier onlyOwner() {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    _;
+  }
+
+  event SetPriceLife(address indexed caller, uint256 hour);
+  event SetPriceSource(address indexed caller, address source);
+
+  function setPriceLife(uint256 _hour) external onlyOwner {
+    priceLife = _hour * 1 hours;
+    emit SetPriceLife(msg.sender, _hour);
+  }
+
+  function setPriceSource(address _source) external onlyOwner {
+    source = AggregatorV3Interface(_source);
+    emit SetPriceSource(msg.sender, _source);
+  }
+
+  function pause() external {
+    _pause();
+  }
+
+  function unpause() external {
+    _unpause();
+  }
+
+  function read() external view override returns (bytes32) {
+    return _getPrice();
+  }
+
+  function peek() external view override returns (bytes32, bool) {
+    return (_getPrice(), _isPriceOk());
+  }
+
   function _getPrice() internal view returns (bytes32) {
     (, int256 answer, , , ) = source.latestRoundData();
     uint256 decimals = source.decimals();
@@ -36,15 +71,10 @@ contract ChainLinkPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IP
 
   function _isPriceFresh() internal view returns (bool) {
     (, , , uint256 lastUpdate, ) = source.latestRoundData();
-    uint256 life = 1 days;
-    return lastUpdate >= now - life;
+    return lastUpdate >= now - priceLife;
   }
 
-  function read() external view override returns (bytes32) {
-    return _getPrice();
-  }
-
-  function peek() external view override returns (bytes32, bool) {
-    return (_getPrice(), _isPriceFresh());
+  function _isPriceOk() internal view returns (bool) {
+    return _isPriceFresh() && !paused();
   }
 }
