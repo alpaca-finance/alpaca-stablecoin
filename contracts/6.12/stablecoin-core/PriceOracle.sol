@@ -17,7 +17,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
@@ -29,26 +28,10 @@ import "../interfaces/IPriceOracle.sol";
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IPriceOracle {
+contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOracle {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
-
-  // --- Auth ---
-  mapping(address => uint256) public wards;
-
-  function rely(address guy) external auth {
-    wards[guy] = 1;
-  }
-
-  function deny(address guy) external auth {
-    wards[guy] = 0;
-  }
-
-  modifier auth() {
-    require(wards[msg.sender] == 1, "Spotter/not-authorized");
-    _;
-  }
 
   // --- Data ---
   struct CollateralPool {

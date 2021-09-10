@@ -19,7 +19,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
@@ -28,7 +27,7 @@ import "../interfaces/IBookKeeper.sol";
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeable {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant PRICE_ORACLE_ROLE = keccak256("PRICE_ORACLE_ROLE");
@@ -39,19 +38,6 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
   bytes32 public constant POSITION_MANAGER_ROLE = keccak256("POSITION_MANAGER_ROLE");
 
-  // --- Auth ---
-  mapping(address => uint256) public whitelist;
-
-  function rely(address usr) external auth {
-    require(live == 1, "BookKeeper/not-live");
-    whitelist[usr] = 1;
-  }
-
-  function deny(address usr) external auth {
-    require(live == 1, "BookKeeper/not-live");
-    whitelist[usr] = 0;
-  }
-
   function pause() external {
     require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
     _pause();
@@ -60,11 +46,6 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   function unpause() external {
     require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
     _unpause();
-  }
-
-  modifier auth() {
-    require(whitelist[msg.sender] == 1, "BookKeeper/not-authorized");
-    _;
   }
 
   mapping(address => mapping(address => uint256)) public override can;

@@ -19,7 +19,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -40,24 +39,6 @@ contract LiquidationEngine is
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant AUCTIONEER_ROLE = keccak256("AUCTIONEER_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
-
-  // --- Auth ---
-  mapping(address => uint256) public whitelist;
-
-  function rely(address usr) external auth {
-    whitelist[usr] = 1;
-    emit Rely(usr);
-  }
-
-  function deny(address usr) external auth {
-    whitelist[usr] = 0;
-    emit Deny(usr);
-  }
-
-  modifier auth() {
-    require(whitelist[msg.sender] == 1, "LiquidationEngine/not-authorized");
-    _;
-  }
 
   // --- Data ---
   struct CollateralPool {
@@ -134,13 +115,13 @@ contract LiquidationEngine is
   }
 
   // --- Administration ---
-  function file(bytes32 what, address data) external auth {
+  function file(bytes32 what, address data) external {
     if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
     else revert("LiquidationEngine/file-unrecognized-param");
     emit File(what, data);
   }
 
-  function file(bytes32 what, uint256 data) external auth {
+  function file(bytes32 what, uint256 data) external {
     if (what == "liquidationMaxSize") liquidationMaxSize = data;
     else revert("LiquidationEngine/file-unrecognized-param");
     emit File(what, data);
@@ -150,7 +131,7 @@ contract LiquidationEngine is
     bytes32 collateralPoolId,
     bytes32 what,
     uint256 data
-  ) external auth {
+  ) external {
     if (what == "liquidationPenalty") {
       require(data >= WAD, "LiquidationEngine/file-liquidationPenalty-lt-WAD");
       collateralPools[collateralPoolId].liquidationPenalty = data;
@@ -163,7 +144,7 @@ contract LiquidationEngine is
     bytes32 collateralPoolId,
     bytes32 what,
     address auctioneer
-  ) external auth {
+  ) external {
     if (what == "auctioneer") {
       require(
         collateralPoolId == IAuctioneer(auctioneer).collateralPoolId(),
