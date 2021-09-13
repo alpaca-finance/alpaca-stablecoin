@@ -50,7 +50,7 @@ contract AlpacaAuth is AlpacaAuthEvents {
       return true;
     } else if (src == owner) {
       return true;
-    } else if (authority == IAuthority(address(0))) {
+    } else if (address(authority) == address(0)) {
       return false;
     } else {
       return authority.canCall(src, address(this), sig);

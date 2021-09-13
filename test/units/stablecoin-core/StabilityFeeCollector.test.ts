@@ -75,14 +75,14 @@ describe("StabilityFeeCollector", () => {
   describe("#init", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
-        await expect(stabilityFeeCollectorAsAlice.init(formatBytes32String("BNB"))).to.be.revertedWith(
-          "StabilityFeeCollector/not-authorized"
-        )
+        await expect(stabilityFeeCollectorAsAlice.init(formatBytes32String("BNB"))).to.be.revertedWith("!ownerRole")
       })
     })
     context("when the caller is the owner", async () => {
       context("when initialize BNB pool", async () => {
         it("should be success", async () => {
+          await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
+
           await stabilityFeeCollector.init(formatBytes32String("BNB"))
           const pool = await stabilityFeeCollectorAsAlice.collateralPools(formatBytes32String("BNB"))
           expect(pool.stabilityFeeRate.toString()).equal(UnitHelpers.WeiPerRay)
@@ -99,9 +99,8 @@ describe("StabilityFeeCollector", () => {
         // rate ~ 1% annually
         // r^31536000 = 1.01
         // r =~ 1000000000315522921573372069...
-        await stabilityFeeCollector["file(bytes32,bytes32,uint256)"](
+        await stabilityFeeCollector.setStabilityFeeRate(
           formatBytes32String("BNB"),
-          formatBytes32String("stabilityFeeRate"),
           BigNumber.from("1000000000315522921573372069")
         )
 
@@ -130,6 +129,165 @@ describe("StabilityFeeCollector", () => {
           calls[0].debtAccumulatedRate.toString(),
           BigNumber.from("10000000000000000000000000").toString()
         )
+      })
+    })
+  })
+
+  describe("#setGlobalStabilityFeeRate", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(stabilityFeeCollectorAsAlice.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad)).to.be.revertedWith(
+          "!ownerRole"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setGlobalStabilityFeeRate", async () => {
+        await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
+
+        // init BNB pool
+        await stabilityFeeCollector.init(formatBytes32String("BNB"))
+
+        await expect(stabilityFeeCollector.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad))
+          .to.emit(stabilityFeeCollector, "SetGlobalStabilityFeeRate")
+          .withArgs(deployerAddress, UnitHelpers.WeiPerWad)
+      })
+    })
+  })
+
+  describe("#setSystemDebtEngine", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(stabilityFeeCollectorAsAlice.setSystemDebtEngine(mockedBookKeeper.address)).to.be.revertedWith(
+          "!ownerRole"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setSystemDebtEngine", async () => {
+        await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
+
+        // init BNB pool
+        await stabilityFeeCollector.init(formatBytes32String("BNB"))
+
+        await expect(stabilityFeeCollector.setSystemDebtEngine(mockedBookKeeper.address))
+          .to.emit(stabilityFeeCollector, "SetSystemDebtEngine")
+          .withArgs(deployerAddress, mockedBookKeeper.address)
+      })
+    })
+  })
+
+  describe("#setStabilityFeeRate", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(
+          stabilityFeeCollectorAsAlice.setStabilityFeeRate(
+            formatBytes32String("BNB"),
+            BigNumber.from("1000000000315522921573372069")
+          )
+        ).to.be.revertedWith("!ownerRole")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setStabilityFeeRate", async () => {
+        await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
+
+        // init BNB pool
+        await stabilityFeeCollector.init(formatBytes32String("BNB"))
+
+        await expect(
+          stabilityFeeCollector.setStabilityFeeRate(
+            formatBytes32String("BNB"),
+            BigNumber.from("1000000000315522921573372069")
+          )
+        )
+          .to.emit(stabilityFeeCollector, "SetStabilityFeeRate")
+          .withArgs(deployerAddress, formatBytes32String("BNB"), BigNumber.from("1000000000315522921573372069"))
+      })
+    })
+  })
+
+  describe("#pause", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(stabilityFeeCollectorAsAlice.pause()).to.be.revertedWith("!ownerRole or !govRole")
+      })
+    })
+
+    context("when role can access", () => {
+      context("and role is owner role", () => {
+        it("should be success", async () => {
+          await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
+          await stabilityFeeCollector.pause()
+        })
+      })
+    })
+
+    context("and role is gov role", () => {
+      it("should be success", async () => {
+        await stabilityFeeCollector.grantRole(await stabilityFeeCollector.GOV_ROLE(), deployerAddress)
+        await stabilityFeeCollector.pause()
+      })
+    })
+
+    context("when pause contract", () => {
+      it("should be success", async () => {
+        await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
+        await stabilityFeeCollector.pause()
+
+        await expect(
+          stabilityFeeCollector.setStabilityFeeRate(
+            formatBytes32String("BNB"),
+            BigNumber.from("1000000000315522921573372069")
+          )
+        ).to.be.revertedWith("Pausable: paused")
+      })
+    })
+  })
+
+  describe("#unpause", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(stabilityFeeCollectorAsAlice.unpause()).to.be.revertedWith("!ownerRole or !govRole")
+      })
+    })
+
+    context("when role can access", () => {
+      context("and role is owner role", () => {
+        it("should be success", async () => {
+          await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
+          await stabilityFeeCollector.pause()
+          await stabilityFeeCollector.unpause()
+        })
+      })
+
+      context("and role is gov role", () => {
+        it("should be success", async () => {
+          await stabilityFeeCollector.grantRole(await stabilityFeeCollector.GOV_ROLE(), deployerAddress)
+          await stabilityFeeCollector.pause()
+          await stabilityFeeCollector.unpause()
+        })
+      })
+    })
+
+    context("when unpause contract", () => {
+      it("should be success", async () => {
+        await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
+
+        // pause contract
+        await stabilityFeeCollector.pause()
+
+        // unpause contract
+        await stabilityFeeCollector.unpause()
+
+        await expect(
+          stabilityFeeCollector.setStabilityFeeRate(
+            formatBytes32String("BNB"),
+            BigNumber.from("1000000000315522921573372069")
+          )
+        )
+          .to.emit(stabilityFeeCollector, "SetStabilityFeeRate")
+          .withArgs(deployerAddress, formatBytes32String("BNB"), BigNumber.from("1000000000315522921573372069"))
       })
     })
   })

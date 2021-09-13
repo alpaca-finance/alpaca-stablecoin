@@ -19,7 +19,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -30,34 +29,29 @@ import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/ISystemDebtEngine.sol";
 import "../interfaces/ILiquidationStrategy.sol";
 
+/// @title LiquidationEngine
+/// @author Alpaca Fin Corporation
+/** @notice A contract which is the manager for all of the liquidations of the protocol.
+    LiquidationEngine will be the interface for the liquidator to trigger any positions into the liquidation process.
+*/
+
 contract LiquidationEngine is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
   ILiquidationEngine
 {
-  // --- Auth ---
-  mapping(address => uint256) public whitelist;
-
-  function rely(address usr) external auth {
-    whitelist[usr] = 1;
-    emit Rely(usr);
-  }
-
-  function deny(address usr) external auth {
-    whitelist[usr] = 0;
-    emit Deny(usr);
-  }
-
-  modifier auth() {
-    require(whitelist[msg.sender] == 1, "LiquidationEngine/not-authorized");
-    _;
-  }
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant AUCTIONEER_ROLE = keccak256("AUCTIONEER_ROLE");
+  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
   // --- Data ---
   struct CollateralPool {
-    address strategy; // Liquidation strategy address
+    address auctioneer; // Auctioneer contract
+    uint256 liquidationPenalty; // Liquidation Penalty                                          [wad]
+    uint256 liquidationMaxSize; // The maximum amount of liquidated debt value to be put on auction for the collateral pool [rad]
+    uint256 stablecoinNeededForDebtRepay; // The current total amount of stablecoin needed to pay back the liquidated positions' debt for the collateral pool [rad]
   }
 
   IBookKeeper public bookKeeper; // CDP Engine
@@ -66,8 +60,8 @@ contract LiquidationEngine is
 
   ISystemDebtEngine public systemDebtEngine; // Debt Engine
   uint256 public live; // Active Flag
-  uint256 public liquidationMaxSize; // Max DAI needed to cover debt+fees of active auctions [rad]
-  uint256 public stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions [rad]
+  uint256 public liquidationMaxSize; // The maximum amount of liquidated debt value to be put on auction globally [rad]
+  uint256 public stablecoinNeededForDebtRepay; // The current total amount of stablecoin needed to pay back the liquidated positions' debt globally [rad]
 
   // --- Events ---
   event Rely(address indexed usr);
@@ -92,15 +86,17 @@ contract LiquidationEngine is
 
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
     live = 1;
-    whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -122,65 +118,10 @@ contract LiquidationEngine is
     require(y == 0 || (z = x * y) / y == x);
   }
 
-  // --- Administration ---
-  function file(bytes32 what, address data) external auth {
-    if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
-    else revert("LiquidationEngine/file-unrecognized-param");
-    emit File(what, data);
+  function liquidationPenalty(bytes32 collateralPoolId) external view override returns (uint256) {
+    return collateralPools[collateralPoolId].liquidationPenalty;
   }
 
-  function file(bytes32 what, uint256 data) external auth {
-    if (what == "liquidationMaxSize") liquidationMaxSize = data;
-    else revert("LiquidationEngine/file-unrecognized-param");
-    emit File(what, data);
-  }
-
-  // function file(
-  //   bytes32 collateralPoolId,
-  //   bytes32 what,
-  //   uint256 data
-  // ) external auth {
-  //   if (what == "liquidationPenalty") {
-  //     require(data >= WAD, "LiquidationEngine/file-liquidationPenalty-lt-WAD");
-  //     collateralPools[collateralPoolId].liquidationPenalty = data;
-  //   } else if (what == "liquidationMaxSize") collateralPools[collateralPoolId].liquidationMaxSize = data;
-  //   else revert("LiquidationEngine/file-unrecognized-param");
-  //   emit File(collateralPoolId, what, data);
-  // }
-
-  // function file(
-  //   bytes32 collateralPoolId,
-  //   bytes32 what,
-  //   address auctioneer
-  // ) external auth {
-  //   if (what == "auctioneer") {
-  //     require(
-  //       collateralPoolId == IAuctioneer(auctioneer).collateralPoolId(),
-  //       "LiquidationEngine/file-collateralPoolId-neq-auctioneer.collateralPoolId"
-  //     );
-  //     collateralPools[collateralPoolId].auctioneer = auctioneer;
-  //   } else revert("LiquidationEngine/file-unrecognized-param");
-  //   emit File(collateralPoolId, what, auctioneer);
-  // }
-
-  // function liquidationPenalty(bytes32 collateralPoolId) external view override returns (uint256) {
-  //   return collateralPools[collateralPoolId].liquidationPenalty;
-  // }
-
-  // --- CDP Liquidation: all bark and no bite ---
-  //
-  // Liquidate a Vault and start a Dutch auction to sell its collateral for DAI.
-  //
-  // The third argument is the address that will receive the liquidation reward, if any.
-  //
-  // The entire Vault will be liquidated except when the target amount of DAI to be raised in
-  // the resulting auction (debt of Vault + liquidation penalty) causes either stablecoinNeededForDebtRepay to exceed
-  // liquidationMaxSize or collateralPool.stablecoinNeededForDebtRepay to exceed collateralPool.liquidationMaxSize by an economically significant amount. In that
-  // case, a partial liquidation is performed to respect the global and per-collateralPool limits on
-  // outstanding DAI target. The one exception is if the resulting auction would likely
-  // have too little collateral to be interesting to Keepers (debt taken from Vault < collateralPool.debtFloor),
-  // in which case the function reverts. Please refer to the code and comments within if
-  // more detail is desired.
   function liquidate(
     bytes32 collateralPoolId,
     address positionAddress,
@@ -217,8 +158,23 @@ contract LiquidationEngine is
     );
   }
 
-  function cage() external override auth {
+  function cage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
     live = 0;
     emit Cage();
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 }
