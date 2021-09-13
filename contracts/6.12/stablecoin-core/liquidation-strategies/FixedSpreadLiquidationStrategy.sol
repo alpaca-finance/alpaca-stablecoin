@@ -154,15 +154,14 @@ contract FixedSpreadLiquidationStrategy is
     uint256 positionDebtShare, // Debt                   [rad]
     uint256 positionCollateralAmount, // Collateral             [wad]
     address positionAddress, // Address that will receive any leftover collateral
-    address liquidatorAddress, // Address that will receive incentives
     uint256 debtShareToRepay, // [wad]
-    address collateralRecipient, // Receiver of collateral and external call address
     bytes calldata data // Data to pass in external call; if length 0, no call is done
   ) external override {
     // Input validation
     require(positionDebtShare > 0, "FixedSpreadLiquidationStrategy/zero-debt");
     require(positionCollateralAmount > 0, "FixedSpreadLiquidationStrategy/zero-collateralAmount");
     require(positionAddress != address(0), "FixedSpreadLiquidationStrategy/zero-positionAddress");
+    (address liquidatorAddress, address collateralRecipient) = abi.decode(data, (address, address));
 
     // 1. Check if Close Factor is not exceeded
     CollateralPool memory collateralPool = collateralPools[collateralPoolId];

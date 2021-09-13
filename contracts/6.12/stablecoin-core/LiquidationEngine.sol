@@ -62,7 +62,7 @@ contract LiquidationEngine is
 
   IBookKeeper public bookKeeper; // CDP Engine
 
-  mapping(bytes32 => CollateralPool) public override collateralPools;
+  mapping(bytes32 => address) public override strategies; // Liquidation strategy for each collateral pool
 
   ISystemDebtEngine public systemDebtEngine; // Debt Engine
   uint256 public live; // Active Flag
@@ -184,7 +184,6 @@ contract LiquidationEngine is
   function liquidate(
     bytes32 collateralPoolId,
     address positionAddress,
-    address liquidatorAddress,
     uint256 debtShareToRepay,
     bytes calldata data
   ) external nonReentrant returns (uint256 id) {
@@ -194,7 +193,7 @@ contract LiquidationEngine is
       collateralPoolId,
       positionAddress
     );
-    CollateralPool memory mcollateralPool = collateralPools[collateralPoolId];
+    address strategy = strategies[collateralPoolId];
     uint256 debtAccumulatedRate;
     uint256 debtFloor;
     {
@@ -208,26 +207,14 @@ contract LiquidationEngine is
       );
     }
 
-    (address collateralRecipient, bytes memory ext) = abi.decode(data, (address, bytes));
-    ILiquidationStrategy(mcollateralPool.strategy).execute(
+    ILiquidationStrategy(strategy).execute(
       collateralPoolId,
       positionDebtShare,
       positionLockedCollateral,
       positionAddress,
-      liquidatorAddress,
       debtShareToRepay,
-      collateralRecipient,
-      ext
+      data
     );
-  }
-
-  function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override auth {
-    // stablecoinNeededForDebtRepay = sub(stablecoinNeededForDebtRepay, rad);
-    // collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = sub(
-    //   collateralPools[collateralPoolId].stablecoinNeededForDebtRepay,
-    //   rad
-    // );
-    // emit RemoveRepaidDebtFromAuction(collateralPoolId, rad);
   }
 
   function cage() external override auth {

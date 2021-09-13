@@ -6,9 +6,7 @@ interface ILiquidationStrategy {
     uint256,
     uint256,
     address,
-    address,
     uint256,
-    address,
     bytes calldata
   ) external;
 }
