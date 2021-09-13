@@ -25,7 +25,6 @@ import "../../../utils/SafeToken.sol";
 
 import "./BaseFarmableTokenAdapter.sol";
 
-import "hardhat/console.sol";
 
 /// @title IbTokenAdapter is the adapter that inherited BaseFarmableTokenAdapter.
 /// It receives Alpaca's ibTOKEN from users and deposit in Alpaca's FairLaunch.
@@ -152,7 +151,6 @@ contract IbTokenAdapter is
 
     // Allow caging if
     // - msg.sender is whitelisted to do so
-    // - FairLaunch's owner has been changed
     // - Shield's owner has been changed
     require(whitelist[msg.sender] == 1 || shield.owner() != address(timelock), "IbTokenAdapter/not-authorized");
 

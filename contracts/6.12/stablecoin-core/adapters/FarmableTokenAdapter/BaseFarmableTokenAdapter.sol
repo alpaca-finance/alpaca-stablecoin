@@ -28,7 +28,7 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
   /// @dev Collateral Pool ID
   bytes32 public override collateralPoolId;
   /// @dev Token that is used for collateral
-  IToken public override collateralToken;
+  address public override collateralToken;
   /// @dev The decimals of collateralToken
   uint256 public override decimals;
   /// @dev The token that will get after collateral has been staked
@@ -86,8 +86,8 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
 
     bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = _collateralPoolId;
-    collateralToken = IToken(_collateralToken);
-    decimals = collateralToken.decimals();
+    collateralToken = _collateralToken;
+    decimals = IToken(collateralToken).decimals();
     require(decimals <= 18, "BaseFarmableToken/decimals > 18");
 
     to18ConversionFactor = 10**(18 - decimals);

@@ -272,12 +272,12 @@ contract AlpacaStablecoinProxyActions is Common {
   function adjustPosition(
     address manager,
     uint256 cdp,
-    int256 dink,
-    int256 dart,
+    int256 collateralValue,
+    int256 debtShare,
     address adapter,
     bytes calldata data
   ) public {
-    IManager(manager).adjustPosition(cdp, dink, dart, adapter, data);
+    IManager(manager).adjustPosition(cdp, collateralValue, debtShare, adapter, data);
   }
 
   function exportPosition(

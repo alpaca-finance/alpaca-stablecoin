@@ -40,5 +40,5 @@ interface IGenericTokenAdapter {
 
   function collateralPoolId() external view returns (bytes32);
 
-  function collateralToken() external returns (IToken);
+  function collateralToken() external returns (address);
 }
