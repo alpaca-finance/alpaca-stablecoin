@@ -40,10 +40,8 @@ import "../../interfaces/IStablecoinAdapter.sol";
       - `TokenAdapter`: For well behaved ERC20 tokens, with simple transfer
                    semantics.
 
-      - `ETHJoin`: For native Ether.
-
-      - `StablecoinAdapter`: For connecting internal Dai balances to an external
-                   `DSToken` implementation.
+      - `StablecoinAdapter`: For connecting internal Alpaca Stablecoin balances to an external
+                   `AlpacaStablecoin` implementation.
 
     In practice, adapter implementations will be varied and specific to
     individual collateral types, accounting for different transfer
@@ -51,8 +49,8 @@ import "../../interfaces/IStablecoinAdapter.sol";
 
     Adapters need to implement two basic methods:
 
-      - `deposit`: enter collateral into the system
-      - `withdraw`: remove collateral from the system
+      - `deposit`: enter token into the system
+      - `withdraw`: remove token from the system
 
 */
 
@@ -105,12 +103,18 @@ contract StablecoinAdapter is
     require(y == 0 || (z = x * y) / y == x);
   }
 
-  function deposit(address usr, uint256 wad, bytes calldata data) external payable override nonReentrant {
+  /// @dev Deposit stablecoin into the system from the caller to be used for debt repayment or liquidation
+  /// @param usr The source address which is holding the stablecoin
+  /// @param wad The amount of stablecoin to be deposited [wad]
+  function deposit(address usr, uint256 wad, bytes calldata /* data */) external payable override nonReentrant {
     bookKeeper.moveStablecoin(address(this), usr, mul(ONE, wad));
     stablecoin.burn(msg.sender, wad);
   }
 
-  function withdraw(address usr, uint256 wad, bytes calldata data) external override nonReentrant {
+  /// @dev Withdraw stablecoin from the system to the caller
+  /// @param usr The destination address to receive stablecoin
+  /// @param wad The amount of stablecoin to be withdrawn [wad]
+  function withdraw(address usr, uint256 wad, bytes calldata /* data */) external override nonReentrant {
     require(live == 1, "StablecoinAdapter/not-live");
     bookKeeper.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
     stablecoin.mint(usr, wad);

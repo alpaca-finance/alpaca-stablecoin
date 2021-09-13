@@ -88,7 +88,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
-  await bookKeeper.rely(ibTokenAdapter.address)
+  await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter.address)
 
   return {
     ibTokenAdapter,

@@ -29,10 +29,6 @@ import "../../interfaces/IToken.sol";
 import "../../interfaces/IGenericTokenAdapter.sol";
 import "../../utils/SafeToken.sol";
 
-// FIXME: This contract was altered compared to the production version.
-// It doesn't use LibNote anymore.
-// New deployments of this contract will need to include custom events (TO DO).
-
 /*
     Here we provide *adapters* to connect the BookKeeper to arbitrary external
     token implementations, creating a bounded context for the BookKeeper. The
@@ -41,10 +37,8 @@ import "../../utils/SafeToken.sol";
       - `TokenAdapter`: For well behaved ERC20 tokens, with simple transfer
                    semantics.
 
-      - `ETHJoin`: For native Ether.
-
-      - `StablecoinAdapter`: For connecting internal Dai balances to an external
-                   `DSToken` implementation.
+      - `StablecoinAdapter`: For connecting internal Alpaca Stablecoin balances to an external
+                   `AlpacaStablecoin` implementation.
 
     In practice, adapter implementations will be varied and specific to
     individual collateral types, accounting for different transfer
@@ -52,8 +46,8 @@ import "../../utils/SafeToken.sol";
 
     Adapters need to implement two basic methods:
 
-      - `deposit`: enter collateral into the system
-      - `withdraw`: remove collateral from the system
+      - `deposit`: enter token into the system
+      - `withdraw`: remove token from the system
 
 */
 
@@ -110,10 +104,13 @@ contract TokenAdapter is
     live = 0;
   }
 
+  /// @dev Deposit token into the system from the caller to be used as collateral
+  /// @param usr The source address which is holding the collateral token
+  /// @param wad The amount of collateral to be deposited [wad]
   function deposit(
     address usr,
     uint256 wad,
-    bytes calldata data
+    bytes calldata /* data */
   ) external payable override nonReentrant {
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
@@ -123,10 +120,13 @@ contract TokenAdapter is
     address(collateralToken).safeTransferFrom(msg.sender, address(this), wad);
   }
 
+  /// @dev Withdraw token from the system to the caller
+  /// @param usr The destination address to receive collateral token
+  /// @param wad The amount of collateral to be withdrawn [wad]
   function withdraw(
     address usr,
     uint256 wad,
-    bytes calldata data
+    bytes calldata /* data */
   ) external override nonReentrant {
     require(wad <= 2**255, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
