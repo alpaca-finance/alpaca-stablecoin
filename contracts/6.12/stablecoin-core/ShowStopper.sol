@@ -316,40 +316,6 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
     emit Cage(collateralPoolId);
   }
 
-  /** @dev Cancel and settle the ongoing Dutch Auction.
-    The debt that is on sale for that particular auction will be immediately settled and tracked as bad debt.
-    The on-sale collateral will also be retrieved from the auction and return to the position owner.
-    This process will clear the debt from the position.
-    This function will be called upon every active Dutch Action to cancel them before moving on to the next step of the emergency shutdown.
-    `snip` is used with the Liquidation 2.0 Dutch Auction of MakerDAO.
-  */
-  /// @param collateralPoolId Collateral pool id
-  /// @param id Auction sale id
-  function snip(bytes32 collateralPoolId, uint256 id) external {
-    require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
-
-    (address _auctioneer, , , ) = liquidationEngine.collateralPools(collateralPoolId);
-    IAuctioneer auctioneer = IAuctioneer(_auctioneer);
-    (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
-    (, uint256 tab, uint256 lot, address usr, , ) = auctioneer.sales(id);
-
-    bookKeeper.mintUnbackedStablecoin(address(systemDebtEngine), address(systemDebtEngine), tab);
-    auctioneer.yank(id);
-
-    uint256 debtShare = tab / debtAccumulatedRate;
-    totalDebtShare[collateralPoolId] = add(totalDebtShare[collateralPoolId], debtShare);
-    require(int256(lot) >= 0 && int256(debtShare) >= 0, "End/overflow");
-    bookKeeper.confiscatePosition(
-      collateralPoolId,
-      usr,
-      address(this),
-      address(systemDebtEngine),
-      int256(lot),
-      int256(debtShare)
-    );
-    emit Snip(collateralPoolId, id, usr, tab, lot, debtShare);
-  }
-
   /** @dev Inspect the specified position and use the cage price of the collateral pool id to calculate the current shortfall of the position.
       The shortfall will be tracked per collateral pool. It will be used in the determination of the stablecoin redemption price 
       to make sure that all shortfall will be covered. This process will clear the debt from the position.

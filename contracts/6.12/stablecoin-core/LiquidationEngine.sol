@@ -118,10 +118,6 @@ contract LiquidationEngine is
     require(y == 0 || (z = x * y) / y == x);
   }
 
-  function liquidationPenalty(bytes32 collateralPoolId) external view override returns (uint256) {
-    return collateralPools[collateralPoolId].liquidationPenalty;
-  }
-
   function liquidate(
     bytes32 collateralPoolId,
     address positionAddress,
