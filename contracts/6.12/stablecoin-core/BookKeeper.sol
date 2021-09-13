@@ -19,7 +19,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
@@ -30,40 +29,42 @@ import "../interfaces/IBookKeeper.sol";
     It has the ability to move collateral token and stablecoin with in the accounting state variable. 
 */
 
-contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
-  // --- Auth ---
-  mapping(address => uint256) public whitelist;
+contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeable {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant PRICE_ORACLE_ROLE = keccak256("PRICE_ORACLE_ROLE");
+  bytes32 public constant ADAPTER_ROLE = keccak256("ADAPTER_ROLE");
+  bytes32 public constant LIQUIDATION_ENGINE_ROLE = keccak256("LIQUIDATION_ENGINE_ROLE");
+  bytes32 public constant STABILITY_FEE_COLLECTOR_ROLE = keccak256("STABILITY_FEE_COLLECTOR_ROLE");
+  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
+  bytes32 public constant POSITION_MANAGER_ROLE = keccak256("POSITION_MANAGER_ROLE");
+  bytes32 public constant MINTABLE_ROLE = keccak256("MINTABLE_ROLE");
 
-  function rely(address usr) external auth {
-    require(live == 1, "BookKeeper/not-live");
-    whitelist[usr] = 1;
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
   }
 
-  function deny(address usr) external auth {
-    require(live == 1, "BookKeeper/not-live");
-    whitelist[usr] = 0;
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 
-  modifier auth() {
-    require(whitelist[msg.sender] == 1, "BookKeeper/not-authorized");
-    _;
-  }
-
-  /// @dev This is the mapping which stores the consent or allowance to adjust positions by the position addresses. 
+  /// @dev This is the mapping which stores the consent or allowance to adjust positions by the position addresses.
   /// @dev `address` The position address
   /// @dev `address` The allowance delegate address
-  /// @dev `uint256` true (1) means allowed or false (0) means not allowed 
+  /// @dev `uint256` true (1) means allowed or false (0) means not allowed
   mapping(address => mapping(address => uint256)) public override can;
 
   /// @dev Give an allowance to the `usr` address to adjust the position address who is the caller.
   /// @dev `usr` The address to be allowed to adjust position
-  function hope(address usr) external override {
+  function hope(address usr) external override whenNotPaused {
     can[msg.sender][usr] = 1;
   }
 
   /// @dev Revoke an allowance from the `usr` address to adjust the position address who is the caller.
   /// @dev `usr` The address to be revoked from adjusting position
-  function nope(address usr) external override {
+  function nope(address usr) external override whenNotPaused {
     can[msg.sender][usr] = 0;
   }
 
@@ -100,12 +101,14 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
 
   // --- Init ---
   function initialize() external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
-    whitelist[msg.sender] = 1;
     live = 1;
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -140,7 +143,8 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   }
 
   // --- Administration ---
-  function init(bytes32 collateralPoolId) external auth {
+  function init(bytes32 collateralPoolId) external whenNotPaused {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(collateralPools[collateralPoolId].debtAccumulatedRate == 0, "BookKeeper/collateral-pool-already-init");
     collateralPools[collateralPoolId].debtAccumulatedRate = 10**27;
   }
@@ -150,31 +154,39 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
   event SetDebtCeiling(address indexed caller, bytes32 collateralPoolId, uint256 data);
   event SetDebtFloor(address indexed caller, bytes32 collateralPoolId, uint256 data);
 
-  function setTotalDebtCeiling(uint256 _data) external auth {
+  function setTotalDebtCeiling(uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "BookKeeper/not-live");
     totalDebtCeiling = _data;
     emit SetTotalDebtCeiling(msg.sender, _data);
   }
 
-  function setPriceWithSafetyMargin(bytes32 _collateralPoolId, uint256 _data) external override auth {
+  function setPriceWithSafetyMargin(bytes32 _collateralPoolId, uint256 _data) external override {
+    require(hasRole(PRICE_ORACLE_ROLE, msg.sender), "!priceOracleRole");
     require(live == 1, "BookKeeper/not-live");
     collateralPools[_collateralPoolId].priceWithSafetyMargin = _data;
     emit SetPriceWithSafetyMargin(msg.sender, _collateralPoolId, _data);
   }
 
-  function setDebtCeiling(bytes32 _collateralPoolId, uint256 _data) external auth {
+  function setDebtCeiling(bytes32 _collateralPoolId, uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "BookKeeper/not-live");
     collateralPools[_collateralPoolId].debtCeiling = _data;
     emit SetDebtCeiling(msg.sender, _collateralPoolId, _data);
   }
 
-  function setDebtFloor(bytes32 _collateralPoolId, uint256 _data) external auth {
+  function setDebtFloor(bytes32 _collateralPoolId, uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "BookKeeper/not-live");
     collateralPools[_collateralPoolId].debtFloor = _data;
     emit SetDebtFloor(msg.sender, _collateralPoolId, _data);
   }
 
-  function cage() external override auth {
+  function cage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
     live = 0;
   }
 
@@ -187,7 +199,8 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     bytes32 collateralPoolId,
     address usr,
     int256 wad
-  ) external override auth {
+  ) external override whenNotPaused {
+    require(hasRole(ADAPTER_ROLE, msg.sender), "!adapterRole");
     collateralToken[collateralPoolId][usr] = add(collateralToken[collateralPoolId][usr], wad);
   }
 
@@ -201,7 +214,7 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     address src,
     address dst,
     uint256 wad
-  ) external override {
+  ) external override whenNotPaused {
     require(wish(src, msg.sender), "BookKeeper/not-allowed");
     collateralToken[collateralPoolId][src] = sub(collateralToken[collateralPoolId][src], wad);
     collateralToken[collateralPoolId][dst] = add(collateralToken[collateralPoolId][dst], wad);
@@ -215,7 +228,7 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     address src,
     address dst,
     uint256 rad
-  ) external override {
+  ) external override whenNotPaused {
     require(wish(src, msg.sender), "BookKeeper/not-allowed");
     stablecoin[src] = sub(stablecoin[src], rad);
     stablecoin[dst] = add(stablecoin[dst], rad);
@@ -248,7 +261,9 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     address stablecoinOwner,
     int256 collateralValue,
     int256 debtShare
-  ) external override {
+  ) external override whenNotPaused {
+    require(hasRole(POSITION_MANAGER_ROLE, msg.sender), "!positionManagerRole");
+
     // system is live
     require(live == 1, "BookKeeper/not-live");
 
@@ -321,7 +336,9 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     address dst,
     int256 collateralValue,
     int256 debtShare
-  ) external override {
+  ) external override whenNotPaused {
+    require(hasRole(POSITION_MANAGER_ROLE, msg.sender), "!positionManagerRole");
+
     Position storage u = positions[collateralPoolId][src];
     Position storage v = positions[collateralPoolId][dst];
     CollateralPool storage i = collateralPools[collateralPoolId];
@@ -366,7 +383,9 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     address stablecoinDebtor,
     int256 collateralValue,
     int256 debtShare
-  ) external override auth {
+  ) external override whenNotPaused {
+    require(hasRole(LIQUIDATION_ENGINE_ROLE, msg.sender), "!liquidationEngineRole");
+
     Position storage position = positions[collateralPoolId][positionAddress];
     CollateralPool storage collateralPool = collateralPools[collateralPoolId];
 
@@ -391,7 +410,7 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
       A successful `settleSystemBadDebt` would remove the bad debt from the system.
   */
   /// @param rad the amount of stablecoin to be used to settle bad debt [rad]
-  function settleSystemBadDebt(uint256 rad) external override {
+  function settleSystemBadDebt(uint256 rad) external override whenNotPaused {
     address u = msg.sender;
     systemBadDebt[u] = sub(systemBadDebt[u], rad);
     stablecoin[u] = sub(stablecoin[u], rad);
@@ -407,7 +426,8 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     address from,
     address to,
     uint256 rad
-  ) external override auth {
+  ) external override whenNotPaused {
+    require(hasRole(MINTABLE_ROLE, msg.sender), "!mintableRole");
     systemBadDebt[from] = add(systemBadDebt[from], rad);
     stablecoin[to] = add(stablecoin[to], rad);
     totalUnbackedStablecoin = add(totalUnbackedStablecoin, rad);
@@ -428,7 +448,8 @@ contract BookKeeper is IBookKeeper, OwnableUpgradeable, PausableUpgradeable, Acc
     bytes32 collateralPoolId,
     address u,
     int256 debtAccumulatedRate
-  ) external override auth {
+  ) external override whenNotPaused {
+    require(hasRole(STABILITY_FEE_COLLECTOR_ROLE, msg.sender), "!stabilityFeeCollectorRole");
     require(live == 1, "BookKeeper/not-live");
     CollateralPool storage collateralPool = collateralPools[collateralPoolId];
     collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);

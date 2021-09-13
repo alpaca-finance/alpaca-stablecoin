@@ -85,13 +85,10 @@ describe("ShowStopper", () => {
     mockedSystemDebtEngine.smocked.cage.will.return.with()
     mockedPriceOracle.smocked.cage.will.return.with()
 
-    await showStopper["file(bytes32,address)"](formatBytes32String("bookKeeper"), mockedBookKeeper.address)
-    await showStopper["file(bytes32,address)"](
-      formatBytes32String("liquidationEngine"),
-      mockedLiquidationEngine.address
-    )
-    await showStopper["file(bytes32,address)"](formatBytes32String("systemDebtEngine"), mockedSystemDebtEngine.address)
-    await showStopper["file(bytes32,address)"](formatBytes32String("priceOracle"), mockedPriceOracle.address)
+    await showStopper.setBookKeeper(mockedBookKeeper.address)
+    await showStopper.setLiquidationEngine(mockedLiquidationEngine.address)
+    await showStopper.setSystemDebtEngine(mockedSystemDebtEngine.address)
+    await showStopper.setPriceOracle(mockedPriceOracle.address)
     await showStopper["cage()"]()
 
     mockedBookKeeper.smocked.collateralPools.will.return.with([
@@ -136,16 +133,10 @@ describe("ShowStopper", () => {
         mockedSystemDebtEngine.smocked.cage.will.return.with()
         mockedPriceOracle.smocked.cage.will.return.with()
 
-        await showStopper["file(bytes32,address)"](formatBytes32String("bookKeeper"), mockedBookKeeper.address)
-        await showStopper["file(bytes32,address)"](
-          formatBytes32String("liquidationEngine"),
-          mockedLiquidationEngine.address
-        )
-        await showStopper["file(bytes32,address)"](
-          formatBytes32String("systemDebtEngine"),
-          mockedSystemDebtEngine.address
-        )
-        await showStopper["file(bytes32,address)"](formatBytes32String("priceOracle"), mockedPriceOracle.address)
+        await showStopper.setBookKeeper(mockedBookKeeper.address)
+        await showStopper.setLiquidationEngine(mockedLiquidationEngine.address)
+        await showStopper.setSystemDebtEngine(mockedSystemDebtEngine.address)
+        await showStopper.setPriceOracle(mockedPriceOracle.address)
 
         await expect(showStopper["cage()"]()).to.emit(showStopper, "Cage()").withArgs()
 
@@ -162,18 +153,12 @@ describe("ShowStopper", () => {
         mockedSystemDebtEngine.smocked.cage.will.return.with()
         mockedPriceOracle.smocked.cage.will.return.with()
 
-        await showStopper["file(bytes32,address)"](formatBytes32String("bookKeeper"), mockedBookKeeper.address)
-        await showStopper["file(bytes32,address)"](
-          formatBytes32String("liquidationEngine"),
-          mockedLiquidationEngine.address
-        )
-        await showStopper["file(bytes32,address)"](
-          formatBytes32String("systemDebtEngine"),
-          mockedSystemDebtEngine.address
-        )
-        await showStopper["file(bytes32,address)"](formatBytes32String("priceOracle"), mockedPriceOracle.address)
+        await showStopper.setBookKeeper(mockedBookKeeper.address)
+        await showStopper.setLiquidationEngine(mockedLiquidationEngine.address)
+        await showStopper.setSystemDebtEngine(mockedSystemDebtEngine.address)
+        await showStopper.setPriceOracle(mockedPriceOracle.address)
 
-        await expect(showStopperAsAlice["cage()"]()).to.be.revertedWith("End/not-authorized")
+        await expect(showStopperAsAlice["cage()"]()).to.be.revertedWith("!ownerRole")
       })
     })
   })
@@ -189,16 +174,10 @@ describe("ShowStopper", () => {
           mockedSystemDebtEngine.smocked.cage.will.return.with()
           mockedPriceOracle.smocked.cage.will.return.with()
 
-          await showStopper["file(bytes32,address)"](formatBytes32String("bookKeeper"), mockedBookKeeper.address)
-          await showStopper["file(bytes32,address)"](
-            formatBytes32String("liquidationEngine"),
-            mockedLiquidationEngine.address
-          )
-          await showStopper["file(bytes32,address)"](
-            formatBytes32String("systemDebtEngine"),
-            mockedSystemDebtEngine.address
-          )
-          await showStopper["file(bytes32,address)"](formatBytes32String("priceOracle"), mockedPriceOracle.address)
+          await showStopper.setBookKeeper(mockedBookKeeper.address)
+          await showStopper.setLiquidationEngine(mockedLiquidationEngine.address)
+          await showStopper.setSystemDebtEngine(mockedSystemDebtEngine.address)
+          await showStopper.setPriceOracle(mockedPriceOracle.address)
           await showStopper["cage()"]()
 
           mockedBookKeeper.smocked.collateralPools.will.return.with([
@@ -235,16 +214,10 @@ describe("ShowStopper", () => {
           mockedSystemDebtEngine.smocked.cage.will.return.with()
           mockedPriceOracle.smocked.cage.will.return.with()
 
-          await showStopper["file(bytes32,address)"](formatBytes32String("bookKeeper"), mockedBookKeeper.address)
-          await showStopper["file(bytes32,address)"](
-            formatBytes32String("liquidationEngine"),
-            mockedLiquidationEngine.address
-          )
-          await showStopper["file(bytes32,address)"](
-            formatBytes32String("systemDebtEngine"),
-            mockedSystemDebtEngine.address
-          )
-          await showStopper["file(bytes32,address)"](formatBytes32String("priceOracle"), mockedPriceOracle.address)
+          await showStopper.setBookKeeper(mockedBookKeeper.address)
+          await showStopper.setLiquidationEngine(mockedLiquidationEngine.address)
+          await showStopper.setSystemDebtEngine(mockedSystemDebtEngine.address)
+          await showStopper.setPriceOracle(mockedPriceOracle.address)
           await showStopper["cage()"]()
 
           mockedBookKeeper.smocked.collateralPools.will.return.with([
@@ -559,6 +532,134 @@ describe("ShowStopper", () => {
             expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
             expect(moveCollateral[0].wad).to.be.equal(UnitHelpers.WeiPerRay)
           })
+        })
+      })
+    })
+  })
+
+  describe("#setBookKeeper", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(showStopperAsAlice.setBookKeeper(mockedBookKeeper.address)).to.be.revertedWith("!ownerRole")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when showStopper does not live", () => {
+        it("should be revert", async () => {
+          // grant role access
+          await showStopper.grantRole(await showStopper.OWNER_ROLE(), deployerAddress)
+
+          await setup()
+
+          await expect(showStopper.setBookKeeper(mockedBookKeeper.address)).to.be.revertedWith("End/not-live")
+        })
+      })
+      context("when showStopper is live", () => {
+        it("should be able to call setBookKeeper", async () => {
+          // grant role access
+          await showStopper.grantRole(await showStopper.OWNER_ROLE(), deployerAddress)
+          // set total debt ceiling 1 rad
+          await expect(showStopper.setBookKeeper(mockedBookKeeper.address))
+            .to.emit(showStopper, "SetBookKeeper")
+            .withArgs(deployerAddress, mockedBookKeeper.address)
+        })
+      })
+    })
+  })
+
+  describe("#setLiquidationEngine", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(showStopperAsAlice.setLiquidationEngine(mockedLiquidationEngine.address)).to.be.revertedWith(
+          "!ownerRole"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when showStopper does not live", () => {
+        it("should be revert", async () => {
+          // grant role access
+          await showStopper.grantRole(await showStopper.OWNER_ROLE(), deployerAddress)
+
+          await setup()
+
+          await expect(showStopper.setLiquidationEngine(mockedLiquidationEngine.address)).to.be.revertedWith(
+            "End/not-live"
+          )
+        })
+      })
+      context("when showStopper is live", () => {
+        it("should be able to call setLiquidationEngine", async () => {
+          // grant role access
+          await showStopper.grantRole(await showStopper.OWNER_ROLE(), deployerAddress)
+          // set total debt ceiling 1 rad
+          await expect(showStopper.setLiquidationEngine(mockedLiquidationEngine.address))
+            .to.emit(showStopper, "SetLiquidationEngine")
+            .withArgs(deployerAddress, mockedLiquidationEngine.address)
+        })
+      })
+    })
+  })
+
+  describe("#setSystemDebtEngine", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(showStopperAsAlice.setSystemDebtEngine(mockedSystemDebtEngine.address)).to.be.revertedWith(
+          "!ownerRole"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when showStopper does not live", () => {
+        it("should be revert", async () => {
+          // grant role access
+          await showStopper.grantRole(await showStopper.OWNER_ROLE(), deployerAddress)
+
+          await setup()
+
+          await expect(showStopper.setSystemDebtEngine(mockedSystemDebtEngine.address)).to.be.revertedWith(
+            "End/not-live"
+          )
+        })
+      })
+      context("when showStopper is live", () => {
+        it("should be able to call setSystemDebtEngine", async () => {
+          // grant role access
+          await showStopper.grantRole(await showStopper.OWNER_ROLE(), deployerAddress)
+          // set total debt ceiling 1 rad
+          await expect(showStopper.setSystemDebtEngine(mockedSystemDebtEngine.address))
+            .to.emit(showStopper, "SetSystemDebtEngine")
+            .withArgs(deployerAddress, mockedSystemDebtEngine.address)
+        })
+      })
+    })
+  })
+
+  describe("#setPriceOracle", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(showStopperAsAlice.setPriceOracle(mockedPriceOracle.address)).to.be.revertedWith("!ownerRole")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      context("when showStopper does not live", () => {
+        it("should be revert", async () => {
+          // grant role access
+          await showStopper.grantRole(await showStopper.OWNER_ROLE(), deployerAddress)
+
+          await setup()
+
+          await expect(showStopper.setPriceOracle(mockedPriceOracle.address)).to.be.revertedWith("End/not-live")
+        })
+      })
+      context("when showStopper is live", () => {
+        it("should be able to call setPriceOracle", async () => {
+          // grant role access
+          await showStopper.grantRole(await showStopper.OWNER_ROLE(), deployerAddress)
+          // set total debt ceiling 1 rad
+          await expect(showStopper.setPriceOracle(mockedPriceOracle.address))
+            .to.emit(showStopper, "SetPriceOracle")
+            .withArgs(deployerAddress, mockedPriceOracle.address)
         })
       })
     })

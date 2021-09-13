@@ -17,7 +17,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
@@ -31,22 +30,10 @@ import "../interfaces/IPriceOracle.sol";
     The price oracle is important in reflecting the current state of the market price.
 */
 
-contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IPriceOracle {
-  // --- Auth ---
-  mapping(address => uint256) public wards;
-
-  function rely(address guy) external auth {
-    wards[guy] = 1;
-  }
-
-  function deny(address guy) external auth {
-    wards[guy] = 0;
-  }
-
-  modifier auth() {
-    require(wards[msg.sender] == 1, "Spotter/not-authorized");
-    _;
-  }
+contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOracle {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
   // --- Data ---
   struct CollateralPool {
@@ -70,14 +57,16 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
 
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
-    wards[msg.sender] = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     stableCoinReferencePrice = ONE;
     live = 1;
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -96,19 +85,22 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   event SetPriceFeed(address indexed caller, bytes32 poolId, address priceFeed);
   event SetLiquidationRatio(address indexed caller, bytes32 poolId, uint256 data);
 
-  function setStableCoinReferencePrice(uint256 _data) external auth {
+  function setStableCoinReferencePrice(uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "Spotter/not-live");
     stableCoinReferencePrice = _data;
     emit SetStableCoinReferencePrice(msg.sender, _data);
   }
 
-  function setPriceFeed(bytes32 _poolId, address _priceFeed) external auth {
+  function setPriceFeed(bytes32 _poolId, address _priceFeed) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "Spotter/not-live");
     collateralPools[_poolId].priceFeed = IPriceFeed(_priceFeed);
     emit SetPriceFeed(msg.sender, _poolId, _priceFeed);
   }
 
-  function setLiquidationRatio(bytes32 _poolId, uint256 _data) external auth {
+  function setLiquidationRatio(bytes32 _poolId, uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "Spotter/not-live");
     collateralPools[_poolId].liquidationRatio = _data;
     emit SetLiquidationRatio(msg.sender, _poolId, _data);
@@ -117,7 +109,7 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   // --- Update value ---
   /// @dev Update the latest price with safety margin of the collateral pool to the BookKeeper
   /// @param poolId Collateral pool id
-  function poke(bytes32 poolId) external {
+  function poke(bytes32 poolId) external whenNotPaused {
     (bytes32 rawPrice, bool hasPrice) = collateralPools[poolId].priceFeed.peek();
     uint256 priceWithSafetyMargin = hasPrice
       ? rdiv(rdiv(mul(uint256(rawPrice), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
@@ -126,7 +118,22 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Poke(poolId, rawPrice, priceWithSafetyMargin);
   }
 
-  function cage() external override auth {
+  function cage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
     live = 0;
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 }

@@ -19,7 +19,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -37,28 +36,15 @@ import "../interfaces/ISystemDebtEngine.sol";
 */
 
 contract SystemDebtEngine is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
   ISystemDebtEngine
 {
-  // --- Auth ---
-  mapping(address => uint256) public whitelist;
-
-  function rely(address usr) external auth {
-    require(live == 1, "SystemDebtEngine/not-live");
-    whitelist[usr] = 1;
-  }
-
-  function deny(address usr) external auth {
-    whitelist[usr] = 0;
-  }
-
-  modifier auth() {
-    require(whitelist[msg.sender] == 1, "SystemDebtEngine/not-authorized");
-    _;
-  }
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant LIQUIDATION_ENGINE_ROLE = keccak256("LIQUIDATION_ENGINE_ROLE");
+  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
@@ -84,17 +70,19 @@ contract SystemDebtEngine is
     address surplusAuctionHouse_,
     address badDebtAuctionHouse_
   ) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    whitelist[msg.sender] = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     surplusAuctionHouse = ISurplusAuctioneer(surplusAuctionHouse_);
     badDebtAuctionHouse = IBadDebtAuctioneer(badDebtAuctionHouse_);
     bookKeeper.hope(surplusAuctionHouse_);
     live = 1;
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -113,19 +101,21 @@ contract SystemDebtEngine is
   // --- Administration ---
   event SetSurplusBuffer(address indexed caller, uint256 data);
 
-  function setSurplusBuffer(uint256 _data) external auth {
+  function setSurplusBuffer(uint256 _data) external whenNotPaused {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     surplusBuffer = _data;
     emit SetSurplusBuffer(msg.sender, _data);
   }
 
   // Push to debt-queue
-  function pushToBadDebtQueue(uint256 tab) external override auth {
+  function pushToBadDebtQueue(uint256 tab) external override whenNotPaused {
+    require(hasRole(LIQUIDATION_ENGINE_ROLE, msg.sender), "!liquidationEngineRole");
     badDebtQueue[now] = add(badDebtQueue[now], tab);
     totalBadDebtValue = add(totalBadDebtValue, tab);
   }
 
   // Pop from debt-queue
-  function popFromBadDebtQueue(uint256 timestamp) external nonReentrant {
+  function popFromBadDebtQueue(uint256 timestamp) external whenNotPaused nonReentrant {
     require(add(timestamp, badDebtAuctionDelay) <= now, "SystemDebtEngine/badDebtAuctionDelay-not-finished");
     totalBadDebtValue = sub(totalBadDebtValue, badDebtQueue[timestamp]);
     badDebtQueue[timestamp] = 0;
@@ -137,7 +127,7 @@ contract SystemDebtEngine is
       The stablecoin held by SystemDebtEngine (which is the surplus) will be deducted to compensate the incurred bad debt.
   */
   /// @param rad The amount of bad debt to be settled. [rad]
-  function settleSystemBadDebt(uint256 rad) external nonReentrant {
+  function settleSystemBadDebt(uint256 rad) external whenNotPaused nonReentrant {
     require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
     require(
       rad <= sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
@@ -146,7 +136,7 @@ contract SystemDebtEngine is
     bookKeeper.settleSystemBadDebt(rad);
   }
 
-  function settleSystemBadDebtByAuction(uint256 rad) external nonReentrant {
+  function settleSystemBadDebtByAuction(uint256 rad) external whenNotPaused nonReentrant {
     require(rad <= totalBadDebtInAuction, "SystemDebtEngine/not-enough-ash");
     require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
     totalBadDebtInAuction = sub(totalBadDebtInAuction, rad);
@@ -154,7 +144,7 @@ contract SystemDebtEngine is
   }
 
   // Debt auction
-  function startBadDebtAuction() external nonReentrant returns (uint256 id) {
+  function startBadDebtAuction() external whenNotPaused nonReentrant returns (uint256 id) {
     require(
       badDebtFixedBidSize <=
         sub(sub(bookKeeper.systemBadDebt(address(this)), totalBadDebtValue), totalBadDebtInAuction),
@@ -166,7 +156,7 @@ contract SystemDebtEngine is
   }
 
   // Surplus auction
-  function startSurplusAuction() external nonReentrant returns (uint256 id) {
+  function startSurplusAuction() external whenNotPaused nonReentrant returns (uint256 id) {
     require(
       bookKeeper.stablecoin(address(this)) >=
         add(add(bookKeeper.systemBadDebt(address(this)), surplusAuctionFixedLotSize), surplusBuffer),
@@ -179,7 +169,11 @@ contract SystemDebtEngine is
     id = surplusAuctionHouse.startAuction(surplusAuctionFixedLotSize, 0);
   }
 
-  function cage() external override auth {
+  function cage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
     require(live == 1, "SystemDebtEngine/not-live");
     live = 0;
     totalBadDebtValue = 0;
@@ -187,5 +181,16 @@ contract SystemDebtEngine is
     surplusAuctionHouse.cage(bookKeeper.stablecoin(address(surplusAuctionHouse)));
     badDebtAuctionHouse.cage();
     bookKeeper.settleSystemBadDebt(min(bookKeeper.stablecoin(address(this)), bookKeeper.systemBadDebt(address(this))));
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 }

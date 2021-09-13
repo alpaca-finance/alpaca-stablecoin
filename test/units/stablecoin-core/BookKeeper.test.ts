@@ -37,6 +37,7 @@ describe("BookKeeper", () => {
   let bobAddress: string
 
   // Contracts
+
   let bookKeeper: BookKeeper
   let bookKeeperAsAlice: BookKeeper
   let bookKeeperAsBob: BookKeeper
@@ -55,28 +56,38 @@ describe("BookKeeper", () => {
   })
 
   describe("#init", () => {
-    context("when the caller is not the owner", async () => {
+    context("when the caller is not the owner", () => {
       it("should revert", async () => {
-        await expect(bookKeeperAsAlice.init(formatBytes32String("BNB"))).to.be.revertedWith("BookKeeper/not-authorized")
+        await expect(bookKeeperAsAlice.init(formatBytes32String("BNB"))).to.be.revertedWith("!ownerRole")
       })
     })
-    context("when the caller is the owner", async () => {
+
+    context("when the caller is the owner", () => {
       context("when initialize BNB collateral pool", async () => {
         it("should be success", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           await bookKeeper.init(formatBytes32String("BNB"))
           const pool = await bookKeeper.collateralPools(formatBytes32String("BNB"))
           expect(pool.debtAccumulatedRate).equal(WeiPerRay)
         })
       })
 
-      context("when collateral pool already init", async () => {
+      context("when collateral pool already init", () => {
         it("should be revert", async () => {
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           // first initialize BNB colleteral pool
           await bookKeeper.init(formatBytes32String("BNB"))
           // second initialize BNB colleteral pool
           await expect(bookKeeper.init(formatBytes32String("BNB"))).to.be.revertedWith(
             "BookKeeper/collateral-pool-already-init"
           )
+        })
+      })
+
+      context("when role can't authentication", () => {
+        it("should be revert", async () => {
+          await expect(bookKeeperAsAlice.init(formatBytes32String("BNB"))).to.be.revertedWith("!ownerRole")
         })
       })
     })
@@ -87,12 +98,16 @@ describe("BookKeeper", () => {
       it("should revert", async () => {
         await expect(
           bookKeeperAsAlice.addCollateral(formatBytes32String("BNB"), deployerAddress, WeiPerWad)
-        ).to.be.revertedWith("BookKeeper/not-authorized")
+        ).to.be.revertedWith("!adapterRole")
       })
     })
+
     context("when the caller is the owner", async () => {
       context("when collateral to add is positive", () => {
         it("should be able to call addCollateral", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
           // init BNB collateral pool
           await bookKeeper.init(formatBytes32String("BNB"))
 
@@ -108,6 +123,11 @@ describe("BookKeeper", () => {
 
       context("when collateral to add is negative", () => {
         it("should be able to call addCollateral", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+
           // init BNB collateral pool
           await bookKeeper.init(formatBytes32String("BNB"))
 
@@ -138,6 +158,9 @@ describe("BookKeeper", () => {
 
       context("when alice allow bob to move collateral", () => {
         it("should be able to call moveCollateral", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+
           // add collateral 1 BNB to alice
           await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad)
 
@@ -171,6 +194,10 @@ describe("BookKeeper", () => {
       })
       context("when alice has enough collateral", () => {
         it("should be able to call moveCollateral", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+
           // add collateral 1 BNB to alice
           await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad)
 
@@ -202,6 +229,9 @@ describe("BookKeeper", () => {
 
       context("when alice allow bob to move collateral", () => {
         it("should be able to call moveStablecoin", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
+
           // mint 1 rad to alice
           await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
 
@@ -233,6 +263,9 @@ describe("BookKeeper", () => {
       })
       context("when alice has enough stablecoin", () => {
         it("should be able to call moveStablecoin", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
+
           // mint 1 rad to alice
           await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
 
@@ -256,8 +289,11 @@ describe("BookKeeper", () => {
   describe("#adjustPosition", () => {
     context("when bookkeeper does not live", () => {
       it("should be revert", async () => {
+        // grant role access
+        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
         bookKeeper.cage()
 
+        await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
         await expect(
           bookKeeper.adjustPosition(
             formatBytes32String("BNB"),
@@ -273,6 +309,7 @@ describe("BookKeeper", () => {
 
     context("when collateral pool not init", () => {
       it("should be revert", async () => {
+        await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
         await expect(
           bookKeeper.adjustPosition(
             formatBytes32String("BNB"),
@@ -290,9 +327,12 @@ describe("BookKeeper", () => {
       context("when call adjustPosition(lock)", () => {
         context("when alice call but bob is collateral owner", () => {
           it("should be revert", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
 
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
             await expect(
               bookKeeperAsAlice.adjustPosition(
                 formatBytes32String("BNB"),
@@ -307,6 +347,10 @@ describe("BookKeeper", () => {
           context("when bob allow alice to move collateral", () => {
             context("when bob doesn't have enough collateral", () => {
               it("should be revert", async () => {
+                // grant role access
+                await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+                await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
                 // initialize BNB colleteral pool
                 await bookKeeper.init(formatBytes32String("BNB"))
 
@@ -328,6 +372,11 @@ describe("BookKeeper", () => {
 
             context("when bob has enough collateral", () => {
               it("should be able to call adjustPosition(lock)", async () => {
+                // grant role access
+                await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+                await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+                await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
                 // initialize BNB colleteral pool
                 await bookKeeper.init(formatBytes32String("BNB"))
 
@@ -359,6 +408,10 @@ describe("BookKeeper", () => {
         context("when alice call and alice is collateral owner", () => {
           context("when alice doesn't have enough collateral", () => {
             it("should be revert", async () => {
+              // grant role access
+              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
 
@@ -377,6 +430,11 @@ describe("BookKeeper", () => {
 
           context("when alice has enough collateral", () => {
             it("should be able to call adjustPosition(lock)", async () => {
+              // grant role access
+              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
 
@@ -406,6 +464,10 @@ describe("BookKeeper", () => {
         context("when alice call and alice is collateral owner", () => {
           context("when alice doesn't have enough lock collateral in position", () => {
             it("should be revert", async () => {
+              // grant role access
+              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
 
@@ -424,6 +486,12 @@ describe("BookKeeper", () => {
           })
           context("when alice has enough lock collateral in position", () => {
             it("should be able to call adjustPosition(free)", async () => {
+              // grant role access
+              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
 
@@ -471,6 +539,10 @@ describe("BookKeeper", () => {
         context("when alice call but bob is collateral owner", () => {
           context("when alice doesn't have enough lock collateral in position", () => {
             it("should be revert", async () => {
+              // grant role access
+              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
 
@@ -489,6 +561,11 @@ describe("BookKeeper", () => {
           })
           context("when alice has enough lock collateral in position", () => {
             it("should be able to call adjustPosition(free)", async () => {
+              // grant role access
+              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
 
@@ -534,6 +611,10 @@ describe("BookKeeper", () => {
       context("when debt ceilings are exceeded", () => {
         context("when pool debt ceiling are exceeded", () => {
           it("should be revert", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
+
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 1 rad
@@ -556,6 +637,9 @@ describe("BookKeeper", () => {
         })
         context("when total debt ceiling are exceeded", () => {
           it("should be revert", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -579,6 +663,10 @@ describe("BookKeeper", () => {
       })
       context("when position is not safe", () => {
         it("should be revert", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
           // initialize BNB colleteral pool
           await bookKeeper.init(formatBytes32String("BNB"))
           // set pool debt ceiling 10 rad
@@ -604,6 +692,14 @@ describe("BookKeeper", () => {
       context("when call adjustPosition(draw)", () => {
         context("when alice call but bob is position owner", () => {
           it("should be revert", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), bobAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -640,6 +736,13 @@ describe("BookKeeper", () => {
           })
           context("when bob allow alice to manage position", () => {
             it("should be able to call adjustPosition(draw)", async () => {
+              // grant role access
+              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), bobAddress)
+              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
               // initialize BNB colleteral pool
               await bookKeeper.init(formatBytes32String("BNB"))
               // set pool debt ceiling 10 rad
@@ -694,6 +797,12 @@ describe("BookKeeper", () => {
         })
         context("when alice call and alice is position owner", () => {
           it("should be able to call adjustPosition(draw)", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -744,6 +853,12 @@ describe("BookKeeper", () => {
         })
         context("when position debt value < debt floor", () => {
           it("should be revert", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -786,6 +901,12 @@ describe("BookKeeper", () => {
       context("when call adjustPosition(wipe)", () => {
         context("when alice call and alice is position owner", () => {
           it("should be able to call adjustPosition(wipe)", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -846,6 +967,12 @@ describe("BookKeeper", () => {
         })
         context("when position debt value < debt floor", () => {
           it("should be revert", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -901,6 +1028,12 @@ describe("BookKeeper", () => {
     context("when alice move position to bob", () => {
       context("when alice and bob don't allow anyone else to manage the position", () => {
         it("should be revert", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
           // initialize BNB colleteral pool
           await bookKeeper.init(formatBytes32String("BNB"))
           // set pool debt ceiling 10 rad
@@ -939,6 +1072,12 @@ describe("BookKeeper", () => {
       context("when bob allow alice to manage a position", () => {
         context("when after moving alice position was not safe", () => {
           it("should be revert", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -979,6 +1118,12 @@ describe("BookKeeper", () => {
         })
         context("when after moving bob position was not safe", () => {
           it("should be revert", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -1019,6 +1164,12 @@ describe("BookKeeper", () => {
         })
         context("when after moving alice position was not enough debt", () => {
           it("should be revert", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -1059,6 +1210,12 @@ describe("BookKeeper", () => {
         })
         context("when after moving bob position was not enough debt", () => {
           it("should be revert", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -1099,6 +1256,12 @@ describe("BookKeeper", () => {
         })
         context("when alice and bob positions are safe", () => {
           it("should be able to call movePosition", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
             // initialize BNB colleteral pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -1167,13 +1330,20 @@ describe("BookKeeper", () => {
             WeiPerWad.mul(-1),
             WeiPerWad.mul(-1)
           )
-        ).to.be.revertedWith("BookKeeper/not-authorized")
+        ).to.be.revertedWith("!liquidationEngineRole")
       })
     })
     context("when the caller is the owner", async () => {
       context("when start liquidation", () => {
         context("when liquidating all in position", () => {
           it("should be able to call confiscatePosition", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+
             // init BNB pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -1240,6 +1410,12 @@ describe("BookKeeper", () => {
         })
         context("when liquidating some in position", () => {
           it("should be able to call confiscatePosition", async () => {
+            // grant role access
+            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), deployerAddress)
+            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
             // init BNB pool
             await bookKeeper.init(formatBytes32String("BNB"))
             // set pool debt ceiling 10 rad
@@ -1313,7 +1489,7 @@ describe("BookKeeper", () => {
       it("should revert", async () => {
         await expect(
           bookKeeperAsAlice.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
-        ).to.be.revertedWith("BookKeeper/not-authorized")
+        ).to.be.revertedWith("!mintableRole")
       })
     })
     context("when the caller is the owner", async () => {
@@ -1327,6 +1503,9 @@ describe("BookKeeper", () => {
           expect(totalUnbackedStablecoinBefore).to.be.equal(0)
           const totalStablecoinIssuedBefore = await bookKeeper.totalStablecoinIssued()
           expect(totalStablecoinIssuedBefore).to.be.equal(0)
+
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
 
           //  mint 1 rad to alice
           await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
@@ -1347,6 +1526,9 @@ describe("BookKeeper", () => {
   describe("#settleSystemBadDebt", () => {
     context("when settle system bad debt", () => {
       it("should be able to call settleSystemBadDebt", async () => {
+        // grant role access
+        await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
+
         //  mint 1 rad to deployer
         await bookKeeper.mintUnbackedStablecoin(deployerAddress, deployerAddress, WeiPerRad)
 
@@ -1379,12 +1561,16 @@ describe("BookKeeper", () => {
       it("should revert", async () => {
         await expect(
           bookKeeperAsAlice.accrueStabilityFee(formatBytes32String("BNB"), deployerAddress, WeiPerRay)
-        ).to.be.revertedWith("BookKeeper/not-authorized")
+        ).to.be.revertedWith("!stabilityFeeCollectorRole")
       })
     })
     context("when the caller is the owner", async () => {
       context("when bookkeeper does not live", () => {
         it("should be revert", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.STABILITY_FEE_COLLECTOR_ROLE(), deployerAddress)
+
           bookKeeper.cage()
 
           await expect(
@@ -1394,6 +1580,12 @@ describe("BookKeeper", () => {
       })
       context("when bookkeeper is live", () => {
         it("should be able to call accrueStabilityFee", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.STABILITY_FEE_COLLECTOR_ROLE(), deployerAddress)
+          await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
           // init BNB pool
           await bookKeeper.init(formatBytes32String("BNB"))
           // set pool debt ceiling 10 rad
@@ -1440,12 +1632,15 @@ describe("BookKeeper", () => {
   describe("#setTotalDebtCeiling", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
-        await expect(bookKeeperAsAlice.setTotalDebtCeiling(WeiPerRad)).to.be.revertedWith("BookKeeper/not-authorized")
+        await expect(bookKeeperAsAlice.setTotalDebtCeiling(WeiPerRad)).to.be.revertedWith("!ownerRole")
       })
     })
     context("when the caller is the owner", async () => {
       context("when bookkeeper does not live", () => {
         it("should be revert", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+
           bookKeeper.cage()
 
           await expect(bookKeeper.setTotalDebtCeiling(WeiPerRad)).to.be.revertedWith("BookKeeper/not-live")
@@ -1453,6 +1648,8 @@ describe("BookKeeper", () => {
       })
       context("when bookkeeper is live", () => {
         it("should be able to call setTotalDebtCeiling", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           // init BNB pool
           await bookKeeper.init(formatBytes32String("BNB"))
           // set total debt ceiling 1 rad
@@ -1465,18 +1662,21 @@ describe("BookKeeper", () => {
   })
 
   describe("#setPriceWithSafetyMargin", () => {
-    context("when the caller is not the owner", async () => {
+    context("when role can't access", async () => {
       it("should revert", async () => {
+        await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
         await expect(
           bookKeeperAsAlice.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-        ).to.be.revertedWith("BookKeeper/not-authorized")
+        ).to.be.revertedWith("!priceOracleRole")
       })
     })
-    context("when the caller is the owner", async () => {
+    context("when role can access", async () => {
       context("when bookkeeper does not live", () => {
         it("should be revert", async () => {
-          bookKeeper.cage()
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          await bookKeeper.cage()
 
+          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
           await expect(bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
             "BookKeeper/not-live"
           )
@@ -1484,8 +1684,11 @@ describe("BookKeeper", () => {
       })
       context("when bookkeeper is live", () => {
         it("should be able to call setPriceWithSafetyMargin", async () => {
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           // init BNB pool
           await bookKeeper.init(formatBytes32String("BNB"))
+
+          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
           // set total debt ceiling 1 rad
           await expect(bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay))
             .to.emit(bookKeeper, "SetPriceWithSafetyMargin")
@@ -1499,13 +1702,16 @@ describe("BookKeeper", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
         await expect(bookKeeperAsAlice.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-          "BookKeeper/not-authorized"
+          "!ownerRole"
         )
       })
     })
     context("when the caller is the owner", async () => {
       context("when bookkeeper does not live", () => {
         it("should be revert", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+
           bookKeeper.cage()
 
           await expect(bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
@@ -1515,6 +1721,8 @@ describe("BookKeeper", () => {
       })
       context("when bookkeeper is live", () => {
         it("should be able to call setDebtCeiling", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           // init BNB pool
           await bookKeeper.init(formatBytes32String("BNB"))
           // set total debt ceiling 1 rad
@@ -1530,13 +1738,16 @@ describe("BookKeeper", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
         await expect(bookKeeperAsAlice.setDebtFloor(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-          "BookKeeper/not-authorized"
+          "!ownerRole"
         )
       })
     })
     context("when the caller is the owner", async () => {
       context("when bookkeeper does not live", () => {
         it("should be revert", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+
           bookKeeper.cage()
 
           await expect(bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
@@ -1546,6 +1757,8 @@ describe("BookKeeper", () => {
       })
       context("when bookkeeper is live", () => {
         it("should be able to call setDebtFloor", async () => {
+          // grant role access
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           // init BNB pool
           await bookKeeper.init(formatBytes32String("BNB"))
           // set total debt ceiling 1 rad
@@ -1553,6 +1766,105 @@ describe("BookKeeper", () => {
             .to.emit(bookKeeper, "SetDebtFloor")
             .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
         })
+      })
+    })
+  })
+
+  describe("#pause", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(bookKeeperAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
+      })
+    })
+
+    context("when role can access", () => {
+      context("and role is owner role", () => {
+        it("should be success", async () => {
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          await bookKeeper.pause()
+        })
+      })
+
+      context("and role is gov role", () => {
+        it("should be success", async () => {
+          await bookKeeper.grantRole(await bookKeeper.GOV_ROLE(), deployerAddress)
+          await bookKeeper.pause()
+        })
+      })
+    })
+
+    context("when pause contract", () => {
+      it("should be success", async () => {
+        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+        await bookKeeper.pause()
+
+        await expect(bookKeeper.init(formatBytes32String("BNB"))).to.be.revertedWith("Pausable: paused")
+      })
+    })
+  })
+
+  describe("#unpause", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(bookKeeperAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
+      })
+    })
+
+    context("when role can access", () => {
+      context("and role is owner role", () => {
+        it("should be success", async () => {
+          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          await bookKeeper.pause()
+          await bookKeeper.unpause()
+        })
+      })
+
+      context("and role is gov role", () => {
+        it("should be success", async () => {
+          await bookKeeper.grantRole(await bookKeeper.GOV_ROLE(), deployerAddress)
+          await bookKeeper.pause()
+          await bookKeeper.unpause()
+        })
+      })
+    })
+
+    context("when unpause contract", () => {
+      it("should be success", async () => {
+        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+
+        // pause contract
+        await bookKeeper.pause()
+
+        // unpause contract
+        await bookKeeper.unpause()
+
+        await bookKeeper.init(formatBytes32String("BNB"))
+        const pool = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+        expect(pool.debtAccumulatedRate).equal(WeiPerRay)
+      })
+    })
+  })
+
+  describe("#cage", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(bookKeeperAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
+      })
+    })
+
+    context("when owner role can access", () => {
+      it("should be success", async () => {
+        // grant role access
+        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+        bookKeeper.cage()
+      })
+    })
+
+    context("when show stopper role can access", () => {
+      it("should be success", async () => {
+        // grant role access
+        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), deployerAddress)
+        bookKeeper.cage()
       })
     })
   })

@@ -19,7 +19,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -35,27 +34,13 @@ import "../interfaces/IStabilityFeeCollector.sol";
 */
 
 contract StabilityFeeCollector is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
   IStabilityFeeCollector
 {
-  // --- Auth ---
-  mapping(address => uint256) public whitelist;
-
-  function rely(address usr) external auth {
-    whitelist[usr] = 1;
-  }
-
-  function deny(address usr) external auth {
-    whitelist[usr] = 0;
-  }
-
-  modifier auth() {
-    require(whitelist[msg.sender] == 1, "StabilityFeeCollector/not-authorized");
-    _;
-  }
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
   // --- Data ---
   struct CollateralPool {
@@ -70,13 +55,15 @@ contract StabilityFeeCollector is
 
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    whitelist[msg.sender] = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -154,7 +141,9 @@ contract StabilityFeeCollector is
   }
 
   // --- Administration ---
-  function init(bytes32 collateralPool) external auth {
+  function init(bytes32 collateralPool) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+
     CollateralPool storage i = collateralPools[collateralPool];
     require(i.stabilityFeeRate == 0, "StabilityFeeCollector/collateralPool-already-init");
     i.stabilityFeeRate = ONE;
@@ -167,12 +156,14 @@ contract StabilityFeeCollector is
 
   /// @dev Set the global stability fee rate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
   /// @param _data Global stability fee rate [ray]
-  function setGlobalStabilityFeeRate(uint256 _data) external auth {
+  function setGlobalStabilityFeeRate(uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     globalStabilityFeeRate = _data;
     emit SetGlobalStabilityFeeRate(msg.sender, _data);
   }
 
-  function setSystemDebtEngine(address _data) external auth {
+  function setSystemDebtEngine(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     systemDebtEngine = _data;
     emit SetSystemDebtEngine(msg.sender, _data);
   }
@@ -203,7 +194,8 @@ contract StabilityFeeCollector is
   */
   /// @param _collateralPool Collateral pool id
   /// @param _data the rate [ray]
-  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _data) external auth {
+  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _data) external whenNotPaused {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     collateralPools[_collateralPool].stabilityFeeRate = _data;
     emit SetStabilityFeeRate(msg.sender, _collateralPool, _data);
   }
@@ -215,7 +207,7 @@ contract StabilityFeeCollector is
       the global and per-pool stability fee rates with respect to the last block that `collect` was called.
   */
   /// @param collateralPool Collateral pool id
-  function collect(bytes32 collateralPool) external override nonReentrant returns (uint256 rate) {
+  function collect(bytes32 collateralPool) external override whenNotPaused nonReentrant returns (uint256 rate) {
     rate = _collect(collateralPool);
   }
 
@@ -232,5 +224,16 @@ contract StabilityFeeCollector is
     );
     bookKeeper.accrueStabilityFee(collateralPool, systemDebtEngine, diff(rate, prev));
     collateralPools[collateralPool].lastAccumulationTime = now;
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    _unpause();
   }
 }

@@ -21,7 +21,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
@@ -147,24 +146,8 @@ import "../interfaces/ISystemDebtEngine.sol";
         - the number of gems is limited by how big your bag is
 */
 
-contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
-  // --- Auth ---
-  mapping(address => uint256) public wards;
-
-  function rely(address usr) external auth {
-    wards[usr] = 1;
-    emit Rely(usr);
-  }
-
-  function deny(address usr) external auth {
-    wards[usr] = 0;
-    emit Deny(usr);
-  }
-
-  modifier auth() {
-    require(wards[msg.sender] == 1, "End/not-authorized");
-    _;
-  }
+contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
@@ -219,11 +202,13 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
 
   // --- Init ---
   function initialize() external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
-    wards[msg.sender] = 1;
     live = 1;
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
     emit Rely(msg.sender);
   }
 
@@ -257,21 +242,45 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   }
 
   // --- Administration ---
-  function file(bytes32 what, address data) external auth {
+  event SetBookKeeper(address indexed caller, address data);
+  event SetLiquidationEngine(address indexed caller, address data);
+  event SetSystemDebtEngine(address indexed caller, address data);
+  event SetPriceOracle(address indexed caller, address data);
+  event SetWait(address indexed caller, uint256 data);
+
+  function setBookKeeper(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "End/not-live");
-    if (what == "bookKeeper") bookKeeper = IBookKeeper(data);
-    else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
-    else if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
-    else if (what == "priceOracle") priceOracle = IPriceOracle(data);
-    else revert("End/file-unrecognized-param");
-    emit File(what, data);
+    bookKeeper = IBookKeeper(_data);
+    emit SetBookKeeper(msg.sender, _data);
   }
 
-  function file(bytes32 what, uint256 data) external auth {
+  function setLiquidationEngine(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "End/not-live");
-    if (what == "wait") wait = data;
-    else revert("End/file-unrecognized-param");
-    emit File(what, data);
+    liquidationEngine = ILiquidationEngine(_data);
+    emit SetLiquidationEngine(msg.sender, _data);
+  }
+
+  function setSystemDebtEngine(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(live == 1, "End/not-live");
+    systemDebtEngine = ISystemDebtEngine(_data);
+    emit SetSystemDebtEngine(msg.sender, _data);
+  }
+
+  function setPriceOracle(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(live == 1, "End/not-live");
+    priceOracle = IPriceOracle(_data);
+    emit SetPriceOracle(msg.sender, _data);
+  }
+
+  function setWait(uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(live == 1, "End/not-live");
+    wait = _data;
+    emit SetWait(msg.sender, _data);
   }
 
   // --- Settlement ---
@@ -282,7 +291,8 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
       - SystemDebtEngine will be paused: no accrual of new debt, no system debt settlement
       - PriceOracle will be paused: no new price update, no liquidation trigger
    */
-  function cage() external auth {
+  function cage() external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "End/not-live");
     live = 0;
     when = block.timestamp;
@@ -296,6 +306,7 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   /// @dev Set the cage price of the collateral pool with the latest price from the price oracle
   /// @param collateralPoolId Collateral pool id
   function cage(bytes32 collateralPoolId) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 0, "End/still-live");
     require(cagePrice[collateralPoolId] == 0, "End/cagePrice-collateralPoolId-already-defined");
     (totalDebtShare[collateralPoolId], , , , ) = bookKeeper.collateralPools(collateralPoolId);
