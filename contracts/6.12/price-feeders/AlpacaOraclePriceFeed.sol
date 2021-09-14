@@ -12,7 +12,7 @@ contract AlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable,
   IAlpacaOracle public alpacaPriceOracle;
   address public token0;
   address public token1;
-  uint256 public priceLife = 24; // [hour] how old the price is considered stale.
+  uint256 public priceLife = 1 days; //[seconds] how old the price is considered stale, default 1 day
 
   // --- Init ---
   function initialize(
@@ -37,18 +37,11 @@ contract AlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable,
     _;
   }
 
-  event SetPriceLife(address indexed caller, uint256 hour);
-  event SetTokens(address indexed caller, address token0, address token1);
+  event SetPriceLife(address indexed caller, uint256 second);
 
-  function setPriceLife(uint256 _hour) external onlyOwner {
-    priceLife = _hour * 1 hours;
-    emit SetPriceLife(msg.sender, _hour);
-  }
-
-  function setTokens(address _token0, address _token1) external onlyOwner {
-    token0 = _token0;
-    token1 = _token1;
-    emit SetTokens(msg.sender, _token0, _token1);
+  function setPriceLife(uint256 _second) external onlyOwner {
+    priceLife = _second;
+    emit SetPriceLife(msg.sender, _second);
   }
 
   function pause() external onlyOwner {

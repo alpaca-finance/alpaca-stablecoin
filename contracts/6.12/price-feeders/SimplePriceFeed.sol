@@ -11,7 +11,7 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
 
   uint256 public price;
   uint256 public lastUpdate;
-  uint256 public priceLife = 24; // [hour] how old the price is considered stale.
+  uint256 public priceLife = 1 days; //[seconds] how old the price is considered stale, default 1 day
 
   // --- Init ---
   function initialize() external initializer {
@@ -29,7 +29,7 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
   }
 
   event SetPrice(address indexed caller, uint256 price, uint256 indexed lastUpdate);
-  event SetPriceLife(address indexed caller, uint256 hour);
+  event SetPriceLife(address indexed caller, uint256 second);
 
   function setPrice(uint256 _price) external onlyOwner {
     price = _price;
@@ -37,9 +37,9 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
     emit SetPrice(msg.sender, price, lastUpdate);
   }
 
-  function setPriceLife(uint256 _hour) external onlyOwner {
-    priceLife = _hour * 1 hours;
-    emit SetPriceLife(msg.sender, _hour);
+  function setPriceLife(uint256 _second) external onlyOwner {
+    priceLife = _second;
+    emit SetPriceLife(msg.sender, _second);
   }
 
   function pause() external onlyOwner {
