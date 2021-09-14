@@ -9,14 +9,14 @@ import "../interfaces/IAlpacaOracle.sol";
 contract AlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPriceFeed {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
-  IAlpacaOracle public alpacaPriceOracle;
+  IAlpacaOracle public alpacaOracle;
   address public token0;
   address public token1;
-  uint256 public priceLife = 1 days; //[seconds] how old the price is considered stale, default 1 day
+  uint256 public priceLife; // [seconds] how old the price is considered stale, default 1 day
 
   // --- Init ---
   function initialize(
-    address _alpacaPriceOracle,
+    address _alpacaOracle,
     address _token0,
     address _token1
   ) external initializer {
@@ -27,9 +27,10 @@ contract AlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable,
     // to grant and revoke any roles afterward
     _setupRole(OWNER_ROLE, msg.sender);
 
-    alpacaPriceOracle = IAlpacaOracle(_alpacaPriceOracle);
+    alpacaOracle = IAlpacaOracle(_alpacaOracle);
     token0 = _token0;
     token1 = _token1;
+    priceLife = 1 days;
   }
 
   modifier onlyOwner() {
@@ -61,12 +62,12 @@ contract AlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable,
   }
 
   function _getPrice() internal view returns (bytes32) {
-    (uint256 price, ) = alpacaPriceOracle.getPrice(token0, token1);
+    (uint256 price, ) = alpacaOracle.getPrice(token0, token1);
     return bytes32(price);
   }
 
   function _isPriceFresh() internal view returns (bool) {
-    (, uint256 lastUpdate) = alpacaPriceOracle.getPrice(token0, token1);
+    (, uint256 lastUpdate) = alpacaOracle.getPrice(token0, token1);
 
     // solhint-disable not-rely-on-time
     return lastUpdate >= now - priceLife;

@@ -16,9 +16,9 @@
     "test:lineardecrease": "hardhat test --no-compile ./test/units/calculators/LinearDecrease.test.ts",
     "test:stairstepexponentialdecrease": "hardhat test --no-compile ./test/units/calculators/StairstepExponentialDecrease.test.ts",
     "test:tokenadapter": "hardhat test --no-compile ./test/units/adapter/TokenAdapter.test.ts",
-    "testnet": "hardhat console --no-compile --network testnet",
     "test:stabilityfeecollector": "hardhat test --no-compile ./test/units/stablecoin-core/StabilityFeeCollector.test.ts",
     "test:priceoracle": "hardhat test --no-compile ./test/units/stablecoin-core/PriceOracle.test.ts",
+    "test:alpacaoraclepricefeed": "hardhat test --no-compile ./test/units/price-feeders/AlpacaOraclePriceFeed.test.ts",
     "test:showstopper": "hardhat test --no-compile ./test/units/stablecoin-core/ShowStopper.test.ts",
     "test:alpacastablecoin": "hardhat test --no-compile ./test/units/stablecoin-core/AlpacaStablecoin.test.ts",
     "test:liquidationengine": "hardhat test --no-compile ./test/units/stablecoin-core/LiquidationEngine.test.ts",
@@ -47,10 +47,10 @@
     "chai": "^4.3.0",
     "chai-bn": "^0.2.1",
     "dotenv": "^8.2.0",
+    "eth-permit": "^0.1.10",
     "ethereum-waffle": "^3.2.2",
     "ethereumjs-util": "^7.0.10",
     "ethers": "^5.0.31",
-    "eth-permit": "^0.1.10",
     "hardhat": "^2.0.10",
     "hardhat-deploy": "^0.7.0-beta.45",
     "hardhat-typechain": "^0.3.5",
@@ -74,5 +74,9 @@
   ],
   "engines": {
     "node": ">=12"
+  },
+  "dependencies": {
+    "@types/luxon": "^2.0.4",
+    "luxon": "^2.0.2"
   }
 }
