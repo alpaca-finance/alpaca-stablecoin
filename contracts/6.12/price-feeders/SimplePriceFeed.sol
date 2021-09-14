@@ -1,12 +1,11 @@
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import "../interfaces/IPriceFeed.sol";
-import "../interfaces/IVault.sol";
 
+// SimplePriceFeed is intended to be used for unit test only
 contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPriceFeed {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
