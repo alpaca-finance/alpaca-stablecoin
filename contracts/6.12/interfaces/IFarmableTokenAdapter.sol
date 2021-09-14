@@ -1,27 +1,12 @@
 pragma solidity 0.6.12;
 
-import "../interfaces/IToken.sol";
+import "../interfaces/IGenericTokenAdapter.sol";
 
-interface IFarmableTokenAdapter {
-  function deposit(
+interface IFarmableTokenAdapter is IGenericTokenAdapter {
+  function moveStake(
     address,
     address,
-    uint256
+    uint256,
+    bytes calldata
   ) external;
-
-  function withdraw(
-    address,
-    address,
-    uint256
-  ) external;
-
-  function moveRewards(
-    address,
-    address,
-    uint256
-  ) external;
-
-  function collateralPoolId() external view returns (bytes32);
-
-  function collateralToken() external returns (IToken);
 }

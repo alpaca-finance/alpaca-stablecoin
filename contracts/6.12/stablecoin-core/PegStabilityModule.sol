@@ -43,7 +43,7 @@ contract PegStabilityModule is OwnableUpgradeable, PausableUpgradeable, AccessCo
     emit Deny(usr);
   }
 
-  modifier auth {
+  modifier auth() {
     require(whitelist[msg.sender] == 1);
     _;
   }
@@ -145,7 +145,7 @@ contract PegStabilityModule is OwnableUpgradeable, PausableUpgradeable, AccessCo
       int256(tokenAmount18)
     );
     bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(fee, RAY));
-    stablecoinAdapter.withdraw(usr, stablecoinAmount);
+    stablecoinAdapter.withdraw(usr, stablecoinAmount, abi.encode(0));
 
     emit SellToken(usr, tokenAmount, fee);
   }
@@ -160,7 +160,7 @@ contract PegStabilityModule is OwnableUpgradeable, PausableUpgradeable, AccessCo
     uint256 fee = mul(tokenAmount18, feeOut) / WAD;
     uint256 stablecoinAmount = add(tokenAmount18, fee);
     require(stablecoin.transferFrom(msg.sender, address(this), stablecoinAmount), "PegStabilityModule/failed-transfer");
-    stablecoinAdapter.deposit(address(this), stablecoinAmount);
+    stablecoinAdapter.deposit(address(this), stablecoinAmount, abi.encode(0));
     bookKeeper.adjustPosition(
       collateralPoolId,
       address(this),
