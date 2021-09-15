@@ -35,7 +35,7 @@ contract FlashMintModule is
   // --- Auth ---
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
-  modifier onlyOwner {
+  modifier onlyOwner() {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     _;
   }
@@ -60,7 +60,7 @@ contract FlashMintModule is
   event FlashLoan(address indexed receiver, address token, uint256 amount, uint256 fee);
   event BookKeeperStablecoinFlashLoan(address indexed receiver, uint256 amount, uint256 fee);
 
-  modifier lock {
+  modifier lock() {
     require(locked == 0, "FlashMintModule/reentrancy-guard");
     locked = 1;
     _;
@@ -134,7 +134,7 @@ contract FlashMintModule is
     uint256 total = _add(amount, fee);
 
     bookKeeper.mintUnbackedStablecoin(address(this), address(this), amt);
-    stablecoinAdapter.withdraw(address(receiver), amount);
+    stablecoinAdapter.withdraw(address(receiver), amount, abi.encode(0));
 
     emit FlashLoan(address(receiver), token, amount, fee);
 
@@ -144,7 +144,7 @@ contract FlashMintModule is
     );
 
     stablecoin.transferFrom(address(receiver), address(this), total); // The fee is also enforced here
-    stablecoinAdapter.deposit(address(this), total);
+    stablecoinAdapter.deposit(address(this), total, abi.encode(0));
     bookKeeper.settleSystemBadDebt(amt);
 
     return true;
@@ -178,7 +178,7 @@ contract FlashMintModule is
   }
 
   function convert() external lock {
-    stablecoinAdapter.deposit(address(this), stablecoin.balanceOf(address(this)));
+    stablecoinAdapter.deposit(address(this), stablecoin.balanceOf(address(this)), abi.encode(0));
   }
 
   function accrue() external lock {

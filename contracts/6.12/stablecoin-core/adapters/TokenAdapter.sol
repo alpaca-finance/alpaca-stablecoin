@@ -26,7 +26,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
-import "../../interfaces/ITokenAdapter.sol";
+import "../../interfaces/IGenericTokenAdapter.sol";
 import "../../utils/SafeToken.sol";
 
 /*
@@ -56,18 +56,18 @@ contract TokenAdapter is
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
-  ITokenAdapter
+  IGenericTokenAdapter
 {
   using SafeToken for address;
 
   // --- Auth ---
   mapping(address => uint256) public wards;
 
-  function rely(address usr) external auth {
+  function rely(address usr) external override auth {
     wards[usr] = 1;
   }
 
-  function deny(address usr) external auth {
+  function deny(address usr) external override auth {
     wards[usr] = 0;
   }
 
@@ -77,8 +77,8 @@ contract TokenAdapter is
   }
 
   IBookKeeper public bookKeeper; // CDP Engine
-  bytes32 public collateralPoolId; // Collateral Type
-  IToken public override collateralToken;
+  bytes32 public override collateralPoolId; // Collateral Type
+  address public override collateralToken;
   uint256 public override decimals;
   uint256 public live; // Active Flag
 
@@ -96,18 +96,22 @@ contract TokenAdapter is
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
-    collateralToken = IToken(collateralToken_);
-    decimals = collateralToken.decimals();
+    collateralToken = collateralToken_;
+    decimals = IToken(collateralToken).decimals();
   }
 
-  function cage() external auth {
+  function cage() external override auth {
     live = 0;
   }
 
   /// @dev Deposit token into the system from the caller to be used as collateral
   /// @param usr The source address which is holding the collateral token
   /// @param wad The amount of collateral to be deposited [wad]
-  function deposit(address usr, uint256 wad) external payable override nonReentrant {
+  function deposit(
+    address usr,
+    uint256 wad,
+    bytes calldata /* data */
+  ) external payable override nonReentrant {
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, usr, int256(wad));
@@ -119,11 +123,30 @@ contract TokenAdapter is
   /// @dev Withdraw token from the system to the caller
   /// @param usr The destination address to receive collateral token
   /// @param wad The amount of collateral to be withdrawn [wad]
-  function withdraw(address usr, uint256 wad) external override nonReentrant {
+  function withdraw(
+    address usr,
+    uint256 wad,
+    bytes calldata /* data */
+  ) external override nonReentrant {
     require(wad <= 2**255, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
 
     // Move the actual token
     address(collateralToken).safeTransfer(usr, wad);
   }
+
+  function onAdjustPosition(
+    address src,
+    address dst,
+    int256 collateralValue,
+    int256 debtShare,
+    bytes calldata data
+  ) external override nonReentrant {}
+
+  function onMoveCollateral(
+    address src,
+    address dst,
+    uint256 wad,
+    bytes calldata data
+  ) external override nonReentrant {}
 }

@@ -22,10 +22,8 @@ pragma solidity 0.6.12;
 import "../interfaces/IBookKeeper.sol";
 
 contract PositionHandler {
-  address public immutable owner;
 
   constructor(address bookKeeper) public {
-    owner = msg.sender;
     IBookKeeper(bookKeeper).hope(msg.sender);
   }
 }
