@@ -167,28 +167,4 @@ describe("TokenAdapter", () => {
       })
     })
   })
-
-  describe("#rely()", () => {
-    context("when call rely ", () => {
-      it("should be set wards to 1", async () => {
-        expect(await tokenAdapter.wards(aliceAddress)).to.be.equal(0)
-
-        await tokenAdapter.rely(aliceAddress)
-
-        expect(await tokenAdapter.wards(aliceAddress)).to.be.equal(1)
-      })
-    })
-  })
-
-  describe("#deny()", () => {
-    context("when call deny ", () => {
-      it("should be set wards to 0", async () => {
-        await tokenAdapter.rely(aliceAddress)
-        expect(await tokenAdapter.wards(aliceAddress)).to.be.equal(1)
-
-        await tokenAdapter.deny(aliceAddress)
-        expect(await tokenAdapter.wards(aliceAddress)).to.be.equal(0)
-      })
-    })
-  })
 })

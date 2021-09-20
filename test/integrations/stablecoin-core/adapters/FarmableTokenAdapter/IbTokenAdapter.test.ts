@@ -85,6 +85,8 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     0,
     shield.address,
     await deployer.getAddress(),
+    BigNumber.from(1000),
+    await dev.getAddress(),
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
@@ -161,6 +163,8 @@ describe("IbTokenAdapter", () => {
             0,
             shield.address,
             deployerAddress,
+            BigNumber.from(1000),
+            deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/collateralToken-not-match")
       })
@@ -178,6 +182,8 @@ describe("IbTokenAdapter", () => {
             fairLaunch.address,
             0,
             shield.address,
+            deployerAddress,
+            BigNumber.from(1000),
             deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/reward-token-not-match")
@@ -197,6 +203,8 @@ describe("IbTokenAdapter", () => {
             0,
             deployerAddress,
             deployerAddress,
+            BigNumber.from(1000),
+            deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/shield-not-match")
       })
@@ -215,6 +223,8 @@ describe("IbTokenAdapter", () => {
             0,
             shield.address,
             shield.address,
+            BigNumber.from(1000),
+            deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/timelock-not-match")
       })
@@ -229,7 +239,6 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.pid()).to.be.eq(0)
         expect(await ibTokenAdapter.shield()).to.be.eq(shield.address)
         expect(await ibTokenAdapter.timelock()).to.be.eq(deployerAddress)
-        expect(await ibTokenAdapter.whitelist(deployerAddress)).to.be.bignumber.eq(1)
         expect(await ibTokenAdapter.decimals()).to.be.eq(18)
       })
     })
@@ -364,7 +373,9 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
 
-        // Now Alice harvest rewards. 1 block has been passed, hence Alice should get 100 ALPACA
+        console.log(await (await alpacaToken.balanceOf(devAddress)).toString())
+
+        // Now Alice harvest rewards. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA
         await ibTokenAdapterAsAlice.deposit(
           aliceAddress,
           0,
@@ -372,7 +383,7 @@ describe("IbTokenAdapter", () => {
         )
 
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
-        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("100"))
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("90"))
         expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("1"))
         expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("100")))
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(ethers.utils.parseEther("0"))
@@ -388,7 +399,7 @@ describe("IbTokenAdapter", () => {
         )
 
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("200"))
-        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("100"))
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("90"))
         expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("5"))
         expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("300")))
@@ -401,12 +412,12 @@ describe("IbTokenAdapter", () => {
         // Bob harvest ALPACA. IbTokenAdapter earned another 100 ALPACA.
         // IbTokenAdapter has another 100 ALPACA from previous block. Hence,
         // balanceOf(address(this)) should return 300 ALPACA.
-        // Bob should get 80 ALPACA.
+        // Bob should get 72 (80 - 10%) ALPACA.
         await ibTokenAdapterAsBob.deposit(bobAddress, 0, ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]))
 
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("220"))
-        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("100"))
-        expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(ethers.utils.parseEther("80"))
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("90"))
+        expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(ethers.utils.parseEther("72"))
         expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("5"))
         expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("320")))
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(ethers.utils.parseEther("220"))
@@ -559,7 +570,7 @@ describe("IbTokenAdapter", () => {
         // The following conditions must be satisfy:
         // - Alice pending rewards must be 200 ALPACA
         // - Bob pending rewards must be 0 ALPACA as all rewards after Bob deposited hasn't been harvested.
-        // - Alice should get 200 ALPACA that is harvested before cage (when Bob deposited)
+        // - Alice should get 180 (200 - 10%) ALPACA that is harvested before cage (when Bob deposited)
         // - Alice should get 1 ibDUMMY back.
         expect(await ibTokenAdapter.pendingRewards(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
         expect(await ibTokenAdapter.pendingRewards(bobAddress)).to.be.eq(0)
@@ -575,7 +586,7 @@ describe("IbTokenAdapter", () => {
         expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await fairLaunch.pendingAlpaca(0, ibTokenAdapter.address)).to.be.eq(0)
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
-        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("180"))
         expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("4"))
         expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("200")))
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
@@ -595,7 +606,7 @@ describe("IbTokenAdapter", () => {
         expect(bobIbDUMMYafter.sub(bobIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("4"))
         expect(await fairLaunch.pendingAlpaca(0, ibTokenAdapter.address)).to.be.eq(0)
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
-        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("180"))
         expect(await ibTokenAdapter.totalShare()).to.be.eq(0)
         expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("200")))
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
@@ -623,7 +634,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
 
-        // Now Alice withdraw her position. 1 block has been passed, hence Alice should get 100 ALPACA
+        // Now Alice withdraw her position. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA
         let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
         await ibTokenAdapterAsAlice.withdraw(
           aliceAddress,
@@ -634,7 +645,7 @@ describe("IbTokenAdapter", () => {
 
         expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
-        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("100"))
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("90"))
         expect(await ibTokenAdapter.totalShare()).to.be.eq(0)
         expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("100")))
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
@@ -944,7 +955,7 @@ describe("IbTokenAdapter", () => {
       })
     })
 
-    context("when non-whitelist cage", async () => {
+    context("when caller not owner role cage", async () => {
       context("when assumptions still valid", async () => {
         it("should revert", async () => {
           await expect(ibTokenAdapterAsAlice.cage()).to.be.revertedWith("IbTokenAdapter/not-authorized")
@@ -953,7 +964,7 @@ describe("IbTokenAdapter", () => {
 
       context("when shield's owner is changed", async () => {
         it("should put IbTokenAdapter live = 0", async () => {
-          await shield.transferOwnership(bobAddress)
+          await shield.transferOwnership(aliceAddress)
           await ibTokenAdapterAsAlice.cage()
           expect(await ibTokenAdapter.live()).to.be.eq(0)
         })
@@ -1016,7 +1027,7 @@ describe("IbTokenAdapter", () => {
         // The following conditions must be satisfy:
         // - Alice pending rewards must be 200 ALPACA
         // - Bob pending rewards must be 0 ALPACA as all rewards after Bob deposited hasn't been harvested.
-        // - Alice should get 200 ALPACA that is harvested before cage (when Bob deposited)
+        // - Alice should get 180 (200 - 10%) ALPACA that is harvested before cage (when Bob deposited)
         // - Alice should get 1 ibDUMMY back.
         expect(await ibTokenAdapter.pendingRewards(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
         expect(await ibTokenAdapter.pendingRewards(bobAddress)).to.be.eq(0)
@@ -1032,7 +1043,7 @@ describe("IbTokenAdapter", () => {
         expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await fairLaunch.pendingAlpaca(0, ibTokenAdapter.address)).to.be.eq(0)
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
-        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("180"))
         expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("4"))
         expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("200")))
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
@@ -1058,7 +1069,7 @@ describe("IbTokenAdapter", () => {
         // Now Bob withdraw his position. Only 100 ALPACA has been harvested from FairLaunch.
         // Another 100 ALPACA is pending for IbTokenAdapter to harvest.
         // The following conditions must be satisfy:
-        // - Bob should get 200 ALPACA as 2 blocks passed.
+        // - Bob should get 180 (200 - 10%) ALPACA as 2 blocks passed.
         // - Bob pending rewards must be 0 ALPACA as all rewards are harvested.
         // - Bob should get 4 ibDUMMY back.
         // - Alice's ALPACA should remain the same.
@@ -1073,8 +1084,8 @@ describe("IbTokenAdapter", () => {
         expect(bobIbDUMMYafter.sub(bobIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("4"))
         expect(await fairLaunch.pendingAlpaca(0, ibTokenAdapter.address)).to.be.eq(0)
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
-        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
-        expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(ethers.utils.parseEther("200"))
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("180"))
+        expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(ethers.utils.parseEther("180"))
         expect(await ibTokenAdapter.totalShare()).to.be.eq(0)
         expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("250")))
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
@@ -1124,7 +1135,7 @@ describe("IbTokenAdapter", () => {
 
         // Now Alice wants to harvest the yields. 1 Block move, IbTokenAdapter earned another 100 ALPACA.
         // The following states are expected:
-        // - Alice should get 350 ALPACA in her account
+        // - Alice should get 315 (350 - 10%) ALPACA in her account
         // - Alice pending ALPACA from ibTokenAdapter must be 0
         // - ibTokenAdapter should has 0 ALPACA as all harvested by Alice
         // - ibTokenAdapter should has 0 pending ALPACA as all harvested
@@ -1136,7 +1147,7 @@ describe("IbTokenAdapter", () => {
         )
 
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
-        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("350"))
+        expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("315"))
         expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("1"))
         expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("350")))
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
@@ -1235,7 +1246,7 @@ describe("IbTokenAdapter", () => {
         // he will get his portion
         // The following states are expected:
         // - Bob should get his 4 ibDUMMY back
-        // - Bob earn 100 ALPACA as block diff that Bob exit and uncage = 1 block
+        // - Bob earn 90 (100 - 10%) ALPACA as block diff that Bob exit and uncage = 1 block
         // - IbTokenAdapter should still has 200 ALPACA that Alice dismissed
         let bobIbDUMMYbefore = await ibDUMMY.balanceOf(bobAddress)
         await ibTokenAdapterAsBob.withdraw(
@@ -1249,7 +1260,7 @@ describe("IbTokenAdapter", () => {
         expect(await fairLaunch.pendingAlpaca(0, ibTokenAdapter.address)).to.be.eq(0)
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("200"))
         expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(0)
-        expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(ethers.utils.parseEther("100"))
+        expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(ethers.utils.parseEther("90"))
         expect(await ibTokenAdapter.totalShare()).to.be.eq(0)
         expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("225")))
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(ethers.utils.parseEther("200"))
