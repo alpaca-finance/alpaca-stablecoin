@@ -43,7 +43,6 @@ contract LiquidationEngine is
 {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-  bytes32 public constant AUCTIONEER_ROLE = keccak256("AUCTIONEER_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
   // --- Data ---
@@ -64,35 +63,20 @@ contract LiquidationEngine is
   uint256 public stablecoinNeededForDebtRepay; // The current total amount of stablecoin needed to pay back the liquidated positions' debt globally [rad]
 
   // --- Events ---
-  event Rely(address indexed usr);
-  event Deny(address indexed usr);
-
-  event File(bytes32 indexed what, uint256 data);
-  event File(bytes32 indexed what, address data);
-  event File(bytes32 indexed collateralPoolId, bytes32 indexed what, uint256 data);
-  event File(bytes32 indexed collateralPoolId, bytes32 indexed what, address auctioneer);
-
-  event StartLiquidation(
-    bytes32 indexed collateralPoolId,
-    address indexed positionAddress,
-    uint256 collateralAmountToBeLiquidated,
-    uint256 debtShareToBeLiquidated,
-    uint256 debtValueToBeLiquidatedWithoutPenalty,
-    address auctioneer,
-    uint256 indexed id
-  );
   event RemoveRepaidDebtFromAuction(bytes32 indexed collateralPoolId, uint256 rad);
+  event SetStrategy(address indexed caller, bytes32 collateralPoolId, address strategy);
   event Cage();
 
   // --- Init ---
-  function initialize(address _bookKeeper) external initializer {
+  function initialize(address _bookKeeper, address _systemDebtEngine) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
+    systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
+
     live = 1;
-    emit Rely(msg.sender);
 
     // Grant the contract deployer the default admin role: it will be able
     // to grant and revoke any roles
@@ -118,19 +102,28 @@ contract LiquidationEngine is
     require(y == 0 || (z = x * y) / y == x);
   }
 
+  function setStrategy(bytes32 collateralPoolId, address strategy) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(live == 1, "LiquidationEngine/not-live");
+    strategies[collateralPoolId] = strategy;
+    emit SetStrategy(msg.sender, collateralPoolId, strategy);
+  }
+
   function liquidate(
     bytes32 collateralPoolId,
     address positionAddress,
     uint256 debtShareToRepay,
     bytes calldata data
-  ) external nonReentrant returns (uint256 id) {
+  ) external nonReentrant whenNotPaused returns (uint256 id) {
     require(live == 1, "LiquidationEngine/not-live");
+    require(debtShareToRepay != 0, "LiquidationEngine/zero-debtShareToRepay");
 
     (uint256 positionLockedCollateral, uint256 positionDebtShare) = bookKeeper.positions(
       collateralPoolId,
       positionAddress
     );
     address strategy = strategies[collateralPoolId];
+    require(strategy != address(0), "LiquidationEngine/not-setStrategy");
     uint256 debtAccumulatedRate;
     uint256 debtFloor;
     {
@@ -152,6 +145,10 @@ contract LiquidationEngine is
       debtShareToRepay,
       data
     );
+
+    //Get Alpaca Stablecoin from the liquidator for debt repayment
+    uint256 debtValueToRepay = mul(debtShareToRepay, debtAccumulatedRate);
+    bookKeeper.moveStablecoin(msg.sender, address(systemDebtEngine), debtValueToRepay);
   }
 
   function cage() external override {

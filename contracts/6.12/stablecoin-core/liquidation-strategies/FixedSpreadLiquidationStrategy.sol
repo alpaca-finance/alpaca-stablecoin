@@ -2,7 +2,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -13,15 +12,19 @@ import "../../interfaces/IPriceFeed.sol";
 import "../../interfaces/IPriceOracle.sol";
 import "../../interfaces/ILiquidationEngine.sol";
 import "../../interfaces/ILiquidationStrategy.sol";
+import "../../interfaces/ISystemDebtEngine.sol";
 import "../../interfaces/IFlashLendingCallee.sol";
+import "hardhat/console.sol";
 
 contract FixedSpreadLiquidationStrategy is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
   ILiquidationStrategy
 {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant LIQUIDATION_ENGINE_ROLE = keccak256("LIQUIDATION_ENGINE_ROLE");
+
   struct CollateralPool {
     uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation [wad]
     uint256 liquidatorIncentiveBps; // Percentage (BPS) of how much additional collateral will be given to the liquidator incentive
@@ -39,7 +42,7 @@ contract FixedSpreadLiquidationStrategy is
   // --- Data ---
   IBookKeeper public bookKeeper; // Core CDP Engine
   ILiquidationEngine public liquidationEngine; // Liquidation module
-  address public systemDebtEngine; // Recipient of dai raised in auctions
+  ISystemDebtEngine public systemDebtEngine; // Recipient of dai raised in auctions
   IPriceOracle public priceOracle; // Collateral price module
   mapping(bytes32 => CollateralPool) public collateralPools;
 
@@ -53,15 +56,17 @@ contract FixedSpreadLiquidationStrategy is
     address indexed liquidatorAddress,
     address collateralRecipient
   );
+  event SetCloseFactorBps(address indexed caller, bytes32 collateralPoolId, uint256 strategy);
+  event SetLiquidatorIncentiveBps(address indexed caller, bytes32 collateralPoolId, uint256 strategy);
+  event SetTreasuryFeesBps(address indexed caller, bytes32 collateralPoolId, uint256 strategy);
 
   // --- Init ---
   function initialize(
     address _bookKeeper,
     address priceOracle_,
     address liquidationEngine_,
-    bytes32 collateralPoolId_
+    address systemDebtEngine_
   ) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
@@ -69,6 +74,11 @@ contract FixedSpreadLiquidationStrategy is
     bookKeeper = IBookKeeper(_bookKeeper);
     priceOracle = IPriceOracle(priceOracle_);
     liquidationEngine = ILiquidationEngine(liquidationEngine_);
+    systemDebtEngine = ISystemDebtEngine(systemDebtEngine_);
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -108,6 +118,25 @@ contract FixedSpreadLiquidationStrategy is
     z = mul(x, WAD) / y;
   }
 
+  // --- Setter ---
+  function setCloseFactorBps(bytes32 collateralPoolId, uint256 strategy) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    collateralPools[collateralPoolId].closeFactorBps = strategy;
+    emit SetCloseFactorBps(msg.sender, collateralPoolId, strategy);
+  }
+
+  function setLiquidatorIncentiveBps(bytes32 collateralPoolId, uint256 strategy) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    collateralPools[collateralPoolId].liquidatorIncentiveBps = strategy;
+    emit SetLiquidatorIncentiveBps(msg.sender, collateralPoolId, strategy);
+  }
+
+  function setTreasuryFeesBps(bytes32 collateralPoolId, uint256 strategy) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    collateralPools[collateralPoolId].treasuryFeesBps = strategy;
+    emit SetTreasuryFeesBps(msg.sender, collateralPoolId, strategy);
+  }
+
   // --- Auction ---
 
   // get the price directly from the OSM
@@ -142,7 +171,6 @@ contract FixedSpreadLiquidationStrategy is
       add(info.collateralAmountToLiquidate, info.liquidatorIncentiveFees),
       info.treasuryFees
     );
-
     require(
       info.collateralAmountToLiquidateWithAllFees <= positionCollateralAmount,
       "FixedSpreadLiquidationStrategy/liquidate-too-much"
@@ -157,17 +185,23 @@ contract FixedSpreadLiquidationStrategy is
     uint256 debtShareToRepay, // [wad]
     bytes calldata data // Data to pass in external call; if length 0, no call is done
   ) external override {
+    require(hasRole(LIQUIDATION_ENGINE_ROLE, msg.sender), "!liquidationEngingRole");
+
     // Input validation
     require(positionDebtShare > 0, "FixedSpreadLiquidationStrategy/zero-debt");
     require(positionCollateralAmount > 0, "FixedSpreadLiquidationStrategy/zero-collateralAmount");
     require(positionAddress != address(0), "FixedSpreadLiquidationStrategy/zero-positionAddress");
-    (address liquidatorAddress, address collateralRecipient) = abi.decode(data, (address, address));
+    (address liquidatorAddress, address collateralRecipient, bytes memory ext) = abi.decode(
+      data,
+      (address, address, bytes)
+    );
 
     // 1. Check if Close Factor is not exceeded
     CollateralPool memory collateralPool = collateralPools[collateralPoolId];
     require(
       collateralPool.closeFactorBps > 0 &&
-        wdiv(mul(positionDebtShare, collateralPool.closeFactorBps), 10000) >= debtShareToRepay
+        wdiv(mul(positionDebtShare, collateralPool.closeFactorBps), 10000) >= debtShareToRepay,
+      "FixedSpreadLiquidationStrategy/close-factor-exceeded"
     );
 
     // 2. Get current collateral price from Oracle
@@ -201,24 +235,21 @@ contract FixedSpreadLiquidationStrategy is
     );
 
     // 6. Give the treasury fees to System Debt Engine to be stored as system surplus
-    bookKeeper.moveCollateral(collateralPoolId, address(this), systemDebtEngine, info.treasuryFees);
+    bookKeeper.moveCollateral(collateralPoolId, address(this), address(systemDebtEngine), info.treasuryFees);
 
     // 7. Do external call (if data is defined) but to be
     // extremely careful we don't allow to do it to the two
     // contracts which the FixedSpreadLiquidationStrategy needs to be authorized
     if (
-      data.length > 0 && collateralRecipient != address(bookKeeper) && collateralRecipient != address(liquidationEngine)
+      ext.length > 0 && collateralRecipient != address(bookKeeper) && collateralRecipient != address(liquidationEngine)
     ) {
       IFlashLendingCallee(collateralRecipient).flashLendingCall(
         msg.sender,
         info.debtValueToRepay,
         add(info.collateralAmountToLiquidate, info.liquidatorIncentiveFees),
-        data
+        ext
       );
     }
-
-    // 8. Get Alpaca Stablecoin from the liquidator for debt repayment
-    bookKeeper.moveStablecoin(msg.sender, systemDebtEngine, info.debtValueToRepay);
 
     emit FixedSpreadLiquidate(
       collateralPoolId,
