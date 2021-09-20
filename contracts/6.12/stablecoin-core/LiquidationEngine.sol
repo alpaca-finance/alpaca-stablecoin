@@ -45,22 +45,12 @@ contract LiquidationEngine is
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
-  // --- Data ---
-  struct CollateralPool {
-    address auctioneer; // Auctioneer contract
-    uint256 liquidationPenalty; // Liquidation Penalty                                          [wad]
-    uint256 liquidationMaxSize; // The maximum amount of liquidated debt value to be put on auction for the collateral pool [rad]
-    uint256 stablecoinNeededForDebtRepay; // The current total amount of stablecoin needed to pay back the liquidated positions' debt for the collateral pool [rad]
-  }
-
   IBookKeeper public bookKeeper; // CDP Engine
 
   mapping(bytes32 => address) public override strategies; // Liquidation strategy for each collateral pool
 
   ISystemDebtEngine public systemDebtEngine; // Debt Engine
   uint256 public live; // Active Flag
-  uint256 public liquidationMaxSize; // The maximum amount of liquidated debt value to be put on auction globally [rad]
-  uint256 public stablecoinNeededForDebtRepay; // The current total amount of stablecoin needed to pay back the liquidated positions' debt globally [rad]
 
   // --- Events ---
   event RemoveRepaidDebtFromAuction(bytes32 indexed collateralPoolId, uint256 rad);
