@@ -19,7 +19,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -52,7 +51,6 @@ import "../../utils/SafeToken.sol";
 */
 
 contract TokenAdapter is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
@@ -61,18 +59,10 @@ contract TokenAdapter is
   using SafeToken for address;
 
   // --- Auth ---
-  mapping(address => uint256) public wards;
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
-  function rely(address usr) external override auth {
-    wards[usr] = 1;
-  }
-
-  function deny(address usr) external override auth {
-    wards[usr] = 0;
-  }
-
-  modifier auth() {
-    require(wards[msg.sender] == 1, "TokenAdapter/not-authorized");
+  modifier onlyOwner() {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     _;
   }
 
@@ -87,12 +77,12 @@ contract TokenAdapter is
     bytes32 collateralPoolId_,
     address collateralToken_
   ) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    wards[msg.sender] = 1;
+    _setupRole(OWNER_ROLE, msg.sender);
+
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
@@ -100,7 +90,7 @@ contract TokenAdapter is
     decimals = IToken(collateralToken).decimals();
   }
 
-  function cage() external override auth {
+  function cage() external override onlyOwner {
     live = 0;
   }
 

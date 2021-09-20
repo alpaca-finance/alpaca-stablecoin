@@ -69,6 +69,10 @@ contract FlashMintModule is
 
   // --- Init ---
   function initialize(address stablecoinAdapter_, address systemDebtEngine_) external initializer {
+    // 1. Initialized all dependencies
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+
     _setupRole(OWNER_ROLE, msg.sender);
 
     IBookKeeper bookKeeper_ = bookKeeper = IBookKeeper(IStablecoinAdapter(stablecoinAdapter_).bookKeeper());

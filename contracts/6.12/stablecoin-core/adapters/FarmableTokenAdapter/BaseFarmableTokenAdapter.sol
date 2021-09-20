@@ -2,6 +2,7 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "../../../interfaces/IBookKeeper.sol";
@@ -13,14 +14,17 @@ import "../../../utils/SafeToken.sol";
 
 /// @title BaseFarmableTokenAdapter is the base for adapters that receives tokens which can be farmed in other places
 /// and shares yields among depositors. Hence, higher capital effciency!
-contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, ReentrancyGuardUpgradeable {
+contract BaseFarmableTokenAdapter is
+  Initializable,
+  IFarmableTokenAdapter,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable
+{
   using SafeToken for address;
 
   uint256 internal constant WAD = 10**18;
   uint256 internal constant RAY = 10**27;
 
-  /// @dev Mapping of whitelisted address that can pause FarmableTokenAdapter
-  mapping(address => uint256) public whitelist;
   uint256 public live;
 
   /// @dev Book Keeper instance
@@ -57,8 +61,11 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
   event Rely(address indexed usr);
   event Deny(address indexed usr);
 
-  modifier auth() {
-    require(whitelist[msg.sender] == 1, "BaseFarmableToken/not-authed");
+  // --- Auth ---
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+
+  modifier onlyOwner() {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     _;
   }
 
@@ -77,10 +84,10 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
     address _collateralToken,
     address _rewardToken
   ) internal initializer {
+    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    whitelist[msg.sender] = 1;
-    emit Rely(msg.sender);
+    _setupRole(OWNER_ROLE, msg.sender);
 
     live = 1;
 
@@ -93,16 +100,6 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
     to18ConversionFactor = 10**(18 - decimals);
     toTokenConversionFactor = 10**decimals;
     rewardToken = IToken(_rewardToken);
-  }
-
-  function rely(address usr) external override auth {
-    whitelist[usr] = 1;
-    emit Rely(msg.sender);
-  }
-
-  function deny(address usr) external override auth {
-    whitelist[usr] = 0;
-    emit Deny(msg.sender);
   }
 
   function add(uint256 x, uint256 y) public pure returns (uint256 z) {
@@ -341,7 +338,7 @@ contract BaseFarmableTokenAdapter is Initializable, IFarmableTokenAdapter, Reent
     moveStake(source, destination, wad, data);
   }
 
-  function cage() public virtual override auth {
+  function cage() public virtual override onlyOwner {
     live = 0;
   }
 
