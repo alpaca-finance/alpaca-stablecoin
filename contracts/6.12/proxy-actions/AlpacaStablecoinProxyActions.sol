@@ -878,7 +878,7 @@ contract AlpacaStablecoinProxyActions is Common {
     IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, amtC, data);
   }
 
-  function wipeAndFreeTokenCovertToBNB(
+  function wipeFreeIbBNBAndCovertToBNB(
     address vault,
     address manager,
     address tokenAdapter,
@@ -892,7 +892,7 @@ contract AlpacaStablecoinProxyActions is Common {
     ibBNBToBNB(vault, amtC);
   }
 
-  function wipeAndFreeTokenCovert(
+  function wipeFreeTokenAndConvert(
     address vault,
     address manager,
     address tokenAdapter,
@@ -935,7 +935,7 @@ contract AlpacaStablecoinProxyActions is Common {
     IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, amtC, data);
   }
 
-  function wipeAllAndFreeTokenConvertToBNB(
+  function wipeAllFreeIbBNBAndConvertToBNB(
     address vault,
     address manager,
     address tokenAdapter,
@@ -948,7 +948,7 @@ contract AlpacaStablecoinProxyActions is Common {
     ibBNBToBNB(vault, amtC);
   }
 
-  function wipeAllAndFreeTokenConvert(
+  function wipeAllFreeTokenAndConvert(
     address vault,
     address manager,
     address tokenAdapter,
