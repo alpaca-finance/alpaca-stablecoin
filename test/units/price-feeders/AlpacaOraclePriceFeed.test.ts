@@ -92,7 +92,7 @@ describe("AlpacaOraclePriceFeed", () => {
     ) as AlpacaOraclePriceFeed
   })
 
-  describe("#peek()", () => {
+  describe("#peekPrice()", () => {
     context("when priceLife is 24 hours", () => {
       context("when alpacaOracle returns 25 hours old price", () => {
         it("should be able to get price with okFlag = false", async () => {
@@ -100,7 +100,7 @@ describe("AlpacaOraclePriceFeed", () => {
 
           mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 25)])
 
-          const [price, ok] = await alpacaOraclePriceFeed.peek()
+          const [price, ok] = await alpacaOraclePriceFeed.peekPrice()
           expect(price).to.be.equal(WeiPerWad.mul(10))
           expect(ok).to.be.false
 
@@ -116,7 +116,7 @@ describe("AlpacaOraclePriceFeed", () => {
 
           mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 23)])
 
-          const [price, ok] = await alpacaOraclePriceFeed.peek()
+          const [price, ok] = await alpacaOraclePriceFeed.peekPrice()
           expect(price).to.be.equal(WeiPerWad.mul(10))
           expect(ok).to.be.true
 
@@ -135,7 +135,7 @@ describe("AlpacaOraclePriceFeed", () => {
           mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 3)])
 
           await alpacaOraclePriceFeed.setPriceLife(2 * 60 * 60)
-          const [price, ok] = await alpacaOraclePriceFeed.peek()
+          const [price, ok] = await alpacaOraclePriceFeed.peekPrice()
           expect(price).to.be.equal(WeiPerWad.mul(10))
           expect(ok).to.be.false
 
@@ -151,7 +151,7 @@ describe("AlpacaOraclePriceFeed", () => {
           mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 1)])
 
           await alpacaOraclePriceFeed.setPriceLife(2 * 60 * 60)
-          const [price, ok] = await alpacaOraclePriceFeed.peek()
+          const [price, ok] = await alpacaOraclePriceFeed.peekPrice()
           expect(price).to.be.equal(WeiPerWad.mul(10))
           expect(ok).to.be.true
 
@@ -170,7 +170,7 @@ describe("AlpacaOraclePriceFeed", () => {
         mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 0)])
 
         await alpacaOraclePriceFeed.pause()
-        const [price, ok] = await alpacaOraclePriceFeed.peek()
+        const [price, ok] = await alpacaOraclePriceFeed.peekPrice()
         expect(price).to.be.equal(WeiPerWad.mul(10))
         expect(ok).to.be.false
 

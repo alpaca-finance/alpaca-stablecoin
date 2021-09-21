@@ -60,7 +60,7 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   uint256 public live;
 
   // --- Events ---
-  event Poke(
+  event SetPrice(
     bytes32 poolId,
     bytes32 val, // [wad]
     uint256 spot // [ray]
@@ -113,13 +113,13 @@ contract PriceOracle is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   }
 
   // --- Update value ---
-  function poke(bytes32 poolId) external {
-    (bytes32 val, bool has) = collateralPools[poolId].priceFeed.peek();
+  function setPrice(bytes32 poolId) external {
+    (bytes32 val, bool has) = collateralPools[poolId].priceFeed.peekPrice();
     uint256 priceWithSafetyMargin = has
       ? rdiv(rdiv(mul(uint256(val), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
       : 0;
     bookKeeper.setPriceWithSafetyMargin(poolId, priceWithSafetyMargin);
-    emit Poke(poolId, val, priceWithSafetyMargin);
+    emit SetPrice(poolId, val, priceWithSafetyMargin);
   }
 
   function cage() external override auth {

@@ -53,12 +53,12 @@ contract AlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable,
     _unpause();
   }
 
-  function read() external view override returns (bytes32) {
+  function readPrice() external view override returns (bytes32) {
     (uint256 price, ) = alpacaOracle.getPrice(token0, token1);
     return bytes32(price);
   }
 
-  function peek() external view override returns (bytes32, bool) {
+  function peekPrice() external view override returns (bytes32, bool) {
     (uint256 price, uint256 lastUpdate) = alpacaOracle.getPrice(token0, token1);
     return (bytes32(price), _isPriceOk(lastUpdate));
   }

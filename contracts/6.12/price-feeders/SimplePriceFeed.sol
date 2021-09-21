@@ -50,11 +50,11 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
     _unpause();
   }
 
-  function read() external view override returns (bytes32) {
+  function readPrice() external view override returns (bytes32) {
     return bytes32(price);
   }
 
-  function peek() external view override returns (bytes32, bool) {
+  function peekPrice() external view override returns (bytes32, bool) {
     return (bytes32(price), _isPriceOk());
   }
 

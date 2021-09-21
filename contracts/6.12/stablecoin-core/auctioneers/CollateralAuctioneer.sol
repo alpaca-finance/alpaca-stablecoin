@@ -230,11 +230,11 @@ contract CollateralAuctioneer is
 
   // get the price directly from the OSM
   // Could get this from rmul(BookKeeper.collateralPools(collateralPoolId).spot, Spotter.mat()) instead, but
-  // if mat has changed since the last poke, the resulting value will be
+  // if mat has changed since the last setPrice, the resulting value will be
   // incorrect.
   function getFeedPrice() internal returns (uint256 feedPrice) {
     (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
-    (bytes32 val, bool has) = priceFeed.peek();
+    (bytes32 val, bool has) = priceFeed.peekPrice();
     require(has, "CollateralAuctioneer/invalid-price");
     feedPrice = rdiv(mul(uint256(val), BLN), priceOracle.stableCoinReferencePrice());
   }
