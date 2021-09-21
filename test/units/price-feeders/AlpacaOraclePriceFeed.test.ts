@@ -105,7 +105,7 @@ describe("AlpacaOraclePriceFeed", () => {
           expect(ok).to.be.false
 
           const { calls } = mockedAlpacaOracle.smocked.getPrice
-          expect(calls.length).to.be.equal(2)
+          expect(calls.length).to.be.equal(1)
           expect(calls[0][0]).to.be.equal(token0Address)
           expect(calls[0][1]).to.be.equal(token1Address)
         })
@@ -121,7 +121,7 @@ describe("AlpacaOraclePriceFeed", () => {
           expect(ok).to.be.true
 
           const { calls } = mockedAlpacaOracle.smocked.getPrice
-          expect(calls.length).to.be.equal(2)
+          expect(calls.length).to.be.equal(1)
           expect(calls[0][0]).to.be.equal(token0Address)
           expect(calls[0][1]).to.be.equal(token1Address)
         })
@@ -140,7 +140,7 @@ describe("AlpacaOraclePriceFeed", () => {
           expect(ok).to.be.false
 
           const { calls } = mockedAlpacaOracle.smocked.getPrice
-          expect(calls.length).to.be.equal(2)
+          expect(calls.length).to.be.equal(1)
           expect(calls[0][0]).to.be.equal(token0Address)
           expect(calls[0][1]).to.be.equal(token1Address)
         })
@@ -156,7 +156,7 @@ describe("AlpacaOraclePriceFeed", () => {
           expect(ok).to.be.true
 
           const { calls } = mockedAlpacaOracle.smocked.getPrice
-          expect(calls.length).to.be.equal(2)
+          expect(calls.length).to.be.equal(1)
           expect(calls[0][0]).to.be.equal(token0Address)
           expect(calls[0][1]).to.be.equal(token1Address)
         })
@@ -175,7 +175,7 @@ describe("AlpacaOraclePriceFeed", () => {
         expect(ok).to.be.false
 
         const { calls } = mockedAlpacaOracle.smocked.getPrice
-        expect(calls.length).to.be.equal(2)
+        expect(calls.length).to.be.equal(1)
         expect(calls[0][0]).to.be.equal(token0Address)
         expect(calls[0][1]).to.be.equal(token1Address)
       })

@@ -54,26 +54,21 @@ contract AlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable,
   }
 
   function read() external view override returns (bytes32) {
-    return _getPrice();
-  }
-
-  function peek() external view override returns (bytes32, bool) {
-    return (_getPrice(), _isPriceOk());
-  }
-
-  function _getPrice() internal view returns (bytes32) {
     (uint256 price, ) = alpacaOracle.getPrice(token0, token1);
     return bytes32(price);
   }
 
-  function _isPriceFresh() internal view returns (bool) {
-    (, uint256 lastUpdate) = alpacaOracle.getPrice(token0, token1);
+  function peek() external view override returns (bytes32, bool) {
+    (uint256 price, uint256 lastUpdate) = alpacaOracle.getPrice(token0, token1);
+    return (bytes32(price), _isPriceOk(lastUpdate));
+  }
 
+  function _isPriceFresh(uint256 lastUpdate) internal view returns (bool) {
     // solhint-disable not-rely-on-time
     return lastUpdate >= now - priceLife;
   }
 
-  function _isPriceOk() internal view returns (bool) {
-    return _isPriceFresh() && !paused();
+  function _isPriceOk(uint256 lastUpdate) internal view returns (bool) {
+    return _isPriceFresh(lastUpdate) && !paused();
   }
 }
