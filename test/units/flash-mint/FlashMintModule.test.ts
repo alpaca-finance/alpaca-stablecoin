@@ -220,15 +220,11 @@ describe("FlashMintModule", () => {
     })
   })
 
-  describe("#bookKeeperStablecoinFlashLoan", () => {
+  describe("#bookKeeperFlashLoan", () => {
     context("when ceiling exceeded", () => {
       it("should be revert", async () => {
         await expect(
-          flashMintModule.bookKeeperStablecoinFlashLoan(
-            mockMyFashLoan.address,
-            WeiPerRad.mul(10),
-            formatBytes32String("")
-          )
+          flashMintModule.bookKeeperFlashLoan(mockMyFashLoan.address, WeiPerRad.mul(10), formatBytes32String(""))
         ).to.be.revertedWith("FlashMintModule/ceiling-exceeded")
       })
     })
@@ -237,11 +233,7 @@ describe("FlashMintModule", () => {
         await flashMintModule.setMax(WeiPerWad.mul(100))
         await flashMintModule.setFeeRate(WeiPerWad.div(10))
         await expect(
-          flashMintModule.bookKeeperStablecoinFlashLoan(
-            mockMyFashLoan.address,
-            WeiPerRad.mul(10),
-            formatBytes32String("")
-          )
+          flashMintModule.bookKeeperFlashLoan(mockMyFashLoan.address, WeiPerRad.mul(10), formatBytes32String(""))
         ).to.be.revertedWith("FlashMintModule/callback-failed")
       })
     })
@@ -249,31 +241,23 @@ describe("FlashMintModule", () => {
       it("should be revert", async () => {
         await flashMintModule.setMax(WeiPerWad.mul(100))
         await flashMintModule.setFeeRate(WeiPerWad.div(10))
-        mockMyFashLoan.smocked.onBookKeeperStablecoinFlashLoan.will.return.with(
-          keccak256(toUtf8Bytes("BookKeeperStablecoinFlashBorrower.onBookKeeperStablecoinFlashLoan"))
+        mockMyFashLoan.smocked.onBookKeeperFlashLoan.will.return.with(
+          keccak256(toUtf8Bytes("BookKeeperFlashBorrower.onBookKeeperFlashLoan"))
         )
         await expect(
-          flashMintModule.bookKeeperStablecoinFlashLoan(
-            mockMyFashLoan.address,
-            WeiPerRad.mul(10),
-            formatBytes32String("")
-          )
+          flashMintModule.bookKeeperFlashLoan(mockMyFashLoan.address, WeiPerRad.mul(10), formatBytes32String(""))
         ).to.be.revertedWith("FlashMintModule/insufficient-fee")
       })
     })
     context("when parameters are valid", () => {
       it("should be able to call flashLoan", async () => {
         await flashMintModule.setMax(WeiPerWad.mul(100))
-        mockMyFashLoan.smocked.onBookKeeperStablecoinFlashLoan.will.return.with(
-          keccak256(toUtf8Bytes("BookKeeperStablecoinFlashBorrower.onBookKeeperStablecoinFlashLoan"))
+        mockMyFashLoan.smocked.onBookKeeperFlashLoan.will.return.with(
+          keccak256(toUtf8Bytes("BookKeeperFlashBorrower.onBookKeeperFlashLoan"))
         )
         await expect(
-          flashMintModule.bookKeeperStablecoinFlashLoan(
-            mockMyFashLoan.address,
-            WeiPerRad.mul(10),
-            formatBytes32String("")
-          )
-        ).to.be.emit(flashMintModule, "BookKeeperStablecoinFlashLoan")
+          flashMintModule.bookKeeperFlashLoan(mockMyFashLoan.address, WeiPerRad.mul(10), formatBytes32String(""))
+        ).to.be.emit(flashMintModule, "BookKeeperFlashLoan")
 
         const { calls: bookKeeperMinUnbackStablecoinCalls } = mockBookKeeper.smocked.mintUnbackedStablecoin
         expect(bookKeeperMinUnbackStablecoinCalls.length).to.be.equal(1)
