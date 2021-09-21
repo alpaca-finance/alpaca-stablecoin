@@ -18,12 +18,11 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "../../../interfaces/IAlpacaFairLaunch.sol";
+import "../../../interfaces/IBookKeeper.sol";
 import "../../../interfaces/IFarmableTokenAdapter.sol";
 import "../../../interfaces/ITimeLock.sol";
 import "../../../interfaces/IShield.sol";
 import "../../../utils/SafeToken.sol";
-
-import "./BaseFarmableTokenAdapter.sol";
 
 /// @title IbTokenAdapter is the adapter that inherited BaseFarmableTokenAdapter.
 /// It receives Alpaca's ibTOKEN from users and deposit in Alpaca's FairLaunch.
@@ -130,12 +129,13 @@ contract IbTokenAdapter is
     collateralPoolId = _collateralPoolId;
     collateralToken = _collateralToken;
     decimals = IToken(collateralToken).decimals();
-    require(decimals <= 18, "BaseFarmableToken/decimals > 18");
+    require(decimals <= 18, "IbTokenAdapter/decimals > 18");
 
     to18ConversionFactor = 10**(18 - decimals);
     toTokenConversionFactor = 10**decimals;
     rewardToken = IToken(_rewardToken);
 
+    require(_treasuryAccount != address(0), "IbTokenAdapter/bad treasury account");
     treasuryFeeBps = _treasuryFeeBps;
     treasuryAccount = _treasuryAccount;
 
@@ -187,6 +187,18 @@ contract IbTokenAdapter is
     z = mul(x, RAY) / y;
   }
 
+  function setTreasuryFeeBps(uint256 _treasuryFeeBps) external onlyOwner {
+    require(live == 1, "IbTokenAdapter/not-live");
+    require(treasuryFeeBps <= 5000, "IbTokenAdapter/bad treasury fee bps");
+    treasuryFeeBps = _treasuryFeeBps;
+  }
+
+  function setTreasuryAccount(address _treasuryAccount) external onlyOwner {
+    require(live == 1, "IbTokenAdapter/not-live");
+    require(_treasuryAccount != address(0), "IbTokenAdapter/bad treasury account");
+    treasuryAccount = _treasuryAccount;
+  }
+
   /// @dev Ignore collateralTokens that have been directly transferred
   function netAssetValuation() public view returns (uint256) {
     return totalShare;
@@ -199,19 +211,14 @@ contract IbTokenAdapter is
   }
 
   /// @dev Harvest ALPACA from FairLaunch
+  /// @dev Return the amount of rewards that is harvested.
+  /// Expect that the adapter which inherited BaseFarmableTokenAdapter
   function _harvest() internal returns (uint256) {
     if (live == 1) {
       // Withdraw all rewards
       (uint256 stakedBalance, , , ) = fairlaunch.userInfo(pid, address(this));
       if (stakedBalance > 0) fairlaunch.withdraw(address(this), pid, 0);
     }
-    return __harvest();
-  }
-
-  /// @dev Return the amount of rewards that is harvested.
-  /// Expect that the adapter which inherited BaseFarmableTokenAdapter
-  /// override this __harvest and perform actual harvest before return
-  function __harvest() internal returns (uint256) {
     return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
   }
 
@@ -278,7 +285,7 @@ contract IbTokenAdapter is
     uint256 amount,
     bytes calldata data
   ) private {
-    require(live == 1, "BaseFarmableToken/not live");
+    require(live == 1, "IbTokenAdapter/not live");
     address user = abi.decode(data, (address));
     harvest(positionAddress, user);
     if (amount > 0) {
@@ -286,7 +293,7 @@ contract IbTokenAdapter is
 
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
-      require(int256(wad) > 0, "BaseFarmableToken/wad overflow");
+      require(int256(wad) > 0, "IbTokenAdapter/wad overflow");
 
       address(collateralToken).safeTransferFrom(msg.sender, address(this), amount);
       bookKeeper.addCollateral(collateralPoolId, positionAddress, int256(wad));
@@ -331,8 +338,8 @@ contract IbTokenAdapter is
 
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
-      require(int256(wad) > 0, "BaseFarmableToken/wad overflow");
-      require(stake[positionAddress] >= wad, "BaseFarmableToken/insufficient staked amount");
+      require(int256(wad) > 0, "IbTokenAdapter/wad overflow");
+      require(stake[positionAddress] >= wad, "IbTokenAdapter/insufficient staked amount");
 
       address(collateralToken).safeTransfer(user, amount);
       bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(wad));
@@ -359,7 +366,7 @@ contract IbTokenAdapter is
   /// @param to The address to received collateralTokens
   function _emergencyWithdraw(address positionAddress, address to) private {
     uint256 wad = bookKeeper.collateralToken(collateralPoolId, positionAddress);
-    require(wad <= 2**255, "BaseFarmableTokenAdapter/wad overflow");
+    require(wad <= 2**255, "IbTokenAdapter/wad overflow");
     uint256 val = wmul(wmul(wad, netAssetPerShare()), toTokenConversionFactor);
 
     address(collateralToken).safeTransfer(to, val);
@@ -407,12 +414,12 @@ contract IbTokenAdapter is
     (uint256 lockedCollateral, ) = bookKeeper.positions(collateralPoolId, source);
     require(
       stake[source] >= add(bookKeeper.collateralToken(collateralPoolId, source), lockedCollateral),
-      "BaseFarmableTokenAdapter/stake[source] < collateralTokens + lockedCollateral"
+      "IbTokenAdapter/stake[source] < collateralTokens + lockedCollateral"
     );
     (lockedCollateral, ) = bookKeeper.positions(collateralPoolId, destination);
     require(
       stake[destination] <= add(bookKeeper.collateralToken(collateralPoolId, destination), lockedCollateral),
-      "BaseFarmableTokenAdapter/stake[destination] > collateralTokens + lockedCollateral"
+      "IbTokenAdapter/stake[destination] > collateralTokens + lockedCollateral"
     );
 
     emit MoveStake(source, destination, wad);
@@ -438,16 +445,6 @@ contract IbTokenAdapter is
   ) external override nonReentrant {
     deposit(source, 0, data);
     moveStake(source, destination, wad, data);
-  }
-
-  function setTreasuryFeeBps(uint256 _data) external onlyOwner {
-    require(live == 1, "IbTokenAdapter/not-live");
-    treasuryFeeBps = _data;
-  }
-
-  function setTreasuryAccount(uint256 _data) external onlyOwner {
-    require(live == 1, "IbTokenAdapter/not-live");
-    treasuryFeeBps = _data;
   }
 
   /// @dev Pause ibTokenAdapter when assumptions change

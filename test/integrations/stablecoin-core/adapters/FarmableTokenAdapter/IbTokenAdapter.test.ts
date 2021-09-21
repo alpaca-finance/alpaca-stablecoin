@@ -352,7 +352,7 @@ describe("IbTokenAdapter", () => {
             ethers.utils.parseEther("1"),
             ethers.utils.defaultAbiCoder.encode(["address"], [deployerAddress])
           )
-        ).to.be.revertedWith("BaseFarmableToken/not live")
+        ).to.be.revertedWith("IbTokenAdapter/not live")
       })
     })
 
@@ -471,7 +471,7 @@ describe("IbTokenAdapter", () => {
             ethers.utils.parseEther("2"),
             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
           )
-        ).to.be.revertedWith("BaseFarmableToken/insufficient staked amount")
+        ).to.be.revertedWith("IbTokenAdapter/insufficient staked amount")
       })
     })
 
