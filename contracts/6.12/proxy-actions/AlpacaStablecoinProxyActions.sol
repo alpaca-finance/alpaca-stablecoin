@@ -307,33 +307,41 @@ contract AlpacaStablecoinProxyActions is Common {
 
   function bnbToIbBNB(address vault, uint256 amt) public payable returns (uint256) {
     SafeToken.safeApprove(address(IAlpacaVault(vault).token()), address(vault), amt);
+    uint256 collateralTokenBefore = vault.balanceOf(address(this));
     IAlpacaVault(vault).deposit{ value: msg.value }(msg.value);
+    uint256 collateralTokenAfter = vault.balanceOf(address(this));
     SafeToken.safeApprove(address(IAlpacaVault(vault).token()), address(vault), 0);
-    uint256 collateralTokenAmount = vault.balanceOf(address(this));
-    address(vault).safeTransfer(msg.sender, collateralTokenAmount);
-    return collateralTokenAmount;
+    uint256 backCollateralToken = _safeSub(collateralTokenAfter, collateralTokenBefore);
+    address(vault).safeTransfer(msg.sender, backCollateralToken);
+    return backCollateralToken;
   }
 
   function ibBNBToBNB(address vault, uint256 amt) public payable {
     address(vault).safeTransferFrom(msg.sender, address(this), amt);
+    uint256 bnbBefore = address(this).balance;
     IAlpacaVault(vault).withdraw(amt);
-    SafeToken.safeTransferETH(msg.sender, address(this).balance);
+    uint256 bnbAfter = address(this).balance;
+    SafeToken.safeTransferETH(msg.sender, _safeSub(bnbAfter, bnbBefore));
   }
 
   function tokenToIbToken(address vault, uint256 amt) public returns (uint256) {
     address(IAlpacaVault(vault).token()).safeTransferFrom(msg.sender, address(this), amt);
     SafeToken.safeApprove(address(IAlpacaVault(vault).token()), address(vault), amt);
+    uint256 collateralTokenBefore = vault.balanceOf(address(this));
     IAlpacaVault(vault).deposit(amt);
+    uint256 collateralTokenAfter = vault.balanceOf(address(this));
     SafeToken.safeApprove(address(IAlpacaVault(vault).token()), address(vault), 0);
-    uint256 collateralTokenAmount = vault.balanceOf(address(this));
-    address(vault).safeTransfer(msg.sender, collateralTokenAmount);
-    return collateralTokenAmount;
+    uint256 backCollateralToken = _safeSub(collateralTokenAfter, collateralTokenBefore);
+    address(vault).safeTransfer(msg.sender, backCollateralToken);
+    return backCollateralToken;
   }
 
   function ibTokenToToken(address vault, uint256 amt) public {
     address(vault).safeTransferFrom(msg.sender, address(this), amt);
+    uint256 baseTokenBefore = IAlpacaVault(vault).token().balanceOf(address(this));
     IAlpacaVault(vault).withdraw(amt);
-    address(IAlpacaVault(vault).token()).safeTransfer(msg.sender, IAlpacaVault(vault).token().balanceOf(address(this)));
+    uint256 baseTokenAfter = IAlpacaVault(vault).token().balanceOf(address(this));
+    address(IAlpacaVault(vault).token()).safeTransfer(msg.sender, _safeSub(baseTokenAfter, baseTokenBefore));
   }
 
   function lockBNB(
@@ -881,7 +889,7 @@ contract AlpacaStablecoinProxyActions is Common {
     bytes calldata data
   ) public {
     wipeAndFreeToken(manager, tokenAdapter, stablecoinAdapter, cdp, amtC, wadD, data);
-    ibTokenToToken(vault, amtC);
+    ibBNBToBNB(vault, amtC);
   }
 
   function wipeAndFreeTokenCovert(
