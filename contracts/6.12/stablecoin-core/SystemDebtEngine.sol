@@ -98,6 +98,21 @@ contract SystemDebtEngine is
     return x <= y ? x : y;
   }
 
+  // --- withdraw surplus ---
+  function withdrawCollateralSurplus(
+    bytes32 collateralPoolId,
+    address to,
+    uint256 wad
+  ) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    bookKeeper.moveCollateral(collateralPoolId, address(this), to, wad);
+  }
+
+  function withdrawStablecoinSurplus(address to, uint256 rad) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    bookKeeper.moveStablecoin(address(this), to, rad);
+  }
+
   // --- Administration ---
   event SetSurplusBuffer(address indexed caller, uint256 data);
 

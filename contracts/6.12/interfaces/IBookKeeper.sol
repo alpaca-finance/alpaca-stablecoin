@@ -95,11 +95,11 @@ interface IBookKeeper {
     external
     view
     returns (
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
+      uint256, // [wad]
+      uint256, // [ray]
+      uint256, // [ray]
+      uint256, // [rad]
+      uint256 // [rad]
     );
 
   function accrueStabilityFee(
@@ -108,9 +108,9 @@ interface IBookKeeper {
     int256
   ) external;
 
-  function systemBadDebt(address) external view returns (uint256);
+  function systemBadDebt(address) external view returns (uint256); // rad
 
-  function settleSystemBadDebt(uint256) external;
+  function settleSystemBadDebt(uint256) external; // rad
 
   function hope(address) external;
 

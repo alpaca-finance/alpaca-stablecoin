@@ -3,10 +3,11 @@ import { BigNumber, Signer } from "ethers"
 import chai from "chai"
 import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import { SystemDebtEngine, SystemDebtEngine__factory } from "../../../typechain"
+import { BookKeeper, SystemDebtEngine, SystemDebtEngine__factory } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 
 import * as UnitHelpers from "../../helper/unit"
+import { formatBytes32String } from "ethers/lib/utils"
 
 chai.use(solidity)
 const { expect } = chai
@@ -221,6 +222,63 @@ describe("SystemDebtEngine", () => {
       it("should be success", async () => {
         await systemDebtEngine.grantRole(await systemDebtEngine.LIQUIDATION_ENGINE_ROLE(), deployerAddress)
         await systemDebtEngine.pushToBadDebtQueue(UnitHelpers.WeiPerWad)
+      })
+    })
+  })
+
+  describe("#withdrawCollateralSurplus", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(
+          systemDebtEngineAsAlice.withdrawCollateralSurplus(
+            formatBytes32String("BNB"),
+            deployerAddress,
+            UnitHelpers.WeiPerWad
+          )
+        ).to.be.revertedWith("!ownerRole")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call withdrawCollateralSurplus", async () => {
+        await systemDebtEngine.grantRole(await systemDebtEngine.OWNER_ROLE(), deployerAddress)
+        mockedBookKeeper.smocked.moveCollateral.will.return.with()
+
+        await systemDebtEngine.withdrawCollateralSurplus(
+          formatBytes32String("BNB"),
+          deployerAddress,
+          UnitHelpers.WeiPerWad
+        )
+
+        const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
+        expect(moveCollateral.length).to.be.equal(1)
+        expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(moveCollateral[0].src).to.be.equal(systemDebtEngine.address)
+        expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
+        expect(moveCollateral[0].wad).to.be.equal(UnitHelpers.WeiPerWad)
+      })
+    })
+  })
+
+  describe("#withdrawStablecoinSurplus", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(
+          systemDebtEngineAsAlice.withdrawStablecoinSurplus(deployerAddress, UnitHelpers.WeiPerRad)
+        ).to.be.revertedWith("!ownerRole")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call withdrawStablecoinSurplus", async () => {
+        await systemDebtEngine.grantRole(await systemDebtEngine.OWNER_ROLE(), deployerAddress)
+        mockedBookKeeper.smocked.moveStablecoin.will.return.with()
+
+        await systemDebtEngine.withdrawStablecoinSurplus(deployerAddress, UnitHelpers.WeiPerRad)
+
+        const { calls: moveStablecoin } = mockedBookKeeper.smocked.moveStablecoin
+        expect(moveStablecoin.length).to.be.equal(1)
+        expect(moveStablecoin[0].src).to.be.equal(systemDebtEngine.address)
+        expect(moveStablecoin[0].dst).to.be.equal(deployerAddress)
+        expect(moveStablecoin[0].rad).to.be.equal(UnitHelpers.WeiPerRad)
       })
     })
   })

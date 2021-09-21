@@ -14,7 +14,6 @@ import "../../interfaces/ILiquidationEngine.sol";
 import "../../interfaces/ILiquidationStrategy.sol";
 import "../../interfaces/ISystemDebtEngine.sol";
 import "../../interfaces/IFlashLendingCallee.sol";
-import "hardhat/console.sol";
 
 contract FixedSpreadLiquidationStrategy is
   PausableUpgradeable,
@@ -26,7 +25,7 @@ contract FixedSpreadLiquidationStrategy is
   bytes32 public constant LIQUIDATION_ENGINE_ROLE = keccak256("LIQUIDATION_ENGINE_ROLE");
 
   struct CollateralPool {
-    uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation [wad]
+    uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation
     uint256 liquidatorIncentiveBps; // Percentage (BPS) of how much additional collateral will be given to the liquidator incentive
     uint256 treasuryFeesBps; // Percentage (BPS) of how much additional collateral will be transferred to the treasury
   }
@@ -147,7 +146,8 @@ contract FixedSpreadLiquidationStrategy is
     (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
     (bytes32 val, bool has) = priceFeed.peek();
     require(has, "FixedSpreadLiquidationStrategy/invalid-price");
-    feedPrice = rdiv(mul(uint256(val), BLN), priceOracle.stableCoinReferencePrice());
+    // (val [wad] * BLN [10 ** 9] ) [ray] / priceOracle.stableCoinReferencePrice [ray]
+    feedPrice = rdiv(mul(uint256(val), BLN), priceOracle.stableCoinReferencePrice()); // [ray]
   }
 
   function calculateLiquidationInfo(
@@ -157,20 +157,30 @@ contract FixedSpreadLiquidationStrategy is
     uint256 positionCollateralAmount
   ) internal returns (LiquidationInfo memory info) {
     (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
-    info.debtValueToRepay = mul(debtShareToRepay, debtAccumulatedRate);
-    info.collateralAmountToLiquidate = wdiv(info.debtValueToRepay, currentCollateralPrice);
-    info.liquidatorIncentiveFees = wdiv(
-      mul(info.collateralAmountToLiquidate, collateralPools[collateralPoolId].liquidatorIncentiveBps),
-      10000
-    );
-    info.treasuryFees = wdiv(
-      mul(info.collateralAmountToLiquidate, collateralPools[collateralPoolId].treasuryFeesBps),
-      10000
-    );
+
+    // ---- Calculate collateral amount to liquidate ----
+    // debtShareToRepay [wad] * debtAccumulatedRate [ray]
+    info.debtValueToRepay = mul(debtShareToRepay, debtAccumulatedRate); //[rad]
+    // info.debtValueToRepay [rad] / currentCollateralPrice [ray]
+    info.collateralAmountToLiquidate = info.debtValueToRepay / currentCollateralPrice; // [wad]
+    // ---- Calcualte liquidator Incentive Fees ----
+    // ( info.collateralAmountToLiquidate [wad] * liquidatorIncentiveBps)/ 10000
+    info.liquidatorIncentiveFees =
+      mul(info.collateralAmountToLiquidate, collateralPools[collateralPoolId].liquidatorIncentiveBps) /
+      10000; // [wad]
+
+    // --- Calcualte treasuryFees ---
+    // ( info.collateralAmountToLiquidate [wad] * treasuryFeesBps) /10000
+    info.treasuryFees =
+      mul(info.collateralAmountToLiquidate, collateralPools[collateralPoolId].treasuryFeesBps) /
+      10000; // [wad]
+
+    // --- Calcualte collateral Amount To Liquidate With AllFees --
+    //  (collateralAmountToLiquidate [wad] + liquidatorIncentiveFees [wad]) + treasuryFees [wad]
     info.collateralAmountToLiquidateWithAllFees = add(
       add(info.collateralAmountToLiquidate, info.liquidatorIncentiveFees),
       info.treasuryFees
-    );
+    ); // [wad]
     require(
       info.collateralAmountToLiquidateWithAllFees <= positionCollateralAmount,
       "FixedSpreadLiquidationStrategy/liquidate-too-much"
@@ -179,7 +189,7 @@ contract FixedSpreadLiquidationStrategy is
 
   function execute(
     bytes32 collateralPoolId,
-    uint256 positionDebtShare, // Debt                   [rad]
+    uint256 positionDebtShare, // Debt                   [wad]
     uint256 positionCollateralAmount, // Collateral             [wad]
     address positionAddress, // Address that will receive any leftover collateral
     uint256 debtShareToRepay, // [wad]
@@ -198,6 +208,8 @@ contract FixedSpreadLiquidationStrategy is
 
     // 1. Check if Close Factor is not exceeded
     CollateralPool memory collateralPool = collateralPools[collateralPoolId];
+    // ((positionDebtShare [wad] * collateralPool.closeFactorBps) [wad] / 10000)
+    // debtShareToRepay [wad]
     require(
       collateralPool.closeFactorBps > 0 &&
         wdiv(mul(positionDebtShare, collateralPool.closeFactorBps), 10000) >= debtShareToRepay,

@@ -120,6 +120,8 @@ contract LiquidationEngine is
       // 1. Check if the position is underwater
       uint256 priceWithSafetyMargin;
       (, debtAccumulatedRate, priceWithSafetyMargin, , debtFloor) = bookKeeper.collateralPools(collateralPoolId);
+      // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]
+      // (positionDebtShare [wad] * debtAccumulatedRate [ray]) [rad]
       require(
         priceWithSafetyMargin > 0 &&
           mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate),
@@ -137,7 +139,8 @@ contract LiquidationEngine is
     );
 
     //Get Alpaca Stablecoin from the liquidator for debt repayment
-    uint256 debtValueToRepay = mul(debtShareToRepay, debtAccumulatedRate);
+    // debtShareToRepay [wad] * debtAccumulatedRate [ray]
+    uint256 debtValueToRepay = mul(debtShareToRepay, debtAccumulatedRate); // [rad]
     bookKeeper.moveStablecoin(msg.sender, address(systemDebtEngine), debtValueToRepay);
   }
 
