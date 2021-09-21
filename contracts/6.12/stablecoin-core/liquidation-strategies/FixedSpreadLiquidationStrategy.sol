@@ -117,6 +117,10 @@ contract FixedSpreadLiquidationStrategy is
     z = mul(x, WAD) / y;
   }
 
+  function div(uint256 x, uint256 y) internal pure returns (uint256 z) {
+    z = x / y;
+  }
+
   // --- Setter ---
   function setCloseFactorBps(bytes32 collateralPoolId, uint256 strategy) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
@@ -162,18 +166,20 @@ contract FixedSpreadLiquidationStrategy is
     // debtShareToRepay [wad] * debtAccumulatedRate [ray]
     info.debtValueToRepay = mul(debtShareToRepay, debtAccumulatedRate); //[rad]
     // info.debtValueToRepay [rad] / currentCollateralPrice [ray]
-    info.collateralAmountToLiquidate = info.debtValueToRepay / currentCollateralPrice; // [wad]
+    info.collateralAmountToLiquidate = div(info.debtValueToRepay, currentCollateralPrice); // [wad]
     // ---- Calcualte liquidator Incentive Fees ----
     // ( info.collateralAmountToLiquidate [wad] * liquidatorIncentiveBps)/ 10000
-    info.liquidatorIncentiveFees =
-      mul(info.collateralAmountToLiquidate, collateralPools[collateralPoolId].liquidatorIncentiveBps) /
-      10000; // [wad]
+    info.liquidatorIncentiveFees = div(
+      mul(info.collateralAmountToLiquidate, collateralPools[collateralPoolId].liquidatorIncentiveBps),
+      10000
+    ); // [wad]
 
     // --- Calcualte treasuryFees ---
     // ( info.collateralAmountToLiquidate [wad] * treasuryFeesBps) /10000
-    info.treasuryFees =
-      mul(info.collateralAmountToLiquidate, collateralPools[collateralPoolId].treasuryFeesBps) /
-      10000; // [wad]
+    info.treasuryFees = div(
+      mul(info.collateralAmountToLiquidate, collateralPools[collateralPoolId].treasuryFeesBps),
+      10000
+    ); // [wad]
 
     // --- Calcualte collateral Amount To Liquidate With AllFees --
     //  (collateralAmountToLiquidate [wad] + liquidatorIncentiveFees [wad]) + treasuryFees [wad]
