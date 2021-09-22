@@ -214,11 +214,12 @@ contract FixedSpreadLiquidationStrategy is
 
     // 1. Check if Close Factor is not exceeded
     CollateralPool memory collateralPool = collateralPools[collateralPoolId];
-    // ((positionDebtShare [wad] * collateralPool.closeFactorBps) [wad] / 10000)
-    // debtShareToRepay [wad]
+    // `positionDebtShare * collateralPool.closeFactorBps / 10000 >= debtShareToRepay` is transformed in to
+    // `positionDebtShare [wad] * collateralPool.closeFactorBps [bps] >= debtShareToRepay * 10000 [wad]`
+    // to prevent precision loss from division
     require(
       collateralPool.closeFactorBps > 0 &&
-        wdiv(mul(positionDebtShare, collateralPool.closeFactorBps), 10000) >= debtShareToRepay,
+        mul(positionDebtShare, collateralPool.closeFactorBps) >= mul(debtShareToRepay, 10000),
       "FixedSpreadLiquidationStrategy/close-factor-exceeded"
     );
 
