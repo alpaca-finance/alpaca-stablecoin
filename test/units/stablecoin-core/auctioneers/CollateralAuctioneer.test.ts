@@ -207,7 +207,7 @@ describe("CollateralAuctioneer", () => {
         it("should revert", async () => {
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
           // mock price to be 0
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(One), false])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(One), false])
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(WeiPerRay)
 
           await expect(
@@ -219,7 +219,7 @@ describe("CollateralAuctioneer", () => {
         it("should revert", async () => {
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
           // mock price to be 0
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(Zero), true])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(Zero), true])
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(WeiPerRay)
 
           await expect(
@@ -246,7 +246,7 @@ describe("CollateralAuctioneer", () => {
           const prize = Zero
 
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
 
           mockedPositionManager.smocked.mapPositionHandlerToOwner.will.return.with(deployerAddress)
@@ -259,7 +259,7 @@ describe("CollateralAuctioneer", () => {
           expect(collateralPoolsCalls.length).to.be.equal(1)
           expect(collateralPoolsCalls[0][0]).to.be.equal(formatBytes32String("BTCB"))
 
-          const { calls: peekCalls } = mockedPriceFeed.smocked.peek
+          const { calls: peekCalls } = mockedPriceFeed.smocked.peekPrice
           expect(peekCalls.length).to.be.equal(1)
 
           const { calls: stableCoinReferencePriceCalls } = mockedPriceOracle.smocked.stableCoinReferencePrice
@@ -301,7 +301,7 @@ describe("CollateralAuctioneer", () => {
           const prize = liquidatorTip.add(debt.mul(parseEther("0.05")).div(WeiPerWad))
 
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
           mockedBookKeeper.smocked.mintUnbackedStablecoin.will.return.with()
 
@@ -321,7 +321,7 @@ describe("CollateralAuctioneer", () => {
           expect(collateralPoolsCalls.length).to.be.equal(1)
           expect(collateralPoolsCalls[0][0]).to.be.equal(formatBytes32String("BTCB"))
 
-          const { calls: peekCalls } = mockedPriceFeed.smocked.peek
+          const { calls: peekCalls } = mockedPriceFeed.smocked.peekPrice
           expect(peekCalls.length).to.be.equal(1)
 
           const { calls: stableCoinReferencePriceCalls } = mockedPriceOracle.smocked.stableCoinReferencePrice
@@ -368,12 +368,12 @@ describe("CollateralAuctioneer", () => {
       collateralAmount: BigNumber
     ) => {
       mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-      mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+      mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
       mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
 
       await collateralAuctioneer.startAuction(debt, collateralAmount, positionAddress, liquidatorAddress)
 
-      mockedPriceFeed.smocked.peek.reset()
+      mockedPriceFeed.smocked.peekPrice.reset()
       mockedPriceOracle.smocked.collateralPools.reset()
       mockedPriceOracle.smocked.stableCoinReferencePrice.reset()
     }
@@ -471,7 +471,7 @@ describe("CollateralAuctioneer", () => {
           mockedLinearDecrease.smocked.price.will.return.with(One)
 
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
 
           await collateralAuctioneer["file(bytes32,address)"](formatBytes32String("calc"), mockedLinearDecrease.address)
@@ -492,7 +492,7 @@ describe("CollateralAuctioneer", () => {
           mockedLinearDecrease.smocked.price.will.return.with(One)
 
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
 
           await collateralAuctioneer["file(bytes32,address)"](formatBytes32String("calc"), mockedLinearDecrease.address)
@@ -526,19 +526,19 @@ describe("CollateralAuctioneer", () => {
           // start an auction
           {
             mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-            mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+            mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
             mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
 
             await collateralAuctioneer.startAuction(debt, collateralAmount, positionAddress, liquidatorAddress)
 
-            mockedPriceFeed.smocked.peek.reset()
+            mockedPriceFeed.smocked.peekPrice.reset()
             mockedPriceOracle.smocked.collateralPools.reset()
             mockedPriceOracle.smocked.stableCoinReferencePrice.reset()
           }
 
           // start mocking for redo()
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
           mockedLinearDecrease.smocked.price.will.return.with(fedPrice)
 
@@ -550,7 +550,7 @@ describe("CollateralAuctioneer", () => {
           expect(collateralPoolsCalls.length).to.be.equal(1)
           expect(collateralPoolsCalls[0][0]).to.be.equal(formatBytes32String("BTCB"))
 
-          const { calls: peekCalls } = mockedPriceFeed.smocked.peek
+          const { calls: peekCalls } = mockedPriceFeed.smocked.peekPrice
           expect(peekCalls.length).to.be.equal(1)
 
           const { calls: stableCoinReferencePriceCalls } = mockedPriceOracle.smocked.stableCoinReferencePrice
@@ -596,19 +596,19 @@ describe("CollateralAuctioneer", () => {
           // start an auction
           {
             mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-            mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+            mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
             mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
 
             await collateralAuctioneer.startAuction(debt, collateralAmount, positionAddress, liquidatorAddress)
 
-            mockedPriceFeed.smocked.peek.reset()
+            mockedPriceFeed.smocked.peekPrice.reset()
             mockedPriceOracle.smocked.collateralPools.reset()
             mockedPriceOracle.smocked.stableCoinReferencePrice.reset()
           }
 
           // start mocking for redo()
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
           mockedLinearDecrease.smocked.price.will.return.with(fedPrice)
           mockedBookKeeper.smocked.mintUnbackedStablecoin.will.return.with()
@@ -632,7 +632,7 @@ describe("CollateralAuctioneer", () => {
           expect(collateralPoolsCalls.length).to.be.equal(1)
           expect(collateralPoolsCalls[0][0]).to.be.equal(formatBytes32String("BTCB"))
 
-          const { calls: peekCalls } = mockedPriceFeed.smocked.peek
+          const { calls: peekCalls } = mockedPriceFeed.smocked.peekPrice
           expect(peekCalls.length).to.be.equal(1)
 
           const { calls: stableCoinReferencePriceCalls } = mockedPriceOracle.smocked.stableCoinReferencePrice
@@ -682,7 +682,7 @@ describe("CollateralAuctioneer", () => {
             // start an auction
             {
               mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-              mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+              mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
               mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
 
               await modifiableCollateralAuctioneer.startAuction(
@@ -692,14 +692,14 @@ describe("CollateralAuctioneer", () => {
                 liquidatorAddress
               )
 
-              mockedPriceFeed.smocked.peek.reset()
+              mockedPriceFeed.smocked.peekPrice.reset()
               mockedPriceOracle.smocked.collateralPools.reset()
               mockedPriceOracle.smocked.stableCoinReferencePrice.reset()
             }
 
             // start mocking for redo()
             mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-            mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+            mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
             mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
             mockedLinearDecrease.smocked.price.will.return.with(fedPrice)
             // mockedBookKeeper.smocked.mintUnbackedStablecoin.will.return.with()
@@ -731,7 +731,7 @@ describe("CollateralAuctioneer", () => {
             expect(collateralPoolsCalls.length).to.be.equal(1)
             expect(collateralPoolsCalls[0][0]).to.be.equal(formatBytes32String("BTCB"))
 
-            const { calls: peekCalls } = mockedPriceFeed.smocked.peek
+            const { calls: peekCalls } = mockedPriceFeed.smocked.peekPrice
             expect(peekCalls.length).to.be.equal(1)
 
             const { calls: stableCoinReferencePriceCalls } = mockedPriceOracle.smocked.stableCoinReferencePrice
@@ -777,12 +777,12 @@ describe("CollateralAuctioneer", () => {
       collateralAmount: BigNumber
     ) => {
       mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, WeiPerRay])
-      mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(priceValue), true])
+      mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(priceValue), true])
       mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(stableCoinReferencePrice)
 
       await collateralAuctioneer.startAuction(debt, collateralAmount, positionAddress, liquidatorAddress)
 
-      mockedPriceFeed.smocked.peek.reset()
+      mockedPriceFeed.smocked.peekPrice.reset()
       mockedPriceOracle.smocked.collateralPools.reset()
       mockedPriceOracle.smocked.stableCoinReferencePrice.reset()
     }
