@@ -52,7 +52,6 @@ contract FixedSpreadLiquidationStrategy is
     uint256 liquidatorIncentiveFees,
     uint256 treasuryFees,
     address indexed positionAddress,
-    address indexed liquidatorAddress,
     address collateralRecipient
   );
   event SetCloseFactorBps(address indexed caller, bytes32 collateralPoolId, uint256 strategy);
@@ -207,10 +206,7 @@ contract FixedSpreadLiquidationStrategy is
     require(positionDebtShare > 0, "FixedSpreadLiquidationStrategy/zero-debt");
     require(positionCollateralAmount > 0, "FixedSpreadLiquidationStrategy/zero-collateralAmount");
     require(positionAddress != address(0), "FixedSpreadLiquidationStrategy/zero-positionAddress");
-    (address liquidatorAddress, address collateralRecipient, bytes memory ext) = abi.decode(
-      data,
-      (address, address, bytes)
-    );
+    (address collateralRecipient, bytes memory ext) = abi.decode(data, (address, bytes));
 
     // 1. Check if Close Factor is not exceeded
     CollateralPool memory collateralPool = collateralPools[collateralPoolId];
@@ -277,7 +273,6 @@ contract FixedSpreadLiquidationStrategy is
       info.liquidatorIncentiveFees,
       info.treasuryFees,
       positionAddress,
-      liquidatorAddress,
       collateralRecipient
     );
   }
