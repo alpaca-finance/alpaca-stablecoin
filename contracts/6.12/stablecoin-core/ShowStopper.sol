@@ -21,7 +21,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
@@ -147,24 +146,8 @@ import "../interfaces/ISystemDebtEngine.sol";
         - the number of gems is limited by how big your bag is
 */
 
-contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
-  // --- Auth ---
-  mapping(address => uint256) public wards;
-
-  function rely(address usr) external auth {
-    wards[usr] = 1;
-    emit Rely(usr);
-  }
-
-  function deny(address usr) external auth {
-    wards[usr] = 0;
-    emit Deny(usr);
-  }
-
-  modifier auth() {
-    require(wards[msg.sender] == 1, "End/not-authorized");
-    _;
-  }
+contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
@@ -219,11 +202,13 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
 
   // --- Init ---
   function initialize() external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
-    wards[msg.sender] = 1;
     live = 1;
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
     emit Rely(msg.sender);
   }
 
@@ -257,25 +242,57 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
   }
 
   // --- Administration ---
-  function file(bytes32 what, address data) external auth {
+  event SetBookKeeper(address indexed caller, address data);
+  event SetLiquidationEngine(address indexed caller, address data);
+  event SetSystemDebtEngine(address indexed caller, address data);
+  event SetPriceOracle(address indexed caller, address data);
+  event SetWait(address indexed caller, uint256 data);
+
+  function setBookKeeper(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "End/not-live");
-    if (what == "bookKeeper") bookKeeper = IBookKeeper(data);
-    else if (what == "liquidationEngine") liquidationEngine = ILiquidationEngine(data);
-    else if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
-    else if (what == "priceOracle") priceOracle = IPriceOracle(data);
-    else revert("End/file-unrecognized-param");
-    emit File(what, data);
+    bookKeeper = IBookKeeper(_data);
+    emit SetBookKeeper(msg.sender, _data);
   }
 
-  function file(bytes32 what, uint256 data) external auth {
+  function setLiquidationEngine(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "End/not-live");
-    if (what == "wait") wait = data;
-    else revert("End/file-unrecognized-param");
-    emit File(what, data);
+    liquidationEngine = ILiquidationEngine(_data);
+    emit SetLiquidationEngine(msg.sender, _data);
+  }
+
+  function setSystemDebtEngine(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(live == 1, "End/not-live");
+    systemDebtEngine = ISystemDebtEngine(_data);
+    emit SetSystemDebtEngine(msg.sender, _data);
+  }
+
+  function setPriceOracle(address _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(live == 1, "End/not-live");
+    priceOracle = IPriceOracle(_data);
+    emit SetPriceOracle(msg.sender, _data);
+  }
+
+  function setWait(uint256 _data) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(live == 1, "End/not-live");
+    wait = _data;
+    emit SetWait(msg.sender, _data);
   }
 
   // --- Settlement ---
-  function cage() external auth {
+  /** @dev Start the process of emergency shutdown. The following will happen in order:
+      - Start a cooldown period of the emergency shutdown
+      - BookKeeper will be paused: locking/unlocking collateral and mint/repay Alpaca Stablecoin will not be allow for any positions
+      - LiquidationEngine will be paused: positions will not be liquidated
+      - SystemDebtEngine will be paused: no accrual of new debt, no system debt settlement
+      - PriceOracle will be paused: no new price update, no liquidation trigger
+   */
+  function cage() external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "End/not-live");
     live = 0;
     when = block.timestamp;
@@ -286,7 +303,10 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Cage();
   }
 
+  /// @dev Set the cage price of the collateral pool with the latest price from the price oracle
+  /// @param collateralPoolId Collateral pool id
   function cage(bytes32 collateralPoolId) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 0, "End/still-live");
     require(cagePrice[collateralPoolId] == 0, "End/cagePrice-collateralPoolId-already-defined");
     (totalDebtShare[collateralPoolId], , , , ) = bookKeeper.collateralPools(collateralPoolId);
@@ -296,6 +316,15 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Cage(collateralPoolId);
   }
 
+  /** @dev Cancel and settle the ongoing Dutch Auction.
+    The debt that is on sale for that particular auction will be immediately settled and tracked as bad debt.
+    The on-sale collateral will also be retrieved from the auction and return to the position owner.
+    This process will clear the debt from the position.
+    This function will be called upon every active Dutch Action to cancel them before moving on to the next step of the emergency shutdown.
+    `snip` is used with the Liquidation 2.0 Dutch Auction of MakerDAO.
+  */
+  /// @param collateralPoolId Collateral pool id
+  /// @param id Auction sale id
   function snip(bytes32 collateralPoolId, uint256 id) external {
     require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
 
@@ -321,6 +350,13 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Snip(collateralPoolId, id, usr, tab, lot, debtShare);
   }
 
+  /** @dev Inspect the specified position and use the cage price of the collateral pool id to calculate the current shortfall of the position.
+      The shortfall will be tracked per collateral pool. It will be used in the determination of the stablecoin redemption price 
+      to make sure that all shortfall will be covered. This process will clear the debt from the position.
+      `skim` is used with the English Auction Liquidation of MakerDAO in Liquidation 1.0
+  */
+  /// @param collateralPoolId Collateral pool id
+  /// @param urn Position address
   function skim(bytes32 collateralPoolId, address urn) external {
     require(cagePrice[collateralPoolId] != 0, "End/cagePrice-collateralPoolId-not-defined");
     (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
@@ -342,6 +378,12 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Skim(collateralPoolId, urn, wad, debtShare);
   }
 
+  /** @dev Free the collateral from the position which has been safely settled by the emergency shutdown and give the collateral back to the position owner.
+      The position to be freed must has no debt at all. That means it must have gone through the process of `skim` or `smip` already.
+      The position will be limited to the caller address. If the position address is not an EOA address but is managed by a position manager contract,
+      the owner of the position will have to move the collateral inside the position to the owner address first before calling `free`.
+  */
+  /// @param collateralPoolId Collateral pool id
   function free(bytes32 collateralPoolId) external {
     require(live == 0, "End/still-live");
     (uint256 lockedCollateral, uint256 debtShare) = bookKeeper.positions(collateralPoolId, msg.sender);
@@ -358,6 +400,14 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Free(collateralPoolId, msg.sender, lockedCollateral);
   }
 
+  /** @dev Finalize the total debt of the system after the emergency shutdown.
+      This function should be called after:
+      - Every positions has undergone `skim` or `snip` to settle all the debt.
+      - System surplus must be zero, this means all surplus should be used to settle bad debt already.
+      - The emergency shutdown cooldown period must have passed.
+      This total debt will be equivalent to the total stablecoin issued which should already reflect 
+      the correct value if all the above requirements before calling `thaw` are satisfied.
+  */
   function thaw() external {
     require(live == 0, "End/still-live");
     require(debt == 0, "End/debt-not-zero");
@@ -367,6 +417,11 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Thaw();
   }
 
+  /** @dev Calculate the cash price of the collateral pool id.
+      The cash price is the price where the Alpaca Stablecoin owner will be entitled to when redeeming from Alpaca Stablecoin -> collateral token.
+      The cash price will take into account the deficit/surplus of this collateral pool and calculate the price so that any bad debt will be covered.
+  */
+  /// @param collateralPoolId Collateral pool id
   function flow(bytes32 collateralPoolId) external {
     require(debt != 0, "End/debt-zero");
     require(finalCashPrice[collateralPoolId] == 0, "End/finalCashPrice-collateralPoolId-already-defined");
@@ -377,6 +432,8 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Flow(collateralPoolId);
   }
 
+  /// @dev Pack the deposited stablecoin of the caller into a bag to be cashed out into collateral token later
+  /// @param wad the amount of stablecoin to be packed
   function pack(uint256 wad) external {
     require(debt != 0, "End/debt-zero");
     bookKeeper.moveStablecoin(msg.sender, address(systemDebtEngine), mul(wad, RAY));
@@ -384,6 +441,9 @@ contract ShowStopper is OwnableUpgradeable, PausableUpgradeable, AccessControlUp
     emit Pack(msg.sender, wad);
   }
 
+  /// @dev Cash out all the stablecoin in the bag of the caller into the corresponding collateral token
+  /// @param collateralPoolId Collateral pool id
+  /// @param wad the amount of stablecoin to be cashed
   function cash(bytes32 collateralPoolId, uint256 wad) external {
     require(finalCashPrice[collateralPoolId] != 0, "End/finalCashPrice-collateralPoolId-not-defined");
     bookKeeper.moveCollateral(collateralPoolId, address(this), msg.sender, rmul(wad, finalCashPrice[collateralPoolId]));

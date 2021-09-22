@@ -25,6 +25,7 @@ import "../interfaces/IStablecoin.sol";
 // New deployments of this contract will need to include custom events (TO DO).
 
 contract AlpacaStablecoin is IStablecoin, AccessControl {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
   // --- ERC20 Data ---
@@ -75,7 +76,7 @@ contract AlpacaStablecoin is IStablecoin, AccessControl {
 
     // Grant the contract deployer the default admin role: it will be able
     // to grant and revoke any roles
-    _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Token ---
@@ -152,13 +153,14 @@ contract AlpacaStablecoin is IStablecoin, AccessControl {
     bytes32 r,
     bytes32 s
   ) external {
-    bytes32 digest = keccak256(
-      abi.encodePacked(
-        "\x19\x01",
-        DOMAIN_SEPARATOR,
-        keccak256(abi.encode(PERMIT_TYPEHASH, holder, spender, nonce, expiry, allowed))
-      )
-    );
+    bytes32 digest =
+      keccak256(
+        abi.encodePacked(
+          "\x19\x01",
+          DOMAIN_SEPARATOR,
+          keccak256(abi.encode(PERMIT_TYPEHASH, holder, spender, nonce, expiry, allowed))
+        )
+      );
 
     require(holder != address(0), "AlpacaStablecoin/invalid-address-0");
     require(holder == ecrecover(digest, v, r, s), "AlpacaStablecoin/invalid-permit");

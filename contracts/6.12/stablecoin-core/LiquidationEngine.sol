@@ -19,7 +19,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -29,37 +28,29 @@ import "../interfaces/IAuctioneer.sol";
 import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/ISystemDebtEngine.sol";
 
+/// @title LiquidationEngine
+/// @author Alpaca Fin Corporation
+/** @notice A contract which is the manager for all of the liquidations of the protocol.
+    LiquidationEngine will be the interface for the liquidator to trigger any positions into the liquidation process.
+*/
+
 contract LiquidationEngine is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
   ILiquidationEngine
 {
-  // --- Auth ---
-  mapping(address => uint256) public whitelist;
-
-  function rely(address usr) external auth {
-    whitelist[usr] = 1;
-    emit Rely(usr);
-  }
-
-  function deny(address usr) external auth {
-    whitelist[usr] = 0;
-    emit Deny(usr);
-  }
-
-  modifier auth {
-    require(whitelist[msg.sender] == 1, "LiquidationEngine/not-authorized");
-    _;
-  }
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant AUCTIONEER_ROLE = keccak256("AUCTIONEER_ROLE");
+  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
   // --- Data ---
   struct CollateralPool {
     address auctioneer; // Auctioneer contract
     uint256 liquidationPenalty; // Liquidation Penalty                                          [wad]
-    uint256 liquidationMaxSize; // Max DAI needed to cover debt+fees of active auctions per collateralPool [rad]
-    uint256 stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions per collateralPool [rad]
+    uint256 liquidationMaxSize; // The maximum amount of liquidated debt value to be put on auction for the collateral pool [rad]
+    uint256 stablecoinNeededForDebtRepay; // The current total amount of stablecoin needed to pay back the liquidated positions' debt for the collateral pool [rad]
   }
 
   IBookKeeper public bookKeeper; // CDP Engine
@@ -68,8 +59,8 @@ contract LiquidationEngine is
 
   ISystemDebtEngine public systemDebtEngine; // Debt Engine
   uint256 public live; // Active Flag
-  uint256 public liquidationMaxSize; // Max DAI needed to cover debt+fees of active auctions [rad]
-  uint256 public stablecoinNeededForDebtRepay; // Amt DAI needed to cover debt+fees of active auctions [rad]
+  uint256 public liquidationMaxSize; // The maximum amount of liquidated debt value to be put on auction globally [rad]
+  uint256 public stablecoinNeededForDebtRepay; // The current total amount of stablecoin needed to pay back the liquidated positions' debt globally [rad]
 
   // --- Events ---
   event Rely(address indexed usr);
@@ -94,15 +85,17 @@ contract LiquidationEngine is
 
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
     live = 1;
-    whitelist[msg.sender] = 1;
     emit Rely(msg.sender);
+
+    // Grant the contract deployer the default admin role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -125,13 +118,13 @@ contract LiquidationEngine is
   }
 
   // --- Administration ---
-  function file(bytes32 what, address data) external auth {
+  function file(bytes32 what, address data) external {
     if (what == "systemDebtEngine") systemDebtEngine = ISystemDebtEngine(data);
     else revert("LiquidationEngine/file-unrecognized-param");
     emit File(what, data);
   }
 
-  function file(bytes32 what, uint256 data) external auth {
+  function file(bytes32 what, uint256 data) external {
     if (what == "liquidationMaxSize") liquidationMaxSize = data;
     else revert("LiquidationEngine/file-unrecognized-param");
     emit File(what, data);
@@ -141,7 +134,7 @@ contract LiquidationEngine is
     bytes32 collateralPoolId,
     bytes32 what,
     uint256 data
-  ) external auth {
+  ) external {
     if (what == "liquidationPenalty") {
       require(data >= WAD, "LiquidationEngine/file-liquidationPenalty-lt-WAD");
       collateralPools[collateralPoolId].liquidationPenalty = data;
@@ -154,7 +147,7 @@ contract LiquidationEngine is
     bytes32 collateralPoolId,
     bytes32 what,
     address auctioneer
-  ) external auth {
+  ) external {
     if (what == "auctioneer") {
       require(
         collateralPoolId == IAuctioneer(auctioneer).collateralPoolId(),
@@ -190,8 +183,10 @@ contract LiquidationEngine is
   ) external nonReentrant returns (uint256 id) {
     require(live == 1, "LiquidationEngine/not-live");
 
-    (uint256 positionLockedCollateral, uint256 positionDebtShare) =
-      bookKeeper.positions(collateralPoolId, positionAddress);
+    (uint256 positionLockedCollateral, uint256 positionDebtShare) = bookKeeper.positions(
+      collateralPoolId,
+      positionAddress
+    );
     CollateralPool memory mcollateralPool = collateralPools[collateralPoolId];
     uint256 debtShareToBeLiquidated;
     uint256 debtAccumulatedRate;
@@ -213,11 +208,10 @@ contract LiquidationEngine is
           mcollateralPool.liquidationMaxSize > mcollateralPool.stablecoinNeededForDebtRepay,
         "LiquidationEngine/liquidation-limit-hit"
       );
-      uint256 room =
-        min(
-          liquidationMaxSize - stablecoinNeededForDebtRepay,
-          mcollateralPool.liquidationMaxSize - mcollateralPool.stablecoinNeededForDebtRepay
-        );
+      uint256 room = min(
+        liquidationMaxSize - stablecoinNeededForDebtRepay,
+        mcollateralPool.liquidationMaxSize - mcollateralPool.stablecoinNeededForDebtRepay
+      );
 
       // uint256.max()/(RAD*WAD) = 115,792,089,237,316
       debtShareToBeLiquidated = min(
@@ -270,8 +264,10 @@ contract LiquidationEngine is
     {
       // Avoid stack too deep
       // This calcuation will overflow if debtShareToBeLiquidated*debtAccumulatedRate exceeds ~10^14
-      uint256 debtValueToBeLiquidatedWithPenalty =
-        mul(debtValueToBeLiquidatedWithoutPenalty, mcollateralPool.liquidationPenalty) / WAD;
+      uint256 debtValueToBeLiquidatedWithPenalty = mul(
+        debtValueToBeLiquidatedWithoutPenalty,
+        mcollateralPool.liquidationPenalty
+      ) / WAD;
       stablecoinNeededForDebtRepay = add(stablecoinNeededForDebtRepay, debtValueToBeLiquidatedWithPenalty);
       collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = add(
         mcollateralPool.stablecoinNeededForDebtRepay,
@@ -297,7 +293,11 @@ contract LiquidationEngine is
     );
   }
 
-  function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override auth {
+  /// @dev Remove debt from the system when it is already paid by the liquidator
+  /// @param collateralPoolId Collateral pool id
+  /// @param rad The debt value to be removed
+  function removeRepaidDebtFromAuction(bytes32 collateralPoolId, uint256 rad) external override whenNotPaused {
+    require(hasRole(AUCTIONEER_ROLE, msg.sender), "!auctioneerRole");
     stablecoinNeededForDebtRepay = sub(stablecoinNeededForDebtRepay, rad);
     collateralPools[collateralPoolId].stablecoinNeededForDebtRepay = sub(
       collateralPools[collateralPoolId].stablecoinNeededForDebtRepay,
@@ -306,8 +306,23 @@ contract LiquidationEngine is
     emit RemoveRepaidDebtFromAuction(collateralPoolId, rad);
   }
 
-  function cage() external override auth {
+  function cage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
     live = 0;
     emit Cage();
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 }

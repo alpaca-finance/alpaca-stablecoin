@@ -8,7 +8,21 @@ interface IStablecoinAdapter {
 
   function stablecoin() external returns (IStablecoin);
 
-  function deposit(address, uint256) external payable;
+  function rely(address usr) external;
 
-  function withdraw(address, uint256) external;
+  function deny(address usr) external;
+
+  function cage() external;
+
+  function deposit(
+    address positionAddress,
+    uint256 wad,
+    bytes calldata data
+  ) external payable;
+
+  function withdraw(
+    address positionAddress,
+    uint256 wad,
+    bytes calldata data
+  ) external;
 }
