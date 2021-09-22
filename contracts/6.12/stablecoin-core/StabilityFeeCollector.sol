@@ -44,14 +44,14 @@ contract StabilityFeeCollector is
 
   // --- Data ---
   struct CollateralPool {
-    uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee rate or mint interest rate [ray]
+    uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee debtAccumulatedRate or mint interest debtAccumulatedRate [ray]
     uint256 lastAccumulationTime; // Time of last call to `collect` [unix epoch time]
   }
 
   mapping(bytes32 => CollateralPool) public collateralPools;
   IBookKeeper public bookKeeper;
   address public systemDebtEngine;
-  uint256 public globalStabilityFeeRate; // Global, per-second stability fee rate [ray]
+  uint256 public globalStabilityFeeRate; // Global, per-second stability fee debtAccumulatedRate [ray]
 
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
@@ -122,7 +122,7 @@ contract StabilityFeeCollector is
     }
   }
 
-  uint256 constant ONE = 10**27;
+  uint256 constant RAY = 10**27;
 
   function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
     z = x + y;
@@ -137,92 +137,104 @@ contract StabilityFeeCollector is
   function rmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
     z = x * y;
     require(y == 0 || z / y == x);
-    z = z / ONE;
+    z = z / RAY;
   }
 
   // --- Administration ---
   function init(bytes32 collateralPool) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
 
-    CollateralPool storage i = collateralPools[collateralPool];
-    require(i.stabilityFeeRate == 0, "StabilityFeeCollector/collateralPool-already-init");
-    i.stabilityFeeRate = ONE;
-    i.lastAccumulationTime = now;
+    CollateralPool storage collateralPool = collateralPools[collateralPool];
+    require(collateralPool.stabilityFeeRate == 0, "StabilityFeeCollector/collateralPool-already-init");
+    collateralPool.stabilityFeeRate = RAY;
+    collateralPool.lastAccumulationTime = now;
   }
 
   event SetGlobalStabilityFeeRate(address indexed caller, uint256 data);
   event SetSystemDebtEngine(address indexed caller, address data);
   event SetStabilityFeeRate(address indexed caller, bytes32 poolId, uint256 data);
 
-  /// @dev Set the global stability fee rate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
-  /// @param _data Global stability fee rate [ray]
-  function setGlobalStabilityFeeRate(uint256 _data) external {
+  /// @dev Set the global stability fee debtAccumulatedRate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
+  /// @param _globalStabilityFeeRate Global stability fee debtAccumulatedRate [ray]
+  function setGlobalStabilityFeeRate(uint256 _globalStabilityFeeRate) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    globalStabilityFeeRate = _data;
-    emit SetGlobalStabilityFeeRate(msg.sender, _data);
+    globalStabilityFeeRate = _globalStabilityFeeRate;
+    emit SetGlobalStabilityFeeRate(msg.sender, _globalStabilityFeeRate);
   }
 
-  function setSystemDebtEngine(address _data) external {
+  function setSystemDebtEngine(address _systemDebtEngine) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    systemDebtEngine = _data;
-    emit SetSystemDebtEngine(msg.sender, _data);
+    systemDebtEngine = _systemDebtEngine;
+    emit SetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
 
-  /** @dev Set the stability fee rate of the collateral pool.
-      The rate to be set here is the `r` in:
+  /** @dev Set the stability fee debtAccumulatedRate of the collateral pool.
+      The debtAccumulatedRate to be set here is the `r` in:
 
           r^N = APR
 
       Where:
-        r = stability fee rate
+        r = stability fee debtAccumulatedRate
         N = Accumulation frequency which is per-second in this case; the value will be 60*60*24*365 = 31536000 to signify the number of seconds within a year.
-        APR = the annual percentage rate
+        APR = the annual percentage debtAccumulatedRate
 
-    For example, to achieve 0.5% APR for stability fee rate:
+    For example, to achieve 0.5% APR for stability fee debtAccumulatedRate:
 
           r^31536000 = 1.005
 
     Find the 31536000th root of 1.005 and we will get:
 
           r = 1.000000000158153903837946258002097...
-    
-    The rate is in [ray] format, so the actual value of `stabilityFeeRate` will be:
 
-          stabilityFeeRate = 1000000000158153903837946258 
+    The debtAccumulatedRate is in [ray] format, so the actual value of `stabilityFeeRate` will be:
+
+          stabilityFeeRate = 1000000000158153903837946258
 
     The above `stabilityFeeRate` will be the value we will use in this contract.
   */
   /// @param _collateralPool Collateral pool id
-  /// @param _data the rate [ray]
-  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _data) external whenNotPaused {
+  /// @param _stabilityFeeRate the debtAccumulatedRate [ray]
+  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _stabilityFeeRate) external whenNotPaused {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    collateralPools[_collateralPool].stabilityFeeRate = _data;
-    emit SetStabilityFeeRate(msg.sender, _collateralPool, _data);
+    collateralPools[_collateralPool].stabilityFeeRate = _stabilityFeeRate;
+    emit SetStabilityFeeRate(msg.sender, _collateralPool, _stabilityFeeRate);
   }
 
   // --- Stability Fee Collection ---
   /** @dev Collect the stability fee of the collateral pool.
-      This function could be called by anyone. 
-      It will update the `debtAccumulatedRate` of the specified collateral pool according to 
+      This function could be called by anyRAY.
+      It will update the `debtAccumulatedRate` of the specified collateral pool according to
       the global and per-pool stability fee rates with respect to the last block that `collect` was called.
   */
   /// @param collateralPool Collateral pool id
-  function collect(bytes32 collateralPool) external override whenNotPaused nonReentrant returns (uint256 rate) {
-    rate = _collect(collateralPool);
+  function collect(bytes32 collateralPool)
+    external
+    override
+    whenNotPaused
+    nonReentrant
+    returns (uint256 debtAccumulatedRate)
+  {
+    debtAccumulatedRate = _collect(collateralPool);
   }
 
-  function _collect(bytes32 collateralPool) internal returns (uint256 rate) {
+  function _collect(bytes32 collateralPool) internal returns (uint256 debtAccumulatedRate) {
     require(now >= collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
-    (, uint256 prev, , , ) = bookKeeper.collateralPools(collateralPool);
-    rate = rmul(
+    (, uint256 previousDebtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPool);
+
+    // debtAccumulatedRate [ray]
+    debtAccumulatedRate = rmul(
       rpow(
         add(globalStabilityFeeRate, collateralPools[collateralPool].stabilityFeeRate),
         now - collateralPools[collateralPool].lastAccumulationTime,
-        ONE
+        RAY
       ),
-      prev
+      previousDebtAccumulatedRate
     );
-    bookKeeper.accrueStabilityFee(collateralPool, systemDebtEngine, diff(rate, prev));
+    bookKeeper.accrueStabilityFee(
+      collateralPool,
+      systemDebtEngine,
+      diff(debtAccumulatedRate, previousDebtAccumulatedRate)
+    );
     collateralPools[collateralPool].lastAccumulationTime = now;
   }
 
