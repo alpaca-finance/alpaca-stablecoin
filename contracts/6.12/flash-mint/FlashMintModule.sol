@@ -21,17 +21,12 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 
 import "../interfaces/IERC3156FlashLender.sol";
 import "../interfaces/IERC3156FlashBorrower.sol";
-import "../interfaces/IBookKeeperStablecoinFlashLender.sol";
+import "../interfaces/IBookKeeperFlashLender.sol";
 import "../interfaces/IStablecoin.sol";
 import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IBookKeeper.sol";
 
-contract FlashMintModule is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  IERC3156FlashLender,
-  IBookKeeperStablecoinFlashLender
-{
+contract FlashMintModule is PausableUpgradeable, AccessControlUpgradeable, IERC3156FlashLender, IBookKeeperFlashLender {
   // --- Auth ---
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
@@ -52,13 +47,13 @@ contract FlashMintModule is
 
   bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
   bytes32 public constant CALLBACK_SUCCESS_BOOK_KEEPER_STABLE_COIN =
-    keccak256("BookKeeperStablecoinFlashBorrower.onBookKeeperStablecoinFlashLoan");
+    keccak256("BookKeeperFlashBorrower.onBookKeeperFlashLoan");
 
   // --- Events ---
   event SetMax(uint256 data);
   event SetFeeRate(uint256 data);
   event FlashLoan(address indexed receiver, address token, uint256 amount, uint256 fee);
-  event BookKeeperStablecoinFlashLoan(address indexed receiver, uint256 amount, uint256 fee);
+  event BookKeeperFlashLoan(address indexed receiver, uint256 amount, uint256 fee);
 
   modifier lock() {
     require(locked == 0, "FlashMintModule/reentrancy-guard");
@@ -69,6 +64,10 @@ contract FlashMintModule is
 
   // --- Init ---
   function initialize(address stablecoinAdapter_, address systemDebtEngine_) external initializer {
+    // 1. Initialized all dependencies
+    PausableUpgradeable.__Pausable_init();
+    AccessControlUpgradeable.__AccessControl_init();
+
     _setupRole(OWNER_ROLE, msg.sender);
 
     IBookKeeper bookKeeper_ = bookKeeper = IBookKeeper(IStablecoinAdapter(stablecoinAdapter_).bookKeeper());
@@ -150,9 +149,9 @@ contract FlashMintModule is
     return true;
   }
 
-  // --- BookKeeper Stablecoin Flash Loan ---
-  function bookKeeperStablecoinFlashLoan(
-    IBookKeeperStablecoinFlashBorrower receiver, // address of conformant IBookKeeperStablecoinFlashBorrower
+  // --- BookKeeper Flash Loan ---
+  function bookKeeperFlashLoan(
+    IBookKeeperFlashBorrower receiver, // address of conformant IBookKeeperFlashBorrower
     uint256 amount, // amount to flash loan [rad]
     bytes calldata data // arbitrary data to pass to the receiver
   ) external override lock returns (bool) {
@@ -163,11 +162,10 @@ contract FlashMintModule is
 
     bookKeeper.mintUnbackedStablecoin(address(this), address(receiver), amount);
 
-    emit BookKeeperStablecoinFlashLoan(address(receiver), amount, fee);
+    emit BookKeeperFlashLoan(address(receiver), amount, fee);
 
     require(
-      receiver.onBookKeeperStablecoinFlashLoan(msg.sender, amount, fee, data) ==
-        CALLBACK_SUCCESS_BOOK_KEEPER_STABLE_COIN,
+      receiver.onBookKeeperFlashLoan(msg.sender, amount, fee, data) == CALLBACK_SUCCESS_BOOK_KEEPER_STABLE_COIN,
       "FlashMintModule/callback-failed"
     );
 
