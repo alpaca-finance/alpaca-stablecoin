@@ -179,11 +179,11 @@ contract AlpacaStablecoinProxyActions is Common {
   }
 
   function hope(address obj, address usr) public {
-    IBookKeeper(obj).hope(usr);
+    IBookKeeper(obj).whitelist(usr);
   }
 
   function nope(address obj, address usr) public {
-    IBookKeeper(obj).nope(usr);
+    IBookKeeper(obj).blacklist(usr);
   }
 
   function open(
@@ -517,8 +517,8 @@ contract AlpacaStablecoinProxyActions is Common {
     // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
     moveStablecoin(manager, cdp, address(this), _toRad(wad));
     // Allows adapter to access to proxy's Alpaca Stablecoin balance in the bookKeeper
-    if (IBookKeeper(bookKeeper).can(address(this), address(stablecoinAdapter)) == 0) {
-      IBookKeeper(bookKeeper).hope(stablecoinAdapter);
+    if (IBookKeeper(bookKeeper).positionWhitelist(address(this), address(stablecoinAdapter)) == 0) {
+      IBookKeeper(bookKeeper).whitelist(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, wad, data);
@@ -660,8 +660,8 @@ contract AlpacaStablecoinProxyActions is Common {
     // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
     moveStablecoin(manager, cdp, address(this), _toRad(stablecoinAmount));
     // Allows adapter to access to proxy's Alpaca Stablecoin balance in the bookKeeper
-    if (IBookKeeper(bookKeeper).can(address(this), address(stablecoinAdapter)) == 0) {
-      IBookKeeper(bookKeeper).hope(stablecoinAdapter);
+    if (IBookKeeper(bookKeeper).positionWhitelist(address(this), address(stablecoinAdapter)) == 0) {
+      IBookKeeper(bookKeeper).whitelist(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, stablecoinAmount, data);
@@ -708,8 +708,8 @@ contract AlpacaStablecoinProxyActions is Common {
     // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
     moveStablecoin(address(manager), cdp, address(this), _toRad(stablecoinAmount));
     // Allows adapter to access to proxy's Alpaca Stablecoin balance in the bookKeeper
-    if (IBookKeeper(manager.bookKeeper()).can(address(this), address(stablecoinAdapter)) == 0) {
-      IBookKeeper(manager.bookKeeper()).hope(stablecoinAdapter);
+    if (IBookKeeper(manager.bookKeeper()).positionWhitelist(address(this), address(stablecoinAdapter)) == 0) {
+      IBookKeeper(manager.bookKeeper()).whitelist(stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
     IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, stablecoinAmount, data);

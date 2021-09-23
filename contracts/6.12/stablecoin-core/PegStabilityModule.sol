@@ -87,7 +87,7 @@ contract PegStabilityModule is OwnableUpgradeable, PausableUpgradeable, AccessCo
     systemDebtEngine = systemDebtEngine_;
     to18ConversionFactor = 10**(18 - authTokenAdapter__.decimals());
     stablecoin__.approve(stablecoinAdapter_, uint256(-1));
-    bookKeeper__.hope(stablecoinAdapter_);
+    bookKeeper__.whitelist(stablecoinAdapter_);
   }
 
   // --- Math ---
@@ -118,11 +118,11 @@ contract PegStabilityModule is OwnableUpgradeable, PausableUpgradeable, AccessCo
   // hope can be used to transfer control of the PSM vault to another contract
   // This can be used to upgrade the contract
   function hope(address usr) external auth {
-    bookKeeper.hope(usr);
+    bookKeeper.whitelist(usr);
   }
 
   function nope(address usr) external auth {
-    bookKeeper.nope(usr);
+    bookKeeper.blacklist(usr);
   }
 
   // --- Primary Functions ---

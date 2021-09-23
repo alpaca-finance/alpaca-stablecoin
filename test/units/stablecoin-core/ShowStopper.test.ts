@@ -1,13 +1,11 @@
 import { ethers, upgrades, waffle } from "hardhat"
 import { Signer, BigNumber } from "ethers"
 import chai from "chai"
-import { MockProvider, solidity } from "ethereum-waffle"
+import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
 import { ShowStopper, ShowStopper__factory } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 
-import * as TimeHelpers from "../../helper/time"
-import * as AssertHelpers from "../../helper/assert"
 import * as UnitHelpers from "../../helper/unit"
 import { formatBytes32BigNumber } from "../../helper/format"
 
@@ -99,7 +97,7 @@ describe("ShowStopper", () => {
       BigNumber.from(0),
     ])
     mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, BigNumber.from(0)])
-    mockedPriceFeed.smocked.read.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
+    mockedPriceFeed.smocked.readPrice.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
     mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
     await showStopper["cage(bytes32)"](formatBytes32String("BNB"))
   }
@@ -188,7 +186,7 @@ describe("ShowStopper", () => {
             BigNumber.from(0),
           ])
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, BigNumber.from(0)])
-          mockedPriceFeed.smocked.read.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
+          mockedPriceFeed.smocked.readPrice.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
 
           await expect(showStopper["cage(bytes32)"](formatBytes32String("BNB")))
@@ -201,7 +199,9 @@ describe("ShowStopper", () => {
 
       context("pool is active", () => {
         it("should revert", async () => {
-          await expect(showStopper["cage(bytes32)"](formatBytes32String("BNB"))).to.be.revertedWith("End/still-live")
+          await expect(showStopper["cage(bytes32)"](formatBytes32String("BNB"))).to.be.revertedWith(
+            "ShowStopper/still-live"
+          )
         })
       })
 
@@ -228,13 +228,13 @@ describe("ShowStopper", () => {
             BigNumber.from(0),
           ])
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, BigNumber.from(0)])
-          mockedPriceFeed.smocked.read.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
+          mockedPriceFeed.smocked.readPrice.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
 
           await showStopper["cage(bytes32)"](formatBytes32String("BNB"))
 
           await expect(showStopper["cage(bytes32)"](formatBytes32String("BNB"))).to.be.revertedWith(
-            "End/cagePrice-collateralPoolId-already-defined"
+            "ShowStopper/cage-price-collateral-pool-id-already-defined"
           )
 
           expect(await showStopper.live()).to.be.equal(0)
@@ -243,7 +243,7 @@ describe("ShowStopper", () => {
     })
   })
 
-  describe("#free", () => {
+  describe("#redeemLockedCollateral", () => {
     context("when setting collateral pool is active", () => {
       context("pool is inactive", () => {
         context("and debtShare is more than 0", () => {
@@ -252,7 +252,9 @@ describe("ShowStopper", () => {
 
             mockedBookKeeper.smocked.positions.will.return.with([UnitHelpers.WeiPerRay, BigNumber.from("1")])
 
-            await expect(showStopper.free(formatBytes32String("BNB"))).to.be.revertedWith("End/debtShare-not-zero")
+            await expect(showStopper.redeemLockedCollateral(formatBytes32String("BNB"))).to.be.revertedWith(
+              "ShowStopper/debtShare-not-zero"
+            )
           })
         })
 
@@ -262,7 +264,9 @@ describe("ShowStopper", () => {
 
             mockedBookKeeper.smocked.positions.will.return.with([ethers.constants.MaxUint256, BigNumber.from("0")])
 
-            await expect(showStopper.free(formatBytes32String("BNB"))).to.be.revertedWith("End/overflow")
+            await expect(showStopper.redeemLockedCollateral(formatBytes32String("BNB"))).to.be.revertedWith(
+              "ShowStopper/overflow"
+            )
           })
         })
 
@@ -273,8 +277,8 @@ describe("ShowStopper", () => {
             mockedBookKeeper.smocked.positions.will.return.with([UnitHelpers.WeiPerRay, BigNumber.from("0")])
             mockedBookKeeper.smocked.confiscatePosition.will.return.with()
 
-            await expect(showStopper.free(formatBytes32String("BNB")))
-              .to.emit(showStopper, "Free")
+            await expect(showStopper.redeemLockedCollateral(formatBytes32String("BNB")))
+              .to.emit(showStopper, "RedeemLockedCollateral")
               .withArgs(formatBytes32String("BNB"), deployerAddress, UnitHelpers.WeiPerRay)
 
             const { calls: positions } = mockedBookKeeper.smocked.positions
@@ -288,20 +292,22 @@ describe("ShowStopper", () => {
             expect(confiscatePosition[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(confiscatePosition[0].positionAddress).to.be.equal(deployerAddress)
             expect(confiscatePosition[0].collateralCreditor).to.be.equal(deployerAddress)
-            expect(confiscatePosition[0].collateralValue).to.be.equal(UnitHelpers.WeiPerRay.mul("-1"))
+            expect(confiscatePosition[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerRay.mul("-1"))
           })
         })
       })
 
       context("pool is active", () => {
         it("should revert", async () => {
-          await expect(showStopper.free(formatBytes32String("BNB"))).to.be.revertedWith("End/still-live")
+          await expect(showStopper.redeemLockedCollateral(formatBytes32String("BNB"))).to.be.revertedWith(
+            "ShowStopper/still-live"
+          )
         })
       })
     })
   })
 
-  describe("#thaw", () => {
+  describe("#finalizeDebt", () => {
     context("when calculate debt", () => {
       context("pool is inactive", () => {
         context("debt is not 0", () => {
@@ -309,9 +315,9 @@ describe("ShowStopper", () => {
             await setup()
 
             mockedBookKeeper.smocked.totalStablecoinIssued.will.return.with(UnitHelpers.WeiPerRay)
-            await showStopper.thaw()
+            await showStopper.finalizeDebt()
 
-            await expect(showStopper.thaw()).to.be.revertedWith("End/debt-not-zero")
+            await expect(showStopper.finalizeDebt()).to.be.revertedWith("ShowStopper/debt-not-zero")
           })
         })
 
@@ -321,7 +327,7 @@ describe("ShowStopper", () => {
 
             mockedBookKeeper.smocked.stablecoin.will.return.with(UnitHelpers.WeiPerRay)
 
-            await expect(showStopper.thaw()).to.be.revertedWith("End/surplus-not-zero")
+            await expect(showStopper.finalizeDebt()).to.be.revertedWith("ShowStopper/surplus-not-zero")
           })
         })
 
@@ -332,24 +338,26 @@ describe("ShowStopper", () => {
             mockedBookKeeper.smocked.totalStablecoinIssued.will.return.with(UnitHelpers.WeiPerRay)
             mockedBookKeeper.smocked.stablecoin.will.return.with(BigNumber.from("0"))
 
-            await expect(showStopper.thaw()).to.emit(showStopper, "Thaw").withArgs()
+            await expect(showStopper.finalizeDebt()).to.emit(showStopper, "FinalizeDebt").withArgs()
           })
         })
       })
 
       context("pool is active", () => {
         it("should revert", async () => {
-          await expect(showStopper.thaw()).to.be.revertedWith("End/still-live")
+          await expect(showStopper.finalizeDebt()).to.be.revertedWith("ShowStopper/still-live")
         })
       })
     })
   })
 
-  describe("#flow", () => {
+  describe("#finalizeCashPrice", () => {
     context("when calculate cash price", () => {
       context("debt is 0", () => {
         it("should revert", async () => {
-          await expect(showStopper.flow(formatBytes32String("BNB"))).to.be.revertedWith("End/debt-zero")
+          await expect(showStopper.finalizeCashPrice(formatBytes32String("BNB"))).to.be.revertedWith(
+            "ShowStopper/debt-zero"
+          )
         })
       })
 
@@ -358,7 +366,7 @@ describe("ShowStopper", () => {
           await setup()
 
           mockedBookKeeper.smocked.totalStablecoinIssued.will.return.with(UnitHelpers.WeiPerRay)
-          await showStopper.thaw()
+          await showStopper.finalizeDebt()
 
           mockedBookKeeper.smocked.collateralPools.will.return.with([
             BigNumber.from(0),
@@ -367,10 +375,10 @@ describe("ShowStopper", () => {
             BigNumber.from(0),
             BigNumber.from(0),
           ])
-          await showStopper.flow(formatBytes32String("BNB"))
+          await showStopper.finalizeCashPrice(formatBytes32String("BNB"))
 
-          await expect(showStopper.flow(formatBytes32String("BNB"))).to.be.revertedWith(
-            "End/finalCashPrice-collateralPoolId-already-defined"
+          await expect(showStopper.finalizeCashPrice(formatBytes32String("BNB"))).to.be.revertedWith(
+            "ShowStopper/final-cash-price-collateral-pool-id-already-defined"
           )
         })
       })
@@ -380,7 +388,7 @@ describe("ShowStopper", () => {
           await setup()
 
           mockedBookKeeper.smocked.totalStablecoinIssued.will.return.with(UnitHelpers.WeiPerRay)
-          await showStopper.thaw()
+          await showStopper.finalizeDebt()
 
           mockedBookKeeper.smocked.collateralPools.will.return.with([
             BigNumber.from(0),
@@ -390,8 +398,8 @@ describe("ShowStopper", () => {
             BigNumber.from(0),
           ])
 
-          await expect(showStopper.flow(formatBytes32String("BNB")))
-            .to.emit(showStopper, "Flow")
+          await expect(showStopper.finalizeCashPrice(formatBytes32String("BNB")))
+            .to.emit(showStopper, "FinalizeCashPrice")
             .withArgs(formatBytes32String("BNB"))
 
           const { calls: collateralPools } = mockedBookKeeper.smocked.collateralPools
@@ -403,11 +411,13 @@ describe("ShowStopper", () => {
     })
   })
 
-  describe("#pack", () => {
+  describe("#accumulateStablecoin", () => {
     context("when moving stable coin", () => {
       context("debt is 0", () => {
         it("should revert", async () => {
-          await expect(showStopper.pack(UnitHelpers.WeiPerRay)).to.be.revertedWith("End/debt-zero")
+          await expect(showStopper.accumulateStablecoin(UnitHelpers.WeiPerRay)).to.be.revertedWith(
+            "ShowStopper/debt-zero"
+          )
         })
       })
 
@@ -416,35 +426,35 @@ describe("ShowStopper", () => {
           await setup()
 
           mockedBookKeeper.smocked.totalStablecoinIssued.will.return.with(UnitHelpers.WeiPerRay)
-          await showStopper.thaw()
+          await showStopper.finalizeDebt()
 
           mockedBookKeeper.smocked.moveStablecoin.will.return.with()
 
-          await expect(showStopper.pack(UnitHelpers.WeiPerWad))
-            .to.emit(showStopper, "Pack")
+          await expect(showStopper.accumulateStablecoin(UnitHelpers.WeiPerWad))
+            .to.emit(showStopper, "AccumulateStablecoin")
             .withArgs(deployerAddress, UnitHelpers.WeiPerWad)
         })
       })
     })
   })
 
-  describe("#cash", () => {
+  describe("#redeemStablecoin", () => {
     context("when calculate cash", () => {
       context("cash price is not defined", () => {
         it("should revert", async () => {
-          await expect(showStopper.cash(formatBytes32String("BNB"), UnitHelpers.WeiPerWad)).to.be.revertedWith(
-            "End/finalCashPrice-collateralPoolId-not-defined"
-          )
+          await expect(
+            showStopper.redeemStablecoin(formatBytes32String("BNB"), UnitHelpers.WeiPerWad)
+          ).to.be.revertedWith("ShowStopper/final-cash-price-collateral-pool-id-not-defined")
         })
       })
 
       context("cash price is already defined", () => {
-        context("and bag balance < withdraw", () => {
+        context("and stablecoinAccumulator balance < withdraw", () => {
           it("should revert", async () => {
             await setup()
 
             mockedBookKeeper.smocked.totalStablecoinIssued.will.return.with(UnitHelpers.WeiPerRay)
-            await showStopper.thaw()
+            await showStopper.finalizeDebt()
 
             mockedBookKeeper.smocked.collateralPools.will.return.with([
               BigNumber.from(0),
@@ -454,22 +464,22 @@ describe("ShowStopper", () => {
               BigNumber.from(0),
             ])
 
-            await showStopper.flow(formatBytes32String("BNB"))
+            await showStopper.finalizeCashPrice(formatBytes32String("BNB"))
 
             mockedBookKeeper.smocked.moveStablecoin.will.return.with()
 
-            await expect(showStopper.cash(formatBytes32String("BNB"), UnitHelpers.WeiPerWad)).to.be.revertedWith(
-              "End/insufficient-bag-balance"
-            )
+            await expect(
+              showStopper.redeemStablecoin(formatBytes32String("BNB"), UnitHelpers.WeiPerWad)
+            ).to.be.revertedWith("ShowStopper/insufficient-stablecoin-accumulator-balance")
           })
         })
 
-        context("and bag balance = withdraw", () => {
+        context("and stablecoinAccumulator balance = withdraw", () => {
           it("should be success", async () => {
             await setup()
 
             mockedBookKeeper.smocked.totalStablecoinIssued.will.return.with(UnitHelpers.WeiPerRay)
-            await showStopper.thaw()
+            await showStopper.finalizeDebt()
 
             mockedBookKeeper.smocked.collateralPools.will.return.with([
               BigNumber.from(0),
@@ -479,14 +489,14 @@ describe("ShowStopper", () => {
               BigNumber.from(0),
             ])
 
-            await showStopper.flow(formatBytes32String("BNB"))
+            await showStopper.finalizeCashPrice(formatBytes32String("BNB"))
 
-            await showStopper.pack(UnitHelpers.WeiPerWad)
+            await showStopper.accumulateStablecoin(UnitHelpers.WeiPerWad)
 
             mockedBookKeeper.smocked.moveCollateral.will.return.with()
 
-            await expect(showStopper.cash(formatBytes32String("BNB"), UnitHelpers.WeiPerWad))
-              .to.emit(showStopper, "Cash")
+            await expect(showStopper.redeemStablecoin(formatBytes32String("BNB"), UnitHelpers.WeiPerWad))
+              .to.emit(showStopper, "RedeemStablecoin")
               .withArgs(formatBytes32String("BNB"), deployerAddress, UnitHelpers.WeiPerWad)
 
             const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
@@ -495,16 +505,16 @@ describe("ShowStopper", () => {
             expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[0].src).to.be.equal(showStopper.address)
             expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-            expect(moveCollateral[0].wad).to.be.equal(UnitHelpers.WeiPerRay)
+            expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerRay)
           })
         })
 
-        context("and bag balance > withdraw", () => {
+        context("and stablecoinAccumulator balance > withdraw", () => {
           it("should be success", async () => {
             await setup()
 
             mockedBookKeeper.smocked.totalStablecoinIssued.will.return.with(UnitHelpers.WeiPerRay)
-            await showStopper.thaw()
+            await showStopper.finalizeDebt()
 
             mockedBookKeeper.smocked.collateralPools.will.return.with([
               BigNumber.from(0),
@@ -514,14 +524,14 @@ describe("ShowStopper", () => {
               BigNumber.from(0),
             ])
 
-            await showStopper.flow(formatBytes32String("BNB"))
+            await showStopper.finalizeCashPrice(formatBytes32String("BNB"))
 
-            await showStopper.pack(UnitHelpers.WeiPerWad.mul(2))
+            await showStopper.accumulateStablecoin(UnitHelpers.WeiPerWad.mul(2))
 
             mockedBookKeeper.smocked.moveCollateral.will.return.with()
 
-            await expect(showStopper.cash(formatBytes32String("BNB"), UnitHelpers.WeiPerWad))
-              .to.emit(showStopper, "Cash")
+            await expect(showStopper.redeemStablecoin(formatBytes32String("BNB"), UnitHelpers.WeiPerWad))
+              .to.emit(showStopper, "RedeemStablecoin")
               .withArgs(formatBytes32String("BNB"), deployerAddress, UnitHelpers.WeiPerWad)
 
             const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
@@ -530,7 +540,7 @@ describe("ShowStopper", () => {
             expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[0].src).to.be.equal(showStopper.address)
             expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-            expect(moveCollateral[0].wad).to.be.equal(UnitHelpers.WeiPerRay)
+            expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerRay)
           })
         })
       })
@@ -551,7 +561,7 @@ describe("ShowStopper", () => {
 
           await setup()
 
-          await expect(showStopper.setBookKeeper(mockedBookKeeper.address)).to.be.revertedWith("End/not-live")
+          await expect(showStopper.setBookKeeper(mockedBookKeeper.address)).to.be.revertedWith("ShowStopper/not-live")
         })
       })
       context("when showStopper is live", () => {
@@ -584,7 +594,7 @@ describe("ShowStopper", () => {
           await setup()
 
           await expect(showStopper.setLiquidationEngine(mockedLiquidationEngine.address)).to.be.revertedWith(
-            "End/not-live"
+            "ShowStopper/not-live"
           )
         })
       })
@@ -618,7 +628,7 @@ describe("ShowStopper", () => {
           await setup()
 
           await expect(showStopper.setSystemDebtEngine(mockedSystemDebtEngine.address)).to.be.revertedWith(
-            "End/not-live"
+            "ShowStopper/not-live"
           )
         })
       })
@@ -649,7 +659,7 @@ describe("ShowStopper", () => {
 
           await setup()
 
-          await expect(showStopper.setPriceOracle(mockedPriceOracle.address)).to.be.revertedWith("End/not-live")
+          await expect(showStopper.setPriceOracle(mockedPriceOracle.address)).to.be.revertedWith("ShowStopper/not-live")
         })
       })
       context("when showStopper is live", () => {

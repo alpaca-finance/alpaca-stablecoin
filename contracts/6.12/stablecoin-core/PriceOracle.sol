@@ -49,7 +49,7 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
   uint256 public live;
 
   // --- Events ---
-  event Poke(
+  event SetPrice(
     bytes32 poolId,
     bytes32 rawPrice, // Raw price from price feed [wad]
     uint256 priceWithSafetyMargin // Price with safety margin [ray]
@@ -109,13 +109,13 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
   // --- Update value ---
   /// @dev Update the latest price with safety margin of the collateral pool to the BookKeeper
   /// @param poolId Collateral pool id
-  function poke(bytes32 poolId) external whenNotPaused {
-    (bytes32 rawPrice, bool hasPrice) = collateralPools[poolId].priceFeed.peek();
+  function setPrice(bytes32 poolId) external whenNotPaused {
+    (bytes32 rawPrice, bool hasPrice) = collateralPools[poolId].priceFeed.peekPrice();
     uint256 priceWithSafetyMargin = hasPrice
       ? rdiv(rdiv(mul(uint256(rawPrice), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
       : 0;
     bookKeeper.setPriceWithSafetyMargin(poolId, priceWithSafetyMargin);
-    emit Poke(poolId, rawPrice, priceWithSafetyMargin);
+    emit SetPrice(poolId, rawPrice, priceWithSafetyMargin);
   }
 
   function cage() external override {

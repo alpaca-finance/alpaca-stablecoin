@@ -77,7 +77,7 @@ contract SystemDebtEngine is
     bookKeeper = IBookKeeper(_bookKeeper);
     surplusAuctionHouse = ISurplusAuctioneer(surplusAuctionHouse_);
     badDebtAuctionHouse = IBadDebtAuctioneer(badDebtAuctionHouse_);
-    bookKeeper.hope(surplusAuctionHouse_);
+    bookKeeper.whitelist(surplusAuctionHouse_);
     live = 1;
 
     // Grant the contract deployer the default admin role: it will be able
