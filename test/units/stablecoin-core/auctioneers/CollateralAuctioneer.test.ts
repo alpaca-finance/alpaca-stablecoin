@@ -273,7 +273,7 @@ describe("CollateralAuctioneer", () => {
           expect(ibTokenAdapterCalls.length).to.be.eq(1)
           expect(ibTokenAdapterCalls[0].source).to.be.eq(positionAddress)
           expect(ibTokenAdapterCalls[0].destination).to.be.eq(collateralAuctioneer.address)
-          expect(ibTokenAdapterCalls[0].wad).to.be.eq(collateralAmount)
+          expect(ibTokenAdapterCalls[0].share).to.be.eq(collateralAmount)
           expect(ibTokenAdapterCalls[0].data).to.be.eq(
             ethers.utils.defaultAbiCoder.encode(["address"], [deployerAddress])
           )
