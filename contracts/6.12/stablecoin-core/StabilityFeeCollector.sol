@@ -202,7 +202,7 @@ contract StabilityFeeCollector is
 
   // --- Stability Fee Collection ---
   /** @dev Collect the stability fee of the collateral pool.
-      This function could be called by anyRAY.
+      This function could be called by anyone.
       It will update the `debtAccumulatedRate` of the specified collateral pool according to
       the global and per-pool stability fee rates with respect to the last block that `collect` was called.
   */
