@@ -131,10 +131,10 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     collateralPools[collateralPoolId].debtAccumulatedRate = 10**27;
   }
 
-  event SetTotalDebtCeiling(address indexed caller, uint256 data);
+  event SetTotalDebtCeiling(address indexed caller, uint256 totalDebtCeiling);
   event SetPriceWithSafetyMargin(address indexed caller, bytes32 collateralPoolId, uint256 priceWithSafetyMargin);
-  event SetDebtCeiling(address indexed caller, bytes32 collateralPoolId, uint256 data);
-  event SetDebtFloor(address indexed caller, bytes32 collateralPoolId, uint256 data);
+  event SetDebtCeiling(address indexed caller, bytes32 collateralPoolId, uint256 debtCeiling);
+  event SetDebtFloor(address indexed caller, bytes32 collateralPoolId, uint256 debtFloor);
 
   function setTotalDebtCeiling(uint256 _totalDebtCeiling) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
