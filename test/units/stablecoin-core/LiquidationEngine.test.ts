@@ -212,7 +212,7 @@ describe("LiquidationEngine", () => {
         expect(confiscatePositionCalls[0].positionAddress).to.be.equal(aliceAddress)
         expect(confiscatePositionCalls[0].collateralCreditor).to.be.equal(mockedAuctioneer.address)
         expect(confiscatePositionCalls[0].stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
-        expect(confiscatePositionCalls[0].collateralValue).to.be.equal(UnitHelpers.WeiPerWad.mul(-10))
+        expect(confiscatePositionCalls[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(-10))
         expect(confiscatePositionCalls[0].debtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(-10))
 
         const { calls: startAuctionCalls } = mockedAuctioneer.smocked.startAuction
@@ -288,7 +288,7 @@ describe("LiquidationEngine", () => {
         expect(confiscatePositionCalls[0].collateralCreditor).to.be.equal(mockedAuctioneer.address)
         expect(confiscatePositionCalls[0].stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
         // collateralAmountToBeLiquidated = positionLockedCollateral * debtShareToBeLiquidated / positionDebtShare = 10 wad * ~4.5454 wad / 10 wad = ~4.5454 wad
-        expect(confiscatePositionCalls[0].collateralValue).to.be.equal(BigNumber.from("-4545454545454545454"))
+        expect(confiscatePositionCalls[0].collateralAmount).to.be.equal(BigNumber.from("-4545454545454545454"))
         // debtShareToBeLiquidated = debtSize / debtAccumulatedRate / penalty = 10 rad / 2 ray / 110% = ~4.5454 wad
         expect(confiscatePositionCalls[0].debtShare).to.be.equal(BigNumber.from("-4545454545454545454"))
 
@@ -363,7 +363,7 @@ describe("LiquidationEngine", () => {
           expect(confiscatePositionCalls[0].positionAddress).to.be.equal(aliceAddress)
           expect(confiscatePositionCalls[0].collateralCreditor).to.be.equal(mockedAuctioneer.address)
           expect(confiscatePositionCalls[0].stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
-          expect(confiscatePositionCalls[0].collateralValue).to.be.equal(UnitHelpers.WeiPerWad.mul(-10))
+          expect(confiscatePositionCalls[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(-10))
           expect(confiscatePositionCalls[0].debtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(-10))
 
           const { calls: startAuctionCalls } = mockedAuctioneer.smocked.startAuction

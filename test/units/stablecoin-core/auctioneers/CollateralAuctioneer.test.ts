@@ -331,7 +331,7 @@ describe("CollateralAuctioneer", () => {
           expect(mintUnbackedStablecoinCalls.length).to.be.equal(1)
           expect(mintUnbackedStablecoinCalls[0].from).to.be.equal(AddressZero)
           expect(mintUnbackedStablecoinCalls[0].to).to.be.equal(liquidatorAddress)
-          expect(mintUnbackedStablecoinCalls[0].rad).to.be.equal(prize)
+          expect(mintUnbackedStablecoinCalls[0].value).to.be.equal(prize)
 
           const id = await collateralAuctioneer.kicks()
           expect(id).to.be.equal(1)
@@ -646,7 +646,7 @@ describe("CollateralAuctioneer", () => {
           expect(mintUnbackedStablecoinCalls.length).to.be.equal(1)
           expect(mintUnbackedStablecoinCalls[0].from).to.be.equal(AddressZero)
           expect(mintUnbackedStablecoinCalls[0].to).to.be.equal(liquidatorAddress)
-          expect(mintUnbackedStablecoinCalls[0].rad).to.be.equal(prize)
+          expect(mintUnbackedStablecoinCalls[0].value).to.be.equal(prize)
 
           const id = await collateralAuctioneer.kicks()
           expect(id).to.be.equal(1)
@@ -857,18 +857,18 @@ describe("CollateralAuctioneer", () => {
           const { calls: priceCalls } = mockedLinearDecrease.smocked.price
           expect(priceCalls.length).to.be.equal(1)
 
-          const { calls: movemoveCollateralCalls } = mockedBookKeeper.smocked.moveCollateral
-          expect(movemoveCollateralCalls.length).to.be.equal(1)
-          expect(movemoveCollateralCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BTCB"))
-          expect(movemoveCollateralCalls[0].src).to.be.equal(collateralAuctioneer.address)
-          expect(movemoveCollateralCalls[0].dst).to.be.equal(aliceAddress)
-          expect(movemoveCollateralCalls[0].wad).to.be.equal(WeiPerWad.mul(2))
+          const { calls: moveCollateralCalls } = mockedBookKeeper.smocked.moveCollateral
+          expect(moveCollateralCalls.length).to.be.equal(1)
+          expect(moveCollateralCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BTCB"))
+          expect(moveCollateralCalls[0].src).to.be.equal(collateralAuctioneer.address)
+          expect(moveCollateralCalls[0].dst).to.be.equal(aliceAddress)
+          expect(moveCollateralCalls[0].amount).to.be.equal(WeiPerWad.mul(2))
 
           const { calls: moveStablecoinCalls } = mockedBookKeeper.smocked.moveStablecoin
           expect(moveStablecoinCalls.length).to.be.equal(1)
           expect(moveStablecoinCalls[0].src).to.be.equal(deployerAddress)
           expect(moveStablecoinCalls[0].dst).to.be.equal(systemDebtEngineAddress)
-          expect(moveStablecoinCalls[0].rad).to.be.equal(WeiPerWad.mul(2).mul(price))
+          expect(moveStablecoinCalls[0].value).to.be.equal(WeiPerWad.mul(2).mul(price))
 
           const { calls: removeRepaidDebtFromAuctionCalls } =
             mockedLiquidationEngine.smocked.removeRepaidDebtFromAuction

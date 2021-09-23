@@ -341,8 +341,8 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     require(vtab <= mul(v.lockedCollateral, i.priceWithSafetyMargin), "BookKeeper/not-safe-dst");
 
     // both sides non-debtFloory
-    require(either(utab >= i.debtFloor, u.debtShare == 0), "BookKeeper/debtFloor-src");
-    require(either(vtab >= i.debtFloor, v.debtShare == 0), "BookKeeper/debtFloor-dst");
+    require(either(utab >= i.debtFloor, u.debtShare == 0), "BookKeeper/debt-floor-src");
+    require(either(vtab >= i.debtFloor, v.debtShare == 0), "BookKeeper/debt-floor-dst");
   }
 
   // --- CDP Confiscation ---
