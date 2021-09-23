@@ -176,7 +176,7 @@ contract StabilityFeeCollector is
       Where:
         r = stability fee rate
         N = Accumulation frequency which is per-second in this case; the value will be 60*60*24*365 = 31536000 to signify the number of seconds within a year.
-        APR = the annual percentage debtAccumulatedRate
+        APR = the annual percentage rate
 
     For example, to achieve 0.5% APR for stability fee debtAccumulatedRate:
 
