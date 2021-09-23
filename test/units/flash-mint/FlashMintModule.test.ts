@@ -195,7 +195,7 @@ describe("FlashMintModule", () => {
         expect(bookKeeperMinUnbackStablecoinCalls.length).to.be.equal(1)
         expect(bookKeeperMinUnbackStablecoinCalls[0].from).to.be.equal(flashMintModule.address)
         expect(bookKeeperMinUnbackStablecoinCalls[0].to).to.be.equal(flashMintModule.address)
-        expect(bookKeeperMinUnbackStablecoinCalls[0].rad).to.be.equal(WeiPerRad.mul(10))
+        expect(bookKeeperMinUnbackStablecoinCalls[0].value).to.be.equal(WeiPerRad.mul(10))
 
         const { calls: stablecoinAdapterWithdrawCalls } = mockStablecoinAdapter.smocked.withdraw
         expect(stablecoinAdapterWithdrawCalls.length).to.be.equal(1)
@@ -215,7 +215,7 @@ describe("FlashMintModule", () => {
 
         const { calls: bookKeeperSettleSystemBadDebtCalls } = mockBookKeeper.smocked.settleSystemBadDebt
         expect(bookKeeperSettleSystemBadDebtCalls.length).to.be.equal(1)
-        expect(bookKeeperSettleSystemBadDebtCalls[0].rad).to.be.equal(WeiPerRad.mul(10))
+        expect(bookKeeperSettleSystemBadDebtCalls[0].value).to.be.equal(WeiPerRad.mul(10))
       })
     })
   })
@@ -279,11 +279,11 @@ describe("FlashMintModule", () => {
         expect(bookKeeperMinUnbackStablecoinCalls.length).to.be.equal(1)
         expect(bookKeeperMinUnbackStablecoinCalls[0].from).to.be.equal(flashMintModule.address)
         expect(bookKeeperMinUnbackStablecoinCalls[0].to).to.be.equal(mockMyFashLoan.address)
-        expect(bookKeeperMinUnbackStablecoinCalls[0].rad).to.be.equal(WeiPerRad.mul(10))
+        expect(bookKeeperMinUnbackStablecoinCalls[0].value).to.be.equal(WeiPerRad.mul(10))
 
         const { calls: bookKeeperSettleSystemBadDebtCalls } = mockBookKeeper.smocked.settleSystemBadDebt
         expect(bookKeeperSettleSystemBadDebtCalls.length).to.be.equal(1)
-        expect(bookKeeperSettleSystemBadDebtCalls[0].rad).to.be.equal(WeiPerRad.mul(10))
+        expect(bookKeeperSettleSystemBadDebtCalls[0].value).to.be.equal(WeiPerRad.mul(10))
       })
     })
   })

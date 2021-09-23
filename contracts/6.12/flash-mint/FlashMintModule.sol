@@ -76,7 +76,7 @@ contract FlashMintModule is
     IStablecoin stablecoin_ = stablecoin = IStablecoin(IStablecoinAdapter(stablecoinAdapter_).stablecoin());
     systemDebtEngine = systemDebtEngine_;
 
-    bookKeeper_.hope(stablecoinAdapter_);
+    bookKeeper_.whitelist(stablecoinAdapter_);
     stablecoin_.approve(stablecoinAdapter_, type(uint256).max);
   }
 

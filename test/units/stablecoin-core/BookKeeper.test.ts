@@ -170,7 +170,7 @@ describe("BookKeeper", () => {
           expect(collateralTokenBobBefore).to.be.equal(0)
 
           // alice allow bob to move collateral
-          await bookKeeperAsAlice.hope(bobAddress)
+          await bookKeeperAsAlice.whitelist(bobAddress)
 
           // bob call move collateral from alice to bob
           await bookKeeperAsBob.moveCollateral(formatBytes32String("BNB"), aliceAddress, bobAddress, WeiPerWad)
@@ -241,7 +241,7 @@ describe("BookKeeper", () => {
           expect(stablecoinBobBefore).to.be.equal(0)
 
           // alice allow bob to move stablecoin
-          await bookKeeperAsAlice.hope(bobAddress)
+          await bookKeeperAsAlice.whitelist(bobAddress)
 
           // bob call move stablecoin from alice to bob
           await bookKeeperAsBob.moveStablecoin(aliceAddress, bobAddress, WeiPerRad)
@@ -342,7 +342,7 @@ describe("BookKeeper", () => {
                 WeiPerWad.mul(10),
                 0
               )
-            ).to.be.revertedWith("BookKeeper/not-allowed-v")
+            ).to.be.revertedWith("BookKeeper/not-allowed-collateral-owner")
           })
           context("when bob allow alice to move collateral", () => {
             context("when bob doesn't have enough collateral", () => {
@@ -355,7 +355,7 @@ describe("BookKeeper", () => {
                 await bookKeeper.init(formatBytes32String("BNB"))
 
                 // alice allow bob to move stablecoin
-                await bookKeeperAsBob.hope(aliceAddress)
+                await bookKeeperAsBob.whitelist(aliceAddress)
 
                 await expect(
                   bookKeeperAsAlice.adjustPosition(
@@ -384,7 +384,7 @@ describe("BookKeeper", () => {
                 await bookKeeper.addCollateral(formatBytes32String("BNB"), bobAddress, WeiPerWad.mul(10))
 
                 // alice allow bob to move stablecoin
-                await bookKeeperAsBob.hope(aliceAddress)
+                await bookKeeperAsBob.whitelist(aliceAddress)
 
                 const positionBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
                 expect(positionBefore.lockedCollateral).to.be.equal(0)
@@ -732,7 +732,7 @@ describe("BookKeeper", () => {
                 0,
                 WeiPerWad.mul(10)
               )
-            ).to.be.revertedWith("BookKeeper/not-allowed-u")
+            ).to.be.revertedWith("BookKeeper/not-allowed-position-address")
           })
           context("when bob allow alice to manage position", () => {
             it("should be able to call adjustPosition(draw)", async () => {
@@ -767,7 +767,7 @@ describe("BookKeeper", () => {
               )
 
               // bob allow alice
-              await bookKeeperAsBob.hope(aliceAddress)
+              await bookKeeperAsBob.whitelist(aliceAddress)
 
               const positionBobBefore = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
               expect(positionBobBefore.debtShare).to.be.equal(0)
@@ -894,7 +894,7 @@ describe("BookKeeper", () => {
                 0,
                 WeiPerWad.mul(10)
               )
-            ).to.be.revertedWith("BookKeeper/debtFloor")
+            ).to.be.revertedWith("BookKeeper/debt-floor")
           })
         })
       })
@@ -1017,7 +1017,7 @@ describe("BookKeeper", () => {
                 0,
                 WeiPerWad.mul(-9)
               )
-            ).to.be.revertedWith("BookKeeper/debtFloor")
+            ).to.be.revertedWith("BookKeeper/debt-floor")
           })
         })
       })
@@ -1103,7 +1103,7 @@ describe("BookKeeper", () => {
             )
 
             // bob allow alice to manage a position
-            await bookKeeperAsBob.hope(aliceAddress)
+            await bookKeeperAsBob.whitelist(aliceAddress)
 
             await expect(
               bookKeeperAsAlice.movePosition(
@@ -1149,7 +1149,7 @@ describe("BookKeeper", () => {
             )
 
             // bob allow alice to manage a position
-            await bookKeeperAsBob.hope(aliceAddress)
+            await bookKeeperAsBob.whitelist(aliceAddress)
 
             await expect(
               bookKeeperAsAlice.movePosition(
@@ -1195,7 +1195,7 @@ describe("BookKeeper", () => {
             )
 
             // bob allow alice to manage a position
-            await bookKeeperAsBob.hope(aliceAddress)
+            await bookKeeperAsBob.whitelist(aliceAddress)
 
             await expect(
               bookKeeperAsAlice.movePosition(
@@ -1205,7 +1205,7 @@ describe("BookKeeper", () => {
                 WeiPerWad.mul(5),
                 WeiPerWad.mul(1)
               )
-            ).to.be.revertedWith("BookKeeper/debtFloor-src")
+            ).to.be.revertedWith("BookKeeper/debt-floor-src")
           })
         })
         context("when after moving bob position was not enough debt", () => {
@@ -1241,7 +1241,7 @@ describe("BookKeeper", () => {
             )
 
             // bob allow alice to manage a position
-            await bookKeeperAsBob.hope(aliceAddress)
+            await bookKeeperAsBob.whitelist(aliceAddress)
 
             await expect(
               bookKeeperAsAlice.movePosition(
@@ -1251,7 +1251,7 @@ describe("BookKeeper", () => {
                 WeiPerWad.mul(5),
                 WeiPerWad.mul(1)
               )
-            ).to.be.revertedWith("BookKeeper/debtFloor-dst")
+            ).to.be.revertedWith("BookKeeper/debt-floor-dst")
           })
         })
         context("when alice and bob positions are safe", () => {
@@ -1287,7 +1287,7 @@ describe("BookKeeper", () => {
             )
 
             // bob allow alice to manage a position
-            await bookKeeperAsBob.hope(aliceAddress)
+            await bookKeeperAsBob.whitelist(aliceAddress)
 
             const positionAliceBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionAliceBefore.lockedCollateral).to.be.equal(WeiPerWad.mul(10))

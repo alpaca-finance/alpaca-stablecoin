@@ -123,7 +123,7 @@ describe("StabilityFeeCollector", () => {
         const { calls } = mockedBookKeeper.smocked.accrueStabilityFee
         expect(calls.length).to.be.equal(1)
         expect(calls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(calls[0].u).to.be.equal(AddressZero)
+        expect(calls[0].stabilityFeeRecipient).to.be.equal(AddressZero)
         // rate ~ 0.01 ray ~ 1%
         AssertHelpers.assertAlmostEqual(
           calls[0].debtAccumulatedRate.toString(),

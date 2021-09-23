@@ -20,38 +20,38 @@
 pragma solidity 0.6.12;
 
 interface IBookKeeper {
-  function collateralToken(bytes32, address) external view returns (uint256);
+  function collateralToken(bytes32 collateralPoolId, address ownerAddress) external view returns (uint256);
 
   function addCollateral(
-    bytes32,
-    address,
-    int256
+    bytes32 collateralPoolId,
+    address ownerAddress,
+    int256 amount // [wad]
   ) external;
 
   function movePosition(
-    bytes32,
-    address,
-    address,
-    int256,
-    int256
+    bytes32 collateralPoolId,
+    address src,
+    address dst,
+    int256 collateralAmount,
+    int256 debtShare
   ) external;
 
-  function can(address, address) external view returns (uint256);
+  function positionWhitelist(address positionAddress, address whitelistedAddress) external view returns (uint256);
 
   function adjustPosition(
-    bytes32,
-    address,
-    address,
-    address,
-    int256,
-    int256
+    bytes32 collateralPoolId,
+    address positionAddress,
+    address collateralOwner,
+    address stablecoinOwner,
+    int256 collateralValue,
+    int256 debtShare
   ) external;
 
-  function setPriceWithSafetyMargin(bytes32, uint256) external;
+  function setPriceWithSafetyMargin(bytes32 collateralPoolId, uint256 priceWithSafetyMargin) external;
 
-  function stablecoin(address) external view returns (uint256);
+  function stablecoin(address ownerAddress) external view returns (uint256);
 
-  function positions(bytes32 collateralPoolId, address urn)
+  function positions(bytes32 collateralPoolId, address positionAddress)
     external
     view
     returns (
@@ -64,55 +64,55 @@ interface IBookKeeper {
   function moveStablecoin(
     address src,
     address dst,
-    uint256 rad
+    uint256 value // [rad]
   ) external;
 
   function moveCollateral(
     bytes32 collateralPoolId,
     address src,
     address dst,
-    uint256 wad
+    uint256 amount // [wad]
   ) external;
 
   function confiscatePosition(
-    bytes32 i,
-    address u,
-    address v,
-    address w,
-    int256 dink,
-    int256 dart
+    bytes32 collateralPoolId,
+    address positionAddress,
+    address collateralCreditor,
+    address stablecoinDebtor,
+    int256 collateralAmount, // [wad]
+    int256 debtShare // [wad]
   ) external;
 
   function mintUnbackedStablecoin(
-    address u,
-    address v,
-    uint256 rad
+    address from,
+    address to,
+    uint256 value // [rad]
   ) external;
 
   function cage() external;
 
-  function collateralPools(bytes32)
+  function collateralPools(bytes32 collateralPoolId)
     external
     view
     returns (
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
+      uint256 totalDebtShare, // [wad]
+      uint256 debtAccumulatedRate, // [ray]
+      uint256 priceWithSafetyMargin, // [ray]
+      uint256 debtCeiling, // [rad]
+      uint256 debtFloor // [rad]
     );
 
   function accrueStabilityFee(
-    bytes32,
-    address,
-    int256
+    bytes32 collateralPoolId,
+    address stabilityFeeRecipient,
+    int256 debtAccumulatedRate // [ray]
   ) external;
 
-  function systemBadDebt(address) external view returns (uint256);
+  function systemBadDebt(address ownerAddress) external view returns (uint256); // [rad]
 
-  function settleSystemBadDebt(uint256) external;
+  function settleSystemBadDebt(uint256 value) external;
 
-  function hope(address) external;
+  function whitelist(address toBeWhitelistedAddress) external;
 
-  function nope(address) external;
+  function blacklist(address toBeBlacklistedAddress) external;
 }

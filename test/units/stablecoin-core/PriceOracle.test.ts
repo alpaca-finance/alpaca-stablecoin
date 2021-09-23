@@ -78,7 +78,7 @@ describe("PriceOracle", () => {
 
           expect(setPriceWithSafetyMargin.length).to.be.equal(1)
           expect(setPriceWithSafetyMargin[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-          expect(setPriceWithSafetyMargin[0]._data).to.be.equal(BigNumber.from("0"))
+          expect(setPriceWithSafetyMargin[0]._priceWithSafetyMargin).to.be.equal(BigNumber.from("0"))
         })
       })
 
@@ -102,7 +102,7 @@ describe("PriceOracle", () => {
 
           expect(setPriceWithSafetyMargin.length).to.be.equal(1)
           expect(setPriceWithSafetyMargin[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-          expect(setPriceWithSafetyMargin[0]._data).to.be.equal(BigNumber.from("10").pow("43"))
+          expect(setPriceWithSafetyMargin[0]._priceWithSafetyMargin).to.be.equal(BigNumber.from("10").pow("43"))
         })
       })
 
@@ -130,7 +130,7 @@ describe("PriceOracle", () => {
 
           expect(setPriceWithSafetyMargin.length).to.be.equal(1)
           expect(setPriceWithSafetyMargin[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-          expect(setPriceWithSafetyMargin[0]._data).to.be.equal(
+          expect(setPriceWithSafetyMargin[0]._priceWithSafetyMargin).to.be.equal(
             BigNumber.from("931322574615478515625").mul(BigNumber.from("10").pow("33"))
           )
         })
@@ -157,7 +157,7 @@ describe("PriceOracle", () => {
 
           expect(setPriceWithSafetyMargin.length).to.be.equal(1)
           expect(setPriceWithSafetyMargin[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-          expect(setPriceWithSafetyMargin[0]._data).to.be.equal(BigNumber.from("0"))
+          expect(setPriceWithSafetyMargin[0]._priceWithSafetyMargin).to.be.equal(BigNumber.from("0"))
         })
       })
 
@@ -188,7 +188,9 @@ describe("PriceOracle", () => {
 
           expect(setPriceWithSafetyMargin.length).to.be.equal(1)
           expect(setPriceWithSafetyMargin[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-          expect(setPriceWithSafetyMargin[0]._data).to.be.equal(BigNumber.from("7").mul(BigNumber.from("10").pow("54")))
+          expect(setPriceWithSafetyMargin[0]._priceWithSafetyMargin).to.be.equal(
+            BigNumber.from("7").mul(BigNumber.from("10").pow("54"))
+          )
         })
       })
     })
@@ -366,7 +368,7 @@ describe("PriceOracle", () => {
 
         expect(setPriceWithSafetyMargin.length).to.be.equal(1)
         expect(setPriceWithSafetyMargin[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(setPriceWithSafetyMargin[0]._data).to.be.equal(BigNumber.from("0"))
+        expect(setPriceWithSafetyMargin[0]._priceWithSafetyMargin).to.be.equal(BigNumber.from("0"))
       })
     })
   })
