@@ -174,7 +174,7 @@ contract StabilityFeeCollector is
           r^N = APR
 
       Where:
-        r = stability fee debtAccumulatedRate
+        r = stability fee rate
         N = Accumulation frequency which is per-second in this case; the value will be 60*60*24*365 = 31536000 to signify the number of seconds within a year.
         APR = the annual percentage debtAccumulatedRate
 
