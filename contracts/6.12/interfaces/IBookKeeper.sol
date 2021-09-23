@@ -86,7 +86,7 @@ interface IBookKeeper {
   function mintUnbackedStablecoin(
     address from,
     address to,
-    uint256 value
+    uint256 value // [rad]
   ) external;
 
   function cage() external;
