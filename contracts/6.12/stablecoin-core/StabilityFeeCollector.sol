@@ -168,8 +168,8 @@ contract StabilityFeeCollector is
     emit SetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
 
-  /** @dev Set the stability fee debtAccumulatedRate of the collateral pool.
-      The debtAccumulatedRate to be set here is the `r` in:
+  /** @dev Set the stability fee rate of the collateral pool.
+      The rate to be set here is the `r` in:
 
           r^N = APR
 
