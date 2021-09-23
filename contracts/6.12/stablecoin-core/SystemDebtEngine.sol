@@ -26,6 +26,7 @@ import "../interfaces/IBookKeeper.sol";
 import "../interfaces/ISurplusAuctioneer.sol";
 import "../interfaces/IBadDebtAuctioneer.sol";
 import "../interfaces/ISystemDebtEngine.sol";
+import "../interfaces/IGenericTokenAdapter.sol";
 
 /// @title SystemDebtEngine
 /// @author Alpaca Fin Corporation
@@ -81,11 +82,13 @@ contract SystemDebtEngine is
   // --- withdraw surplus ---
   function withdrawCollateralSurplus(
     bytes32 collateralPoolId,
+    IGenericTokenAdapter adapter,
     address to,
     uint256 wad
   ) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     bookKeeper.moveCollateral(collateralPoolId, address(this), to, wad);
+    adapter.onMoveCollateral(address(this), to, wad, abi.encode(to));
   }
 
   function withdrawStablecoinSurplus(address to, uint256 rad) external {

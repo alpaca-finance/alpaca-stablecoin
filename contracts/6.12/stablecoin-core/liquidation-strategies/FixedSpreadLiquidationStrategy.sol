@@ -14,6 +14,8 @@ import "../../interfaces/ILiquidationEngine.sol";
 import "../../interfaces/ILiquidationStrategy.sol";
 import "../../interfaces/ISystemDebtEngine.sol";
 import "../../interfaces/IFlashLendingCallee.sol";
+import "../../interfaces/IGenericTokenAdapter.sol";
+import "../../interfaces/IManager.sol";
 
 contract FixedSpreadLiquidationStrategy is
   PausableUpgradeable,
@@ -25,6 +27,7 @@ contract FixedSpreadLiquidationStrategy is
   bytes32 public constant LIQUIDATION_ENGINE_ROLE = keccak256("LIQUIDATION_ENGINE_ROLE");
 
   struct CollateralPool {
+    IGenericTokenAdapter adapter;
     uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation
     uint256 liquidatorIncentiveBps; // Percentage (BPS) of how much additional collateral will be given to the liquidator incentive
     uint256 treasuryFeesBps; // Percentage (BPS) of how much additional collateral will be transferred to the treasury
@@ -43,6 +46,8 @@ contract FixedSpreadLiquidationStrategy is
   ILiquidationEngine public liquidationEngine; // Liquidation module
   ISystemDebtEngine public systemDebtEngine; // Recipient of dai raised in auctions
   IPriceOracle public priceOracle; // Collateral price module
+  IManager public positionManager;
+
   mapping(bytes32 => CollateralPool) public collateralPools;
 
   event FixedSpreadLiquidate(
@@ -54,16 +59,19 @@ contract FixedSpreadLiquidationStrategy is
     address indexed positionAddress,
     address collateralRecipient
   );
-  event SetCloseFactorBps(address indexed caller, bytes32 collateralPoolId, uint256 strategy);
-  event SetLiquidatorIncentiveBps(address indexed caller, bytes32 collateralPoolId, uint256 strategy);
-  event SetTreasuryFeesBps(address indexed caller, bytes32 collateralPoolId, uint256 strategy);
+  event SetAdapter(address indexed caller, bytes32 collateralPoolId, address _adapter);
+  event SetCloseFactorBps(address indexed caller, bytes32 collateralPoolId, uint256 _closeFactorBps);
+  event SetLiquidatorIncentiveBps(address indexed caller, bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps);
+  event SetTreasuryFeesBps(address indexed caller, bytes32 collateralPoolId, uint256 _treasuryFeeBps);
+  event SetPositionManager(address indexed caller, address _positionManager);
 
   // --- Init ---
   function initialize(
     address _bookKeeper,
     address priceOracle_,
     address liquidationEngine_,
-    address systemDebtEngine_
+    address systemDebtEngine_,
+    address _positionManager
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
@@ -73,6 +81,7 @@ contract FixedSpreadLiquidationStrategy is
     priceOracle = IPriceOracle(priceOracle_);
     liquidationEngine = ILiquidationEngine(liquidationEngine_);
     systemDebtEngine = ISystemDebtEngine(systemDebtEngine_);
+    positionManager = IManager(_positionManager);
 
     // Grant the contract deployer the default admin role: it will be able
     // to grant and revoke any roles
@@ -121,6 +130,12 @@ contract FixedSpreadLiquidationStrategy is
   }
 
   // --- Setter ---
+  function setAdapter(bytes32 collateralPoolId, address _adapter) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    collateralPools[collateralPoolId].adapter = IGenericTokenAdapter(_adapter);
+    emit SetAdapter(msg.sender, collateralPoolId, _adapter);
+  }
+
   function setCloseFactorBps(bytes32 collateralPoolId, uint256 strategy) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     collateralPools[collateralPoolId].closeFactorBps = strategy;
@@ -137,6 +152,12 @@ contract FixedSpreadLiquidationStrategy is
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     collateralPools[collateralPoolId].treasuryFeesBps = strategy;
     emit SetTreasuryFeesBps(msg.sender, collateralPoolId, strategy);
+  }
+
+  function setPositionManager(address _positionManager) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    positionManager = IManager(_positionManager);
+    emit SetPositionManager(msg.sender, _positionManager);
   }
 
   // --- Auction ---
@@ -240,6 +261,14 @@ contract FixedSpreadLiquidationStrategy is
       -int256(info.collateralAmountToLiquidateWithAllFees),
       -int256(debtShareToRepay)
     );
+    address positionOwnerAddress = positionManager.mapPositionHandlerToOwner(positionAddress);
+    if (positionOwnerAddress == address(0)) positionOwnerAddress = positionAddress;
+    collateralPool.adapter.onMoveCollateral(
+      positionAddress,
+      address(this),
+      info.collateralAmountToLiquidateWithAllFees,
+      abi.encode(positionOwnerAddress)
+    );
 
     // 5. Give the collateral to the collateralRecipient
     bookKeeper.moveCollateral(
@@ -248,9 +277,16 @@ contract FixedSpreadLiquidationStrategy is
       collateralRecipient,
       add(info.collateralAmountToLiquidate, info.liquidatorIncentiveFees)
     );
+    collateralPool.adapter.onMoveCollateral(
+      address(this),
+      collateralRecipient,
+      add(info.collateralAmountToLiquidate, info.liquidatorIncentiveFees),
+      abi.encode(0)
+    );
 
     // 6. Give the treasury fees to System Debt Engine to be stored as system surplus
     bookKeeper.moveCollateral(collateralPoolId, address(this), address(systemDebtEngine), info.treasuryFees);
+    collateralPool.adapter.onMoveCollateral(address(this), address(systemDebtEngine), info.treasuryFees, abi.encode(0));
 
     // 7. Do external call (if data is defined) but to be
     // extremely careful we don't allow to do it to the two
