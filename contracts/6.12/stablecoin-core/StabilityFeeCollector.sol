@@ -193,7 +193,7 @@ contract StabilityFeeCollector is
     The above `stabilityFeeRate` will be the value we will use in this contract.
   */
   /// @param _collateralPool Collateral pool id
-  /// @param _stabilityFeeRate the debtAccumulatedRate [ray]
+  /// @param _stabilityFeeRate the new stability fee rate [ray]
   function setStabilityFeeRate(bytes32 _collateralPool, uint256 _stabilityFeeRate) external whenNotPaused {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     collateralPools[_collateralPool].stabilityFeeRate = _stabilityFeeRate;
