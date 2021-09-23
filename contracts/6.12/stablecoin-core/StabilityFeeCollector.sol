@@ -186,7 +186,7 @@ contract StabilityFeeCollector is
 
           r = 1.000000000158153903837946258002097...
 
-    The debtAccumulatedRate is in [ray] format, so the actual value of `stabilityFeeRate` will be:
+    The rate is in [ray] format, so the actual value of `stabilityFeeRate` will be:
 
           stabilityFeeRate = 1000000000158153903837946258
 
