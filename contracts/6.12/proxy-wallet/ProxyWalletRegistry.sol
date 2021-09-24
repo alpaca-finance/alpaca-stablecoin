@@ -49,8 +49,16 @@ contract ProxyWalletRegistry is OwnableUpgradeable, PausableUpgradeable, AccessC
   // deploys a new proxy instance
   // sets custom owner of proxy
   function build(address owner) public returns (address payable proxy) {
-    require(proxies[owner] == ProxyWallet(0) || proxies[owner].owner() != owner); // Not allow new proxy if the user already has one and remains being the owner
+    require(proxies[owner] == ProxyWallet(0)); // Not allow new proxy if the user already has one
     proxy = factory.build(owner);
     proxies[owner] = ProxyWallet(proxy);
+  }
+
+  function setOwner(address newOwner) public {
+    require(proxies[newOwner] == ProxyWallet(0));
+    ProxyWallet proxy = proxies[msg.sender];
+    require(proxy.owner() == newOwner);
+    proxies[newOwner] = proxy;
+    proxies[msg.sender] = ProxyWallet(0);
   }
 }

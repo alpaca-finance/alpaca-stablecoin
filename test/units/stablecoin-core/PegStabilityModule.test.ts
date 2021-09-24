@@ -123,7 +123,7 @@ describe("PegStabilityModule", () => {
         expect(bookKeeperMoveStablecoinCalls.length).to.be.equal(1)
         expect(bookKeeperMoveStablecoinCalls[0].src).to.be.equal(pegStabilityModule.address)
         expect(bookKeeperMoveStablecoinCalls[0].dst).to.be.equal(mockSystemDebtEngine.address)
-        expect(bookKeeperMoveStablecoinCalls[0].rad).to.be.equal(WeiPerWad.mul(WeiPerRay))
+        expect(bookKeeperMoveStablecoinCalls[0].value).to.be.equal(WeiPerWad.mul(WeiPerRay))
 
         const { calls: stablecoinAdapterWithdrawCalls } = mockStablecoinAdapter.smocked.withdraw
         expect(stablecoinAdapterWithdrawCalls.length).to.be.equal(1)
@@ -173,7 +173,7 @@ describe("PegStabilityModule", () => {
         expect(bookKeeperMoveStablecoinCalls.length).to.be.equal(1)
         expect(bookKeeperMoveStablecoinCalls[0].src).to.be.equal(pegStabilityModule.address)
         expect(bookKeeperMoveStablecoinCalls[0].dst).to.be.equal(mockSystemDebtEngine.address)
-        expect(bookKeeperMoveStablecoinCalls[0].rad).to.be.equal(WeiPerWad.mul(WeiPerRay))
+        expect(bookKeeperMoveStablecoinCalls[0].value).to.be.equal(WeiPerWad.mul(WeiPerRay))
       })
     })
   })

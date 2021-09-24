@@ -17,15 +17,15 @@
 pragma solidity 0.6.12;
 
 import "../FlashMintModule.sol";
-import "../../interfaces/IBookKeeperStablecoinFlashBorrower.sol";
+import "../../interfaces/IBookKeeperFlashBorrower.sol";
 import "../../interfaces/IERC3156FlashBorrower.sol";
 
-abstract contract FlashLoanReceiverBase is IBookKeeperStablecoinFlashBorrower, IERC3156FlashBorrower {
+abstract contract FlashLoanReceiverBase is IBookKeeperFlashBorrower, IERC3156FlashBorrower {
   FlashMintModule public flash;
 
   bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
   bytes32 public constant CALLBACK_SUCCESS_BOOK_KEEPER_STABLE_COIN =
-    keccak256("BookKeeperStablecoinFlashBorrower.onBookKeeperStablecoinFlashLoan");
+    keccak256("BookKeeperFlashBorrower.onBookKeeperFlashLoan");
 
   // --- Init ---
   constructor(address _flash) public {
@@ -53,7 +53,7 @@ abstract contract FlashLoanReceiverBase is IBookKeeperStablecoinFlashBorrower, I
     flash.stablecoin().approve(address(flash), amount);
   }
 
-  function payBackBookKeeperStablecoin(uint256 amount) internal {
+  function payBackBookKeeper(uint256 amount) internal {
     // Lender takes back the stablecoin as per ERC 3156 spec
     flash.bookKeeper().moveStablecoin(address(this), address(flash), amount);
   }

@@ -23,8 +23,6 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
-import "../interfaces/ISurplusAuctioneer.sol";
-import "../interfaces/IBadDebtAuctioneer.sol";
 import "../interfaces/ISystemDebtEngine.sol";
 import "../interfaces/IGenericTokenAdapter.sol";
 

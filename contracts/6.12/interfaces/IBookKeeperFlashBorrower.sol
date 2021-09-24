@@ -16,16 +16,16 @@
 
 pragma solidity 0.6.12;
 
-interface IBookKeeperStablecoinFlashBorrower {
+interface IBookKeeperFlashBorrower {
   /**
    * @dev Receive a flash loan.
    * @param initiator The initiator of the loan.
    * @param amount The amount of tokens lent. [rad]
    * @param fee The additional amount of tokens to repay. [rad]
    * @param data Arbitrary data structure, intended to contain user-defined parameters.
-   * @return The keccak256 hash of "IBookKeeperStablecoinFlashLoanReceiver.onBookKeeperStablecoinFlashLoan"
+   * @return The keccak256 hash of "IBookKeeperFlashLoanReceiver.onBookKeeperFlashLoan"
    */
-  function onBookKeeperStablecoinFlashLoan(
+  function onBookKeeperFlashLoan(
     address initiator,
     uint256 amount,
     uint256 fee,

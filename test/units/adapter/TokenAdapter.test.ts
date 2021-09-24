@@ -111,7 +111,7 @@ describe("TokenAdapter", () => {
         expect(addCollateral.length).to.be.equal(1)
         expect(addCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BTCB"))
         expect(addCollateral[0].usr).to.be.equal(aliceAddress)
-        expect(addCollateral[0].wad).to.be.equal(BigNumber.from("1000000000000000000"))
+        expect(addCollateral[0].amount).to.be.equal(BigNumber.from("1000000000000000000"))
 
         expect(transferFrom.length).to.be.equal(1)
         expect(transferFrom[0].sender).to.be.equal(deployerAddress)
@@ -147,7 +147,7 @@ describe("TokenAdapter", () => {
         expect(addCollateral.length).to.be.equal(1)
         expect(addCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BTCB"))
         expect(addCollateral[0].usr).to.be.equal(deployerAddress)
-        expect(addCollateral[0].wad).to.be.equal(BigNumber.from("-1000000000000000000"))
+        expect(addCollateral[0].amount).to.be.equal(BigNumber.from("-1000000000000000000"))
 
         expect(transfer.length).to.be.equal(1)
         expect(transfer[0].recipient).to.be.equal(aliceAddress)
@@ -164,30 +164,6 @@ describe("TokenAdapter", () => {
         await tokenAdapter.cage()
 
         expect(await tokenAdapter.live()).to.be.equal(0)
-      })
-    })
-  })
-
-  describe("#rely()", () => {
-    context("when call rely ", () => {
-      it("should be set wards to 1", async () => {
-        expect(await tokenAdapter.wards(aliceAddress)).to.be.equal(0)
-
-        await tokenAdapter.rely(aliceAddress)
-
-        expect(await tokenAdapter.wards(aliceAddress)).to.be.equal(1)
-      })
-    })
-  })
-
-  describe("#deny()", () => {
-    context("when call deny ", () => {
-      it("should be set wards to 0", async () => {
-        await tokenAdapter.rely(aliceAddress)
-        expect(await tokenAdapter.wards(aliceAddress)).to.be.equal(1)
-
-        await tokenAdapter.deny(aliceAddress)
-        expect(await tokenAdapter.wards(aliceAddress)).to.be.equal(0)
       })
     })
   })

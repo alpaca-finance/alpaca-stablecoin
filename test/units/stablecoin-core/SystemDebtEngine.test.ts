@@ -81,7 +81,7 @@ describe("SystemDebtEngine", () => {
 
         const { calls } = mockedBookKeeper.smocked.settleSystemBadDebt
         expect(calls.length).to.be.equal(1)
-        expect(calls[0].rad).to.be.equal(UnitHelpers.WeiPerRad)
+        expect(calls[0].value).to.be.equal(UnitHelpers.WeiPerRad)
       })
     })
   })

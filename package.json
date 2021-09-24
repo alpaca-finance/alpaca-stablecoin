@@ -9,6 +9,7 @@
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
     "test": "hardhat test --no-compile",
     "test:integrations:ibTokenAdapter": "hardhat test --no-compile ./test/integrations/stablecoin-core/adapters/FarmableTokenAdapter/IbTokenAdapter.test.ts",
+    "test:integrations:proxywallet": "hardhat test --no-compile ./test/integrations/proxy-wallet/ProxyWallet.test.ts",
     "test:collateral-auctioneer": "hardhat test --no-compile ./test/units/stablecoin-core/auctioneers/CollateralAuctioneer.test.ts",
     "test:cdp-manager": "hardhat test --no-compile ./test/units/managers/CDPManager.test.ts",
     "testnet": "hardhat console --no-compile --network testnet",
@@ -27,11 +28,13 @@
     "test:pegstabilitymodule": "hardhat test --no-compile ./test/units/stablecoin-core/PegStabilityModule.test.ts",
     "test:fixedSpreadliquidationstrategy": "hardhat test --no-compile ./test/units/liquidation-strategies/FixedSpreadLiquidationStrategy.test.ts",
     "test:flashmintmodule": "hardhat test --no-compile ./test/units/flash-mint/FlashMintModule.test.ts",
+    "test:integrations:alpacastablecoinproxyaction": "hardhat test --no-compile ./test/integrations/AlpacaStablecoinProxyAction.test.ts",
     "coverage": "hardhat coverage",
     "solhint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
     "prettier:solidity": "./node_modules/.bin/prettier --write contracts/**/*.sol"
   },
   "devDependencies": {
+    "@alpaca-finance/alpaca-contract": "1.2.22",
     "@chainlink/contracts": "^0.1.7",
     "@eth-optimism/smock": "^1.1.10",
     "@ethersproject/bignumber": "^5.0.14",
@@ -65,7 +68,8 @@
     "ts-generator": "^0.1.1",
     "ts-node": "^9.1.1",
     "typechain": "^4.0.1",
-    "typescript": "^4.1.5"
+    "typescript": "^4.1.5",
+    "web3": "^1.5.2"
   },
   "files": [
     "typechain",

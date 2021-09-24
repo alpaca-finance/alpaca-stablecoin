@@ -16,7 +16,7 @@ contract MockMyFlashLoan is FlashLoanReceiverBase {
     return CALLBACK_SUCCESS;
   }
 
-  function onBookKeeperStablecoinFlashLoan(
+  function onBookKeeperFlashLoan(
     address initiator,
     uint256 amount,
     uint256 fee,

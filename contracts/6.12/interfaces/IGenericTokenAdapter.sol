@@ -3,10 +3,6 @@ pragma solidity 0.6.12;
 import "../interfaces/IToken.sol";
 
 interface IGenericTokenAdapter {
-  function rely(address usr) external;
-
-  function deny(address usr) external;
-
   function cage() external;
 
   function decimals() external returns (uint256);
