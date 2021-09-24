@@ -1,8 +1,9 @@
 pragma solidity 0.6.12;
 
 import "./IPriceFeed.sol";
+import "../interfaces/ICagable.sol";
 
-interface IPriceOracle {
+interface IPriceOracle is ICagable {
   function collateralPools(bytes32)
     external
     view
@@ -10,8 +11,6 @@ interface IPriceOracle {
       IPriceFeed priceFeed,
       uint256 liquidationRatio // [ray]
     );
-
-  function cage() external;
 
   function stableCoinReferencePrice() external view returns (uint256);
 }

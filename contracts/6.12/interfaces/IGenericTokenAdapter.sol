@@ -1,10 +1,9 @@
 pragma solidity 0.6.12;
 
 import "../interfaces/IToken.sol";
+import "../interfaces/ICagable.sol";
 
-interface IGenericTokenAdapter {
-  function cage() external;
-
+interface IGenericTokenAdapter is ICagable {
   function decimals() external returns (uint256);
 
   function deposit(

@@ -51,7 +51,7 @@ contract AuthTokenAdapter is
     emit Deny(usr);
   }
 
-  modifier auth {
+  modifier auth() {
     require(wards[msg.sender] == 1);
     _;
   }
@@ -65,7 +65,6 @@ contract AuthTokenAdapter is
   // --- Events ---
   event Rely(address indexed usr);
   event Deny(address indexed usr);
-  event Cage();
   event Deposit(address indexed urn, uint256 wad, address indexed msgSender);
   event Withdraw(address indexed guy, uint256 wad);
 
@@ -89,9 +88,16 @@ contract AuthTokenAdapter is
     collateralPoolId = collateralPoolId_;
   }
 
-  function cage() external auth {
+  function cage() external override auth {
+    require(live == 1, "AuthTokenAdapter/not-live");
     live = 0;
     emit Cage();
+  }
+
+  function uncage() external override auth {
+    require(live == 0, "AuthTokenAdapter/not-caged");
+    live = 1;
+    emit Uncage();
   }
 
   function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {

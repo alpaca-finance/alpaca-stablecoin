@@ -61,40 +61,46 @@ contract StablecoinAdapter is
   ReentrancyGuardUpgradeable,
   IStablecoinAdapter
 {
-  // --- Auth ---
-  mapping(address => uint256) public wards;
-
-  function rely(address usr) external override auth {
-    wards[usr] = 1;
-  }
-
-  function deny(address usr) external override auth {
-    wards[usr] = 0;
-  }
-
-  modifier auth {
-    require(wards[msg.sender] == 1, "StablecoinAdapter/not-authorized");
-    _;
-  }
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
   IBookKeeper public override bookKeeper; // CDP Engine
   IStablecoin public override stablecoin; // Stablecoin Token
   uint256 public live; // Active Flag
 
-  function initialize(address _bookKeeper, address stablecoin_) external initializer {
+  function initialize(address _bookKeeper, address _stablecoin) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    wards[msg.sender] = 1;
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
-    stablecoin = IStablecoin(stablecoin_);
+    stablecoin = IStablecoin(_stablecoin);
+
+    // Grant the contract deployer the owner role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
-  function cage() external override auth {
+  function cage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    require(live == 1, "StablecoinAdapter/not-live");
     live = 0;
+    emit Cage();
+  }
+
+  function uncage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    require(live == 0, "StablecoinAdapter/not-caged");
+    live = 1;
+    emit Uncage();
   }
 
   uint256 constant ONE = 10**27;
@@ -106,7 +112,11 @@ contract StablecoinAdapter is
   /// @dev Deposit stablecoin into the system from the caller to be used for debt repayment or liquidation
   /// @param usr The source address which is holding the stablecoin
   /// @param wad The amount of stablecoin to be deposited [wad]
-  function deposit(address usr, uint256 wad, bytes calldata /* data */) external payable override nonReentrant {
+  function deposit(
+    address usr,
+    uint256 wad,
+    bytes calldata /* data */
+  ) external payable override nonReentrant {
     bookKeeper.moveStablecoin(address(this), usr, mul(ONE, wad));
     stablecoin.burn(msg.sender, wad);
   }
@@ -114,7 +124,11 @@ contract StablecoinAdapter is
   /// @dev Withdraw stablecoin from the system to the caller
   /// @param usr The destination address to receive stablecoin
   /// @param wad The amount of stablecoin to be withdrawn [wad]
-  function withdraw(address usr, uint256 wad, bytes calldata /* data */) external override nonReentrant {
+  function withdraw(
+    address usr,
+    uint256 wad,
+    bytes calldata /* data */
+  ) external override nonReentrant {
     require(live == 1, "StablecoinAdapter/not-live");
     bookKeeper.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
     stablecoin.mint(usr, wad);

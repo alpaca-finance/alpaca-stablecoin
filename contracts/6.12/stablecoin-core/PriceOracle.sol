@@ -64,7 +64,7 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
     stableCoinReferencePrice = ONE;
     live = 1;
 
-    // Grant the contract deployer the default admin role: it will be able
+    // Grant the contract deployer the owner role: it will be able
     // to grant and revoke any roles
     _setupRole(OWNER_ROLE, msg.sender);
   }
@@ -123,7 +123,19 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
       hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
       "!(ownerRole or showStopperRole)"
     );
+    require(live == 1, "PriceOracle/not-live");
     live = 0;
+    emit Cage();
+  }
+
+  function uncage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    require(live == 0, "PriceOracle/not-caged");
+    live = 1;
+    emit Uncage();
   }
 
   // --- pause ---

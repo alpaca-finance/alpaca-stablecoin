@@ -19,7 +19,9 @@
 
 pragma solidity 0.6.12;
 
-interface IBookKeeper {
+import "../interfaces/ICagable.sol";
+
+interface IBookKeeper is ICagable {
   function collateralToken(bytes32 collateralPoolId, address ownerAddress) external view returns (uint256);
 
   function addCollateral(
@@ -88,8 +90,6 @@ interface IBookKeeper {
     address to,
     uint256 value // [rad]
   ) external;
-
-  function cage() external;
 
   function collateralPools(bytes32 collateralPoolId)
     external

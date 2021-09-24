@@ -2,8 +2,9 @@ pragma solidity 0.6.12;
 
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IToken.sol";
+import "../interfaces/ICagable.sol";
 
-interface IAuthTokenAdapter {
+interface IAuthTokenAdapter is ICagable {
   function bookKeeper() external returns (IBookKeeper);
 
   function collateralPoolId() external returns (bytes32);

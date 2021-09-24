@@ -1,9 +1,9 @@
 pragma solidity 0.6.12;
 
-interface ISurplusAuctioneer {
-  function startAuction(uint256 lot, uint256 bid) external returns (uint256);
+import "../interfaces/ICagable.sol";
 
-  function cage(uint256) external;
+interface ISurplusAuctioneer is ICagable {
+  function startAuction(uint256 lot, uint256 bid) external returns (uint256);
 
   function live() external returns (uint256);
 }
