@@ -42,7 +42,6 @@ contract SystemDebtEngine is
 {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-  bytes32 public constant LIQUIDATION_ENGINE_ROLE = keccak256("LIQUIDATION_ENGINE_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
   // --- Data ---

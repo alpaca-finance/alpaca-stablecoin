@@ -15,6 +15,7 @@ const { expect } = chai
 type fixture = {
   systemDebtEngine: SystemDebtEngine
   mockedBookKeeper: MockContract
+  mockedIbTokenAdapter: MockContract
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
@@ -23,13 +24,14 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   // Deploy mocked BookKeeper
   const mockedBookKeeper = await smockit(await ethers.getContractFactory("BookKeeper", deployer))
 
+  // Deploy mocked IbTokenAdapter
+  const mockedIbTokenAdapter = await smockit(await ethers.getContractFactory("IbTokenAdapter", deployer))
+
   const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
   const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [
     mockedBookKeeper.address,
-    mockedBookKeeper.address,
-    mockedBookKeeper.address,
   ])) as SystemDebtEngine
-  return { systemDebtEngine, mockedBookKeeper }
+  return { systemDebtEngine, mockedBookKeeper, mockedIbTokenAdapter }
 }
 
 describe("SystemDebtEngine", () => {
@@ -43,12 +45,13 @@ describe("SystemDebtEngine", () => {
 
   // Contracts
   let mockedBookKeeper: MockContract
+  let mockedIbTokenAdapter: MockContract
 
   let systemDebtEngine: SystemDebtEngine
   let systemDebtEngineAsAlice: SystemDebtEngine
 
   beforeEach(async () => {
-    ;({ systemDebtEngine, mockedBookKeeper } = await waffle.loadFixture(loadFixtureHandler))
+    ;({ systemDebtEngine, mockedBookKeeper, mockedIbTokenAdapter } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
 
@@ -208,30 +211,13 @@ describe("SystemDebtEngine", () => {
     })
   })
 
-  describe("#pushToBadDebtQueue", () => {
-    context("when role can't access", () => {
-      it("should revert", async () => {
-        await systemDebtEngine.grantRole(await systemDebtEngine.LIQUIDATION_ENGINE_ROLE(), deployerAddress)
-        await expect(systemDebtEngineAsAlice.pushToBadDebtQueue(UnitHelpers.WeiPerWad)).to.be.revertedWith(
-          "!liquidationEngineRole"
-        )
-      })
-    })
-
-    context("when role can access", () => {
-      it("should be success", async () => {
-        await systemDebtEngine.grantRole(await systemDebtEngine.LIQUIDATION_ENGINE_ROLE(), deployerAddress)
-        await systemDebtEngine.pushToBadDebtQueue(UnitHelpers.WeiPerWad)
-      })
-    })
-  })
-
   describe("#withdrawCollateralSurplus", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
         await expect(
           systemDebtEngineAsAlice.withdrawCollateralSurplus(
             formatBytes32String("BNB"),
+            mockedIbTokenAdapter.address,
             deployerAddress,
             UnitHelpers.WeiPerWad
           )
@@ -245,6 +231,7 @@ describe("SystemDebtEngine", () => {
 
         await systemDebtEngine.withdrawCollateralSurplus(
           formatBytes32String("BNB"),
+          mockedIbTokenAdapter.address,
           deployerAddress,
           UnitHelpers.WeiPerWad
         )
@@ -254,7 +241,16 @@ describe("SystemDebtEngine", () => {
         expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
         expect(moveCollateral[0].src).to.be.equal(systemDebtEngine.address)
         expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-        expect(moveCollateral[0].wad).to.be.equal(UnitHelpers.WeiPerWad)
+        expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerWad)
+
+        const { calls: onMoveCollateral } = mockedIbTokenAdapter.smocked.onMoveCollateral
+        expect(onMoveCollateral.length).to.be.equal(1)
+        expect(onMoveCollateral[0].source).to.be.equal(systemDebtEngine.address)
+        expect(onMoveCollateral[0].destination).to.be.equal(deployerAddress)
+        expect(onMoveCollateral[0].share).to.be.equal(UnitHelpers.WeiPerWad)
+        expect(onMoveCollateral[0].data).to.be.equal(
+          ethers.utils.defaultAbiCoder.encode(["address"], [deployerAddress])
+        )
       })
     })
   })
@@ -278,7 +274,7 @@ describe("SystemDebtEngine", () => {
         expect(moveStablecoin.length).to.be.equal(1)
         expect(moveStablecoin[0].src).to.be.equal(systemDebtEngine.address)
         expect(moveStablecoin[0].dst).to.be.equal(deployerAddress)
-        expect(moveStablecoin[0].rad).to.be.equal(UnitHelpers.WeiPerRad)
+        expect(moveStablecoin[0].value).to.be.equal(UnitHelpers.WeiPerRad)
       })
     })
   })

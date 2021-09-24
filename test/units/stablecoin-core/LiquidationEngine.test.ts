@@ -191,7 +191,7 @@ describe("LiquidationEngine", () => {
         expect(moveStablecoin.length).to.be.equal(1)
         expect(moveStablecoin[0].src).to.be.equal(deployerAddress)
         expect(moveStablecoin[0].dst).to.be.equal(mockedSystemDebtEngine.address)
-        expect(moveStablecoin[0].rad).to.be.equal(UnitHelpers.WeiPerRad.mul(2))
+        expect(moveStablecoin[0].value).to.be.equal(UnitHelpers.WeiPerRad.mul(2))
 
         const { calls: execute } = mockedFixedSpreadLiquidationStrategy.smocked.execute
         expect(execute.length).to.be.equal(1)
