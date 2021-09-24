@@ -61,7 +61,7 @@ contract SystemDebtEngine is
     bookKeeper = IBookKeeper(_bookKeeper);
     live = 1;
 
-    // Grant the contract deployer the default admin role: it will be able
+    // Grant the contract deployer the owner role: it will be able
     // to grant and revoke any roles
     _setupRole(OWNER_ROLE, msg.sender);
   }
@@ -80,24 +80,23 @@ contract SystemDebtEngine is
   }
 
   // --- withdraw surplus ---
+  /// @param amount The amount of collateral. [wad]
   function withdrawCollateralSurplus(
     bytes32 collateralPoolId,
     IGenericTokenAdapter adapter,
     address to,
-    uint256 wad
+    uint256 amount // [wad]
   ) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    bookKeeper.moveCollateral(collateralPoolId, address(this), to, wad);
-    adapter.onMoveCollateral(address(this), to, wad, abi.encode(to));
+    bookKeeper.moveCollateral(collateralPoolId, address(this), to, amount);
+    adapter.onMoveCollateral(address(this), to, amount, abi.encode(to));
   }
 
-  function withdrawStablecoinSurplus(address to, uint256 rad) external {
+  /// @param value The value of collateral. [rad]
+  function withdrawStablecoinSurplus(address to, uint256 value) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(
-      sub(bookKeeper.stablecoin(address(this)), rad) >= surplusBuffer,
-      "SystemDebtEngine/insufficient-surplus-buffer"
-    );
-    bookKeeper.moveStablecoin(address(this), to, rad);
+    require(sub(bookKeeper.stablecoin(address(this)), value) >= surplusBuffer, "SystemDebtEngine/insufficient-surplus");
+    bookKeeper.moveStablecoin(address(this), to, value);
   }
 
   // --- Administration ---
@@ -114,11 +113,11 @@ contract SystemDebtEngine is
       This function could be called by anyone to settle the system bad debt when there is available surplus.
       The stablecoin held by SystemDebtEngine (which is the surplus) will be deducted to compensate the incurred bad debt.
   */
-  /// @param rad The amount of bad debt to be settled. [rad]
-  function settleSystemBadDebt(uint256 rad) external whenNotPaused nonReentrant {
-    require(rad <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
-    require(rad <= bookKeeper.systemBadDebt(address(this)), "SystemDebtEngine/insufficient-debt");
-    bookKeeper.settleSystemBadDebt(rad);
+  /// @param value The value of bad debt to be settled. [rad]
+  function settleSystemBadDebt(uint256 value) external override whenNotPaused nonReentrant {
+    require(value <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
+    require(value <= bookKeeper.systemBadDebt(address(this)), "SystemDebtEngine/insufficient-debt");
+    bookKeeper.settleSystemBadDebt(value);
   }
 
   function cage() external override {
@@ -129,6 +128,17 @@ contract SystemDebtEngine is
     require(live == 1, "SystemDebtEngine/not-live");
     live = 0;
     bookKeeper.settleSystemBadDebt(min(bookKeeper.stablecoin(address(this)), bookKeeper.systemBadDebt(address(this))));
+    emit Cage();
+  }
+
+  function uncage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    require(live == 0, "SystemDebtEngine/not-caged");
+    live = 1;
+    emit Uncage();
   }
 
   // --- pause ---

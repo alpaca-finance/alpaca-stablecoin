@@ -53,9 +53,7 @@ contract LiquidationEngine is
   uint256 public live; // Active Flag
 
   // --- Events ---
-  event RemoveRepaidDebtFromAuction(bytes32 indexed collateralPoolId, uint256 rad);
   event SetStrategy(address indexed caller, bytes32 collateralPoolId, address strategy);
-  event Cage();
 
   // --- Init ---
   function initialize(address _bookKeeper, address _systemDebtEngine) external initializer {
@@ -68,7 +66,7 @@ contract LiquidationEngine is
 
     live = 1;
 
-    // Grant the contract deployer the default admin role: it will be able
+    // Grant the contract deployer the owner role: it will be able
     // to grant and revoke any roles
     _setupRole(OWNER_ROLE, msg.sender);
   }
@@ -102,7 +100,7 @@ contract LiquidationEngine is
   function liquidate(
     bytes32 collateralPoolId,
     address positionAddress,
-    uint256 debtShareToRepay,
+    uint256 debtShareToRepay, // [wad]
     bytes calldata data
   ) external nonReentrant whenNotPaused returns (uint256 id) {
     require(live == 1, "LiquidationEngine/not-live");
@@ -149,8 +147,19 @@ contract LiquidationEngine is
       hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
       "!(ownerRole or showStopperRole)"
     );
+    require(live == 1, "LiquidationEngine/not-live");
     live = 0;
     emit Cage();
+  }
+
+  function uncage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    require(live == 0, "LiquidationEngine/not-caged");
+    live = 1;
+    emit Uncage();
   }
 
   // --- pause ---

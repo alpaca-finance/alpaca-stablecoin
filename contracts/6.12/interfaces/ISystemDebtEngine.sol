@@ -1,5 +1,7 @@
 pragma solidity 0.6.12;
 
-interface ISystemDebtEngine {
-  function cage() external;
+import "../interfaces/ICagable.sol";
+
+interface ISystemDebtEngine is ICagable {
+  function settleSystemBadDebt(uint256 value) external; // [rad]
 }

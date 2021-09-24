@@ -2,11 +2,11 @@ pragma solidity 0.6.12;
 
 interface ILiquidationStrategy {
   function execute(
-    bytes32,
-    uint256,
-    uint256,
-    address,
-    uint256,
-    bytes calldata
+    bytes32 collateralPoolId,
+    uint256 positionDebtShare, // [wad]
+    uint256 positionLockedCollateral, // [wad]
+    address positionAddress,
+    uint256 debtShareToRepay, // [wad]
+    bytes calldata data
   ) external;
 }

@@ -99,7 +99,7 @@ describe("ShowStopper", () => {
       BigNumber.from(0),
     ])
     mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, BigNumber.from(0)])
-    mockedPriceFeed.smocked.read.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
+    mockedPriceFeed.smocked.readPrice.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
     mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
     await showStopper["cage(bytes32)"](formatBytes32String("BNB"))
   }
@@ -188,7 +188,7 @@ describe("ShowStopper", () => {
             BigNumber.from(0),
           ])
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, BigNumber.from(0)])
-          mockedPriceFeed.smocked.read.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
+          mockedPriceFeed.smocked.readPrice.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
 
           await expect(showStopper["cage(bytes32)"](formatBytes32String("BNB")))
@@ -228,7 +228,7 @@ describe("ShowStopper", () => {
             BigNumber.from(0),
           ])
           mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, BigNumber.from(0)])
-          mockedPriceFeed.smocked.read.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
+          mockedPriceFeed.smocked.readPrice.will.return.with(formatBytes32BigNumber(UnitHelpers.WeiPerWad))
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
 
           await showStopper["cage(bytes32)"](formatBytes32String("BNB"))

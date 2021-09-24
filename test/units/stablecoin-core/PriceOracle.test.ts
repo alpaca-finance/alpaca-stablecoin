@@ -1,16 +1,12 @@
 import { ethers, upgrades, waffle } from "hardhat"
 import { Signer, BigNumber } from "ethers"
 import chai from "chai"
-import { MockProvider, solidity } from "ethereum-waffle"
+import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
 import { PriceOracle, PriceOracle__factory } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 
-import * as TimeHelpers from "../../helper/time"
-import * as AssertHelpers from "../../helper/assert"
-import * as UnitHelpers from "../../helper/unit"
 import { formatBytes32BigNumber } from "../../helper/format"
-import { WeiPerRay } from "../../helper/unit"
 
 chai.use(solidity)
 const { expect } = chai
@@ -64,19 +60,19 @@ describe("PriceOracle", () => {
     priceOracleAsAlice = PriceOracle__factory.connect(priceOracle.address, alice) as PriceOracle
   })
 
-  describe("#poke()", () => {
+  describe("#setPrice()", () => {
     context("when price from price feed is 1", () => {
       context("and price with safety margin is 0", () => {
         it("should be success", async () => {
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(One), false])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(One), false])
           await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
 
           mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
-          await expect(priceOracle.poke(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "Poke")
+          await expect(priceOracle.setPrice(formatBytes32String("BNB")))
+            .to.emit(priceOracle, "SetPrice")
             .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(One), 0)
 
-          const { calls: peek } = mockedPriceFeed.smocked.peek
+          const { calls: peek } = mockedPriceFeed.smocked.peekPrice
           const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
           expect(peek.length).to.be.equal(1)
 
@@ -88,7 +84,7 @@ describe("PriceOracle", () => {
 
       context("and price with safety margin is 10^43", () => {
         it("should be success", async () => {
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(One), true])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(One), true])
           await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
 
           await priceOracle.setLiquidationRatio(formatBytes32String("BNB"), 10 ** 10)
@@ -96,11 +92,11 @@ describe("PriceOracle", () => {
           await priceOracle.setStableCoinReferencePrice(10 ** 10)
 
           mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
-          await expect(priceOracle.poke(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "Poke")
+          await expect(priceOracle.setPrice(formatBytes32String("BNB")))
+            .to.emit(priceOracle, "SetPrice")
             .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(One), BigNumber.from("10").pow("43"))
 
-          const { calls: peek } = mockedPriceFeed.smocked.peek
+          const { calls: peek } = mockedPriceFeed.smocked.peekPrice
           const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
           expect(peek.length).to.be.equal(1)
 
@@ -112,7 +108,7 @@ describe("PriceOracle", () => {
 
       context("and price with safety margin is 9.31322574615478515625 * 10^53", () => {
         it("should be success", async () => {
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(One), true])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(One), true])
           await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
 
           await priceOracle.setLiquidationRatio(formatBytes32String("BNB"), 4 ** 10)
@@ -120,15 +116,15 @@ describe("PriceOracle", () => {
           await priceOracle.setStableCoinReferencePrice(2 ** 10)
 
           mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
-          await expect(priceOracle.poke(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "Poke")
+          await expect(priceOracle.setPrice(formatBytes32String("BNB")))
+            .to.emit(priceOracle, "SetPrice")
             .withArgs(
               formatBytes32String("BNB"),
               formatBytes32BigNumber(One),
               BigNumber.from("931322574615478515625").mul(BigNumber.from("10").pow("33"))
             )
 
-          const { calls: peek } = mockedPriceFeed.smocked.peek
+          const { calls: peek } = mockedPriceFeed.smocked.peekPrice
           const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
           expect(peek.length).to.be.equal(1)
 
@@ -144,15 +140,18 @@ describe("PriceOracle", () => {
     context("when price from price feed is 7 * 10^11", () => {
       context("and price with safety margin is 0", () => {
         it("should be success", async () => {
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(BigNumber.from("700000000000")), false])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([
+            formatBytes32BigNumber(BigNumber.from("700000000000")),
+            false,
+          ])
           await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
 
           mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
-          await expect(priceOracle.poke(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "Poke")
+          await expect(priceOracle.setPrice(formatBytes32String("BNB")))
+            .to.emit(priceOracle, "SetPrice")
             .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(BigNumber.from("700000000000")), 0)
 
-          const { calls: peek } = mockedPriceFeed.smocked.peek
+          const { calls: peek } = mockedPriceFeed.smocked.peekPrice
           const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
           expect(peek.length).to.be.equal(1)
 
@@ -164,7 +163,10 @@ describe("PriceOracle", () => {
 
       context("and price with safety margin is 7 * 10^54", () => {
         it("should be success", async () => {
-          mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(BigNumber.from("700000000000")), true])
+          mockedPriceFeed.smocked.peekPrice.will.return.with([
+            formatBytes32BigNumber(BigNumber.from("700000000000")),
+            true,
+          ])
           await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
 
           await priceOracle.setLiquidationRatio(formatBytes32String("BNB"), 10 ** 10)
@@ -172,15 +174,15 @@ describe("PriceOracle", () => {
           await priceOracle.setStableCoinReferencePrice(10 ** 10)
 
           mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
-          await expect(priceOracle.poke(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "Poke")
+          await expect(priceOracle.setPrice(formatBytes32String("BNB")))
+            .to.emit(priceOracle, "SetPrice")
             .withArgs(
               formatBytes32String("BNB"),
               formatBytes32BigNumber(BigNumber.from("700000000000")),
               BigNumber.from("7").mul(BigNumber.from("10").pow("54"))
             )
 
-          const { calls: peek } = mockedPriceFeed.smocked.peek
+          const { calls: peek } = mockedPriceFeed.smocked.peekPrice
           const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
           expect(peek.length).to.be.equal(1)
 
@@ -306,11 +308,11 @@ describe("PriceOracle", () => {
         await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), deployerAddress)
         await priceOracle.pause()
 
-        mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(One), false])
+        mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(One), false])
         await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
 
         mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
-        await expect(priceOracle.poke(formatBytes32String("BNB"))).to.be.revertedWith("Pausable: paused")
+        await expect(priceOracle.setPrice(formatBytes32String("BNB"))).to.be.revertedWith("Pausable: paused")
       })
     })
   })
@@ -350,15 +352,15 @@ describe("PriceOracle", () => {
         // unpause contract
         await priceOracle.unpause()
 
-        mockedPriceFeed.smocked.peek.will.return.with([formatBytes32BigNumber(One), false])
+        mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(One), false])
         await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
 
         mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
-        await expect(priceOracle.poke(formatBytes32String("BNB")))
-          .to.emit(priceOracle, "Poke")
+        await expect(priceOracle.setPrice(formatBytes32String("BNB")))
+          .to.emit(priceOracle, "SetPrice")
           .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(One), 0)
 
-        const { calls: peek } = mockedPriceFeed.smocked.peek
+        const { calls: peek } = mockedPriceFeed.smocked.peekPrice
         const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
         expect(peek.length).to.be.equal(1)
 
