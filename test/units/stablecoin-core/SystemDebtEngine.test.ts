@@ -89,33 +89,82 @@ describe("SystemDebtEngine", () => {
     })
   })
 
-  describe("#cage", () => {
-    context("when the caller is not the owner", () => {
-      it("should be revert", async () => {
-        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), deployerAddress)
+  describe("#cage()", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
         await expect(systemDebtEngineAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
-    context("when parameters are valid", () => {
-      it("should be able to call cage", async () => {
-        await systemDebtEngine.grantRole(await systemDebtEngine.OWNER_ROLE(), deployerAddress)
 
-        const liveBefore = await systemDebtEngine.live()
-        expect(liveBefore).to.be.equal(1)
+    context("when role can access", () => {
+      context("caller is owner role ", () => {
+        it("should be set live to 0", async () => {
+          // grant role access
+          await systemDebtEngine.grantRole(await systemDebtEngine.OWNER_ROLE(), aliceAddress)
 
-        await systemDebtEngine.cage()
+          expect(await systemDebtEngineAsAlice.live()).to.be.equal(1)
 
-        const liveAfter = await systemDebtEngine.live()
-        expect(liveAfter).to.be.equal(0)
+          await expect(systemDebtEngineAsAlice.cage()).to.emit(systemDebtEngineAsAlice, "Cage").withArgs()
+
+          expect(await systemDebtEngineAsAlice.live()).to.be.equal(0)
+        })
+      })
+
+      context("caller is showStopper role", () => {
+        it("should be set live to 0", async () => {
+          // grant role access
+          await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), aliceAddress)
+
+          expect(await systemDebtEngineAsAlice.live()).to.be.equal(1)
+
+          await expect(systemDebtEngineAsAlice.cage()).to.emit(systemDebtEngineAsAlice, "Cage").withArgs()
+
+          expect(await systemDebtEngineAsAlice.live()).to.be.equal(0)
+        })
       })
     })
-    context("when SystemDebtEngine doesn't live", () => {
-      it("shoud be revert", async () => {
-        await systemDebtEngine.grantRole(await systemDebtEngine.OWNER_ROLE(), deployerAddress)
+  })
 
-        await systemDebtEngine.cage()
+  describe("#uncage()", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(systemDebtEngineAsAlice.uncage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
+      })
+    })
 
-        await expect(systemDebtEngine.cage()).to.be.revertedWith("SystemDebtEngine/not-live")
+    context("when role can access", () => {
+      context("caller is owner role ", () => {
+        it("should be set live to 1", async () => {
+          // grant role access
+          await systemDebtEngine.grantRole(await systemDebtEngine.OWNER_ROLE(), aliceAddress)
+
+          expect(await systemDebtEngineAsAlice.live()).to.be.equal(1)
+
+          await systemDebtEngineAsAlice.cage()
+
+          expect(await systemDebtEngineAsAlice.live()).to.be.equal(0)
+
+          await expect(systemDebtEngineAsAlice.uncage()).to.emit(systemDebtEngineAsAlice, "Uncage").withArgs()
+
+          expect(await systemDebtEngineAsAlice.live()).to.be.equal(1)
+        })
+      })
+
+      context("caller is showStopper role", () => {
+        it("should be set live to 1", async () => {
+          // grant role access
+          await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), aliceAddress)
+
+          expect(await systemDebtEngineAsAlice.live()).to.be.equal(1)
+
+          await systemDebtEngineAsAlice.cage()
+
+          expect(await systemDebtEngineAsAlice.live()).to.be.equal(0)
+
+          await expect(systemDebtEngineAsAlice.uncage()).to.emit(systemDebtEngineAsAlice, "Uncage").withArgs()
+
+          expect(await systemDebtEngineAsAlice.live()).to.be.equal(1)
+        })
       })
     })
   })

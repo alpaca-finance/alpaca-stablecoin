@@ -157,13 +157,81 @@ describe("TokenAdapter", () => {
   })
 
   describe("#cage()", () => {
-    context("when setting token adapter is inactive ", () => {
-      it("should be set live to 0", async () => {
-        expect(await tokenAdapter.live()).to.be.equal(1)
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(tokenAdapterAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
+      })
+    })
 
-        await tokenAdapter.cage()
+    context("when role can access", () => {
+      context("caller is owner role ", () => {
+        it("should be set live to 0", async () => {
+          // grant role access
+          await tokenAdapter.grantRole(await tokenAdapter.OWNER_ROLE(), aliceAddress)
 
-        expect(await tokenAdapter.live()).to.be.equal(0)
+          expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
+
+          await expect(tokenAdapterAsAlice.cage()).to.emit(tokenAdapterAsAlice, "Cage").withArgs()
+
+          expect(await tokenAdapterAsAlice.live()).to.be.equal(0)
+        })
+      })
+
+      context("caller is showStopper role", () => {
+        it("should be set live to 0", async () => {
+          // grant role access
+          await tokenAdapter.grantRole(await tokenAdapter.SHOW_STOPPER_ROLE(), aliceAddress)
+
+          expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
+
+          await expect(tokenAdapterAsAlice.cage()).to.emit(tokenAdapterAsAlice, "Cage").withArgs()
+
+          expect(await tokenAdapterAsAlice.live()).to.be.equal(0)
+        })
+      })
+    })
+  })
+
+  describe("#uncage()", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(tokenAdapterAsAlice.uncage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
+      })
+    })
+
+    context("when role can access", () => {
+      context("caller is owner role ", () => {
+        it("should be set live to 1", async () => {
+          // grant role access
+          await tokenAdapter.grantRole(await tokenAdapter.OWNER_ROLE(), aliceAddress)
+
+          expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
+
+          await tokenAdapterAsAlice.cage()
+
+          expect(await tokenAdapterAsAlice.live()).to.be.equal(0)
+
+          await expect(tokenAdapterAsAlice.uncage()).to.emit(tokenAdapterAsAlice, "Uncage").withArgs()
+
+          expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
+        })
+      })
+
+      context("caller is showStopper role", () => {
+        it("should be set live to 1", async () => {
+          // grant role access
+          await tokenAdapter.grantRole(await tokenAdapter.SHOW_STOPPER_ROLE(), aliceAddress)
+
+          expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
+
+          await tokenAdapterAsAlice.cage()
+
+          expect(await tokenAdapterAsAlice.live()).to.be.equal(0)
+
+          await expect(tokenAdapterAsAlice.uncage()).to.emit(tokenAdapterAsAlice, "Uncage").withArgs()
+
+          expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
+        })
       })
     })
   })

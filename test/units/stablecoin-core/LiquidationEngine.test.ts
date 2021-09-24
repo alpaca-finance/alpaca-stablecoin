@@ -207,24 +207,82 @@ describe("LiquidationEngine", () => {
     })
   })
 
-  describe("#cage", () => {
-    context("when the caller is not the owner", () => {
-      it("should be revert", async () => {
-        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), deployerAddress)
+  describe("#cage()", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
         await expect(liquidationEngineAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
-    context("when parameters are valid", () => {
-      it("should be able to call cage", async () => {
-        await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), deployerAddress)
 
-        const liveBefore = await liquidationEngine.live()
-        expect(liveBefore).to.be.equal(1)
+    context("when role can access", () => {
+      context("caller is owner role ", () => {
+        it("should be set live to 0", async () => {
+          // grant role access
+          await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), aliceAddress)
 
-        await liquidationEngine.cage()
+          expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
 
-        const liveAfter = await liquidationEngine.live()
-        expect(liveAfter).to.be.equal(0)
+          await expect(liquidationEngineAsAlice.cage()).to.emit(liquidationEngineAsAlice, "Cage").withArgs()
+
+          expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
+        })
+      })
+
+      context("caller is showStopper role", () => {
+        it("should be set live to 0", async () => {
+          // grant role access
+          await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), aliceAddress)
+
+          expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
+
+          await expect(liquidationEngineAsAlice.cage()).to.emit(liquidationEngineAsAlice, "Cage").withArgs()
+
+          expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
+        })
+      })
+    })
+  })
+
+  describe("#uncage()", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(liquidationEngineAsAlice.uncage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
+      })
+    })
+
+    context("when role can access", () => {
+      context("caller is owner role ", () => {
+        it("should be set live to 1", async () => {
+          // grant role access
+          await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), aliceAddress)
+
+          expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
+
+          await liquidationEngineAsAlice.cage()
+
+          expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
+
+          await expect(liquidationEngineAsAlice.uncage()).to.emit(liquidationEngineAsAlice, "Uncage").withArgs()
+
+          expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
+        })
+      })
+
+      context("caller is showStopper role", () => {
+        it("should be set live to 1", async () => {
+          // grant role access
+          await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), aliceAddress)
+
+          expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
+
+          await liquidationEngineAsAlice.cage()
+
+          expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
+
+          await expect(liquidationEngineAsAlice.uncage()).to.emit(liquidationEngineAsAlice, "Uncage").withArgs()
+
+          expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
+        })
       })
     })
   })
