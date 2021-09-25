@@ -64,6 +64,7 @@ contract FixedSpreadLiquidationStrategy is
     uint256 liquidatorIncentiveFees,
     uint256 treasuryFees,
     address indexed positionAddress,
+    address indexed liquidatorAddress,
     address collateralRecipient
   );
   event SetCollateralPool(
@@ -276,6 +277,7 @@ contract FixedSpreadLiquidationStrategy is
     uint256 positionCollateralAmount, // Collateral             [wad]
     address positionAddress, // Address that will receive any leftover collateral
     uint256 debtShareToRepay, // [wad]
+    address liquidatorAddress,
     bytes calldata data // Data to pass in external call; if length 0, no call is done
   ) external override {
     require(hasRole(LIQUIDATION_ENGINE_ROLE, msg.sender), "!liquidationEngingRole");
@@ -369,6 +371,7 @@ contract FixedSpreadLiquidationStrategy is
       info.liquidatorIncentiveFees,
       info.treasuryFees,
       positionAddress,
+      liquidatorAddress,
       collateralRecipient
     );
   }

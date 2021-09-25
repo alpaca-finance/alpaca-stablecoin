@@ -373,6 +373,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
             UnitHelpers.WeiPerWad,
             aliceAddress,
             UnitHelpers.WeiPerWad,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
           )
         ).to.be.revertedWith("!liquidationEngingRole")
@@ -393,6 +394,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               UnitHelpers.WeiPerWad,
               aliceAddress,
               UnitHelpers.WeiPerWad,
+              deployerAddress,
               ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-debt")
@@ -413,6 +415,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               0,
               aliceAddress,
               UnitHelpers.WeiPerWad,
+              deployerAddress,
               ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-collateralAmount")
@@ -433,6 +436,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               UnitHelpers.WeiPerWad,
               AddressZero,
               UnitHelpers.WeiPerWad,
+              deployerAddress,
               ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-positionAddress")
@@ -462,6 +466,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               UnitHelpers.WeiPerWad,
               aliceAddress,
               UnitHelpers.WeiPerWad,
+              deployerAddress,
               ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/close-factor-exceeded")
@@ -500,6 +505,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               UnitHelpers.WeiPerRad.mul(5),
               aliceAddress,
               UnitHelpers.WeiPerRad,
+              deployerAddress,
               ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/close-factor-exceeded")
@@ -537,6 +543,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               UnitHelpers.WeiPerWad,
               aliceAddress,
               UnitHelpers.WeiPerWad,
+              deployerAddress,
               ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-price")
@@ -569,6 +576,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               UnitHelpers.WeiPerWad,
               aliceAddress,
               UnitHelpers.WeiPerWad,
+              deployerAddress,
               ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-starting-price")
@@ -605,6 +613,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
             UnitHelpers.WeiPerWad,
             aliceAddress,
             UnitHelpers.WeiPerWad,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
           )
         ).to.be.revertedWith("FixedSpreadLiquidationStrategy/liquidate-too-much")
@@ -646,6 +655,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
                 UnitHelpers.WeiPerWad.mul(7),
                 aliceAddress,
                 UnitHelpers.WeiPerWad,
+                deployerAddress,
                 ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
               )
             )
@@ -657,6 +667,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
                 UnitHelpers.WeiPerWad.mul(5).div(10),
                 UnitHelpers.WeiPerWad.mul(5).div(10),
                 aliceAddress,
+                deployerAddress,
                 deployerAddress
               )
 
@@ -734,6 +745,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
                 UnitHelpers.WeiPerWad.mul(98765),
                 aliceAddress,
                 UnitHelpers.WeiPerWad.div(4),
+                deployerAddress,
                 ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
               )
             )
@@ -745,6 +757,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
                 UnitHelpers.WeiPerWad.mul(4629375).div(100000),
                 UnitHelpers.WeiPerWad.mul(10801875).div(100000),
                 aliceAddress,
+                deployerAddress,
                 deployerAddress
               )
 
@@ -826,6 +839,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
             UnitHelpers.WeiPerWad.mul(8),
             aliceAddress,
             UnitHelpers.WeiPerWad.mul(37).div(100),
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(
               ["address", "bytes"],
               [mockedFlashLendingCallee.address, ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])]
@@ -840,6 +854,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
             UnitHelpers.WeiPerWad.mul(111).div(1000000),
             UnitHelpers.WeiPerWad.mul(1887).div(1000000),
             aliceAddress,
+            deployerAddress,
             mockedFlashLendingCallee.address
           )
 
