@@ -9,11 +9,14 @@ import "./PositionHandler.sol";
 import "../interfaces/IManager.sol";
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IGenericTokenAdapter.sol";
+import "../interfaces/IShowStopper.sol";
 
 /// @title PositionManager is a contract for manging positions
 contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IManager {
   /// @dev Address of a BookKeeper
   address public override bookKeeper;
+
+  address public showStopper;
 
   /// @dev The lastest id that has been used
   uint256 public lastPositionId;
@@ -81,12 +84,13 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
 
   /// @dev Initializer for intializing PositionManager
   /// @param _bookKeeper The address of the Book Keeper
-  function initialize(address _bookKeeper) external initializer {
+  function initialize(address _bookKeeper, address _showStopper) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
     bookKeeper = _bookKeeper;
+    showStopper = _showStopper;
   }
 
   function _safeAdd(uint256 x, uint256 y) internal pure returns (uint256 z) {
@@ -342,5 +346,23 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
       _safeToInt(debtShare)
     );
     emit MovePosition(sourceId, destinationId, lockedCollateral, debtShare);
+  }
+
+  /// @dev Redeem locked collateral from a position when emergency shutdown is activated
+  /// @param posId The position id to be adjusted
+  /// @param adapter The adapter to be called once the position is adjusted
+  /// @param data The extra data for adapter
+  function redeemLockedCollateral(
+    uint256 posId,
+    address adapter,
+    bytes calldata data
+  ) public onlyOwnerAllowed(posId) {
+    address positionAddress = positions[posId];
+    IShowStopper(showStopper).redeemLockedCollateral(
+      collateralPools[posId],
+      IGenericTokenAdapter(adapter),
+      positionAddress,
+      data
+    );
   }
 }
