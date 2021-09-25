@@ -350,7 +350,10 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
     bytes calldata data
   ) external {
     require(live == 0, "ShowStopper/still-live");
-    require(positionAddress == msg.sender || bookKeeper.positionWhitelist(positionAddress, msg.sender) == 1);
+    require(
+      positionAddress == msg.sender || bookKeeper.positionWhitelist(positionAddress, msg.sender) == 1,
+      "ShowStopper/not-allowed"
+    );
     (uint256 lockedCollateralAmount, uint256 debtShare) = bookKeeper.positions(collateralPoolId, positionAddress);
     require(debtShare == 0, "ShowStopper/debtShare-not-zero");
     require(lockedCollateralAmount <= 2**255, "ShowStopper/overflow");
