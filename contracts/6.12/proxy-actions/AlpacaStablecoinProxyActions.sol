@@ -106,7 +106,7 @@ contract AlpacaStablecoinProxyActions {
     // Gets actual stablecoin amount in the usr
     uint256 stablecoinValue = IBookKeeper(bookKeeper).stablecoin(usr); // [rad]
 
-    uint256 requiredStablecoinValue = _safeSub(_safeMul(debtShare, rate), stablecoinValue);
+    uint256 requiredStablecoinValue = _safeSub(_safeMul(debtShare, rate), stablecoinValue); // [rad]
     requiredStablecoinAmount = requiredStablecoinValue / RAY;
 
     // If the value precision has some dust, it will need to request for 1 extra amount wei
