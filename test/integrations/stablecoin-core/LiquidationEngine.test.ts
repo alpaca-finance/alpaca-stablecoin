@@ -1,21 +1,53 @@
-import { ethers, upgrades } from "hardhat"
-import { Signer } from "ethers"
+import { ethers, upgrades, waffle } from "hardhat"
+import { Signer, BigNumber, Wallet } from "ethers"
 
 import {
   ProxyWalletRegistry__factory,
   ProxyWalletFactory__factory,
   ProxyWalletRegistry,
   ProxyWallet__factory,
+  BookKeeper__factory,
+  PositionManager,
+  BookKeeper,
+  BEP20__factory,
+  IbTokenAdapter__factory,
+  IbTokenAdapter,
+  AlpacaToken__factory,
+  FairLaunch__factory,
+  Shield__factory,
+  BEP20,
+  Shield,
+  AlpacaToken,
+  FairLaunch,
+  AlpacaStablecoinProxyActions__factory,
+  AlpacaStablecoinProxyActions,
+  StabilityFeeCollector__factory,
+  StabilityFeeCollector,
 } from "../../../typechain"
 import { expect } from "chai"
 import { AddressZero } from "../../helper/address"
 
-type proxyWalletFixture = {
+const { parseEther, formatBytes32String } = ethers.utils
+
+type fixture = {
   proxyWalletRegistry: ProxyWalletRegistry
+  ibTokenAdapter: IbTokenAdapter
+  bookKeeper: BookKeeper
+  ibDUMMY: BEP20
+  shield: Shield
+  alpacaToken: AlpacaToken
+  fairLaunch: FairLaunch
+  alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions
+  positionManager: PositionManager
+  stabilityFeeCollector: StabilityFeeCollector
 }
 
-const loadFixtureHandler = async (): Promise<proxyWalletFixture> => {
-  const [deployer] = await ethers.getSigners()
+const ALPACA_PER_BLOCK = ethers.utils.parseEther("100")
+const COLLATERAL_POOL_ID = formatBytes32String("ibDUMMY")
+
+const loadFixtureHandler = async (): Promise<fixture> => {
+  const [deployer, alice, bob, dev] = await ethers.getSigners()
+
   const ProxyWalletFactory = new ProxyWalletFactory__factory(deployer)
   const proxyWalletFactory = await ProxyWalletFactory.deploy()
 
@@ -24,10 +56,88 @@ const loadFixtureHandler = async (): Promise<proxyWalletFixture> => {
     proxyWalletFactory.address,
   ])) as ProxyWalletRegistry
 
-  return { proxyWalletRegistry }
+  // Deploy mocked BookKeeper
+  const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
+  await bookKeeper.deployed()
+
+  // Deploy mocked BEP20
+  const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
+  const ibDUMMY = await BEP20.deploy("ibDUMMY", "ibDUMMY")
+  await ibDUMMY.deployed()
+  await ibDUMMY.mint(await alice.getAddress(), ethers.utils.parseEther("100"))
+  await ibDUMMY.mint(await bob.getAddress(), ethers.utils.parseEther("100"))
+
+  // Deploy Alpaca's Fairlaunch
+  const AlpacaToken = (await ethers.getContractFactory("AlpacaToken", deployer)) as AlpacaToken__factory
+  const alpacaToken = await AlpacaToken.deploy(88, 89)
+  await alpacaToken.mint(await deployer.getAddress(), ethers.utils.parseEther("150"))
+  await alpacaToken.deployed()
+
+  const FairLaunch = (await ethers.getContractFactory("FairLaunch", deployer)) as FairLaunch__factory
+  const fairLaunch = await FairLaunch.deploy(alpacaToken.address, await dev.getAddress(), ALPACA_PER_BLOCK, 0, 0, 0)
+  await fairLaunch.deployed()
+
+  const Shield = (await ethers.getContractFactory("Shield", deployer)) as Shield__factory
+  const shield = await Shield.deploy(deployer.address, fairLaunch.address)
+  await shield.deployed()
+
+  // Config Alpaca's FairLaunch
+  // Assuming Deployer is timelock for easy testing
+  await fairLaunch.addPool(1, ibDUMMY.address, true)
+  await fairLaunch.transferOwnership(shield.address)
+  await shield.transferOwnership(await deployer.getAddress())
+  await alpacaToken.transferOwnership(fairLaunch.address)
+
+  const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
+  const ibTokenAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
+    bookKeeper.address,
+    COLLATERAL_POOL_ID,
+    ibDUMMY.address,
+    alpacaToken.address,
+    fairLaunch.address,
+    0,
+    shield.address,
+    await deployer.getAddress(),
+    BigNumber.from(1000),
+    await dev.getAddress(),
+  ])) as IbTokenAdapter
+  await ibTokenAdapter.deployed()
+
+  await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter.address)
+
+  const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
+  const alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
+
+  // Deploy PositionManager
+  const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
+  const positionManager = (await upgrades.deployProxy(PositionManager, [mockedBookKeeper.address])) as PositionManager
+  await positionManager.deployed()
+
+  // Deploy StabilityFeeCollector
+  const StabilityFeeCollector = (await ethers.getContractFactory(
+    "StabilityFeeCollector",
+    deployer
+  )) as StabilityFeeCollector__factory
+  const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
+    bookKeeper.address,
+  ])) as StabilityFeeCollector
+
+  return {
+    proxyWalletRegistry,
+    ibTokenAdapter,
+    bookKeeper,
+    ibDUMMY,
+    shield,
+    alpacaToken,
+    fairLaunch,
+    alpacaStablecoinProxyActions,
+    positionManager,
+    stabilityFeeCollector,
+  }
 }
 
-describe("ProxyWallet", () => {
+describe("LiquidationEngine", () => {
   // Accounts
   let deployer: Signer
   let alice: Signer
@@ -40,14 +150,38 @@ describe("ProxyWallet", () => {
   let bobAddress: string
   let devAddress: string
 
-  // Contract
+  // Contracts
   let proxyWalletRegistry: ProxyWalletRegistry
 
   let proxyWalletRegistryAsAlice: ProxyWalletRegistry
   let proxyWalletRegistryAsBob: ProxyWalletRegistry
 
+  let proxyWalletAliceAddress: string
+  let proxyWalletBobAddress: string
+
+  let ibTokenAdapter: IbTokenAdapter
+  let bookKeeper: BookKeeper
+  let ibDUMMY: BEP20
+  let shield: Shield
+  let alpacaToken: AlpacaToken
+  let fairLaunch: FairLaunch
+
+  let positionManager: PositionManager
+
+  let stabilityFeeCollector: StabilityFeeCollector
+
+  // Signer
+  let ibTokenAdapterAsAlice: IbTokenAdapter
+  let ibTokenAdapterAsBob: IbTokenAdapter
+
+  let ibDUMMYasAlice: BEP20
+  let ibDUMMYasBob: BEP20
+
+  let alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions
+
   beforeEach(async () => {
-    ;({ proxyWalletRegistry } = await loadFixtureHandler())
+    ;({ proxyWalletRegistry, ibTokenAdapter, bookKeeper, ibDUMMY, shield, alpacaToken, fairLaunch } =
+      await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
       deployer.getAddress(),
@@ -57,17 +191,28 @@ describe("ProxyWallet", () => {
     ])
     proxyWalletRegistryAsAlice = ProxyWalletRegistry__factory.connect(proxyWalletRegistry.address, alice)
     proxyWalletRegistryAsBob = ProxyWalletRegistry__factory.connect(proxyWalletRegistry.address, bob)
+
+    await proxyWalletRegistryAsAlice["build()"]()
+    proxyWalletAliceAddress = await proxyWalletRegistry.proxies(aliceAddress)
+    await proxyWalletRegistryAsBob["build()"]()
+    proxyWalletBobAddress = await proxyWalletRegistry.proxies(bobAddress)
+
+    ibTokenAdapterAsAlice = IbTokenAdapter__factory.connect(ibTokenAdapter.address, alice)
+    ibTokenAdapterAsBob = IbTokenAdapter__factory.connect(ibTokenAdapter.address, bob)
+
+    ibDUMMYasAlice = BEP20__factory.connect(ibDUMMY.address, alice)
+    ibDUMMYasBob = BEP20__factory.connect(ibDUMMY.address, bob)
   })
-  describe("#new user create a new proxy wallet", async () => {
-    context("alice create a new proxy wallet", async () => {
-      it("alice should be able to create a proxy wallet", async () => {
-        expect(await proxyWalletRegistry.proxies(aliceAddress)).to.be.equal(AddressZero)
-        // #1 alice create a proxy wallet
-        await proxyWalletRegistryAsAlice["build()"]()
-        const proxyWalletAliceAddress = await proxyWalletRegistry.proxies(aliceAddress)
-        expect(proxyWalletAliceAddress).to.be.not.equal(AddressZero)
-        const proxyWalletAsAlice = await ProxyWallet__factory.connect(proxyWalletAliceAddress, alice)
-        expect(await proxyWalletAsAlice.owner()).to.be.equal(aliceAddress)
+  describe("#liquidate", async () => {
+    context("price drop but does not make the position underwater", async () => {
+      it("should revert", async () => {
+        const vaultAddress = await ibTokenAdapter.collateralToken()
+        alpacaStablecoinProxyActions.interface.encodeFunctionData("convertOpenLockTokenAndDraw", [
+          vaultAddress,
+          positionManager.address,
+          stabilityFeeCollector.address,
+          ibTokenAdapter.address,
+        ])
       })
     })
   })
