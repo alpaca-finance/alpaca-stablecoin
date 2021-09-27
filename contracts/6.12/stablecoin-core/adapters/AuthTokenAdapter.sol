@@ -28,6 +28,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
 import "../../interfaces/IAuthTokenAdapter.sol";
+import "../../interfaces/ICagable.sol";
 
 // Authed TokenAdapter for a token that has a lower precision than 18 and it has decimals (like USDC)
 
@@ -36,7 +37,8 @@ contract AuthTokenAdapter is
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
-  IAuthTokenAdapter
+  IAuthTokenAdapter,
+  ICagable
 {
   // --- Auth ---
   mapping(address => uint256) public wards;

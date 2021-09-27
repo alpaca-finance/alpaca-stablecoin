@@ -25,6 +25,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/ISystemDebtEngine.sol";
 import "../interfaces/IGenericTokenAdapter.sol";
+import "../interfaces/ICagable.sol";
 
 /// @title SystemDebtEngine
 /// @author Alpaca Fin Corporation
@@ -38,7 +39,8 @@ contract SystemDebtEngine is
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
-  ISystemDebtEngine
+  ISystemDebtEngine,
+  ICagable
 {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");

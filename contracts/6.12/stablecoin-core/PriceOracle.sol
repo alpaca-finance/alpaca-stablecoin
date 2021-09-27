@@ -23,6 +23,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IPriceOracle.sol";
+import "../interfaces/ICagable.sol";
 
 /// @title PriceOracle
 /// @author Alpaca Fin Corporation
@@ -30,7 +31,7 @@ import "../interfaces/IPriceOracle.sol";
     The price oracle is important in reflecting the current state of the market price.
 */
 
-contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOracle {
+contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOracle, ICagable {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");

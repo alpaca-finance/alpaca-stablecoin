@@ -1,9 +1,8 @@
 pragma solidity 0.6.12;
 
 import "./IPriceFeed.sol";
-import "../interfaces/ICagable.sol";
 
-interface IPriceOracle is ICagable {
+interface IPriceOracle {
   function collateralPools(bytes32)
     external
     view

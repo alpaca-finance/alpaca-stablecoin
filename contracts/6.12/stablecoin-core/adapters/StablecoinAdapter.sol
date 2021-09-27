@@ -27,6 +27,7 @@ import "../../interfaces/IStablecoin.sol";
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
 import "../../interfaces/IStablecoinAdapter.sol";
+import "../../interfaces/ICagable.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
@@ -59,7 +60,8 @@ contract StablecoinAdapter is
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
-  IStablecoinAdapter
+  IStablecoinAdapter,
+  ICagable
 {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");

@@ -28,6 +28,7 @@ import "../interfaces/IAuctioneer.sol";
 import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/ISystemDebtEngine.sol";
 import "../interfaces/ILiquidationStrategy.sol";
+import "../interfaces/ICagable.sol";
 
 /// @title LiquidationEngine
 /// @author Alpaca Fin Corporation
@@ -39,7 +40,8 @@ contract LiquidationEngine is
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
-  ILiquidationEngine
+  ILiquidationEngine,
+  ICagable
 {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");

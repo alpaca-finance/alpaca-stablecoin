@@ -22,6 +22,7 @@ import "../../../interfaces/IBookKeeper.sol";
 import "../../../interfaces/IFarmableTokenAdapter.sol";
 import "../../../interfaces/ITimeLock.sol";
 import "../../../interfaces/IShield.sol";
+import "../../../interfaces/ICagable.sol";
 import "../../../utils/SafeToken.sol";
 
 /// @title IbTokenAdapter is the adapter that inherited BaseFarmableTokenAdapter.
@@ -31,7 +32,8 @@ contract IbTokenAdapter is
   IFarmableTokenAdapter,
   PausableUpgradeable,
   AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  ICagable
 {
   using SafeToken for address;
 
