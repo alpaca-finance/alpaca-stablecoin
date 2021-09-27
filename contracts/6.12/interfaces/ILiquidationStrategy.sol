@@ -7,6 +7,7 @@ interface ILiquidationStrategy {
     uint256 positionLockedCollateral, // [wad]
     address positionAddress,
     uint256 debtShareToRepay, // [wad]
+    address liquidatorAddress,
     bytes calldata data
   ) external;
 }
