@@ -274,7 +274,7 @@ contract AlpacaStablecoinProxyActions {
     address manager,
     uint256 positionId,
     int256 collateralValue,
-    int256 debtShare,
+    int256 debtShare, // [wad]
     address adapter,
     bytes calldata data
   ) public {
