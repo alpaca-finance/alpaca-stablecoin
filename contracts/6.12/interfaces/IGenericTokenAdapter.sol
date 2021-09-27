@@ -3,8 +3,6 @@ pragma solidity 0.6.12;
 import "../interfaces/IToken.sol";
 
 interface IGenericTokenAdapter {
-  function cage() external;
-
   function decimals() external returns (uint256);
 
   function deposit(
