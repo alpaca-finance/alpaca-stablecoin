@@ -8,6 +8,7 @@ import {
   ProxyWallet__factory,
   BookKeeper__factory,
   PositionManager,
+  PositionManager__factory,
   BookKeeper,
   BEP20__factory,
   IbTokenAdapter__factory,
@@ -23,15 +24,23 @@ import {
   AlpacaStablecoinProxyActions,
   StabilityFeeCollector__factory,
   StabilityFeeCollector,
+  StablecoinAdapter__factory,
+  StablecoinAdapter,
+  AlpacaStablecoin__factory,
+  AlpacaStablecoin,
+  ProxyWallet,
 } from "../../../typechain"
 import { expect } from "chai"
 import { AddressZero } from "../../helper/address"
+import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
+import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
 
 const { parseEther, formatBytes32String } = ethers.utils
 
 type fixture = {
   proxyWalletRegistry: ProxyWalletRegistry
   ibTokenAdapter: IbTokenAdapter
+  stablecoinAdapter: StablecoinAdapter
   bookKeeper: BookKeeper
   ibDUMMY: BEP20
   shield: Shield
@@ -60,6 +69,13 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
   const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
   await bookKeeper.deployed()
+
+  await bookKeeper.init(COLLATERAL_POOL_ID)
+  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(1000))
+  await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID, WeiPerRad.mul(1000))
+
+  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
+  await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
 
   // Deploy mocked BEP20
   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
@@ -106,13 +122,31 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter.address)
 
+  // Deploy Alpaca Stablecoin
+  const AlpacaStablecoin = (await ethers.getContractFactory("AlpacaStablecoin", deployer)) as AlpacaStablecoin__factory
+  const alpacaStablecoin = await AlpacaStablecoin.deploy("Alpaca USD", "AUSD", "31337")
+  await alpacaStablecoin.deployed()
+
+  const StablecoinAdapter = (await ethers.getContractFactory(
+    "StablecoinAdapter",
+    deployer
+  )) as StablecoinAdapter__factory
+  const stablecoinAdapter = (await upgrades.deployProxy(StablecoinAdapter, [
+    bookKeeper.address,
+    alpacaStablecoin.address,
+  ])) as StablecoinAdapter
+  await stablecoinAdapter.deployed()
+
+  await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), stablecoinAdapter.address)
+
   const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
   const alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
 
   // Deploy PositionManager
   const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
-  const positionManager = (await upgrades.deployProxy(PositionManager, [mockedBookKeeper.address])) as PositionManager
+  const positionManager = (await upgrades.deployProxy(PositionManager, [bookKeeper.address])) as PositionManager
   await positionManager.deployed()
+  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
 
   // Deploy StabilityFeeCollector
   const StabilityFeeCollector = (await ethers.getContractFactory(
@@ -122,10 +156,13 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
   ])) as StabilityFeeCollector
+  await stabilityFeeCollector.init(COLLATERAL_POOL_ID)
+  await bookKeeper.grantRole(await bookKeeper.STABILITY_FEE_COLLECTOR_ROLE(), stabilityFeeCollector.address)
 
   return {
     proxyWalletRegistry,
     ibTokenAdapter,
+    stablecoinAdapter,
     bookKeeper,
     ibDUMMY,
     shield,
@@ -156,10 +193,11 @@ describe("LiquidationEngine", () => {
   let proxyWalletRegistryAsAlice: ProxyWalletRegistry
   let proxyWalletRegistryAsBob: ProxyWalletRegistry
 
-  let proxyWalletAliceAddress: string
-  let proxyWalletBobAddress: string
+  let deployerProxyWallet: ProxyWallet
+  let aliceProxyWallet: ProxyWallet
 
   let ibTokenAdapter: IbTokenAdapter
+  let stablecoinAdapter: StablecoinAdapter
   let bookKeeper: BookKeeper
   let ibDUMMY: BEP20
   let shield: Shield
@@ -179,9 +217,26 @@ describe("LiquidationEngine", () => {
 
   let alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions
 
+  before(async () => {
+    ;({
+      proxyWallets: [deployerProxyWallet, aliceProxyWallet],
+    } = await waffle.loadFixture(loadProxyWalletFixtureHandler))
+  })
+
   beforeEach(async () => {
-    ;({ proxyWalletRegistry, ibTokenAdapter, bookKeeper, ibDUMMY, shield, alpacaToken, fairLaunch } =
-      await waffle.loadFixture(loadFixtureHandler))
+    ;({
+      proxyWalletRegistry,
+      ibTokenAdapter,
+      stablecoinAdapter,
+      bookKeeper,
+      ibDUMMY,
+      shield,
+      alpacaToken,
+      fairLaunch,
+      alpacaStablecoinProxyActions,
+      positionManager,
+      stabilityFeeCollector,
+    } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
       deployer.getAddress(),
@@ -191,11 +246,6 @@ describe("LiquidationEngine", () => {
     ])
     proxyWalletRegistryAsAlice = ProxyWalletRegistry__factory.connect(proxyWalletRegistry.address, alice)
     proxyWalletRegistryAsBob = ProxyWalletRegistry__factory.connect(proxyWalletRegistry.address, bob)
-
-    await proxyWalletRegistryAsAlice["build()"]()
-    proxyWalletAliceAddress = await proxyWalletRegistry.proxies(aliceAddress)
-    await proxyWalletRegistryAsBob["build()"]()
-    proxyWalletBobAddress = await proxyWalletRegistry.proxies(bobAddress)
 
     ibTokenAdapterAsAlice = IbTokenAdapter__factory.connect(ibTokenAdapter.address, alice)
     ibTokenAdapterAsBob = IbTokenAdapter__factory.connect(ibTokenAdapter.address, bob)
@@ -207,12 +257,21 @@ describe("LiquidationEngine", () => {
     context("price drop but does not make the position underwater", async () => {
       it("should revert", async () => {
         const vaultAddress = await ibTokenAdapter.collateralToken()
-        alpacaStablecoinProxyActions.interface.encodeFunctionData("convertOpenLockTokenAndDraw", [
-          vaultAddress,
+        const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
           positionManager.address,
           stabilityFeeCollector.address,
           ibTokenAdapter.address,
+          stablecoinAdapter.address,
+          COLLATERAL_POOL_ID,
+          WeiPerWad,
+          WeiPerWad,
+          true,
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
         ])
+        const col = await bookKeeper.collateralPools(COLLATERAL_POOL_ID)
+        console.log("debtAccumulatedRate", col.debtAccumulatedRate.toString())
+        await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+        await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
       })
     })
   })
