@@ -340,12 +340,17 @@ contract FixedSpreadLiquidationStrategy is
       address(this),
       collateralRecipient,
       add(info.collateralAmountToLiquidate, info.liquidatorIncentiveFees),
-      abi.encode(0)
+      abi.encode(positionOwnerAddress)
     );
 
     // 6. Give the treasury fees to System Debt Engine to be stored as system surplus
     bookKeeper.moveCollateral(collateralPoolId, address(this), address(systemDebtEngine), info.treasuryFees);
-    collateralPool.adapter.onMoveCollateral(address(this), address(systemDebtEngine), info.treasuryFees, abi.encode(0));
+    collateralPool.adapter.onMoveCollateral(
+      address(this),
+      address(systemDebtEngine),
+      info.treasuryFees,
+      abi.encode(positionOwnerAddress)
+    );
 
     // 7. Do external call (if data is defined) but to be
     // extremely careful we don't allow to do it to the two
