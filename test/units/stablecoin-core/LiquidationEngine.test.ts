@@ -179,7 +179,7 @@ describe("LiquidationEngine", () => {
         )
 
         const { calls: positions } = mockedBookKeeper.smocked.positions
-        expect(positions.length).to.be.equal(1)
+        expect(positions.length).to.be.equal(2)
         expect(positions[0][0]).to.be.equal(formatBytes32String("BNB"))
         expect(positions[0][1]).to.be.equal(aliceAddress)
 
@@ -402,7 +402,7 @@ describe("LiquidationEngine", () => {
         )
 
         const { calls: positions } = mockedBookKeeper.smocked.positions
-        expect(positions.length).to.be.equal(1)
+        expect(positions.length).to.be.equal(2)
         expect(positions[0][0]).to.be.equal(formatBytes32String("BNB"))
         expect(positions[0][1]).to.be.equal(aliceAddress)
 
