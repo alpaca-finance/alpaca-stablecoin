@@ -104,7 +104,7 @@ contract LiquidationEngine is
     address positionAddress,
     uint256 debtShareToRepay, // [wad]
     bytes calldata data
-  ) external nonReentrant whenNotPaused returns (uint256 id) {
+  ) external nonReentrant whenNotPaused {
     require(live == 1, "LiquidationEngine/not-live");
     require(debtShareToRepay != 0, "LiquidationEngine/zero-debtShareToRepay");
 
@@ -114,20 +114,15 @@ contract LiquidationEngine is
     );
     address strategy = strategies[collateralPoolId];
     require(strategy != address(0), "LiquidationEngine/not-setStrategy");
-    uint256 debtAccumulatedRate;
-    uint256 debtFloor;
-    {
-      // 1. Check if the position is underwater
-      uint256 priceWithSafetyMargin;
-      (, debtAccumulatedRate, priceWithSafetyMargin, , debtFloor) = bookKeeper.collateralPools(collateralPoolId);
-      // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]
-      // (positionDebtShare [wad] * debtAccumulatedRate [ray]) [rad]
-      require(
-        priceWithSafetyMargin > 0 &&
-          mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate),
-        "LiquidationEngine/not-unsafe"
-      );
-    }
+    // 1. Check if the position is underwater
+    (, uint256 debtAccumulatedRate, uint256 priceWithSafetyMargin, , ) = bookKeeper.collateralPools(collateralPoolId);
+    // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]
+    // (positionDebtShare [wad] * debtAccumulatedRate [ray]) [rad]
+    require(
+      priceWithSafetyMargin > 0 &&
+        mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate),
+      "LiquidationEngine/not-unsafe"
+    );
 
     ILiquidationStrategy(strategy).execute(
       collateralPoolId,
@@ -139,10 +134,25 @@ contract LiquidationEngine is
       data
     );
 
-    //Get Alpaca Stablecoin from the liquidator for debt repayment
+    // Get Alpaca Stablecoin from the liquidator for debt repayment
     // debtShareToRepay [wad] * debtAccumulatedRate [ray]
     uint256 debtValueToRepay = mul(debtShareToRepay, debtAccumulatedRate); // [rad]
     bookKeeper.moveStablecoin(msg.sender, address(systemDebtEngine), debtValueToRepay);
+
+    (positionLockedCollateral, positionDebtShare) = bookKeeper.positions(collateralPoolId, positionAddress);
+
+    // If collateral has been depleted from liquidation whilst there is remaining debt in the position
+    if (positionLockedCollateral == 0 && positionDebtShare > 0) {
+      // Record the bad debt to the system and close the position
+      bookKeeper.confiscatePosition(
+        collateralPoolId,
+        positionAddress,
+        positionAddress,
+        address(systemDebtEngine),
+        -int256(positionLockedCollateral),
+        -int256(positionDebtShare)
+      );
+    }
   }
 
   function cage() external override {
