@@ -85,9 +85,9 @@ contract FixedSpreadLiquidationStrategy is
   // --- Init ---
   function initialize(
     address _bookKeeper,
-    address priceOracle_,
-    address liquidationEngine_,
-    address systemDebtEngine_,
+    address _priceOracle,
+    address _liquidationEngine,
+    address _systemDebtEngine,
     address _positionManager
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
@@ -95,9 +95,9 @@ contract FixedSpreadLiquidationStrategy is
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
-    priceOracle = IPriceOracle(priceOracle_);
-    liquidationEngine = ILiquidationEngine(liquidationEngine_);
-    systemDebtEngine = ISystemDebtEngine(systemDebtEngine_);
+    priceOracle = IPriceOracle(_priceOracle);
+    liquidationEngine = ILiquidationEngine(_liquidationEngine);
+    systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
     positionManager = IManager(_positionManager);
 
     // Grant the contract deployer the default admin role: it will be able
