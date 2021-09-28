@@ -49,6 +49,7 @@ type fixture = {
   alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions
   positionManager: PositionManager
   stabilityFeeCollector: StabilityFeeCollector
+  alpacaStablecoin: AlpacaStablecoin
 }
 
 const ALPACA_PER_BLOCK = ethers.utils.parseEther("100")
@@ -171,6 +172,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     alpacaStablecoinProxyActions,
     positionManager,
     stabilityFeeCollector,
+    alpacaStablecoin,
   }
 }
 
@@ -217,6 +219,8 @@ describe("LiquidationEngine", () => {
 
   let alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions
 
+  let alpacaStablecoin: AlpacaStablecoin
+
   before(async () => {
     ;({
       proxyWallets: [deployerProxyWallet, aliceProxyWallet],
@@ -236,6 +240,7 @@ describe("LiquidationEngine", () => {
       alpacaStablecoinProxyActions,
       positionManager,
       stabilityFeeCollector,
+      alpacaStablecoin,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
@@ -269,9 +274,10 @@ describe("LiquidationEngine", () => {
           ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
         ])
         const col = await bookKeeper.collateralPools(COLLATERAL_POOL_ID)
-        console.log("debtAccumulatedRate", col.debtAccumulatedRate.toString())
         await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
         await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+        const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+        expect(alpacaStablecoinBalance).to.be.equal(WeiPerWad)
       })
     })
   })
