@@ -312,6 +312,10 @@ contract FixedSpreadLiquidationStrategy is
     );
 
     // 4. Confiscate position
+    require(
+      info.collateralAmountToLiquidateWithAllFees <= 2**255 && debtShareToRepay <= 2**255,
+      "FixedSpreadLiquidationStrategy/overflow"
+    );
     bookKeeper.confiscatePosition(
       collateralPoolId,
       positionAddress,
