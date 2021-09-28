@@ -261,7 +261,6 @@ describe("LiquidationEngine", () => {
   describe("#liquidate", async () => {
     context("price drop but does not make the position underwater", async () => {
       it("should revert", async () => {
-        const vaultAddress = await ibTokenAdapter.collateralToken()
         const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
           positionManager.address,
           stabilityFeeCollector.address,
@@ -273,7 +272,6 @@ describe("LiquidationEngine", () => {
           true,
           ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
         ])
-        const col = await bookKeeper.collateralPools(COLLATERAL_POOL_ID)
         await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
         await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
         const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
