@@ -26,6 +26,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
 import "../../interfaces/IGenericTokenAdapter.sol";
+import "../../interfaces/ICagable.sol";
 import "../../utils/SafeToken.sol";
 
 /*
@@ -54,12 +55,14 @@ contract TokenAdapter is
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
-  IGenericTokenAdapter
+  IGenericTokenAdapter,
+  ICagable
 {
   using SafeToken for address;
 
   // --- Auth ---
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
   modifier onlyOwner() {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
@@ -88,10 +91,30 @@ contract TokenAdapter is
     collateralPoolId = collateralPoolId_;
     collateralToken = collateralToken_;
     decimals = IToken(collateralToken).decimals();
+
+    // Grant the contract deployer the owner role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
-  function cage() external override onlyOwner {
+  function cage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    require(live == 1, "TokenAdapter/not-live");
     live = 0;
+    emit Cage();
+  }
+
+  function uncage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    require(live == 0, "TokenAdapter/not-caged");
+    live = 1;
+    emit Uncage();
   }
 
   /// @dev Deposit token into the system from the caller to be used as collateral

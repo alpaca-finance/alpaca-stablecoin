@@ -26,6 +26,7 @@
     "test:liquidationengine": "hardhat test --no-compile ./test/units/stablecoin-core/LiquidationEngine.test.ts",
     "test:systemdebtengine": "hardhat test --no-compile ./test/units/stablecoin-core/SystemDebtEngine.test.ts",
     "test:pegstabilitymodule": "hardhat test --no-compile ./test/units/stablecoin-core/PegStabilityModule.test.ts",
+    "test:fixedSpreadliquidationstrategy": "hardhat test --no-compile ./test/units/liquidation-strategies/FixedSpreadLiquidationStrategy.test.ts",
     "test:flashmintmodule": "hardhat test --no-compile ./test/units/flash-mint/FlashMintModule.test.ts",
     "test:integrations:alpacastablecoinproxyaction": "hardhat test --no-compile ./test/integrations/AlpacaStablecoinProxyAction.test.ts",
     "coverage": "hardhat coverage",

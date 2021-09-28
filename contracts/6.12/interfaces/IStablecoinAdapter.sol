@@ -8,12 +8,6 @@ interface IStablecoinAdapter {
 
   function stablecoin() external returns (IStablecoin);
 
-  function rely(address usr) external;
-
-  function deny(address usr) external;
-
-  function cage() external;
-
   function deposit(
     address positionAddress,
     uint256 wad,
