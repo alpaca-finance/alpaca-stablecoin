@@ -407,23 +407,9 @@ contract AlpacaStablecoinProxyActions {
     address positionAddress = IManager(manager).positions(positionId);
 
     // Takes token amount from user's wallet and joins into the bookKeeper
-    tokenAdapterDeposit(tokenAdapter, address(this), amount, transferFrom, data);
-    // Locks token amount into the CDP
-    IBookKeeper(IManager(manager).bookKeeper()).adjustPosition(
-      IManager(manager).collateralPools(positionId),
-      positionAddress,
-      address(this),
-      address(this),
-      _safeToInt(convertTo18(tokenAdapter, amount)),
-      0
-    );
-    IGenericTokenAdapter(tokenAdapter).onAdjustPosition(
-      address(this),
-      positionAddress,
-      _safeToInt(convertTo18(tokenAdapter, amount)),
-      0,
-      data
-    );
+    tokenAdapterDeposit(tokenAdapter, positionAddress, amount, transferFrom, data);
+    // Locks token amount into the position manager
+    adjustPosition(manager, positionId, _safeToInt(convertTo18(tokenAdapter, amount)), 0, tokenAdapter, data);
   }
 
   function safeLockToken(

@@ -275,7 +275,6 @@ contract IbTokenAdapter is
     bytes calldata data
   ) public payable override nonReentrant {
     _deposit(positionAddress, amount, data);
-    fairlaunch.deposit(address(this), pid, amount);
   }
 
   /// @dev Harvest rewardTokens and distribute to user,
@@ -305,6 +304,8 @@ contract IbTokenAdapter is
       stake[positionAddress] = add(stake[positionAddress], share);
     }
     rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
+
+    fairlaunch.deposit(address(this), pid, amount);
 
     emit Deposit(amount);
   }
@@ -446,7 +447,7 @@ contract IbTokenAdapter is
     uint256 share,
     bytes calldata data
   ) external override nonReentrant {
-    deposit(source, 0, data);
+    _deposit(source, 0, data);
     moveStake(source, destination, share, data);
   }
 

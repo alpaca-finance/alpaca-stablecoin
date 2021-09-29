@@ -29,6 +29,7 @@
     "test:fixedSpreadliquidationstrategy": "hardhat test --no-compile ./test/units/liquidation-strategies/FixedSpreadLiquidationStrategy.test.ts",
     "test:flashmintmodule": "hardhat test --no-compile ./test/units/flash-mint/FlashMintModule.test.ts",
     "test:integrations:alpacastablecoinproxyaction": "hardhat test --no-compile ./test/integrations/AlpacaStablecoinProxyAction.test.ts",
+    "test:integrations:positionpermissions": "hardhat test --no-compile ./test/integrations/PositionPermissions.test.ts",
     "coverage": "hardhat coverage",
     "solhint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
     "prettier:solidity": "./node_modules/.bin/prettier --write contracts/**/*.sol"
