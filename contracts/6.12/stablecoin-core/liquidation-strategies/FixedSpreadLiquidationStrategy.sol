@@ -222,7 +222,7 @@ contract FixedSpreadLiquidationStrategy is
   // Could get this from rmul(BookKeeper.collateralPools(collateralPoolId).spot, Spotter.mat()) instead, but
   // if mat has changed since the last poke, the resulting value will be
   // incorrect.
-  function getFeedPrice(bytes32 collateralPoolId) internal returns (uint256 feedPrice) {
+  function getFeedPrice(bytes32 collateralPoolId) internal view returns (uint256 feedPrice) {
     (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
     (bytes32 price, bool priceOk) = priceFeed.peekPrice();
     require(priceOk, "FixedSpreadLiquidationStrategy/invalid-price");
@@ -235,7 +235,36 @@ contract FixedSpreadLiquidationStrategy is
     uint256 debtShareToRepay,
     uint256 currentCollateralPrice,
     uint256 positionCollateralAmount
-  ) internal returns (LiquidationInfo memory info) {
+  )
+    external
+    view
+    returns (
+      uint256 debtValueToRepay,
+      uint256 collateralAmountToLiquidate,
+      uint256 liquidatorIncentiveFees,
+      uint256 treasuryFees,
+      uint256 collateralAmountToLiquidateWithAllFees
+    )
+  {
+    LiquidationInfo memory info = _calculateLiquidationInfo(
+      collateralPoolId,
+      debtShareToRepay,
+      currentCollateralPrice,
+      positionCollateralAmount
+    );
+    debtValueToRepay = info.debtValueToRepay;
+    collateralAmountToLiquidate = info.collateralAmountToLiquidate;
+    liquidatorIncentiveFees = info.liquidatorIncentiveFees;
+    treasuryFees = info.treasuryFees;
+    collateralAmountToLiquidateWithAllFees = info.collateralAmountToLiquidateWithAllFees;
+  }
+
+  function _calculateLiquidationInfo(
+    bytes32 collateralPoolId,
+    uint256 debtShareToRepay,
+    uint256 currentCollateralPrice,
+    uint256 positionCollateralAmount
+  ) internal view returns (LiquidationInfo memory info) {
     (, uint256 debtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPoolId);
 
     // ---- Calculate collateral amount to liquidate ----
@@ -304,7 +333,7 @@ contract FixedSpreadLiquidationStrategy is
     require(currentCollateralPrice > 0, "FixedSpreadLiquidationStrategy/zero-starting-price");
 
     // 3. Calculate collateral amount to be liquidated according to the current price and liquidator incentive
-    LiquidationInfo memory info = calculateLiquidationInfo(
+    LiquidationInfo memory info = _calculateLiquidationInfo(
       collateralPoolId,
       debtShareToRepay,
       currentCollateralPrice,
