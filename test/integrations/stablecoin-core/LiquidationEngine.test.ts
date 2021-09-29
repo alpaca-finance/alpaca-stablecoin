@@ -45,6 +45,8 @@ import { AddressZero } from "../../helper/address"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
 
+import * as AssertHelpers from "../../helper/assert"
+
 const { parseEther, formatBytes32String } = ethers.utils
 
 type fixture = {
@@ -90,8 +92,8 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await bookKeeper.deployed()
 
   await bookKeeper.init(COLLATERAL_POOL_ID)
-  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(1000))
-  await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID, WeiPerRad.mul(1000))
+  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10000000))
+  await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID, WeiPerRad.mul(10000000))
 
   await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
   await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
@@ -1150,6 +1152,110 @@ describe("LiquidationEngine", () => {
         const alicePositionAfterLiquidation = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
         expect(alicePositionAfterLiquidation.lockedCollateral).to.be.equal(2)
         expect(alicePositionAfterLiquidation.debtShare).to.be.equal(ethers.utils.parseEther("0.516908212560386474"))
+      })
+    })
+
+    context("1st liquidation keep position unsafe, 2nd position fully liquidate the position", async () => {
+      it("should success", async () => {
+        // 1. Set priceWithSafetyMargin for ibDUMMY to 3,000 USD with 75% Collateral Factor (priceWithSafetyMargin = 2,250 USD)
+        await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2250))
+
+        // 2. Alice open a new position with 1 ibDUMMY and draw 1,800 AUSD
+        const lockedCollateralAmount = WeiPerWad
+        const drawStablecoinAmount = WeiPerWad.mul(1800)
+        const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
+          positionManager.address,
+          stabilityFeeCollector.address,
+          ibTokenAdapter.address,
+          stablecoinAdapter.address,
+          COLLATERAL_POOL_ID,
+          lockedCollateralAmount,
+          drawStablecoinAmount,
+          true,
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+        ])
+        await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+        await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+        const alicePositionAddress = await positionManager.positions(1)
+        const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+        const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+        expect(
+          alicePosition.lockedCollateral,
+          "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+        ).to.be.equal(WeiPerWad)
+        expect(alicePosition.debtShare, "debtShare should be 1,800 AUSD, because Alice drew 1,800 AUSD").to.be.equal(
+          drawStablecoinAmount
+        )
+        expect(
+          await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+          "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+        ).to.be.equal(0)
+        expect(alpacaStablecoinBalance, "Alice should receive 1,800 AUSD from drawing 1,800 AUSD").to.be.equal(
+          drawStablecoinAmount
+        )
+        expect(
+          await alpacaToken.balanceOf(aliceProxyWallet.address),
+          "Alice's proxy wallet should have 0 ALPACA, as Alice has not harvest any rewards from her position"
+        ).to.be.equal(0)
+
+        // 3. ibDUMMY price drop to 2,300 USD (priceWithSafetyMargin = 1,725 USD)
+        await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(1725))
+        await simplePriceFeedAsDeployer.setPrice(WeiPerWad.mul(2300))
+
+        // 4. Bob liquidate Alice's position up to full close factor successfully
+        await bookKeeperAsBob.whitelist(liquidationEngine.address)
+        await bookKeeper.mintUnbackedStablecoin(deployerAddress, bobAddress, WeiPerRad.mul(2000))
+        const bobStablecoinBeforeLiquidation = await bookKeeper.stablecoin(bobAddress)
+        await liquidationEngineAsBob.liquidate(
+          COLLATERAL_POOL_ID,
+          alicePositionAddress,
+          ethers.utils.parseEther("335"),
+          ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [bobAddress, []])
+        )
+        await liquidationEngineAsBob.liquidate(
+          COLLATERAL_POOL_ID,
+          alicePositionAddress,
+          ethers.utils.parseEther("732.5"),
+          ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [bobAddress, []])
+        )
+
+        // 5. Settle system bad debt
+        const totalDebtShareLiquidated = ethers.utils.parseEther("335").add(WeiPerWad.mul(7325).div(10))
+        await systemDebtEngine.settleSystemBadDebt(totalDebtShareLiquidated.mul(WeiPerRay))
+
+        const bobStablecoinAfterLiquidation = await bookKeeper.stablecoin(bobAddress)
+
+        const alicePositionAfterLiquidation = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+        AssertHelpers.assertAlmostEqual(
+          alicePositionAfterLiquidation.lockedCollateral.toString(),
+          ethers.utils.parseEther("0.519625").toString()
+        )
+        expect(
+          alicePositionAfterLiquidation.debtShare,
+          "debtShare should be 732.5 AUSD, because Bob liquidated 732.5 AUSD from Alice's position"
+        ).to.be.equal(ethers.utils.parseEther("732.5"))
+        expect(
+          await bookKeeper.systemBadDebt(systemDebtEngine.address),
+          "System bad debt should be 0 AUSD"
+        ).to.be.equal(0)
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress)).toString(),
+          ethers.utils.parseEther("0.47573369").toString()
+        )
+        expect(
+          bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation),
+          "Bob should pay 1067.5 AUSD for this liquidation"
+        ).to.be.equal(ethers.utils.parseEther("1067.5").mul(WeiPerRay))
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address)).toString(),
+          ethers.utils.parseEther("0.0046413").toString()
+        )
+        expect(
+          await alpacaToken.balanceOf(aliceProxyWallet.address),
+          "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"
+        ).to.not.equal(0)
       })
     })
   })
