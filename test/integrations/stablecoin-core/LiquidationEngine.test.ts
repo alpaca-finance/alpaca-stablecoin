@@ -1256,6 +1256,15 @@ describe("LiquidationEngine", () => {
           await alpacaToken.balanceOf(aliceProxyWallet.address),
           "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"
         ).to.not.equal(0)
+
+        await expect(
+          liquidationEngineAsBob.liquidate(
+            COLLATERAL_POOL_ID,
+            alicePositionAddress,
+            ethers.utils.parseEther("0.1"),
+            ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [bobAddress, []])
+          )
+        ).to.be.revertedWith("LiquidationEngine/not-unsafe")
       })
     })
   })
