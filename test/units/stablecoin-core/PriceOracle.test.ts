@@ -373,26 +373,82 @@ describe("PriceOracle", () => {
     })
   })
 
-  describe("#cage", () => {
+  describe("#cage()", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
         await expect(priceOracleAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
 
-    context("when owner role can access", () => {
-      it("should be success", async () => {
-        // grant role access
-        await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), deployerAddress)
-        priceOracle.cage()
+    context("when role can access", () => {
+      context("caller is owner role ", () => {
+        it("should be set live to 0", async () => {
+          // grant role access
+          await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), aliceAddress)
+
+          expect(await priceOracleAsAlice.live()).to.be.equal(1)
+
+          await expect(priceOracleAsAlice.cage()).to.emit(priceOracleAsAlice, "Cage").withArgs()
+
+          expect(await priceOracleAsAlice.live()).to.be.equal(0)
+        })
+      })
+
+      context("caller is showStopper role", () => {
+        it("should be set live to 0", async () => {
+          // grant role access
+          await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), aliceAddress)
+
+          expect(await priceOracleAsAlice.live()).to.be.equal(1)
+
+          await expect(priceOracleAsAlice.cage()).to.emit(priceOracleAsAlice, "Cage").withArgs()
+
+          expect(await priceOracleAsAlice.live()).to.be.equal(0)
+        })
+      })
+    })
+  })
+
+  describe("#uncage()", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(priceOracleAsAlice.uncage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
 
-    context("when show stopper role can access", () => {
-      it("should be success", async () => {
-        // grant role access
-        await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), deployerAddress)
-        priceOracle.cage()
+    context("when role can access", () => {
+      context("caller is owner role ", () => {
+        it("should be set live to 1", async () => {
+          // grant role access
+          await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), aliceAddress)
+
+          expect(await priceOracleAsAlice.live()).to.be.equal(1)
+
+          await priceOracleAsAlice.cage()
+
+          expect(await priceOracleAsAlice.live()).to.be.equal(0)
+
+          await expect(priceOracleAsAlice.uncage()).to.emit(priceOracleAsAlice, "Uncage").withArgs()
+
+          expect(await priceOracleAsAlice.live()).to.be.equal(1)
+        })
+      })
+
+      context("caller is showStopper role", () => {
+        it("should be set live to 1", async () => {
+          // grant role access
+          await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), aliceAddress)
+
+          expect(await priceOracleAsAlice.live()).to.be.equal(1)
+
+          await priceOracleAsAlice.cage()
+
+          expect(await priceOracleAsAlice.live()).to.be.equal(0)
+
+          await expect(priceOracleAsAlice.uncage()).to.emit(priceOracleAsAlice, "Uncage").withArgs()
+
+          expect(await priceOracleAsAlice.live()).to.be.equal(1)
+        })
       })
     })
   })

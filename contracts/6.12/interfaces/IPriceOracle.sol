@@ -11,7 +11,5 @@ interface IPriceOracle {
       uint256 liquidationRatio // [ray]
     );
 
-  function cage() external;
-
   function stableCoinReferencePrice() external view returns (uint256);
 }

@@ -4,6 +4,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
+import "../interfaces/ICagable.sol";
 
 /// @title BookKeeper
 /// @author Alpaca Fin Corporation
@@ -11,7 +12,7 @@ import "../interfaces/IBookKeeper.sol";
     It has the ability to move collateral token and stablecoin with in the accounting state variable. 
 */
 
-contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeable {
+contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeable, ICagable {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant PRICE_ORACLE_ROLE = keccak256("PRICE_ORACLE_ROLE");
@@ -169,7 +170,21 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
       hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
       "!(ownerRole or showStopperRole)"
     );
+    require(live == 1, "BookKeeper/not-live");
     live = 0;
+
+    emit Cage();
+  }
+
+  function uncage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    require(live == 0, "BookKeeper/not-caged");
+    live = 1;
+
+    emit Uncage();
   }
 
   // --- Fungibility ---

@@ -23,6 +23,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IPriceOracle.sol";
+import "../interfaces/ICagable.sol";
 
 /// @title PriceOracle
 /// @author Alpaca Fin Corporation
@@ -30,7 +31,7 @@ import "../interfaces/IPriceOracle.sol";
     The price oracle is important in reflecting the current state of the market price.
 */
 
-contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOracle {
+contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOracle, ICagable {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
@@ -64,7 +65,7 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
     stableCoinReferencePrice = ONE;
     live = 1;
 
-    // Grant the contract deployer the default admin role: it will be able
+    // Grant the contract deployer the owner role: it will be able
     // to grant and revoke any roles
     _setupRole(OWNER_ROLE, msg.sender);
   }
@@ -123,7 +124,19 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
       hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
       "!(ownerRole or showStopperRole)"
     );
+    require(live == 1, "PriceOracle/not-live");
     live = 0;
+    emit Cage();
+  }
+
+  function uncage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    require(live == 0, "PriceOracle/not-caged");
+    live = 1;
+    emit Uncage();
   }
 
   // --- pause ---

@@ -373,8 +373,6 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
 
-        console.log(await (await alpacaToken.balanceOf(devAddress)).toString())
-
         // Now Alice harvest rewards. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA
         await ibTokenAdapterAsAlice.deposit(
           aliceAddress,

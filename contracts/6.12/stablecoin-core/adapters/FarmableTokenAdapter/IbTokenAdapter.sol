@@ -22,6 +22,7 @@ import "../../../interfaces/IBookKeeper.sol";
 import "../../../interfaces/IFarmableTokenAdapter.sol";
 import "../../../interfaces/ITimeLock.sol";
 import "../../../interfaces/IShield.sol";
+import "../../../interfaces/ICagable.sol";
 import "../../../utils/SafeToken.sol";
 
 /// @title IbTokenAdapter is the adapter that inherited BaseFarmableTokenAdapter.
@@ -31,7 +32,8 @@ contract IbTokenAdapter is
   IFarmableTokenAdapter,
   PausableUpgradeable,
   AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable
+  ReentrancyGuardUpgradeable,
+  ICagable
 {
   using SafeToken for address;
 
@@ -140,6 +142,10 @@ contract IbTokenAdapter is
     treasuryAccount = _treasuryAccount;
 
     address(collateralToken).safeApprove(address(fairlaunch), uint256(-1));
+
+    // Grant the contract deployer the owner role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   function add(uint256 x, uint256 y) public pure returns (uint256 z) {
@@ -435,24 +441,21 @@ contract IbTokenAdapter is
 
   /// @dev Pause ibTokenAdapter when assumptions change
   function cage() public override nonReentrant {
-    require(live == 1, "IbTokenAdapter/not-live");
-
     // Allow caging if
     // - msg.sender is whitelisted to do so
     // - Shield's owner has been changed
     require(hasRole(OWNER_ROLE, msg.sender) || shield.owner() != address(timelock), "IbTokenAdapter/not-authorized");
-
-    _cage();
-  }
-
-  function _cage() internal {
+    require(live == 1, "IbTokenAdapter/not-live");
     fairlaunch.emergencyWithdraw(pid);
     live = 0;
+    emit Cage();
   }
 
-  function uncage() external onlyOwner {
+  function uncage() external override {
+    require(hasRole(OWNER_ROLE, msg.sender), "IbTokenAdapter/not-authorized");
     require(live == 0, "IbTokenAdapter/not-caged");
     fairlaunch.deposit(address(this), pid, totalShare);
     live = 1;
+    emit Uncage();
   }
 }

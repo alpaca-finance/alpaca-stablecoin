@@ -504,7 +504,7 @@ describe("position manager", () => {
         expect(debtShareBefore.sub(debtShareAfterWipe)).to.be.equal(WeiPerWad.mul(2))
 
         // 3. alice unlock some ibBUSD
-        const freeTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("freeToken", [
+        const freeTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("unlockToken", [
           positionManager.address,
           ibTokenAdapter.address,
           positionId,
@@ -589,7 +589,7 @@ describe("position manager", () => {
         //  b. alice unlock some ibBUSD
         //  c. convert BUSD to ibBUSD
         const wipeFreeTokenAndConvertCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
-          "wipeFreeTokenAndConvert",
+          "wipeUnlockTokenAndConvert",
           [
             vault.address,
             positionManager.address,
@@ -686,7 +686,7 @@ describe("position manager", () => {
         expect(debtShareBefore.sub(debtShareAfterWipe)).to.be.equal(WeiPerWad.mul(5))
 
         // 3. alice unlock some ibBUSD
-        const freeTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("freeToken", [
+        const freeTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("unlockToken", [
           positionManager.address,
           ibTokenAdapter.address,
           positionId,
@@ -771,7 +771,7 @@ describe("position manager", () => {
         //  b. alice unlock some ibBUSD
         //  c. convert BUSD to ibBUSD
         const wipeAllFreeTokenAndConvertCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
-          "wipeAllFreeTokenAndConvert",
+          "wipeAllUnlockTokenAndConvert",
           [
             vault.address,
             positionManager.address,
@@ -866,7 +866,7 @@ describe("position manager", () => {
         //  b. alice unlock some ibBUSD
         //  c. convert BUSD to ibBUSD
         const wipeFreeTokenAndConvertCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
-          "wipeFreeTokenAndConvert",
+          "wipeUnlockTokenAndConvert",
           [
             vault.address,
             positionManager.address,
