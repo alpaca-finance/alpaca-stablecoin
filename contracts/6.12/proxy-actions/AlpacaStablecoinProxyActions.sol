@@ -353,24 +353,11 @@ contract AlpacaStablecoinProxyActions is Common {
     uint256 cdp,
     bytes calldata data
   ) public payable {
+    address positionAddress = IManager(manager).positions(cdp);
     // Receives BNB amount, converts it to WBNB and joins it into the bookKeeper
-    bnbAdapter_deposit(bnbAdapter, address(this), data);
+    bnbAdapter_deposit(bnbAdapter, positionAddress, data);
     // Locks WBNB amount into the CDP
-    IBookKeeper(IManager(manager).bookKeeper()).adjustPosition(
-      IManager(manager).collateralPools(cdp),
-      IManager(manager).positions(cdp),
-      address(this),
-      address(this),
-      _safeToInt(msg.value),
-      0
-    );
-    IGenericTokenAdapter(bnbAdapter).onAdjustPosition(
-      address(this),
-      IManager(manager).positions(cdp),
-      _safeToInt(msg.value),
-      0,
-      data
-    );
+    adjustPosition(manager, cdp, _safeToInt(msg.value), 0, bnbAdapter, data);
   }
 
   function safeLockBNB(
@@ -394,23 +381,9 @@ contract AlpacaStablecoinProxyActions is Common {
   ) public {
     address positionAddress = IManager(manager).positions(cdp);
     // Takes token amount from user's wallet and joins into the bookKeeper
-    tokenAdapter_deposit(tokenAdapter, address(this), amt, transferFrom, data);
-    // Locks token amount into the CDP
-    IBookKeeper(IManager(manager).bookKeeper()).adjustPosition(
-      IManager(manager).collateralPools(cdp),
-      IManager(manager).positions(cdp),
-      address(this),
-      address(this),
-      _safeToInt(convertTo18(tokenAdapter, amt)),
-      0
-    );
-    IGenericTokenAdapter(tokenAdapter).onAdjustPosition(
-      address(this),
-      IManager(manager).positions(cdp),
-      _safeToInt(convertTo18(tokenAdapter, amt)),
-      0,
-      data
-    );
+    tokenAdapter_deposit(tokenAdapter, positionAddress, amt, transferFrom, data);
+    // Locks token amount into the position manager
+    adjustPosition(manager, cdp, _safeToInt(convertTo18(tokenAdapter, amt)), 0, tokenAdapter, data);
   }
 
   function safeLockToken(
@@ -459,7 +432,7 @@ contract AlpacaStablecoinProxyActions is Common {
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), wad, tokenAdapter, data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, amount, data);
+    IGenericTokenAdapter(tokenAdapter).withdraw(address(this), amount, data);
   }
 
   function exitBNB(
@@ -497,6 +470,7 @@ contract AlpacaStablecoinProxyActions is Common {
   function draw(
     address manager,
     address stabilityFeeCollector,
+    address tokenAdapter,
     address stablecoinAdapter,
     uint256 cdp,
     uint256 wad,
@@ -511,7 +485,7 @@ contract AlpacaStablecoinProxyActions is Common {
       cdp,
       0,
       _getDrawDebtShare(bookKeeper, stabilityFeeCollector, positionAddress, collateralPoolId, wad),
-      address(0),
+      tokenAdapter,
       data
     );
     // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
@@ -526,6 +500,7 @@ contract AlpacaStablecoinProxyActions is Common {
 
   function wipe(
     address manager,
+    address tokenAdapter,
     address stablecoinAdapter,
     uint256 posID,
     uint256 wad,
@@ -550,7 +525,7 @@ contract AlpacaStablecoinProxyActions is Common {
           positionAddress,
           collateralPoolId
         ),
-        address(0),
+        tokenAdapter,
         data
       );
     } else {
@@ -571,6 +546,7 @@ contract AlpacaStablecoinProxyActions is Common {
 
   function safeWipe(
     address manager,
+    address tokenAdapter,
     address stablecoinAdapter,
     uint256 posID,
     uint256 wad,
@@ -578,11 +554,12 @@ contract AlpacaStablecoinProxyActions is Common {
     bytes calldata data
   ) public {
     require(IManager(manager).owners(posID) == owner, "!owner");
-    wipe(manager, stablecoinAdapter, posID, wad, data);
+    wipe(manager, tokenAdapter, stablecoinAdapter, posID, wad, data);
   }
 
   function wipeAll(
     address manager,
+    address tokenAdapter,
     address stablecoinAdapter,
     uint256 posID,
     bytes calldata data
@@ -602,7 +579,7 @@ contract AlpacaStablecoinProxyActions is Common {
         data
       );
       // Paybacks debt to the CDP
-      adjustPosition(manager, posID, 0, -int256(debtShare), address(0), data);
+      adjustPosition(manager, posID, 0, -int256(debtShare), tokenAdapter, data);
     } else {
       // Deposits Alpaca Stablecoin amount into the bookKeeper
       stablecoinAdapter_deposit(
@@ -625,13 +602,14 @@ contract AlpacaStablecoinProxyActions is Common {
 
   function safeWipeAll(
     address manager,
+    address tokenAdapter,
     address stablecoinAdapter,
     uint256 posID,
     address owner,
     bytes calldata data
   ) public {
     require(IManager(manager).owners(posID) == owner, "!owner");
-    wipeAll(manager, stablecoinAdapter, posID, data);
+    wipeAll(manager, tokenAdapter, stablecoinAdapter, posID, data);
   }
 
   function lockBNBAndDraw(
@@ -878,7 +856,7 @@ contract AlpacaStablecoinProxyActions is Common {
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), collateralAmount, tokenAdapter, data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, collateralAmount, data);
+    IGenericTokenAdapter(tokenAdapter).withdraw(address(this), collateralAmount, data);
   }
 
   function wipeFreeIbBNBAndCovertToBNB(
@@ -935,7 +913,7 @@ contract AlpacaStablecoinProxyActions is Common {
     // Moves the amount from the CDP positionAddress to proxy's address
     moveCollateral(manager, cdp, address(this), collateralAmount, tokenAdapter, data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, collateralAmount, data);
+    IGenericTokenAdapter(tokenAdapter).withdraw(address(this), collateralAmount, data);
   }
 
   function wipeAllFreeIbBNBAndConvertToBNB(
