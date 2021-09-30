@@ -9,6 +9,7 @@ import "./PositionHandler.sol";
 import "../interfaces/IManager.sol";
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IGenericTokenAdapter.sol";
+import "hardhat/console.sol";
 
 /// @title PositionManager is a contract for manging positions
 contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IManager {
@@ -120,6 +121,9 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
     address user,
     uint256 ok
   ) public override onlyOwnerAllowed(positionId) {
+    console.log("ok ", ok);
+    console.log("positionId ", positionId);
+    console.log("user ", user);
     ownerWhitelist[owners[positionId]][positionId][user] = ok;
     emit AllowManagePosition(msg.sender, positionId, owners[positionId], user, ok);
   }

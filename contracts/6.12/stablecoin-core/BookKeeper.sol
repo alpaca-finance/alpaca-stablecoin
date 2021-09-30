@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/ICagable.sol";
+import "hardhat/console.sol";
 
 /// @title BookKeeper
 /// @author Alpaca Fin Corporation

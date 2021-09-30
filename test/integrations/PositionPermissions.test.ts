@@ -50,6 +50,7 @@ const { parseEther, formatBytes32String } = ethers.utils
 type fixture = {
   proxyWalletRegistry: ProxyWalletRegistry
   ibTokenAdapter: IbTokenAdapter
+  ibTokenAdapter2: IbTokenAdapter
   stablecoinAdapter: StablecoinAdapter
   bookKeeper: BookKeeper
   ibDUMMY: BEP20
@@ -68,7 +69,7 @@ type fixture = {
 
 const ALPACA_PER_BLOCK = ethers.utils.parseEther("100")
 const COLLATERAL_POOL_ID = formatBytes32String("ibDUMMY")
-const COLLATERAL_POOL_ID2 = formatBytes32String("ibDUMMY")
+const COLLATERAL_POOL_ID2 = formatBytes32String("ibDUMMY2")
 const CLOSE_FACTOR_BPS = BigNumber.from(5000)
 const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(250)
 const TREASURY_FEE_BPS = BigNumber.from(100)
@@ -94,8 +95,13 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(1000))
   await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID, WeiPerRad.mul(1000))
 
+  await bookKeeper.init(COLLATERAL_POOL_ID2)
+  await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID2, WeiPerRad.mul(1000))
+
   await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
   await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
+
+  await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID2, WeiPerRay)
 
   // Deploy mocked BEP20
   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
@@ -140,7 +146,22 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
+  const ibTokenAdapter2 = (await upgrades.deployProxy(IbTokenAdapter, [
+    bookKeeper.address,
+    COLLATERAL_POOL_ID2,
+    ibDUMMY.address,
+    alpacaToken.address,
+    fairLaunch.address,
+    0,
+    shield.address,
+    await deployer.getAddress(),
+    BigNumber.from(1000),
+    await dev.getAddress(),
+  ])) as IbTokenAdapter
+  await ibTokenAdapter2.deployed()
+
   await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter.address)
+  await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter2.address)
   await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployer.address)
 
   // Deploy Alpaca Stablecoin
@@ -178,6 +199,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     bookKeeper.address,
   ])) as StabilityFeeCollector
   await stabilityFeeCollector.init(COLLATERAL_POOL_ID)
+  await stabilityFeeCollector.init(COLLATERAL_POOL_ID2)
   await bookKeeper.grantRole(await bookKeeper.STABILITY_FEE_COLLECTOR_ROLE(), stabilityFeeCollector.address)
 
   const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
@@ -207,8 +229,16 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     positionManager.address,
   ])) as FixedSpreadLiquidationStrategy
   await liquidationEngine.setStrategy(COLLATERAL_POOL_ID, fixedSpreadLiquidationStrategy.address)
+  await liquidationEngine.setStrategy(COLLATERAL_POOL_ID2, fixedSpreadLiquidationStrategy.address)
   await fixedSpreadLiquidationStrategy.setCollateralPool(
     COLLATERAL_POOL_ID,
+    ibTokenAdapter.address,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS
+  )
+  await fixedSpreadLiquidationStrategy.setCollateralPool(
+    COLLATERAL_POOL_ID2,
     ibTokenAdapter.address,
     CLOSE_FACTOR_BPS,
     LIQUIDATOR_INCENTIVE_BPS,
@@ -225,10 +255,12 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
   await simplePriceFeed.deployed()
   await priceOracle.setPriceFeed(COLLATERAL_POOL_ID, simplePriceFeed.address)
+  await priceOracle.setPriceFeed(COLLATERAL_POOL_ID2, simplePriceFeed.address)
 
   return {
     proxyWalletRegistry,
     ibTokenAdapter,
+    ibTokenAdapter2,
     stablecoinAdapter,
     bookKeeper,
     ibDUMMY,
@@ -267,8 +299,10 @@ describe("PositionPermissions", () => {
 
   let deployerProxyWallet: ProxyWallet
   let aliceProxyWallet: ProxyWallet
+  let bobProxyWallet: ProxyWallet
 
   let ibTokenAdapter: IbTokenAdapter
+  let ibTokenAdapter2: IbTokenAdapter
   let stablecoinAdapter: StablecoinAdapter
   let bookKeeper: BookKeeper
   let ibDUMMY: BEP20
@@ -308,7 +342,7 @@ describe("PositionPermissions", () => {
 
   before(async () => {
     ;({
-      proxyWallets: [deployerProxyWallet, aliceProxyWallet],
+      proxyWallets: [deployerProxyWallet, aliceProxyWallet, bobProxyWallet],
     } = await waffle.loadFixture(loadProxyWalletFixtureHandler))
   })
 
@@ -316,6 +350,7 @@ describe("PositionPermissions", () => {
     ;({
       proxyWalletRegistry,
       ibTokenAdapter,
+      ibTokenAdapter2,
       stablecoinAdapter,
       bookKeeper,
       ibDUMMY,
@@ -358,197 +393,1360 @@ describe("PositionPermissions", () => {
   })
   describe("#permissions", async () => {
     context("owner position able to", async () => {
-      context("lock collateral", async () => {
-        it("should success", async () => {
-          // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
-          await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+      //   context("lock collateral", async () => {
+      //     it("should success", async () => {
+      //       // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+      //       await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
 
-          // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
-          const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
-            positionManager.address,
-            stabilityFeeCollector.address,
-            ibTokenAdapter.address,
-            stablecoinAdapter.address,
-            COLLATERAL_POOL_ID,
-            WeiPerWad,
-            WeiPerWad,
-            true,
-            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
-          ])
-          await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
-          await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
-          const alicePositionAddress = await positionManager.positions(1)
-          const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
-          const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+      //       // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
+      //       const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
+      //         positionManager.address,
+      //         stabilityFeeCollector.address,
+      //         ibTokenAdapter.address,
+      //         stablecoinAdapter.address,
+      //         COLLATERAL_POOL_ID,
+      //         WeiPerWad,
+      //         WeiPerWad,
+      //         true,
+      //         ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //       ])
+      //       await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+      //       await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+      //       const alicePositionAddress = await positionManager.positions(1)
+      //       const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+      //       const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
 
-          expect(
-            alicePosition.lockedCollateral,
-            "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
-          ).to.be.equal(WeiPerWad)
-          expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
-            WeiPerWad
-          )
-          expect(
-            await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
-            "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
-          ).to.be.equal(0)
-          expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+      //       expect(
+      //         alicePosition.lockedCollateral,
+      //         "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+      //       ).to.be.equal(WeiPerWad)
+      //       expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+      //         WeiPerWad
+      //       )
+      //       expect(
+      //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //         "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+      //       ).to.be.equal(0)
+      //       expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
 
-          // 3. Alice try to adjust position, add 2 ibDummy to position
-          const lockToken = alpacaStablecoinProxyActions.interface.encodeFunctionData("lockToken", [
-            positionManager.address,
-            ibTokenAdapter.address,
-            await positionManager.ownerLastPositionId(aliceProxyWallet.address),
-            WeiPerWad.mul(2),
-            true,
-            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
-          ])
-          await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, lockToken)
-          const aliceAdjustPosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
-          expect(
-            aliceAdjustPosition.lockedCollateral,
-            "lockedCollateral should be 3 ibDUMMY, because Alice add locked 2 ibDUMMY"
-          ).to.be.equal(WeiPerWad.mul(3))
-          expect(
-            aliceAdjustPosition.debtShare,
-            "debtShare should be 1 AUSD, because Alice doesn't draw more"
-          ).to.be.equal(WeiPerWad)
-          expect(
-            await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
-            "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
-          ).to.be.equal(0)
-          expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
-        })
-      })
+      //       // 3. Alice try to adjust position, add 2 ibDummy to position
+      //       const lockToken = alpacaStablecoinProxyActions.interface.encodeFunctionData("lockToken", [
+      //         positionManager.address,
+      //         ibTokenAdapter.address,
+      //         await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+      //         WeiPerWad.mul(2),
+      //         true,
+      //         ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //       ])
+      //       await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, lockToken)
+      //       const aliceAdjustPosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+      //       expect(
+      //         aliceAdjustPosition.lockedCollateral,
+      //         "lockedCollateral should be 3 ibDUMMY, because Alice add locked 2 ibDUMMY"
+      //       ).to.be.equal(WeiPerWad.mul(3))
+      //       expect(
+      //         aliceAdjustPosition.debtShare,
+      //         "debtShare should be 1 AUSD, because Alice doesn't draw more"
+      //       ).to.be.equal(WeiPerWad)
+      //       expect(
+      //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //         "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+      //       ).to.be.equal(0)
+      //       expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+      //     })
+      //   })
 
-      context("move collateral", async () => {
-        context("between owner position same collateral pool", async () => {
-          it("should success", async () => {
-            // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
-            await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+      //   context("move collateral", async () => {
+      //     context("same collateral pool", async () => {
+      //       context("call openLockTokenAndDraw and unlock collateral", async () => {
+      //         it("should success", async () => {
+      //           // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+      //           await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
 
-            // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
-            const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
-              positionManager.address,
-              stabilityFeeCollector.address,
-              ibTokenAdapter.address,
-              stablecoinAdapter.address,
-              COLLATERAL_POOL_ID,
-              WeiPerWad,
-              WeiPerWad,
-              true,
-              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
-            ])
-            await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
-            await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
-            const alicePositionAddress = await positionManager.positions(1)
-            const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
-            const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+      //           // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
+      //           const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "openLockTokenAndDraw",
+      //             [
+      //               positionManager.address,
+      //               stabilityFeeCollector.address,
+      //               ibTokenAdapter.address,
+      //               stablecoinAdapter.address,
+      //               COLLATERAL_POOL_ID,
+      //               WeiPerWad,
+      //               WeiPerWad,
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //             ]
+      //           )
+      //           await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+      //           const alicePositionAddress = await positionManager.positions(1)
+      //           const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
 
-            expect(
-              alicePosition.lockedCollateral,
-              "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
-            ).to.be.equal(WeiPerWad)
-            expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
-              WeiPerWad
-            )
-            expect(
-              await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
-              "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
-            ).to.be.equal(0)
-            expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+      //           expect(
+      //             alicePosition.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+      //             WeiPerWad
+      //           )
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+      //           ).to.be.equal(0)
+      //           expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
 
-            // 3. Alice open a second new position with 2 ibDUMMY and draw 1 AUSD at same collateral pool
-            const openPositionCall2 = alpacaStablecoinProxyActions.interface.encodeFunctionData(
-              "openLockTokenAndDraw",
-              [
+      //           // 3. Alice open a second new position with 2 ibDUMMY and draw 1 AUSD at same collateral pool
+      //           const openPositionCall2 = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "openLockTokenAndDraw",
+      //             [
+      //               positionManager.address,
+      //               stabilityFeeCollector.address,
+      //               ibTokenAdapter.address,
+      //               stablecoinAdapter.address,
+      //               COLLATERAL_POOL_ID,
+      //               WeiPerWad.mul(2),
+      //               WeiPerWad,
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //             ]
+      //           )
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall2)
+      //           const alicePositionAddress2 = await positionManager.positions(2)
+      //           const alpacaStablecoinBalance2 = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           const alicePosition2 = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress2)
+
+      //           expect(
+      //             alicePosition2.lockedCollateral,
+      //             "lockedCollateral should be 2 ibDUMMY, because Alice locked 2 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad.mul(2))
+      //           expect(alicePosition2.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+      //             WeiPerWad
+      //           )
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
+      //             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+      //           ).to.be.equal(0)
+      //           expect(
+      //             alpacaStablecoinBalance2,
+      //             "Alice should receive 2 AUSD from drawing 1 AUSD 2 times form 2 positions"
+      //           ).to.be.equal(WeiPerWad.mul(2))
+
+      //           // 4. Alice try to unlock 1 ibDUMMY at second position
+      //           const adjustPosition = alpacaStablecoinProxyActions.interface.encodeFunctionData("adjustPosition", [
+      //             positionManager.address,
+      //             await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+      //             WeiPerWad.mul(-1),
+      //             0,
+      //             ibTokenAdapter.address,
+      //             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //           ])
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, adjustPosition)
+      //           const aliceAdjustPosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress2)
+      //           expect(
+      //             aliceAdjustPosition.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             aliceAdjustPosition.debtShare,
+      //             "debtShare should be 1 AUSD, because Alice doesn't draw more"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
+      //             "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY into the position"
+      //           ).to.be.equal(WeiPerWad)
+
+      //           // 5. Alice try to move collateral from second position to first position
+      //           const moveCollateral = alpacaStablecoinProxyActions.interface.encodeFunctionData("moveCollateral", [
+      //             positionManager.address,
+      //             await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+      //             alicePositionAddress,
+      //             WeiPerWad,
+      //             ibTokenAdapter.address,
+      //             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //           ])
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, moveCollateral)
+      //           const aliceMoveCollateral = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+      //           const alpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           expect(
+      //             aliceMoveCollateral.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             aliceMoveCollateral.debtShare,
+      //             "debtShare should be 1 AUSD, because Alice doesn't draw more"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice move 1 ibDUMMY at second position into first position"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             alpacaStablecoinBalancefinal,
+      //             "Alice should receive 2 AUSD from drawing 2 AUSD, because Alice draw 2 times"
+      //           ).to.be.equal(WeiPerWad.mul(2))
+      //         })
+      //       })
+
+      //       context("open position and deposit collateral", async () => {
+      //         it("should success", async () => {
+      //           // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+      //           await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+
+      //           // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
+      //           const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "openLockTokenAndDraw",
+      //             [
+      //               positionManager.address,
+      //               stabilityFeeCollector.address,
+      //               ibTokenAdapter.address,
+      //               stablecoinAdapter.address,
+      //               COLLATERAL_POOL_ID,
+      //               WeiPerWad,
+      //               WeiPerWad,
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //             ]
+      //           )
+      //           await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+      //           const alicePositionAddress = await positionManager.positions(1)
+      //           const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+      //           expect(
+      //             alicePosition.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+      //             WeiPerWad
+      //           )
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+      //           ).to.be.equal(0)
+      //           expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+
+      //           // 3. Alice open a second new position at same collateral pool
+      //           const openPositionCall2 = alpacaStablecoinProxyActions.interface.encodeFunctionData("open", [
+      //             positionManager.address,
+      //             COLLATERAL_POOL_ID,
+      //             aliceProxyWallet.address,
+      //           ])
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall2)
+      //           const alicePositionAddress2 = await positionManager.positions(2)
+      //           const alicePosition2 = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress2)
+
+      //           expect(
+      //             alicePosition2.lockedCollateral,
+      //             "lockedCollateral should be 0 ibDUMMY, because Alice doesn't locked ibDUMMY"
+      //           ).to.be.equal(0)
+      //           expect(alicePosition2.debtShare, "debtShare should be 0 AUSD, because doesn't drew AUSD").to.be.equal(0)
+
+      //           // 4. Alice deposit 3 ibDUMMY to new position
+      //           const depositPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "tokenAdapterDeposit",
+      //             [
+      //               ibTokenAdapter.address,
+      //               await positionManager.positions(2),
+      //               WeiPerWad.mul(3),
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //             ]
+      //           )
+      //           await aliceProxyWallet["execute(address,bytes)"](
+      //             alpacaStablecoinProxyActions.address,
+      //             depositPositionCall
+      //           )
+
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
+      //             "collateralToken inside Alice's second position address should be 3 ibDUMMY, because Alice deposit 3 ibDUMMY into the second position"
+      //           ).to.be.equal(WeiPerWad.mul(3))
+
+      //           // 5. Alice try to move collateral from second position to first position
+      //           const moveCollateral = alpacaStablecoinProxyActions.interface.encodeFunctionData("moveCollateral", [
+      //             positionManager.address,
+      //             await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+      //             alicePositionAddress,
+      //             WeiPerWad,
+      //             ibTokenAdapter.address,
+      //             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //           ])
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, moveCollateral)
+      //           const aliceMoveCollateral = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+      //           const alpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           expect(
+      //             aliceMoveCollateral.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             aliceMoveCollateral.debtShare,
+      //             "debtShare should be 1 AUSD, because Alice doesn't draw more"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice move 1 ibDUMMY at second position into first position"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
+      //             "collateralToken inside Alice's second position address should be 2 ibDUMMY, because Alice move 1 ibDUMMY into the first position"
+      //           ).to.be.equal(WeiPerWad.mul(2))
+      //           expect(
+      //             alpacaStablecoinBalancefinal,
+      //             "Alice should receive 1 AUSD, because Alice draw 1 time"
+      //           ).to.be.equal(WeiPerWad)
+      //         })
+      //       })
+
+      //       context("and move to Bob", async () => {
+      //         it("should success", async () => {
+      //           // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+      //           await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+
+      //           // 2. Alice open position
+      //           const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("open", [
+      //             positionManager.address,
+      //             COLLATERAL_POOL_ID,
+      //             aliceProxyWallet.address,
+      //           ])
+      //           await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+      //           const alicePositionAddress = await positionManager.positions(1)
+      //           const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+      //           expect(
+      //             alicePosition.lockedCollateral,
+      //             "lockedCollateral should be 0 ibDUMMY, because Alice doesn't locked ibDUMMY"
+      //           ).to.be.equal(0)
+      //           expect(alicePosition.debtShare, "debtShare should be 0 AUSD, because doesn't drew AUSD").to.be.equal(0)
+
+      //           // 3. Alice deposit 3 ibDUMMY to new position
+      //           const depositPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "tokenAdapterDeposit",
+      //             [
+      //               ibTokenAdapter.address,
+      //               await positionManager.positions(1),
+      //               WeiPerWad.mul(3),
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //             ]
+      //           )
+      //           await aliceProxyWallet["execute(address,bytes)"](
+      //             alpacaStablecoinProxyActions.address,
+      //             depositPositionCall
+      //           )
+
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's second position address should be 3 ibDUMMY, because Alice deposit 3 ibDUMMY into the second position"
+      //           ).to.be.equal(WeiPerWad.mul(3))
+
+      //           // 4. Bob open a position with 1 ibDUMMY and draw 1 AUSD
+      //           const bobOpenPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "openLockTokenAndDraw",
+      //             [
+      //               positionManager.address,
+      //               stabilityFeeCollector.address,
+      //               ibTokenAdapter.address,
+      //               stablecoinAdapter.address,
+      //               COLLATERAL_POOL_ID,
+      //               WeiPerWad,
+      //               WeiPerWad,
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]),
+      //             ]
+      //           )
+      //           await ibDUMMYasBob.approve(bobProxyWallet.address, WeiPerWad.mul(10000))
+      //           await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, bobOpenPositionCall)
+      //           const bobPositionAddress = await positionManager.positions(2)
+      //           const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(bobAddress)
+      //           const bobPosition = await bookKeeper.positions(COLLATERAL_POOL_ID, bobPositionAddress)
+
+      //           expect(
+      //             bobPosition.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Bob locked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(bobPosition.debtShare, "debtShare should be 1 AUSD, because Bob drew 1 AUSD").to.be.equal(
+      //             WeiPerWad
+      //           )
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobPositionAddress),
+      //             "collateralToken inside Bob's position address should be 0 ibDUMMY, because Bob locked all ibDUMMY into the position"
+      //           ).to.be.equal(0)
+      //           expect(alpacaStablecoinBalance, "Bob should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+
+      //           // 5. Alice try to move collateral to bob position
+      //           const moveCollateral = alpacaStablecoinProxyActions.interface.encodeFunctionData("moveCollateral", [
+      //             positionManager.address,
+      //             await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+      //             bobPositionAddress,
+      //             WeiPerWad,
+      //             ibTokenAdapter.address,
+      //             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //           ])
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, moveCollateral)
+      //           const aliceAlpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           const bobAlpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(bobAddress)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 2 ibDUMMY, because Alice move 1 ibDUMMY at second position into first position"
+      //           ).to.be.equal(WeiPerWad.mul(2))
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobPositionAddress),
+      //             "collateralToken inside Bob's position address should be 1 ibDUMMY, because Alice move 1 ibDUMMY into the Bob's position"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             aliceAlpacaStablecoinBalancefinal,
+      //             "Alice should receive 0 AUSD, because Alice doesn't draw"
+      //           ).to.be.equal(0)
+      //           expect(bobAlpacaStablecoinBalancefinal, "Bob should receive 1 AUSD, because Bob draw 1 time").to.be.equal(
+      //             WeiPerWad
+      //           )
+      //         })
+      //       })
+      //     })
+
+      //     context("between 2 collateral pool", async () => {
+      //       context("call openLockTokenAndDraw and unlock collateral", async () => {
+      //         it("should success", async () => {
+      //           // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+      //           await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+
+      //           // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
+      //           const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "openLockTokenAndDraw",
+      //             [
+      //               positionManager.address,
+      //               stabilityFeeCollector.address,
+      //               ibTokenAdapter.address,
+      //               stablecoinAdapter.address,
+      //               COLLATERAL_POOL_ID,
+      //               WeiPerWad,
+      //               WeiPerWad,
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //             ]
+      //           )
+      //           await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+      //           const alicePositionAddress = await positionManager.positions(1)
+      //           const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+      //           expect(
+      //             alicePosition.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+      //             WeiPerWad
+      //           )
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+      //           ).to.be.equal(0)
+      //           expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+
+      //           // 3. Alice open a second new position with 2 ibDUMMY and draw 1 AUSD at new collateral pool
+      //           const openPositionCall2 = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "openLockTokenAndDraw",
+      //             [
+      //               positionManager.address,
+      //               stabilityFeeCollector.address,
+      //               ibTokenAdapter2.address,
+      //               stablecoinAdapter.address,
+      //               COLLATERAL_POOL_ID2,
+      //               WeiPerWad.mul(2),
+      //               WeiPerWad,
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //             ]
+      //           )
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall2)
+      //           const alicePositionAddress2 = await positionManager.positions(2)
+      //           const alpacaStablecoinBalance2 = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           const alicePosition2 = await bookKeeper.positions(COLLATERAL_POOL_ID2, alicePositionAddress2)
+
+      //           expect(
+      //             alicePosition2.lockedCollateral,
+      //             "lockedCollateral should be 2 ibDUMMY, because Alice locked 2 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad.mul(2))
+      //           expect(alicePosition2.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+      //             WeiPerWad
+      //           )
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress2),
+      //             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+      //           ).to.be.equal(0)
+      //           expect(
+      //             alpacaStablecoinBalance2,
+      //             "Alice should receive 2 AUSD from drawing 1 AUSD 2 times form 2 positions"
+      //           ).to.be.equal(WeiPerWad.mul(2))
+
+      //           // 4. Alice try to unlock 1 ibDUMMY at second position
+      //           const adjustPosition = alpacaStablecoinProxyActions.interface.encodeFunctionData("adjustPosition", [
+      //             positionManager.address,
+      //             await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+      //             WeiPerWad.mul(-1),
+      //             0,
+      //             ibTokenAdapter2.address,
+      //             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //           ])
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, adjustPosition)
+      //           const aliceAdjustPosition = await bookKeeper.positions(COLLATERAL_POOL_ID2, alicePositionAddress2)
+      //           expect(
+      //             aliceAdjustPosition.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             aliceAdjustPosition.debtShare,
+      //             "debtShare should be 1 AUSD, because Alice doesn't draw more"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress2),
+      //             "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY into the position"
+      //           ).to.be.equal(WeiPerWad)
+
+      //           // 5. Alice try to move collateral from second position to first position
+      //           const moveCollateral = alpacaStablecoinProxyActions.interface.encodeFunctionData("moveCollateral", [
+      //             positionManager.address,
+      //             await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+      //             alicePositionAddress,
+      //             WeiPerWad,
+      //             ibTokenAdapter2.address,
+      //             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //           ])
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, moveCollateral)
+      //           const aliceMoveCollateral = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+      //           const alpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           expect(
+      //             aliceMoveCollateral.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             aliceMoveCollateral.debtShare,
+      //             "debtShare should be 1 AUSD, because Alice doesn't draw more"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice can't move 1 ibDUMMY at second position into first position across collater pool"
+      //           ).to.be.equal(0)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress2),
+      //             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice move 1 ibDUMMY into new address"
+      //           ).to.be.equal(0)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice move 1 ibDUMMY form alice's address 2 into new address that reuse address 1"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             alpacaStablecoinBalancefinal,
+      //             "Alice should receive 2 AUSD from drawing 2 AUSD, because Alice draw 2 times"
+      //           ).to.be.equal(WeiPerWad.mul(2))
+      //         })
+      //       })
+
+      //       context("open position and deposit collateral", async () => {
+      //         it("should success", async () => {
+      //           // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+      //           await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+
+      //           // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
+      //           const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "openLockTokenAndDraw",
+      //             [
+      //               positionManager.address,
+      //               stabilityFeeCollector.address,
+      //               ibTokenAdapter.address,
+      //               stablecoinAdapter.address,
+      //               COLLATERAL_POOL_ID,
+      //               WeiPerWad,
+      //               WeiPerWad,
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //             ]
+      //           )
+      //           await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+      //           const alicePositionAddress = await positionManager.positions(1)
+      //           const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+      //           expect(
+      //             alicePosition.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+      //             WeiPerWad
+      //           )
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+      //           ).to.be.equal(0)
+      //           expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+
+      //           // 3. Alice open a second new position at same collateral pool
+      //           const openPositionCall2 = alpacaStablecoinProxyActions.interface.encodeFunctionData("open", [
+      //             positionManager.address,
+      //             COLLATERAL_POOL_ID2,
+      //             aliceProxyWallet.address,
+      //           ])
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall2)
+      //           const alicePositionAddress2 = await positionManager.positions(2)
+      //           const alicePosition2 = await bookKeeper.positions(COLLATERAL_POOL_ID2, alicePositionAddress2)
+
+      //           expect(
+      //             alicePosition2.lockedCollateral,
+      //             "lockedCollateral should be 0 ibDUMMY, because Alice doesn't locked ibDUMMY"
+      //           ).to.be.equal(0)
+      //           expect(alicePosition2.debtShare, "debtShare should be 0 AUSD, because doesn't drew AUSD").to.be.equal(0)
+
+      //           // 4. Alice deposit 3 ibDUMMY to new position
+      //           const depositPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "tokenAdapterDeposit",
+      //             [
+      //               ibTokenAdapter2.address,
+      //               await positionManager.positions(2),
+      //               WeiPerWad.mul(3),
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //             ]
+      //           )
+      //           await aliceProxyWallet["execute(address,bytes)"](
+      //             alpacaStablecoinProxyActions.address,
+      //             depositPositionCall
+      //           )
+
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress2),
+      //             "collateralToken inside Alice's second position address should be 3 ibDUMMY, because Alice deposit 3 ibDUMMY into the second position"
+      //           ).to.be.equal(WeiPerWad.mul(3))
+
+      //           // 5. Alice try to move collateral from second position to first position
+      //           const moveCollateral = alpacaStablecoinProxyActions.interface.encodeFunctionData("moveCollateral", [
+      //             positionManager.address,
+      //             await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+      //             alicePositionAddress,
+      //             WeiPerWad,
+      //             ibTokenAdapter2.address,
+      //             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //           ])
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, moveCollateral)
+      //           const aliceMoveCollateral = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+      //           const alpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           expect(
+      //             aliceMoveCollateral.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             aliceMoveCollateral.debtShare,
+      //             "debtShare should be 1 AUSD, because Alice doesn't draw more"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice can't move 1 ibDUMMY at second position into first position across collater pool"
+      //           ).to.be.equal(0)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress2),
+      //             "collateralToken inside Alice's position address should be 2 ibDUMMY, because Alice move 1 ibDUMMY into new address"
+      //           ).to.be.equal(WeiPerWad.mul(2))
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice move 1 ibDUMMY form alice's address 2 into new address that reuse address 1"
+      //           ).to.be.equal(WeiPerWad)
+
+      //           expect(
+      //             alpacaStablecoinBalancefinal,
+      //             "Alice should receive 1 AUSD, because Alice draw 1 time"
+      //           ).to.be.equal(WeiPerWad)
+      //         })
+      //       })
+
+      //       context("and move to Bob", async () => {
+      //         it("should success", async () => {
+      //           // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+      //           await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+
+      //           // 2. Alice open position
+      //           const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("open", [
+      //             positionManager.address,
+      //             COLLATERAL_POOL_ID,
+      //             aliceProxyWallet.address,
+      //           ])
+      //           await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+      //           const alicePositionAddress = await positionManager.positions(1)
+      //           const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+      //           expect(
+      //             alicePosition.lockedCollateral,
+      //             "lockedCollateral should be 0 ibDUMMY, because Alice doesn't locked ibDUMMY"
+      //           ).to.be.equal(0)
+      //           expect(alicePosition.debtShare, "debtShare should be 0 AUSD, because doesn't drew AUSD").to.be.equal(0)
+
+      //           // 3. Alice deposit 3 ibDUMMY to new position
+      //           const depositPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "tokenAdapterDeposit",
+      //             [
+      //               ibTokenAdapter.address,
+      //               await positionManager.positions(1),
+      //               WeiPerWad.mul(3),
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //             ]
+      //           )
+      //           await aliceProxyWallet["execute(address,bytes)"](
+      //             alpacaStablecoinProxyActions.address,
+      //             depositPositionCall
+      //           )
+
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's second position address should be 3 ibDUMMY, because Alice deposit 3 ibDUMMY into the second position"
+      //           ).to.be.equal(WeiPerWad.mul(3))
+
+      //           // 4. Bob open a position with 1 ibDUMMY and draw 1 AUSD at collateral pool id 2
+      //           const bobOpenPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+      //             "openLockTokenAndDraw",
+      //             [
+      //               positionManager.address,
+      //               stabilityFeeCollector.address,
+      //               ibTokenAdapter2.address,
+      //               stablecoinAdapter.address,
+      //               COLLATERAL_POOL_ID2,
+      //               WeiPerWad,
+      //               WeiPerWad,
+      //               true,
+      //               ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]),
+      //             ]
+      //           )
+      //           await ibDUMMYasBob.approve(bobProxyWallet.address, WeiPerWad.mul(10000))
+      //           await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, bobOpenPositionCall)
+      //           const bobPositionAddress = await positionManager.positions(2)
+      //           const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(bobAddress)
+      //           const bobPosition = await bookKeeper.positions(COLLATERAL_POOL_ID2, bobPositionAddress)
+
+      //           expect(
+      //             bobPosition.lockedCollateral,
+      //             "lockedCollateral should be 1 ibDUMMY, because Bob locked 1 ibDUMMY"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(bobPosition.debtShare, "debtShare should be 1 AUSD, because Bob drew 1 AUSD").to.be.equal(
+      //             WeiPerWad
+      //           )
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, bobPositionAddress),
+      //             "collateralToken inside Bob's position address should be 0 ibDUMMY, because Bob locked all ibDUMMY into the position"
+      //           ).to.be.equal(0)
+      //           expect(alpacaStablecoinBalance, "Bob should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+
+      //           // 5. Alice try to move collateral to bob position
+      //           const moveCollateral = alpacaStablecoinProxyActions.interface.encodeFunctionData("moveCollateral", [
+      //             positionManager.address,
+      //             await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+      //             bobPositionAddress,
+      //             WeiPerWad,
+      //             ibTokenAdapter.address,
+      //             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //           ])
+      //           await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, moveCollateral)
+      //           const aliceAlpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
+      //           const bobAlpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(bobAddress)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //             "collateralToken inside Alice's position address should be 2 ibDUMMY, because Alice move 1 ibDUMMY at second position into first position"
+      //           ).to.be.equal(WeiPerWad.mul(2))
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobPositionAddress),
+      //             "collateralToken inside new Bob's position address should be 1 ibDUMMY, because System auto create bob position at same collateral pool, so Alice can move 1 ibDUMMY into the new Bob's position"
+      //           ).to.be.equal(WeiPerWad)
+      //           expect(
+      //             await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, bobPositionAddress),
+      //             "collateralToken inside Bob's position address should be 0 ibDUMMY, because Alice can't move ibDUMMY across collateral pool"
+      //           ).to.be.equal(0)
+      //           expect(
+      //             aliceAlpacaStablecoinBalancefinal,
+      //             "Alice should receive 0 AUSD, because Alice doesn't draw"
+      //           ).to.be.equal(0)
+      //           expect(bobAlpacaStablecoinBalancefinal, "Bob should receive 1 AUSD, because Bob draw 1 time").to.be.equal(
+      //             WeiPerWad
+      //           )
+      //         })
+      //       })
+      //     })
+      //   })
+
+      //   context("mint AUSD", async () => {
+      //     it("should success", async () => {
+      //       // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+      //       await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+
+      //       // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
+      //       const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
+      //         positionManager.address,
+      //         stabilityFeeCollector.address,
+      //         ibTokenAdapter.address,
+      //         stablecoinAdapter.address,
+      //         COLLATERAL_POOL_ID,
+      //         WeiPerWad.mul(2),
+      //         WeiPerWad,
+      //         true,
+      //         ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //       ])
+      //       await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+      //       await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+      //       const alicePositionAddress = await positionManager.positions(1)
+      //       const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+      //       const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+      //       expect(
+      //         alicePosition.lockedCollateral,
+      //         "lockedCollateral should be 2 ibDUMMY, because Alice locked 2 ibDUMMY"
+      //       ).to.be.equal(WeiPerWad.mul(2))
+      //       expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+      //         WeiPerWad
+      //       )
+      //       expect(
+      //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //         "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+      //       ).to.be.equal(0)
+      //       expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+
+      //       // 3. Alice try to mint AUSD
+      //       const drawAUSD = alpacaStablecoinProxyActions.interface.encodeFunctionData("draw", [
+      //         positionManager.address,
+      //         stabilityFeeCollector.address,
+      //         ibTokenAdapter.address,
+      //         stablecoinAdapter.address,
+      //         await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+      //         WeiPerWad,
+      //         ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+      //       ])
+      //       await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, drawAUSD)
+      //       const alpacaStablecoinBalance2 = await alpacaStablecoin.balanceOf(aliceAddress)
+      //       const aliceAdjustPosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+      //       expect(
+      //         aliceAdjustPosition.lockedCollateral,
+      //         "lockedCollateral should be 2 ibDUMMY, because Alice doesn't add ibDUMMY"
+      //       ).to.be.equal(WeiPerWad.mul(2))
+      //       expect(aliceAdjustPosition.debtShare, "debtShare should be 2 AUSD, because Alice draw more").to.be.equal(
+      //         WeiPerWad.mul(2)
+      //       )
+      //       expect(
+      //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+      //         "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+      //       ).to.be.equal(0)
+      //       expect(alpacaStablecoinBalance2, "Alice should receive 2 AUSD from drawing 2 AUSD").to.be.equal(
+      //         WeiPerWad.mul(2)
+      //       )
+      //     })
+      //   })
+
+      context("move position", async () => {
+        context("same collateral pool", async () => {
+          context("call openLockTokenAndDraw and unlock collateral", async () => {
+            it("should success", async () => {
+              // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+              await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+
+              // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
+              const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+                "openLockTokenAndDraw",
+                [
+                  positionManager.address,
+                  stabilityFeeCollector.address,
+                  ibTokenAdapter.address,
+                  stablecoinAdapter.address,
+                  COLLATERAL_POOL_ID,
+                  WeiPerWad,
+                  WeiPerWad,
+                  true,
+                  ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+                ]
+              )
+              await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+              await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+              const alicePositionAddress = await positionManager.positions(1)
+              const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+              const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+              expect(
+                alicePosition.lockedCollateral,
+                "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+              ).to.be.equal(WeiPerWad)
+              expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+                WeiPerWad
+              )
+              expect(
+                await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+                "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+              ).to.be.equal(0)
+              expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+
+              // 3. Alice open a second new position with 2 ibDUMMY and draw 1 AUSD at same collateral pool
+              const openPositionCall2 = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+                "openLockTokenAndDraw",
+                [
+                  positionManager.address,
+                  stabilityFeeCollector.address,
+                  ibTokenAdapter.address,
+                  stablecoinAdapter.address,
+                  COLLATERAL_POOL_ID,
+                  WeiPerWad.mul(2),
+                  WeiPerWad,
+                  true,
+                  ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+                ]
+              )
+              await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall2)
+              const alicePositionAddress2 = await positionManager.positions(2)
+              const alpacaStablecoinBalance2 = await alpacaStablecoin.balanceOf(aliceAddress)
+              const alicePosition2 = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress2)
+
+              expect(
+                alicePosition2.lockedCollateral,
+                "lockedCollateral should be 2 ibDUMMY, because Alice locked 2 ibDUMMY"
+              ).to.be.equal(WeiPerWad.mul(2))
+              expect(alicePosition2.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+                WeiPerWad
+              )
+              expect(
+                await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
+                "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+              ).to.be.equal(0)
+              expect(
+                alpacaStablecoinBalance2,
+                "Alice should receive 2 AUSD from drawing 1 AUSD 2 times form 2 positions"
+              ).to.be.equal(WeiPerWad.mul(2))
+
+              // 4. Alice try to unlock 1 ibDUMMY at second position
+              const adjustPosition = alpacaStablecoinProxyActions.interface.encodeFunctionData("adjustPosition", [
                 positionManager.address,
-                stabilityFeeCollector.address,
+                await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+                WeiPerWad.mul(-1),
+                0,
                 ibTokenAdapter.address,
-                stablecoinAdapter.address,
-                COLLATERAL_POOL_ID,
-                WeiPerWad.mul(2),
-                WeiPerWad,
-                true,
                 ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
-              ]
-            )
-            await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
-            await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall2)
-            const alicePositionAddress2 = await positionManager.positions(2)
-            const alpacaStablecoinBalance2 = await alpacaStablecoin.balanceOf(aliceAddress)
-            const alicePosition2 = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress2)
+              ])
+              await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, adjustPosition)
+              const aliceAdjustPosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress2)
+              expect(
+                aliceAdjustPosition.lockedCollateral,
+                "lockedCollateral should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY"
+              ).to.be.equal(WeiPerWad)
+              expect(
+                aliceAdjustPosition.debtShare,
+                "debtShare should be 1 AUSD, because Alice doesn't draw more"
+              ).to.be.equal(WeiPerWad)
+              expect(
+                await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
+                "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY into the position"
+              ).to.be.equal(WeiPerWad)
 
-            expect(
-              alicePosition2.lockedCollateral,
-              "lockedCollateral should be 2 ibDUMMY, because Alice locked 2 ibDUMMY"
-            ).to.be.equal(WeiPerWad.mul(2))
-            expect(alicePosition2.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
-              WeiPerWad
-            )
-            expect(
-              await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
-              "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
-            ).to.be.equal(0)
-            expect(
-              alpacaStablecoinBalance2,
-              "Alice should receive 2 AUSD from drawing 1 AUSD 2 times form 2 positions"
-            ).to.be.equal(WeiPerWad.mul(2))
+              // 5. Alice try to move position from second position to first position
+              const movePosition = alpacaStablecoinProxyActions.interface.encodeFunctionData("movePosition", [
+                positionManager.address,
+                2,
+                1,
+              ])
+              await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, movePosition)
+              const alicemovePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+              const alpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
+              expect(
+                alicemovePosition.lockedCollateral,
+                "lockedCollateral should be 2 ibDUMMY, because Alice moving position will be move lock collateral"
+              ).to.be.equal(WeiPerWad.mul(2))
+              expect(
+                alicemovePosition.debtShare,
+                "debtShare should be 2 AUSD, because Alice moving position will be move debtShare"
+              ).to.be.equal(WeiPerWad.mul(2))
+              expect(
+                await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
+                "collateralToken inside Alice's position address should still be 1 ibDUMMY, because Alice moving position will not move collateral"
+              ).to.be.equal(WeiPerWad)
+              expect(
+                await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+                "collateralToken inside Alice's position address should still be 0 ibDUMMY, because Alice moving position will not move collateral"
+              ).to.be.equal(0)
+              expect(
+                alpacaStablecoinBalancefinal,
+                "Alice should receive 2 AUSD from drawing 2 AUSD, because Alice draw 2 times"
+              ).to.be.equal(WeiPerWad.mul(2))
+            })
+          })
 
-            // 4. Alice try to unlock 1 ibDUMMY at second position
-            const adjustPosition = alpacaStablecoinProxyActions.interface.encodeFunctionData("adjustPosition", [
-              positionManager.address,
-              await positionManager.ownerLastPositionId(aliceProxyWallet.address),
-              WeiPerWad.mul(-1),
-              0,
-              ibTokenAdapter.address,
-              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
-            ])
-            await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, adjustPosition)
-            const aliceAdjustPosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress2)
-            expect(
-              aliceAdjustPosition.lockedCollateral,
-              "lockedCollateral should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY"
-            ).to.be.equal(WeiPerWad)
-            expect(
-              aliceAdjustPosition.debtShare,
-              "debtShare should be 1 AUSD, because Alice doesn't draw more"
-            ).to.be.equal(WeiPerWad)
-            expect(
-              await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
-              "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY into the position"
-            ).to.be.equal(WeiPerWad)
+          context("and move to Bob", async () => {
+            it("should success", async () => {
+              // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+              await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
 
-            // 5. Alice try to move collateral from second position to first position
-            const moveCollateral = alpacaStablecoinProxyActions.interface.encodeFunctionData("moveCollateral", [
-              positionManager.address,
-              await positionManager.ownerLastPositionId(aliceProxyWallet.address),
-              alicePositionAddress,
-              WeiPerWad,
-              ibTokenAdapter.address,
-              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
-            ])
-            await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, moveCollateral)
-            const aliceMoveCollateral = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
-            const alpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
-            expect(
-              aliceMoveCollateral.lockedCollateral,
-              "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
-            ).to.be.equal(WeiPerWad)
-            expect(
-              aliceMoveCollateral.debtShare,
-              "debtShare should be 1 AUSD, because Alice doesn't draw more"
-            ).to.be.equal(WeiPerWad)
-            expect(
-              await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
-              "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice move 1 ibDUMMY at second position into first position"
-            ).to.be.equal(WeiPerWad)
-            expect(
-              alpacaStablecoinBalancefinal,
-              "Alice should receive 2 AUSD from drawing 2 AUSD, because Alice draw 2 times"
-            ).to.be.equal(WeiPerWad.mul(2))
+              // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
+              const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+                "openLockTokenAndDraw",
+                [
+                  positionManager.address,
+                  stabilityFeeCollector.address,
+                  ibTokenAdapter.address,
+                  stablecoinAdapter.address,
+                  COLLATERAL_POOL_ID,
+                  WeiPerWad,
+                  WeiPerWad,
+                  true,
+                  ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+                ]
+              )
+              await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+              await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+              const alicePositionAddress = await positionManager.positions(1)
+              const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+              const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+              expect(
+                alicePosition.lockedCollateral,
+                "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+              ).to.be.equal(WeiPerWad)
+              expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+                WeiPerWad
+              )
+              expect(
+                await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+                "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+              ).to.be.equal(0)
+              expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+
+              // 4. Bob open a position with 1 ibDUMMY and draw 1 AUSD
+              const bobOpenPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+                "openLockTokenAndDraw",
+                [
+                  positionManager.address,
+                  stabilityFeeCollector.address,
+                  ibTokenAdapter.address,
+                  stablecoinAdapter.address,
+                  COLLATERAL_POOL_ID,
+                  WeiPerWad,
+                  WeiPerWad,
+                  true,
+                  ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]),
+                ]
+              )
+              await ibDUMMYasBob.approve(bobProxyWallet.address, WeiPerWad.mul(10000))
+              await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, bobOpenPositionCall)
+              const bobPositionAddress = await positionManager.positions(2)
+              const bobAlpacaStablecoinBalance = await alpacaStablecoin.balanceOf(bobAddress)
+              const bobPosition = await bookKeeper.positions(COLLATERAL_POOL_ID, bobPositionAddress)
+
+              expect(
+                bobPosition.lockedCollateral,
+                "lockedCollateral should be 1 ibDUMMY, because Bob locked 1 ibDUMMY"
+              ).to.be.equal(WeiPerWad)
+              expect(bobPosition.debtShare, "debtShare should be 1 AUSD, because Bob drew 1 AUSD").to.be.equal(
+                WeiPerWad
+              )
+              expect(
+                await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobPositionAddress),
+                "collateralToken inside Bob's position address should be 0 ibDUMMY, because Bob locked all ibDUMMY into the position"
+              ).to.be.equal(0)
+              expect(bobAlpacaStablecoinBalance, "Bob should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+
+              //5. Alice allow Bob to manage position
+              const allowManagePosition = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+                "allowManagePosition",
+                [positionManager.address, 1, bobAddress, 1]
+              )
+              await aliceProxyWallet["execute(address,bytes)"](
+                alpacaStablecoinProxyActions.address,
+                allowManagePosition
+              )
+              expect(await positionManager.ownerWhitelist(aliceAddress, 1, bobAddress)).to.be.equal(1)
+              // 5. Alice try to move collateral to bob position
+              const movePosition = alpacaStablecoinProxyActions.interface.encodeFunctionData("movePosition", [
+                positionManager.address,
+                2,
+                1,
+              ])
+              await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, movePosition)
+              const aliceAlpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
+              const bobAlpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(bobAddress)
+              const alicePositionAfterMovePosition = await bookKeeper.positions(
+                COLLATERAL_POOL_ID,
+                alicePositionAddress
+              )
+              expect(
+                alicePositionAfterMovePosition.lockedCollateral,
+                "lockedCollateral should be 2 ibDUMMY, because Bob move locked 1 ibDUMMY to Alice"
+              ).to.be.equal(WeiPerWad.mul(2))
+              expect(
+                alicePositionAfterMovePosition.debtShare,
+                "debtShare should be 1 AUSD, because Bob move DebtShare to Alice"
+              ).to.be.equal(WeiPerWad.mul(2))
+              expect(
+                await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+                "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice all lock collateral"
+              ).to.be.equal(0)
+              expect(
+                await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobPositionAddress),
+                "collateralToken inside Bob's position address should be 0 ibDUMMY, because Bob all lock collateral"
+              ).to.be.equal(0)
+              expect(
+                aliceAlpacaStablecoinBalancefinal,
+                "Alice should receive 1 AUSD, because Alice draw 1 time"
+              ).to.be.equal(WeiPerWad)
+              expect(bobAlpacaStablecoinBalancefinal, "Bob should receive 1 AUSD, because Bob draw 1 time").to.be.equal(
+                WeiPerWad
+              )
+            })
           })
         })
+
+        // context("between 2 collateral pool", async () => {
+        //   context("call openLockTokenAndDraw and unlock collateral", async () => {
+        //     it("should success", async () => {
+        //       // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+        //       await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+
+        //       // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
+        //       const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+        //         "openLockTokenAndDraw",
+        //         [
+        //           positionManager.address,
+        //           stabilityFeeCollector.address,
+        //           ibTokenAdapter.address,
+        //           stablecoinAdapter.address,
+        //           COLLATERAL_POOL_ID,
+        //           WeiPerWad,
+        //           WeiPerWad,
+        //           true,
+        //           ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+        //         ]
+        //       )
+        //       await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+        //       await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+        //       const alicePositionAddress = await positionManager.positions(1)
+        //       const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+        //       const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+        //       expect(
+        //         alicePosition.lockedCollateral,
+        //         "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+        //       ).to.be.equal(WeiPerWad)
+        //       expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+        //         WeiPerWad
+        //       )
+        //       expect(
+        //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+        //         "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+        //       ).to.be.equal(0)
+        //       expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+
+        //       // 3. Alice open a second new position with 2 ibDUMMY and draw 1 AUSD at new collateral pool
+        //       const openPositionCall2 = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+        //         "openLockTokenAndDraw",
+        //         [
+        //           positionManager.address,
+        //           stabilityFeeCollector.address,
+        //           ibTokenAdapter2.address,
+        //           stablecoinAdapter.address,
+        //           COLLATERAL_POOL_ID2,
+        //           WeiPerWad.mul(2),
+        //           WeiPerWad,
+        //           true,
+        //           ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+        //         ]
+        //       )
+        //       await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall2)
+        //       const alicePositionAddress2 = await positionManager.positions(2)
+        //       const alpacaStablecoinBalance2 = await alpacaStablecoin.balanceOf(aliceAddress)
+        //       const alicePosition2 = await bookKeeper.positions(COLLATERAL_POOL_ID2, alicePositionAddress2)
+
+        //       expect(
+        //         alicePosition2.lockedCollateral,
+        //         "lockedCollateral should be 2 ibDUMMY, because Alice locked 2 ibDUMMY"
+        //       ).to.be.equal(WeiPerWad.mul(2))
+        //       expect(alicePosition2.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+        //         WeiPerWad
+        //       )
+        //       expect(
+        //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress2),
+        //         "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
+        //       ).to.be.equal(0)
+        //       expect(
+        //         alpacaStablecoinBalance2,
+        //         "Alice should receive 2 AUSD from drawing 1 AUSD 2 times form 2 positions"
+        //       ).to.be.equal(WeiPerWad.mul(2))
+
+        //       // 4. Alice try to unlock 1 ibDUMMY at second position
+        //       const adjustPosition = alpacaStablecoinProxyActions.interface.encodeFunctionData("adjustPosition", [
+        //         positionManager.address,
+        //         await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+        //         WeiPerWad.mul(-1),
+        //         0,
+        //         ibTokenAdapter2.address,
+        //         ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+        //       ])
+        //       await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, adjustPosition)
+        //       const aliceAdjustPosition = await bookKeeper.positions(COLLATERAL_POOL_ID2, alicePositionAddress2)
+        //       expect(
+        //         aliceAdjustPosition.lockedCollateral,
+        //         "lockedCollateral should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY"
+        //       ).to.be.equal(WeiPerWad)
+        //       expect(
+        //         aliceAdjustPosition.debtShare,
+        //         "debtShare should be 1 AUSD, because Alice doesn't draw more"
+        //       ).to.be.equal(WeiPerWad)
+        //       expect(
+        //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress2),
+        //         "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY into the position"
+        //       ).to.be.equal(WeiPerWad)
+
+        //       // 5. Alice try to move collateral from second position to first position
+        //       const moveCollateral = alpacaStablecoinProxyActions.interface.encodeFunctionData("moveCollateral", [
+        //         positionManager.address,
+        //         await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+        //         alicePositionAddress,
+        //         WeiPerWad,
+        //         ibTokenAdapter2.address,
+        //         ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+        //       ])
+        //       await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, moveCollateral)
+        //       const aliceMoveCollateral = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+        //       const alpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
+        //       expect(
+        //         aliceMoveCollateral.lockedCollateral,
+        //         "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+        //       ).to.be.equal(WeiPerWad)
+        //       expect(
+        //         aliceMoveCollateral.debtShare,
+        //         "debtShare should be 1 AUSD, because Alice doesn't draw more"
+        //       ).to.be.equal(WeiPerWad)
+        //       expect(
+        //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+        //         "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice can't move 1 ibDUMMY at second position into first position across collater pool"
+        //       ).to.be.equal(0)
+        //       expect(
+        //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress2),
+        //         "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice move 1 ibDUMMY into new address"
+        //       ).to.be.equal(0)
+        //       expect(
+        //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress),
+        //         "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice move 1 ibDUMMY form alice's address 2 into new address that reuse address 1"
+        //       ).to.be.equal(WeiPerWad)
+        //       expect(
+        //         alpacaStablecoinBalancefinal,
+        //         "Alice should receive 2 AUSD from drawing 2 AUSD, because Alice draw 2 times"
+        //       ).to.be.equal(WeiPerWad.mul(2))
+        //     })
+        //   })
+
+        //   context("and move to Bob", async () => {
+        //     it("should success", async () => {
+        //       // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
+        //       await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+
+        //       // 2. Alice open position
+        //       const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("open", [
+        //         positionManager.address,
+        //         COLLATERAL_POOL_ID,
+        //         aliceProxyWallet.address,
+        //       ])
+        //       await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+        //       await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+        //       const alicePositionAddress = await positionManager.positions(1)
+        //       const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
+
+        //       expect(
+        //         alicePosition.lockedCollateral,
+        //         "lockedCollateral should be 0 ibDUMMY, because Alice doesn't locked ibDUMMY"
+        //       ).to.be.equal(0)
+        //       expect(alicePosition.debtShare, "debtShare should be 0 AUSD, because doesn't drew AUSD").to.be.equal(0)
+
+        //       // 3. Alice deposit 3 ibDUMMY to new position
+        //       const depositPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+        //         "tokenAdapterDeposit",
+        //         [
+        //           ibTokenAdapter.address,
+        //           await positionManager.positions(1),
+        //           WeiPerWad.mul(3),
+        //           true,
+        //           ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+        //         ]
+        //       )
+        //       await aliceProxyWallet["execute(address,bytes)"](
+        //         alpacaStablecoinProxyActions.address,
+        //         depositPositionCall
+        //       )
+
+        //       expect(
+        //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+        //         "collateralToken inside Alice's second position address should be 3 ibDUMMY, because Alice deposit 3 ibDUMMY into the second position"
+        //       ).to.be.equal(WeiPerWad.mul(3))
+
+        //       // 4. Bob open a position with 1 ibDUMMY and draw 1 AUSD at collateral pool id 2
+        //       const bobOpenPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+        //         "openLockTokenAndDraw",
+        //         [
+        //           positionManager.address,
+        //           stabilityFeeCollector.address,
+        //           ibTokenAdapter2.address,
+        //           stablecoinAdapter.address,
+        //           COLLATERAL_POOL_ID2,
+        //           WeiPerWad,
+        //           WeiPerWad,
+        //           true,
+        //           ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]),
+        //         ]
+        //       )
+        //       await ibDUMMYasBob.approve(bobProxyWallet.address, WeiPerWad.mul(10000))
+        //       await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, bobOpenPositionCall)
+        //       const bobPositionAddress = await positionManager.positions(2)
+        //       const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(bobAddress)
+        //       const bobPosition = await bookKeeper.positions(COLLATERAL_POOL_ID2, bobPositionAddress)
+
+        //       expect(
+        //         bobPosition.lockedCollateral,
+        //         "lockedCollateral should be 1 ibDUMMY, because Bob locked 1 ibDUMMY"
+        //       ).to.be.equal(WeiPerWad)
+        //       expect(bobPosition.debtShare, "debtShare should be 1 AUSD, because Bob drew 1 AUSD").to.be.equal(
+        //         WeiPerWad
+        //       )
+        //       expect(
+        //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, bobPositionAddress),
+        //         "collateralToken inside Bob's position address should be 0 ibDUMMY, because Bob locked all ibDUMMY into the position"
+        //       ).to.be.equal(0)
+        //       expect(alpacaStablecoinBalance, "Bob should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+
+        //       // 5. Alice try to move collateral to bob position
+        //       const moveCollateral = alpacaStablecoinProxyActions.interface.encodeFunctionData("moveCollateral", [
+        //         positionManager.address,
+        //         await positionManager.ownerLastPositionId(aliceProxyWallet.address),
+        //         bobPositionAddress,
+        //         WeiPerWad,
+        //         ibTokenAdapter.address,
+        //         ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+        //       ])
+        //       await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, moveCollateral)
+        //       const aliceAlpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
+        //       const bobAlpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(bobAddress)
+        //       expect(
+        //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
+        //         "collateralToken inside Alice's position address should be 2 ibDUMMY, because Alice move 1 ibDUMMY at second position into first position"
+        //       ).to.be.equal(WeiPerWad.mul(2))
+        //       expect(
+        //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobPositionAddress),
+        //         "collateralToken inside new Bob's position address should be 1 ibDUMMY, because System auto create bob position at same collateral pool, so Alice can move 1 ibDUMMY into the new Bob's position"
+        //       ).to.be.equal(WeiPerWad)
+        //       expect(
+        //         await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, bobPositionAddress),
+        //         "collateralToken inside Bob's position address should be 0 ibDUMMY, because Alice can't move ibDUMMY across collateral pool"
+        //       ).to.be.equal(0)
+        //       expect(
+        //         aliceAlpacaStablecoinBalancefinal,
+        //         "Alice should receive 0 AUSD, because Alice doesn't draw"
+        //       ).to.be.equal(0)
+        //       expect(bobAlpacaStablecoinBalancefinal, "Bob should receive 1 AUSD, because Bob draw 1 time").to.be.equal(
+        //         WeiPerWad
+        //       )
+        //     })
+        //   })
+        // })
       })
     })
   })
