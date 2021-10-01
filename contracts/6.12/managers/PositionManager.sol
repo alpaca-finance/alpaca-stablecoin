@@ -20,20 +20,20 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
 
   /// @dev The lastest id that has been used
   uint256 public lastPositionId;
-  /// @dev Mapping of posId => positionHandler
+  /// @dev Mapping of positionId => positionHandler
   mapping(uint256 => address) public override positions;
-  /// @dev Mapping of posId => prev & next posId; Double linked list
+  /// @dev Mapping of positionId => prev & next positionId; Double linked list
   mapping(uint256 => List) public list;
-  /// @dev Mapping of posId => owner
+  /// @dev Mapping of positionId => owner
   mapping(uint256 => address) public override owners;
   /// @dev Mapping of positionHandler => owner
   mapping(address => address) public override mapPositionHandlerToOwner;
-  /// @dev Mapping of posId => collateralPool
+  /// @dev Mapping of positionId => collateralPool
   mapping(uint256 => bytes32) public override collateralPools;
 
-  /// @dev Mapping of owner => the first posId
+  /// @dev Mapping of owner => the first positionId
   mapping(address => uint256) public ownerFirstPositionId;
-  /// @dev Mapping of owner => the last posId
+  /// @dev Mapping of owner => the last positionId
   mapping(address => uint256) public ownerLastPositionId;
   /// @dev Mapping of owner => the number of positions he has
   mapping(address => uint256) public ownerPositionCount;
@@ -48,18 +48,24 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
     uint256 next;
   }
 
-  event NewPosition(address indexed usr, address indexed own, uint256 indexed posId);
-  event AllowManagePosition(address indexed caller, uint256 indexed posId, address owner, address user, uint256 ok);
+  event NewPosition(address indexed usr, address indexed own, uint256 indexed positionId);
+  event AllowManagePosition(
+    address indexed caller,
+    uint256 indexed positionId,
+    address owner,
+    address user,
+    uint256 ok
+  );
   event AllowMigratePosition(address indexed caller, address user, uint256 ok);
   event ExportPosition(
-    uint256 indexed posId,
+    uint256 indexed positionId,
     address source,
     address destination,
     uint256 lockedCollateral,
     uint256 debtShare
   );
   event ImportPosition(
-    uint256 indexed posId,
+    uint256 indexed positionId,
     address source,
     address destination,
     uint256 lockedCollateral,
@@ -68,8 +74,11 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   event MovePosition(uint256 sourceId, uint256 destinationId, uint256 lockedCollateral, uint256 debtShare);
 
   /// @dev Require that the caller must be position's owner or owner whitelist
-  modifier onlyOwnerAllowed(uint256 posId) {
-    require(msg.sender == owners[posId] || ownerWhitelist[owners[posId]][posId][msg.sender] == 1, "owner not allowed");
+  modifier onlyOwnerAllowed(uint256 positionId) {
+    require(
+      msg.sender == owners[positionId] || ownerWhitelist[owners[positionId]][positionId][msg.sender] == 1,
+      "owner not allowed"
+    );
     _;
   }
 
@@ -107,16 +116,16 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   }
 
   /// @dev Allow/disallow a user to manage the position
-  /// @param posId The position id
+  /// @param positionId The position id
   /// @param user The address to be allowed for managing the position
   /// @param ok Ok flag to allow/disallow. 1 for allow and 0 for disallow.
   function allowManagePosition(
-    uint256 posId,
+    uint256 positionId,
     address user,
     uint256 ok
-  ) public override onlyOwnerAllowed(posId) {
-    ownerWhitelist[owners[posId]][posId][user] = ok;
-    emit AllowManagePosition(msg.sender, posId, owners[posId], user, ok);
+  ) public override onlyOwnerAllowed(positionId) {
+    ownerWhitelist[owners[positionId]][positionId][user] = ok;
+    emit AllowManagePosition(msg.sender, positionId, owners[positionId], user, ok);
   }
 
   /// @dev Allow/disallow a user to importPosition/exportPosition from/to msg.sender
@@ -156,69 +165,69 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   }
 
   /// @dev Give the position ownership to a destination address
-  /// @param posId The position id to be given away ownership
+  /// @param positionId The position id to be given away ownership
   /// @param destination The destination to be a new owner of the position
-  function give(uint256 posId, address destination) public override onlyOwnerAllowed(posId) {
+  function give(uint256 positionId, address destination) public override onlyOwnerAllowed(positionId) {
     require(destination != address(0), "destination address(0)");
-    require(destination != owners[posId], "destination already owner");
+    require(destination != owners[positionId], "destination already owner");
 
     // Remove transferred position from double linked list of origin user and pointers
-    if (list[posId].prev != 0) {
+    if (list[positionId].prev != 0) {
       // Set the next pointer of the prev position (if exists) to the next of the transferred one
-      list[list[posId].prev].next = list[posId].next;
+      list[list[positionId].prev].next = list[positionId].next;
     }
 
-    if (list[posId].next != 0) {
+    if (list[positionId].next != 0) {
       // If wasn't the last one
       // Set the prev pointer of the next position to the prev of the transferred one
-      list[list[posId].next].prev = list[posId].prev;
+      list[list[positionId].next].prev = list[positionId].prev;
     } else {
       // If was the last one
       // Update last pointer of the owner
-      ownerLastPositionId[owners[posId]] = list[posId].prev;
+      ownerLastPositionId[owners[positionId]] = list[positionId].prev;
     }
 
-    if (ownerFirstPositionId[owners[posId]] == posId) {
+    if (ownerFirstPositionId[owners[positionId]] == positionId) {
       // If was the first one
       // Update first pointer of the owner
-      ownerFirstPositionId[owners[posId]] = list[posId].next;
+      ownerFirstPositionId[owners[positionId]] = list[positionId].next;
     }
-    ownerPositionCount[owners[posId]] = _safeSub(ownerPositionCount[owners[posId]], 1);
+    ownerPositionCount[owners[positionId]] = _safeSub(ownerPositionCount[owners[positionId]], 1);
 
     // Transfer ownership
-    owners[posId] = destination;
-    mapPositionHandlerToOwner[positions[posId]] = destination;
+    owners[positionId] = destination;
+    mapPositionHandlerToOwner[positions[positionId]] = destination;
 
     // Add transferred position to double linked list of destiny user and pointers
-    list[posId].prev = ownerLastPositionId[destination];
-    list[posId].next = 0;
+    list[positionId].prev = ownerLastPositionId[destination];
+    list[positionId].next = 0;
     if (ownerLastPositionId[destination] != 0) {
-      list[ownerLastPositionId[destination]].next = posId;
+      list[ownerLastPositionId[destination]].next = positionId;
     }
     if (ownerFirstPositionId[destination] == 0) {
-      ownerFirstPositionId[destination] = posId;
+      ownerFirstPositionId[destination] = positionId;
     }
-    ownerLastPositionId[destination] = posId;
+    ownerLastPositionId[destination] = positionId;
     ownerPositionCount[destination] = _safeAdd(ownerPositionCount[destination], 1);
   }
 
   /// @dev Adjust the position keeping the generated stablecoin
   /// or collateral freed in the positionHandler address.
-  /// @param posId The position id to be adjusted
+  /// @param positionId The position id to be adjusted
   /// @param collateralValue The collateralValue to be adjusted
   /// @param debtShare The debtShare to be adjusted
   /// @param adapter The adapter to be called once the position is adjusted
   /// @param data The extra data for adapter
   function adjustPosition(
-    uint256 posId,
+    uint256 positionId,
     int256 collateralValue,
     int256 debtShare,
     address adapter,
     bytes calldata data
-  ) public override onlyOwnerAllowed(posId) {
-    address positionAddress = positions[posId];
+  ) public override onlyOwnerAllowed(positionId) {
+    address positionAddress = positions[positionId];
     IBookKeeper(bookKeeper).adjustPosition(
-      collateralPools[posId],
+      collateralPools[positionId],
       positionAddress,
       positionAddress,
       positionAddress,
@@ -229,98 +238,101 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   }
 
   /// @dev Transfer wad amount of position's collateral from the positionHandler address to a destination address.
-  /// @param posId The position id to move collateral from
+  /// @param positionId The position id to move collateral from
   /// @param destination The destination to received collateral
   /// @param wad The amount in wad to be moved
   /// @param adapter The adapter to be called when collateral has been moved
   /// @param data The extra data for the adapter
   function moveCollateral(
-    uint256 posId,
+    uint256 positionId,
     address destination,
     uint256 wad,
     address adapter,
     bytes calldata data
-  ) public override onlyOwnerAllowed(posId) {
-    IBookKeeper(bookKeeper).moveCollateral(collateralPools[posId], positions[posId], destination, wad);
-    IGenericTokenAdapter(adapter).onMoveCollateral(positions[posId], destination, wad, data);
+  ) public override onlyOwnerAllowed(positionId) {
+    IBookKeeper(bookKeeper).moveCollateral(collateralPools[positionId], positions[positionId], destination, wad);
+    IGenericTokenAdapter(adapter).onMoveCollateral(positions[positionId], destination, wad, data);
   }
 
   /// @dev Transfer wad amount of any type of collateral (collateralPoolId) from the positionHandler address to the destination address
   /// This function has the purpose to take away collateral from the system that doesn't correspond to the position but was sent there wrongly
   /// @param collateralPoolId The collateral pool id
-  /// @param posId The position id to move collateral from
+  /// @param positionId The position id to move collateral from
   /// @param destination The destination to recevied collateral
   /// @param wad The amount in wad to be moved
   /// @param adapter The adapter to be called once collateral is moved
   /// @param data The extra datat to be passed to the adapter
   function moveCollateral(
     bytes32 collateralPoolId,
-    uint256 posId,
+    uint256 positionId,
     address destination,
     uint256 wad,
     address adapter,
     bytes calldata data
-  ) public onlyOwnerAllowed(posId) {
-    IBookKeeper(bookKeeper).moveCollateral(collateralPoolId, positions[posId], destination, wad);
-    IGenericTokenAdapter(adapter).onMoveCollateral(positions[posId], destination, wad, data);
+  ) public onlyOwnerAllowed(positionId) {
+    IBookKeeper(bookKeeper).moveCollateral(collateralPoolId, positions[positionId], destination, wad);
+    IGenericTokenAdapter(adapter).onMoveCollateral(positions[positionId], destination, wad, data);
   }
 
   /// @dev Transfer rad amount of stablecoin from the positionHandler address to the destination address
-  /// @param posId The position id to move stablecoin from
+  /// @param positionId The position id to move stablecoin from
   /// @param destination The destination to received stablecoin
   /// @param rad The amount in rad to be moved
   function moveStablecoin(
-    uint256 posId,
+    uint256 positionId,
     address destination,
     uint256 rad
-  ) public override onlyOwnerAllowed(posId) {
-    IBookKeeper(bookKeeper).moveStablecoin(positions[posId], destination, rad);
+  ) public override onlyOwnerAllowed(positionId) {
+    IBookKeeper(bookKeeper).moveStablecoin(positions[positionId], destination, rad);
   }
 
   /// @dev Export the positions's lockedCollateral and debtShare to a different destination address
   /// The destination address must allow position's owner to do so.
-  /// @param posId The position id to be exported
+  /// @param positionId The position id to be exported
   /// @param destination The PositionHandler to be exported to
-  function exportPosition(uint256 posId, address destination)
+  function exportPosition(uint256 positionId, address destination)
     public
     override
-    onlyOwnerAllowed(posId)
+    onlyOwnerAllowed(positionId)
     onlyMigrationAllowed(destination)
   {
     (uint256 lockedCollateral, uint256 debtShare) = IBookKeeper(bookKeeper).positions(
-      collateralPools[posId],
-      positions[posId]
+      collateralPools[positionId],
+      positions[positionId]
     );
     IBookKeeper(bookKeeper).movePosition(
-      collateralPools[posId],
-      positions[posId],
+      collateralPools[positionId],
+      positions[positionId],
       destination,
       _safeToInt(lockedCollateral),
       _safeToInt(debtShare)
     );
-    emit ExportPosition(posId, positions[posId], destination, lockedCollateral, debtShare);
+    emit ExportPosition(positionId, positions[positionId], destination, lockedCollateral, debtShare);
   }
 
   /// @dev Import lockedCollateral and debtShare from the source address to
   /// the PositionHandler owned by the PositionManager.
   /// The source address must allow position's owner to do so.
   /// @param source The source PositionHandler to be moved to this PositionManager
-  /// @param posId The position id to be moved to this PositionManager
-  function importPosition(address source, uint256 posId)
+  /// @param positionId The position id to be moved to this PositionManager
+  function importPosition(address source, uint256 positionId)
     public
     override
     onlyMigrationAllowed(source)
-    onlyOwnerAllowed(posId)
+    onlyOwnerAllowed(positionId)
   {
-    (uint256 lockedCollateral, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPools[posId], source);
+    (uint256 lockedCollateral, uint256 debtShare) = IBookKeeper(bookKeeper).positions(
+      collateralPools[positionId],
+      source
+    );
     IBookKeeper(bookKeeper).movePosition(
-      collateralPools[posId],
+      collateralPools[positionId],
       source,
-      positions[posId],
+      positions[positionId],
       _safeToInt(lockedCollateral),
       _safeToInt(debtShare)
     );
-    emit ImportPosition(posId, source, positions[posId], lockedCollateral, debtShare);
+    emit ImportPosition(positionId, source, positions[positionId], lockedCollateral, debtShare);
   }
 
   /// @dev Move position's lockedCollateral and debtShare

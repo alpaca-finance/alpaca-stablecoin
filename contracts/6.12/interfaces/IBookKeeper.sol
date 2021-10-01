@@ -89,8 +89,6 @@ interface IBookKeeper {
     uint256 value // [rad]
   ) external;
 
-  function cage() external;
-
   function collateralPools(bytes32 collateralPoolId)
     external
     view
@@ -110,7 +108,7 @@ interface IBookKeeper {
 
   function systemBadDebt(address ownerAddress) external view returns (uint256); // [rad]
 
-  function settleSystemBadDebt(uint256 value) external;
+  function settleSystemBadDebt(uint256 value) external; // [rad]
 
   function whitelist(address toBeWhitelistedAddress) external;
 

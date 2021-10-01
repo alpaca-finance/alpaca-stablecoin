@@ -31,6 +31,7 @@ import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IPriceOracle.sol";
 import "../interfaces/ISystemDebtEngine.sol";
 import "../interfaces/IGenericTokenAdapter.sol";
+import "../interfaces/ICagable.sol";
 
 /*
     This is the `End` and it coordinates Global Settlement. This is an
@@ -283,10 +284,10 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
     require(live == 1, "ShowStopper/not-live");
     live = 0;
     cagedTimestamp = block.timestamp;
-    bookKeeper.cage();
-    liquidationEngine.cage();
-    systemDebtEngine.cage();
-    priceOracle.cage();
+    ICagable(address(bookKeeper)).cage();
+    ICagable(address(liquidationEngine)).cage();
+    ICagable(address(systemDebtEngine)).cage();
+    ICagable(address(priceOracle)).cage();
     emit Cage();
   }
 

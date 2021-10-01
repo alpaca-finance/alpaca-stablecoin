@@ -1855,16 +1855,68 @@ describe("BookKeeper", () => {
     context("when owner role can access", () => {
       it("should be success", async () => {
         // grant role access
-        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-        bookKeeper.cage()
+        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), aliceAddress)
+
+        expect(await bookKeeperAsAlice.live()).to.be.equal(1)
+
+        await expect(bookKeeperAsAlice.cage()).to.emit(bookKeeperAsAlice, "Cage").withArgs()
+
+        expect(await bookKeeperAsAlice.live()).to.be.equal(0)
       })
     })
 
     context("when show stopper role can access", () => {
       it("should be success", async () => {
         // grant role access
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), deployerAddress)
-        bookKeeper.cage()
+        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), aliceAddress)
+
+        expect(await bookKeeperAsAlice.live()).to.be.equal(1)
+
+        await expect(bookKeeperAsAlice.cage()).to.emit(bookKeeperAsAlice, "Cage").withArgs()
+
+        expect(await bookKeeperAsAlice.live()).to.be.equal(0)
+      })
+    })
+  })
+
+  describe("#uncage", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(bookKeeperAsAlice.uncage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
+      })
+    })
+
+    context("when owner role can access", () => {
+      it("should be success", async () => {
+        // grant role access
+        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), aliceAddress)
+
+        expect(await bookKeeperAsAlice.live()).to.be.equal(1)
+
+        await bookKeeperAsAlice.cage()
+
+        expect(await bookKeeperAsAlice.live()).to.be.equal(0)
+
+        await expect(bookKeeperAsAlice.uncage()).to.emit(bookKeeperAsAlice, "Uncage").withArgs()
+
+        expect(await bookKeeperAsAlice.live()).to.be.equal(1)
+      })
+    })
+
+    context("when show stopper role can access", () => {
+      it("should be success", async () => {
+        // grant role access
+        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), aliceAddress)
+
+        expect(await bookKeeperAsAlice.live()).to.be.equal(1)
+
+        await bookKeeperAsAlice.cage()
+
+        expect(await bookKeeperAsAlice.live()).to.be.equal(0)
+
+        await expect(bookKeeperAsAlice.uncage()).to.emit(bookKeeperAsAlice, "Uncage").withArgs()
+
+        expect(await bookKeeperAsAlice.live()).to.be.equal(1)
       })
     })
   })
