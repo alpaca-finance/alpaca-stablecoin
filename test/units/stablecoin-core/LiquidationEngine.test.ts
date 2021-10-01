@@ -85,6 +85,8 @@ describe("LiquidationEngine", () => {
             formatBytes32String("BNB"),
             aliceAddress,
             UnitHelpers.WeiPerWad,
+            UnitHelpers.WeiPerWad,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
           )
         ).to.be.revertedWith("LiquidationEngine/not-live")
@@ -97,9 +99,11 @@ describe("LiquidationEngine", () => {
             formatBytes32String("BNB"),
             aliceAddress,
             0,
+            0,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
           )
-        ).to.be.revertedWith("LiquidationEngine/zero-debtShareToRepay")
+        ).to.be.revertedWith("LiquidationEngine/zero-debt-value-to-be-liquidated")
       })
     })
     context("when liquidation engine colllteral pool does not set strategy", () => {
@@ -121,9 +125,11 @@ describe("LiquidationEngine", () => {
             formatBytes32String("BNB"),
             aliceAddress,
             UnitHelpers.WeiPerWad,
+            UnitHelpers.WeiPerWad,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
           )
-        ).to.be.revertedWith("LiquidationEngine/not-setStrategy")
+        ).to.be.revertedWith("LiquidationEngine/not-set-strategy")
       })
     })
     context("when position is safe", () => {
@@ -147,9 +153,11 @@ describe("LiquidationEngine", () => {
             formatBytes32String("BNB"),
             aliceAddress,
             UnitHelpers.WeiPerWad,
+            UnitHelpers.WeiPerWad,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
           )
-        ).to.be.revertedWith("LiquidationEngine/not-unsafe")
+        ).to.be.revertedWith("LiquidationEngine/position-is-safe")
       })
     })
     context("when liquidating in position", () => {
@@ -175,6 +183,8 @@ describe("LiquidationEngine", () => {
           formatBytes32String("BNB"),
           aliceAddress,
           UnitHelpers.WeiPerWad,
+          UnitHelpers.WeiPerWad,
+          deployerAddress,
           ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
         )
 
@@ -336,6 +346,8 @@ describe("LiquidationEngine", () => {
             formatBytes32String("BNB"),
             aliceAddress,
             UnitHelpers.WeiPerWad,
+            UnitHelpers.WeiPerWad,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
           )
         ).to.be.revertedWith("Pausable: paused")
@@ -398,6 +410,8 @@ describe("LiquidationEngine", () => {
           formatBytes32String("BNB"),
           aliceAddress,
           UnitHelpers.WeiPerWad,
+          UnitHelpers.WeiPerWad,
+          deployerAddress,
           ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
         )
 
