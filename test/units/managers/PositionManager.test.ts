@@ -13,7 +13,7 @@ import {
   TokenAdapter,
 } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
-import { WeiPerRad, WeiPerWad } from "../../helper/unit"
+import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 
 chai.use(solidity)
 const { expect } = chai
@@ -104,12 +104,21 @@ describe("PositionManager", () => {
     context("when supply zero address", () => {
       it("should revert", async () => {
         await expect(positionManager.open(formatBytes32String("BNB"), AddressZero)).to.be.revertedWith(
-          "user address(0)"
+          "PositionManager/user-address(0)"
+        )
+      })
+    })
+    context("when collateral pool doesn't init", () => {
+      it("should revert", async () => {
+        await expect(positionManager.open(formatBytes32String("BNB"), aliceAddress)).to.be.revertedWith(
+          "PositionManager/collateralPool-not-init"
         )
       })
     })
     context("when parameters are valid", () => {
       it("should be able to open CDP with an incremental CDP index", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
+
         expect(await positionManager.owners(1)).to.equal(AddressZero)
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         expect(await positionManager.lastPositionId()).to.bignumber.equal(1)
@@ -131,24 +140,28 @@ describe("PositionManager", () => {
   describe("#give()", () => {
     context("when caller has no access to the position (or have no allowance)", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(positionManager.give(1, aliceAddress)).to.be.revertedWith("owner not allowed")
       })
     })
     context("when input destination as zero address", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(positionManagerAsAlice.give(1, AddressZero)).to.be.revertedWith("destination address(0)")
       })
     })
     context("when input destination as current owner address", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(positionManagerAsAlice.give(1, aliceAddress)).to.be.revertedWith("destination already owner")
       })
     })
     context("when parameters are valid", () => {
       it("should be able to change the owner of CDP ", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         expect(await positionManager.owners(1)).to.equal(aliceAddress)
         await positionManagerAsAlice.give(1, bobAddress)
@@ -160,12 +173,14 @@ describe("PositionManager", () => {
   describe("#allowManagePosition()", () => {
     context("when caller has no access to the position (or have no allowance)", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(positionManager.allowManagePosition(1, aliceAddress, 1)).to.be.revertedWith("owner not allowed")
       })
     })
     context("when parameters are valid", () => {
       it("should be able to add user allowance to a position", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         expect(await positionManager.ownerWhitelist(aliceAddress, 1, bobAddress)).to.be.equal(0)
         await positionManagerAsAlice.allowManagePosition(1, bobAddress, 1)
@@ -189,6 +204,7 @@ describe("PositionManager", () => {
   describe("#list()", () => {
     context("when a few position has been opened", () => {
       it("should work as a linklist perfectly", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         // Alice open position 1-3
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
@@ -257,6 +273,7 @@ describe("PositionManager", () => {
   describe("#adjustPosition()", () => {
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(
           positionManager.adjustPosition(1, parseEther("1"), parseEther("50"), mockedTokenAdapter.address, "0x")
@@ -265,6 +282,7 @@ describe("PositionManager", () => {
     })
     context("when parameters are valid", async () => {
       it("should be able to call BookKeeper.adjustPosition", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         const positionAddress = await positionManager.positions(1)
 
@@ -300,6 +318,7 @@ describe("PositionManager", () => {
   describe("#moveCollateral(uint256,address,uint256,address,bytes)", () => {
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(
           positionManager["moveCollateral(uint256,address,uint256,address,bytes)"](
@@ -314,6 +333,7 @@ describe("PositionManager", () => {
     })
     context("when parameters are valid", async () => {
       it("should be able to call moveCollateral(uint256,address,uint256,address,bytes)", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         const positionAddress = await positionManager.positions(1)
 
@@ -347,6 +367,7 @@ describe("PositionManager", () => {
   describe("#moveCollateral(bytes32,uint256,address,uint256,address,bytes)", () => {
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(
           positionManager["moveCollateral(bytes32,uint256,address,uint256,address,bytes)"](
@@ -362,6 +383,7 @@ describe("PositionManager", () => {
     })
     context("when parameters are valid", async () => {
       it("should be able to call moveCollateral(bytes32,uint256,address,uint256,address,bytes)", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         const positionAddress = await positionManager.positions(1)
 
@@ -394,6 +416,7 @@ describe("PositionManager", () => {
   describe("#moveStablecoin()", () => {
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(positionManager.moveStablecoin(1, bobAddress, WeiPerRad.mul(10))).to.be.revertedWith(
           "owner not allowed"
@@ -402,6 +425,7 @@ describe("PositionManager", () => {
     })
     context("when parameters are valid", async () => {
       it("should be able to call moveStablecoin()", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         const positionAddress = await positionManager.positions(1)
 
@@ -420,12 +444,14 @@ describe("PositionManager", () => {
   describe("#exportPosition()", () => {
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(positionManagerAsBob.exportPosition(1, bobAddress)).to.be.revertedWith("owner not allowed")
       })
     })
     context("when destination (Bob) has no migration access on caller (Alice)", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await positionManagerAsAlice.allowManagePosition(1, bobAddress, 1)
         await expect(positionManagerAsAlice.exportPosition(1, bobAddress)).to.be.revertedWith("migration not allowed")
@@ -433,6 +459,7 @@ describe("PositionManager", () => {
     })
     context("when Alice wants to export her own position to her own address", async () => {
       it("should be able to call exportPosition()", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         const positionAddress = await positionManager.positions(1)
 
@@ -458,6 +485,7 @@ describe("PositionManager", () => {
     })
     context("when Alice wants Bob to export her position to Bob's address", async () => {
       it("should be able to call exportPosition()", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         const positionAddress = await positionManager.positions(1)
 
@@ -490,12 +518,14 @@ describe("PositionManager", () => {
   describe("#importPosition()", () => {
     context("when caller (Bob) has no migration access on source address (Alice)", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await expect(positionManagerAsBob.importPosition(aliceAddress, 1)).to.be.revertedWith("migration not allowed")
       })
     })
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         // Alice gives Bob migration access on her address
         await positionManagerAsAlice.allowMigratePosition(bobAddress, 1)
@@ -504,6 +534,7 @@ describe("PositionManager", () => {
     })
     context("when Alice wants to import her own position from her address", async () => {
       it("should be able to call importPosition()", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         const positionAddress = await positionManager.positions(1)
 
@@ -529,6 +560,7 @@ describe("PositionManager", () => {
     })
     context("when Alice wants Bob to import her position from Bob's address", async () => {
       it("should be able to call importPosition()", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         const positionAddress = await positionManager.positions(1)
 
@@ -563,6 +595,7 @@ describe("PositionManager", () => {
   describe("#movePosition()", () => {
     context("when caller (Bob) has no access to the source position", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await positionManager.open(formatBytes32String("BNB"), bobAddress)
 
@@ -571,6 +604,7 @@ describe("PositionManager", () => {
     })
     context("when caller (Alice) has no access to the destination position", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await positionManager.open(formatBytes32String("BNB"), bobAddress)
 
@@ -579,6 +613,7 @@ describe("PositionManager", () => {
     })
     context("when these two positions are from different collateral pool", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await positionManager.open(formatBytes32String("BTC"), bobAddress)
         await positionManagerAsBob.allowManagePosition(2, aliceAddress, 1)
@@ -588,6 +623,7 @@ describe("PositionManager", () => {
     })
     context("when Alice wants to move her position#1 to her position#2", async () => {
       it("should be able to call movePosition()", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         const position1Address = await positionManager.positions(1)
@@ -615,6 +651,7 @@ describe("PositionManager", () => {
     })
     context("when Alice wants to move her position#1 to Bob's position#2", async () => {
       it("should be able to call movePosition()", async () => {
+        mockedBookKeeper.smocked.collateralPools.will.return.with([0, WeiPerRay, 0, 0, 0])
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         await positionManager.open(formatBytes32String("BNB"), bobAddress)
         await positionManagerAsBob.allowManagePosition(2, aliceAddress, 1)
