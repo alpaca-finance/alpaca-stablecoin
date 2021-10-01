@@ -509,25 +509,40 @@ describe("LiquidationEngine", () => {
         await bookKeeperAsBob.whitelist(fixedSpreadLiquidationStrategy.address)
         await bookKeeper.mintUnbackedStablecoin(deployerAddress, bobAddress, WeiPerRad.mul(100))
         const bobStablecoinBeforeLiquidation = await bookKeeper.stablecoin(bobAddress)
-        await liquidationEngineAsBob.liquidate(
-          COLLATERAL_POOL_ID,
-          alicePositionAddress,
-          debtShareToRepay,
-          debtShareToRepay,
-          bobAddress,
-          ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [bobAddress, []])
+        const expectedSeizedCollateral = debtShareToRepay.mul(LIQUIDATOR_INCENTIVE_BPS).div(BPS)
+        const expectedTreasuryFee = expectedSeizedCollateral.mul(TREASURY_FEE_BPS).div(BPS)
+        const expectedCollateralBobShouldReceive = expectedSeizedCollateral.sub(expectedTreasuryFee)
+        await expect(
+          liquidationEngineAsBob.liquidate(
+            COLLATERAL_POOL_ID,
+            alicePositionAddress,
+            debtShareToRepay,
+            debtShareToRepay,
+            bobAddress,
+            ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [bobAddress, []])
+          )
         )
+          .to.emit(fixedSpreadLiquidationStrategy, "FixedSpreadLiquidate")
+          .withArgs(
+            COLLATERAL_POOL_ID,
+            ethers.utils.parseEther("1"),
+            ethers.utils.parseEther("1"),
+            alicePositionAddress,
+            debtShareToRepay,
+            debtShareToRepay,
+            bobAddress,
+            bobAddress,
+            debtShareToRepay,
+            debtShareToRepay.mul(WeiPerRay),
+            expectedSeizedCollateral,
+            expectedTreasuryFee
+          )
 
         // 5. Settle system bad debt
         await systemDebtEngine.settleSystemBadDebt(debtShareToRepay.mul(WeiPerRay))
 
         const bobStablecoinAfterLiquidation = await bookKeeper.stablecoin(bobAddress)
-
         const alicePositionAfterLiquidation = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
-        const expectedSeizedCollateral = debtShareToRepay.mul(LIQUIDATOR_INCENTIVE_BPS).div(BPS)
-        const expectedTreasuryFee = expectedSeizedCollateral.mul(TREASURY_FEE_BPS).div(BPS)
-        const expectedCollateralBobShouldReceive = expectedSeizedCollateral.sub(expectedTreasuryFee)
-
         expect(
           alicePositionAfterLiquidation.lockedCollateral,
           "lockedCollateral should be 0.4875 ibDUMMY after including liquidator incentive and treasury fee"
