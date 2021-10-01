@@ -288,8 +288,8 @@ contract FixedSpreadLiquidationStrategy is
       // If the max collateral amount (including liquidator incentive) that should be liquidated exceeds the total collateral amount of that position
       _maxCollateralAmountToBeLiquidated > _positionCollateralAmount ||
       // If the remaining collateral amount value in stablecoin is smaller than `debtFloor`
-      // (_positionCollateralAmount [wad] - _maxCollateralAmountToBeLiquidated [wad]) * priceWithSafetyMargin [ray] = [rad]
-      mul(sub(_positionCollateralAmount, _maxCollateralAmountToBeLiquidated), info.priceWithSafetyMargin) < debtFloor
+      // (_positionCollateralAmount [wad] - _maxCollateralAmountToBeLiquidated [wad]) * _currentCollateralPrice [ray] = [rad]
+      mul(sub(_positionCollateralAmount, _maxCollateralAmountToBeLiquidated), _currentCollateralPrice) < debtFloor
     ) {
       // Full Collateral Liquidation
       // Take all collateral amount of the position
@@ -318,9 +318,10 @@ contract FixedSpreadLiquidationStrategy is
           ),
           _currentCollateralPrice
         ); // [wad]
+      } else {
+        // Partial Liquidation
+        info.collateralAmountToBeLiquidated = _maxCollateralAmountToBeLiquidated; // [wad]
       }
-      // Partial Liquidation
-      info.collateralAmountToBeLiquidated = _maxCollateralAmountToBeLiquidated; // [wad]
     }
 
     info.actualDebtShareToBeLiquidated = div(info.actualDebtValueToBeLiquidated, _debtAccumulatedRate); // [wad]

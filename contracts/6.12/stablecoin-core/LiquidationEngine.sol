@@ -134,7 +134,7 @@ contract LiquidationEngine is
       vars.priceWithSafetyMargin > 0 &&
         mul(vars.positionLockedCollateral, vars.priceWithSafetyMargin) <
         mul(vars.positionDebtShare, vars.debtAccumulatedRate),
-      "LiquidationEngine/not-unsafe"
+      "LiquidationEngine/position-is-safe"
     );
 
     vars.systemDebtEngineStablecoinBefore = bookKeeper.stablecoin(address(systemDebtEngine));
