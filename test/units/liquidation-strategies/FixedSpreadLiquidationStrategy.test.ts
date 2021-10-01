@@ -133,7 +133,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
             formatBytes32String("BNB"),
             mockedIbTokenAdapter.address,
             10,
-            10,
+            10010,
             10
           )
         ).to.be.revertedWith("!ownerRole")
@@ -153,10 +153,10 @@ describe("FixedSpreadLiquidationStrategy", () => {
             formatBytes32String("BNB"),
             mockedIbTokenAdapter.address,
             10001,
-            10,
+            10010,
             10
           )
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/close-factor-bps-more-10000")
+        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-close-factor")
       })
     })
     context("when liquidator incentive is more than 25%", () => {
@@ -176,7 +176,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
             2501,
             10
           )
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/liquidator-incentive-bps-more-2500")
+        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-liquidator-incentive-bps")
       })
     })
     context("when treasury fees is more than 25%", () => {
@@ -193,10 +193,10 @@ describe("FixedSpreadLiquidationStrategy", () => {
             formatBytes32String("BNB"),
             mockedIbTokenAdapter.address,
             10,
-            10,
+            10010,
             2501
           )
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/treasury-fees-bps-more-2500")
+        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps")
       })
     })
     context("when parameters are valid", () => {
@@ -213,12 +213,12 @@ describe("FixedSpreadLiquidationStrategy", () => {
             formatBytes32String("BNB"),
             mockedIbTokenAdapter.address,
             10,
-            10,
+            10010,
             10
           )
         )
           .to.emit(fixedSpreadLiquidationStrategy, "SetCollateralPool")
-          .withArgs(deployerAddress, formatBytes32String("BNB"), mockedIbTokenAdapter.address, 10, 10, 10)
+          .withArgs(deployerAddress, formatBytes32String("BNB"), mockedIbTokenAdapter.address, 10, 10010, 10)
       })
     })
   })
@@ -268,7 +268,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
         // set Close Factor
         await expect(
           fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 10001)
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/close-factor-bps-more-10000")
+        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-close-factor")
       })
     })
     context("when parameters are valid", () => {
@@ -291,7 +291,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
     context("when the caller is not the owner", () => {
       it("should be revert", async () => {
         await expect(
-          fixedSpreadLiquidationStrategyAsAlice.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10)
+          fixedSpreadLiquidationStrategyAsAlice.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10010)
         ).to.be.revertedWith("!ownerRole")
       })
     })
@@ -306,7 +306,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
         // set liquidator incentive
         await expect(
           fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 2501)
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/liquidator-incentive-bps-more-2500")
+        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-liquidator-incentive-bps")
       })
     })
     context("when parameters are valid", () => {
@@ -318,9 +318,9 @@ describe("FixedSpreadLiquidationStrategy", () => {
         )
 
         // set liquidator incentive
-        await expect(fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10))
+        await expect(fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10010))
           .to.emit(fixedSpreadLiquidationStrategy, "SetLiquidatorIncentiveBps")
-          .withArgs(deployerAddress, formatBytes32String("BNB"), 10)
+          .withArgs(deployerAddress, formatBytes32String("BNB"), 10010)
       })
     })
   })
@@ -344,7 +344,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
         // set treasury fees
         await expect(
           fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 2501)
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/treasury-fees-bps-more-2500")
+        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps")
       })
     })
     context("when parameters are valid", () => {
@@ -373,8 +373,10 @@ describe("FixedSpreadLiquidationStrategy", () => {
             UnitHelpers.WeiPerWad,
             aliceAddress,
             UnitHelpers.WeiPerWad,
+            UnitHelpers.WeiPerWad,
             deployerAddress,
-            ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
+            deployerAddress,
+            "0x"
           )
         ).to.be.revertedWith("!liquidationEngingRole")
       })
@@ -394,8 +396,10 @@ describe("FixedSpreadLiquidationStrategy", () => {
               UnitHelpers.WeiPerWad,
               aliceAddress,
               UnitHelpers.WeiPerWad,
+              UnitHelpers.WeiPerWad,
               deployerAddress,
-              ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
+              deployerAddress,
+              "0x"
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-debt")
         })
@@ -415,8 +419,10 @@ describe("FixedSpreadLiquidationStrategy", () => {
               0,
               aliceAddress,
               UnitHelpers.WeiPerWad,
+              UnitHelpers.WeiPerWad,
               deployerAddress,
-              ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
+              deployerAddress,
+              "0x"
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-collateralAmount")
         })
@@ -436,79 +442,12 @@ describe("FixedSpreadLiquidationStrategy", () => {
               UnitHelpers.WeiPerWad,
               AddressZero,
               UnitHelpers.WeiPerWad,
+              UnitHelpers.WeiPerWad,
               deployerAddress,
-              ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
+              deployerAddress,
+              "0x"
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-positionAddress")
-        })
-      })
-    })
-    context("when close factor is invalid", () => {
-      context("closeFactorBps is 0", () => {
-        it("should be revert", async () => {
-          await fixedSpreadLiquidationStrategy.grantRole(
-            await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
-            deployerAddress
-          )
-          // mock contract
-          mockedBookKeeper.smocked.collateralPools.will.return.with([
-            BigNumber.from(0),
-            UnitHelpers.WeiPerRay.mul(2),
-            UnitHelpers.WeiPerRay,
-            BigNumber.from(0),
-            BigNumber.from(0),
-          ])
-
-          await expect(
-            fixedSpreadLiquidationStrategy.execute(
-              formatBytes32String("BNB"),
-              UnitHelpers.WeiPerRad,
-              UnitHelpers.WeiPerWad,
-              aliceAddress,
-              UnitHelpers.WeiPerWad,
-              deployerAddress,
-              ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
-            )
-          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/close-factor-exceeded")
-        })
-      })
-
-      context("debtShareToRepay > closeFactor (overpay debtShare)", () => {
-        it("should be revert", async () => {
-          await fixedSpreadLiquidationStrategy.grantRole(
-            await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
-            deployerAddress
-          )
-          // mock contract
-          mockedBookKeeper.smocked.collateralPools.will.return.with([
-            BigNumber.from(0),
-            UnitHelpers.WeiPerRay.mul(2),
-            UnitHelpers.WeiPerRay,
-            BigNumber.from(0),
-            BigNumber.from(0),
-          ])
-          mockedBookKeeper.smocked.confiscatePosition.will.return.with()
-          mockedBookKeeper.smocked.moveCollateral.will.return.with()
-          mockedBookKeeper.smocked.moveStablecoin.will.return.with()
-          mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, 0])
-          mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
-          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(BigNumber.from("1")), true])
-
-          await fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 1)
-          await fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 1)
-          await fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 1)
-
-          await expect(
-            fixedSpreadLiquidationStrategy.execute(
-              formatBytes32String("BNB"),
-              UnitHelpers.WeiPerWad,
-              UnitHelpers.WeiPerRad.mul(5),
-              aliceAddress,
-              UnitHelpers.WeiPerRad,
-              deployerAddress,
-              ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
-            )
-          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/close-factor-exceeded")
         })
       })
     })
@@ -543,8 +482,10 @@ describe("FixedSpreadLiquidationStrategy", () => {
               UnitHelpers.WeiPerWad,
               aliceAddress,
               UnitHelpers.WeiPerWad,
+              UnitHelpers.WeiPerWad,
               deployerAddress,
-              ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
+              deployerAddress,
+              "0x"
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-price")
         })
@@ -576,47 +517,13 @@ describe("FixedSpreadLiquidationStrategy", () => {
               UnitHelpers.WeiPerWad,
               aliceAddress,
               UnitHelpers.WeiPerWad,
+              UnitHelpers.WeiPerWad,
               deployerAddress,
-              ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
+              deployerAddress,
+              "0x"
             )
           ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-starting-price")
         })
-      })
-    })
-
-    context("when liquidate amount > collateral amount (overliquidate)", () => {
-      it("should be revert", async () => {
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
-          deployerAddress
-        )
-        // mock contract
-        mockedBookKeeper.smocked.collateralPools.will.return.with([
-          BigNumber.from(0),
-          UnitHelpers.WeiPerRay.mul(2),
-          UnitHelpers.WeiPerRay,
-          BigNumber.from(0),
-          BigNumber.from(0),
-        ])
-        mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, 0])
-        mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
-        mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(UnitHelpers.WeiPerWad), true])
-
-        await fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 250)
-        await fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 250)
-        await fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 250)
-
-        await expect(
-          fixedSpreadLiquidationStrategy.execute(
-            formatBytes32String("BNB"),
-            UnitHelpers.WeiPerRad,
-            UnitHelpers.WeiPerWad,
-            aliceAddress,
-            UnitHelpers.WeiPerWad,
-            deployerAddress,
-            ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
-          )
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/liquidate-too-much")
       })
     })
 
@@ -645,7 +552,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
 
             await fixedSpreadLiquidationStrategy.setAdapter(formatBytes32String("BNB"), mockedIbTokenAdapter.address)
             await fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 10000)
-            await fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 2500)
+            await fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10250)
             await fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 2500)
 
             await expect(
@@ -655,20 +562,26 @@ describe("FixedSpreadLiquidationStrategy", () => {
                 UnitHelpers.WeiPerWad.mul(7),
                 aliceAddress,
                 UnitHelpers.WeiPerWad,
+                UnitHelpers.WeiPerWad,
                 deployerAddress,
-                ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
+                deployerAddress,
+                "0x"
               )
             )
               .to.emit(fixedSpreadLiquidationStrategy, "FixedSpreadLiquidate")
               .withArgs(
                 formatBytes32String("BNB"),
-                UnitHelpers.WeiPerRad.mul(2),
-                UnitHelpers.WeiPerWad.mul(2),
-                UnitHelpers.WeiPerWad.mul(5).div(10),
-                UnitHelpers.WeiPerWad.mul(5).div(10),
+                UnitHelpers.WeiPerWad,
+                UnitHelpers.WeiPerWad.mul(7),
                 aliceAddress,
+                UnitHelpers.WeiPerWad,
+                UnitHelpers.WeiPerWad,
                 deployerAddress,
-                deployerAddress
+                deployerAddress,
+                UnitHelpers.WeiPerWad,
+                UnitHelpers.WeiPerRad.mul(2),
+                ethers.utils.parseEther("2.05"),
+                ethers.utils.parseEther("0.5125")
               )
 
             const { calls: BookkeeperCollateralPools } = mockedBookKeeper.smocked.collateralPools
@@ -681,7 +594,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
             expect(confiscatePosition[0].positionAddress).to.be.equal(aliceAddress)
             expect(confiscatePosition[0].collateralCreditor).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(confiscatePosition[0].stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
-            expect(confiscatePosition[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(-3))
+            expect(confiscatePosition[0].collateralAmount).to.be.equal(ethers.utils.parseEther("2.05").mul(-1))
             expect(confiscatePosition[0].debtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(-1))
 
             const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
@@ -690,12 +603,12 @@ describe("FixedSpreadLiquidationStrategy", () => {
             expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[0].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-            expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(25).div(10))
+            expect(moveCollateral[0].amount).to.be.equal(ethers.utils.parseEther("1.5375"))
             //Give the treasury fees to System Debt Engine to be stored as system surplus
             expect(moveCollateral[1].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[1].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
-            expect(moveCollateral[1].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(5).div(10))
+            expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("0.5125"))
 
             const { calls: PriceOracleCollateralPools } = mockedPriceOracle.smocked.collateralPools
             expect(PriceOracleCollateralPools.length).to.be.equal(1)
@@ -735,31 +648,20 @@ describe("FixedSpreadLiquidationStrategy", () => {
 
             await fixedSpreadLiquidationStrategy.setAdapter(formatBytes32String("BNB"), mockedIbTokenAdapter.address)
             await fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 5000)
-            await fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 300)
+            await fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10300)
             await fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 700)
 
-            await expect(
-              fixedSpreadLiquidationStrategy.execute(
-                formatBytes32String("BNB"),
-                UnitHelpers.WeiPerWad,
-                UnitHelpers.WeiPerWad.mul(98765),
-                aliceAddress,
-                UnitHelpers.WeiPerWad.div(4),
-                deployerAddress,
-                ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
-              )
+            await fixedSpreadLiquidationStrategy.execute(
+              formatBytes32String("BNB"),
+              UnitHelpers.WeiPerWad,
+              UnitHelpers.WeiPerWad.mul(98765),
+              aliceAddress,
+              UnitHelpers.WeiPerWad.div(4),
+              UnitHelpers.WeiPerWad.div(4),
+              deployerAddress,
+              deployerAddress,
+              "0x"
             )
-              .to.emit(fixedSpreadLiquidationStrategy, "FixedSpreadLiquidate")
-              .withArgs(
-                formatBytes32String("BNB"),
-                UnitHelpers.WeiPerRad.mul(308625).div(100),
-                UnitHelpers.WeiPerWad.mul(1543125).div(1000),
-                UnitHelpers.WeiPerWad.mul(4629375).div(100000),
-                UnitHelpers.WeiPerWad.mul(10801875).div(100000),
-                aliceAddress,
-                deployerAddress,
-                deployerAddress
-              )
 
             const { calls: BookkeeperCollateralPools } = mockedBookKeeper.smocked.collateralPools
             expect(BookkeeperCollateralPools.length).to.be.equal(1)
@@ -771,7 +673,9 @@ describe("FixedSpreadLiquidationStrategy", () => {
             expect(confiscatePosition[0].positionAddress).to.be.equal(aliceAddress)
             expect(confiscatePosition[0].collateralCreditor).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(confiscatePosition[0].stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
-            expect(confiscatePosition[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(-16974375).div(10000))
+            expect(confiscatePosition[0].collateralAmount).to.be.equal(
+              UnitHelpers.WeiPerWad.mul(-158941875).div(100000)
+            )
             expect(confiscatePosition[0].debtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(-25).div(100))
 
             const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
@@ -780,12 +684,12 @@ describe("FixedSpreadLiquidationStrategy", () => {
             expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[0].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-            expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(158941875).div(100000))
+            expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(14781594375).div(10000000))
             //Give the treasury fees to System Debt Engine to be stored as system surplus
             expect(moveCollateral[1].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[1].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
-            expect(moveCollateral[1].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(10801875).div(100000))
+            expect(moveCollateral[1].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(1112593125).div(10000000))
 
             const { calls: PriceOracleCollateralPools } = mockedPriceOracle.smocked.collateralPools
             expect(PriceOracleCollateralPools.length).to.be.equal(1)
@@ -828,7 +732,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
 
         await fixedSpreadLiquidationStrategy.setAdapter(formatBytes32String("BNB"), mockedIbTokenAdapter.address)
         await fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 5000)
-        await fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 1)
+        await fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10001)
         await fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 17)
         await fixedSpreadLiquidationStrategy.setFlashLendingEnabled(1)
 
@@ -839,23 +743,29 @@ describe("FixedSpreadLiquidationStrategy", () => {
             UnitHelpers.WeiPerWad.mul(8),
             aliceAddress,
             UnitHelpers.WeiPerWad.mul(37).div(100),
+            UnitHelpers.WeiPerWad.mul(37).div(100),
             deployerAddress,
+            mockedFlashLendingCallee.address,
             ethers.utils.defaultAbiCoder.encode(
-              ["address", "bytes"],
-              [mockedFlashLendingCallee.address, ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])]
+              ["bytes"],
+              [ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])]
             )
           )
         )
           .to.emit(fixedSpreadLiquidationStrategy, "FixedSpreadLiquidate")
           .withArgs(
             formatBytes32String("BNB"),
-            UnitHelpers.WeiPerRad.mul(111).div(100),
-            UnitHelpers.WeiPerWad.mul(111).div(100),
-            UnitHelpers.WeiPerWad.mul(111).div(1000000),
-            UnitHelpers.WeiPerWad.mul(1887).div(1000000),
+            UnitHelpers.WeiPerWad,
+            UnitHelpers.WeiPerWad.mul(8),
             aliceAddress,
+            UnitHelpers.WeiPerWad.mul(37).div(100),
+            UnitHelpers.WeiPerWad.mul(37).div(100),
             deployerAddress,
-            mockedFlashLendingCallee.address
+            mockedFlashLendingCallee.address,
+            UnitHelpers.WeiPerWad.mul(37).div(100),
+            ethers.utils.parseEther("1.11").mul(UnitHelpers.WeiPerRay),
+            ethers.utils.parseEther("1.110111"),
+            ethers.utils.parseEther("0.0018871887")
           )
 
         const { calls: BookkeeperCollateralPools } = mockedBookKeeper.smocked.collateralPools
@@ -868,7 +778,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
         expect(confiscatePosition[0].positionAddress).to.be.equal(aliceAddress)
         expect(confiscatePosition[0].collateralCreditor).to.be.equal(fixedSpreadLiquidationStrategy.address)
         expect(confiscatePosition[0].stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
-        expect(confiscatePosition[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(-1111998).div(1000000))
+        expect(confiscatePosition[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(-1110111).div(1000000))
         expect(confiscatePosition[0].debtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(-37).div(100))
 
         const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
@@ -877,12 +787,12 @@ describe("FixedSpreadLiquidationStrategy", () => {
         expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
         expect(moveCollateral[0].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
         expect(moveCollateral[0].dst).to.be.equal(mockedFlashLendingCallee.address)
-        expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(1110111).div(1000000))
+        expect(moveCollateral[0].amount).to.be.equal(ethers.utils.parseEther("1.1082238113"))
         //Give the treasury fees to System Debt Engine to be stored as system surplus
         expect(moveCollateral[1].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
         expect(moveCollateral[1].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
         expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
-        expect(moveCollateral[1].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(1887).div(1000000))
+        expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("0.0018871887"))
 
         const { calls: PriceOracleCollateralPools } = mockedPriceOracle.smocked.collateralPools
         expect(PriceOracleCollateralPools.length).to.be.equal(1)

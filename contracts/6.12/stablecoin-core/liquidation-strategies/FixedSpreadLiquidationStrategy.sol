@@ -45,6 +45,8 @@ contract FixedSpreadLiquidationStrategy is
     uint256 treasuryFees; // [wad]
     uint256 maxLiquidatableDebtShare; // [rad]
     uint256 priceWithSafetyMargin; // [ray]
+    uint256 debtAccumulatedRate; // [ray]
+    uint256 debtFloor; // [rad]
   }
 
   // --- Data ---
@@ -170,9 +172,12 @@ contract FixedSpreadLiquidationStrategy is
     uint256 _treasuryFeesBps
   ) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(_closeFactorBps <= 10000, "FixedSpreadLiquidationStrategy/close-factor-bps-more-10000");
-    require(_liquidatorIncentiveBps >= 10000, "FixedSpreadLiquidationStrategy/liquidator-incentive-bps-more-2500");
-    require(_treasuryFeesBps <= 2500, "FixedSpreadLiquidationStrategy/treasury-fees-bps-more-2500");
+    require(_closeFactorBps <= 10000, "FixedSpreadLiquidationStrategy/invalid-close-factor-bps-more");
+    require(
+      _liquidatorIncentiveBps >= 10000 && _liquidatorIncentiveBps <= 19000,
+      "FixedSpreadLiquidationStrategy/invalid-liquidator-incentive-bps"
+    );
+    require(_treasuryFeesBps <= 2500, "FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps-more");
 
     collateralPools[collateralPoolId].adapter = IGenericTokenAdapter(_adapter);
     collateralPools[collateralPoolId].closeFactorBps = _closeFactorBps;
@@ -197,21 +202,24 @@ contract FixedSpreadLiquidationStrategy is
 
   function setCloseFactorBps(bytes32 collateralPoolId, uint256 _closeFactorBps) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(_closeFactorBps <= 10000, "FixedSpreadLiquidationStrategy/close-factor-bps-more-10000");
+    require(_closeFactorBps <= 10000, "FixedSpreadLiquidationStrategy/invalid-close-factor-bps");
     collateralPools[collateralPoolId].closeFactorBps = _closeFactorBps;
     emit SetCloseFactorBps(msg.sender, collateralPoolId, _closeFactorBps);
   }
 
   function setLiquidatorIncentiveBps(bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(_liquidatorIncentiveBps >= 10000, "FixedSpreadLiquidationStrategy/liquidator-incentive-bps-more-2500");
+    require(
+      _liquidatorIncentiveBps >= 10000 && _liquidatorIncentiveBps <= 19000,
+      "FixedSpreadLiquidationStrategy/invalid-liquidator-incentive-bps"
+    );
     collateralPools[collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
     emit SetLiquidatorIncentiveBps(msg.sender, collateralPoolId, _liquidatorIncentiveBps);
   }
 
   function setTreasuryFeesBps(bytes32 collateralPoolId, uint256 _treasuryFeesBps) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(_treasuryFeesBps <= 2500, "FixedSpreadLiquidationStrategy/treasury-fees-bps-more-2500");
+    require(_treasuryFeesBps <= 2500, "FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps");
     collateralPools[collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
     emit SetTreasuryFeesBps(msg.sender, collateralPoolId, _treasuryFeesBps);
   }
@@ -251,12 +259,13 @@ contract FixedSpreadLiquidationStrategy is
   ) internal view returns (LiquidationInfo memory info) {
     (
       ,
-      uint256 _debtAccumulatedRate, // [ray]
+      info.debtAccumulatedRate, // [ray]
+      info.priceWithSafetyMargin, // [ray]
       ,
-      ,
-      uint256 debtFloor // [rad]
+      info.debtFloor // [rad]
     ) = bookKeeper.collateralPools(_collateralPoolId);
-    uint256 _positionDebtValue = mul(_positionDebtShare, _debtAccumulatedRate);
+
+    uint256 _positionDebtValue = mul(_positionDebtShare, info.debtAccumulatedRate);
 
     // Calculate max liquidatable debt value based on the close factor
     // (_positionDebtShare [wad] * closeFactorBps [bps]) / 10000
@@ -271,7 +280,7 @@ contract FixedSpreadLiquidationStrategy is
       ? info.maxLiquidatableDebtShare
       : _debtShareToBeLiquidated; // [wad]
     // actualDebtShareToBeLiquidated [wad] * _debtAccumulatedRate [ray]
-    info.actualDebtValueToBeLiquidated = mul(info.actualDebtShareToBeLiquidated, _debtAccumulatedRate); // [rad]
+    info.actualDebtValueToBeLiquidated = mul(info.actualDebtShareToBeLiquidated, info.debtAccumulatedRate); // [rad]
 
     // Calculate the max collateral amount to be liquidated by taking all the fees into account
     // ( actualDebtValueToBeLiquidated [rad] * liquidatorIncentiveBps [bps] / 10000 / _currentCollateralPrice [ray]
@@ -283,13 +292,12 @@ contract FixedSpreadLiquidationStrategy is
     // If the calculated collateral amount to be liquidated exceeds the position collateral amount,
     // then we need to recalculate the debt value to be liquidated that would be enough to liquidate the position entirely
     // Or if the remaining collateral or the remaining debt is very small and smaller than `debtFloor`, we will force full collateral liquidation
-    (, , info.priceWithSafetyMargin, , ) = bookKeeper.collateralPools(_collateralPoolId);
     if (
       // If the max collateral amount (including liquidator incentive) that should be liquidated exceeds the total collateral amount of that position
       _maxCollateralAmountToBeLiquidated > _positionCollateralAmount ||
       // If the remaining collateral amount value in stablecoin is smaller than `debtFloor`
       // (_positionCollateralAmount [wad] - _maxCollateralAmountToBeLiquidated [wad]) * _currentCollateralPrice [ray] = [rad]
-      mul(sub(_positionCollateralAmount, _maxCollateralAmountToBeLiquidated), _currentCollateralPrice) < debtFloor
+      mul(sub(_positionCollateralAmount, _maxCollateralAmountToBeLiquidated), _currentCollateralPrice) < info.debtFloor
     ) {
       // Full Collateral Liquidation
       // Take all collateral amount of the position
@@ -306,7 +314,7 @@ contract FixedSpreadLiquidationStrategy is
       // If the remaining debt after liquidation is smaller than `debtFloor`
       if (
         _positionDebtValue > info.actualDebtValueToBeLiquidated &&
-        sub(_positionDebtValue, info.actualDebtValueToBeLiquidated) < debtFloor
+        sub(_positionDebtValue, info.actualDebtValueToBeLiquidated) < info.debtFloor
       ) {
         // Full Debt Liquidation
         info.actualDebtValueToBeLiquidated = _positionDebtValue; // [rad]
@@ -324,7 +332,7 @@ contract FixedSpreadLiquidationStrategy is
       }
     }
 
-    info.actualDebtShareToBeLiquidated = div(info.actualDebtValueToBeLiquidated, _debtAccumulatedRate); // [wad]
+    info.actualDebtShareToBeLiquidated = div(info.actualDebtValueToBeLiquidated, info.debtAccumulatedRate); // [wad]
 
     info.treasuryFees = div(
       mul(info.collateralAmountToBeLiquidated, collateralPools[_collateralPoolId].treasuryFeesBps),
