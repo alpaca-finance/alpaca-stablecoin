@@ -156,10 +156,12 @@ contract LiquidationEngine is
       _positionAddress
     );
     require(vars.newPositionDebtShare < vars.positionDebtShare, "LiquidationEngine/debt-not-liquidated");
+
+    // (positionDebtShare [wad] - newPositionDebtShare [wad]) * debtAccumulatedRate [ray]
     vars.wantStablecoinValueFromLiquidation = mul(
       sub(vars.positionDebtShare, vars.newPositionDebtShare),
       vars.debtAccumulatedRate
-    );
+    ); // [rad]
     require(
       sub(bookKeeper.stablecoin(address(systemDebtEngine)), vars.systemDebtEngineStablecoinBefore) >=
         vars.wantStablecoinValueFromLiquidation,
