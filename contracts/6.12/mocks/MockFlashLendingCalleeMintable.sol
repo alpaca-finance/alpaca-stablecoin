@@ -4,6 +4,8 @@ import "../interfaces/IFlashLendingCallee.sol";
 import "../interfaces/IBookKeeper.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
+import "hardhat/console.sol";
+
 contract MockFlashLendingCalleeMintable is IFlashLendingCallee, PausableUpgradeable {
   IBookKeeper public bookKeeper;
 
@@ -18,8 +20,12 @@ contract MockFlashLendingCalleeMintable is IFlashLendingCallee, PausableUpgradea
     address caller,
     uint256 debtValueToRepay, // [rad]
     uint256 collateralAmountToLiquidate, // [wad]
-    bytes calldata
+    bytes calldata data
   ) external override {
     bookKeeper.mintUnbackedStablecoin(address(this), address(this), debtValueToRepay);
+    if (data.length > 0) {
+      (address treasuryAccount, bytes32 collateralPoolId) = abi.decode(data, (address, bytes32));
+      bookKeeper.moveCollateral(collateralPoolId, address(this), treasuryAccount, collateralAmountToLiquidate);
+    }
   }
 }
