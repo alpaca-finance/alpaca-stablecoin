@@ -47,6 +47,17 @@ contract LiquidationEngine is
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
+  struct LocalVars {
+    uint256 positionLockedCollateral;
+    uint256 positionDebtShare;
+    uint256 debtAccumulatedRate;
+    uint256 priceWithSafetyMargin;
+    uint256 systemDebtEngineStablecoinBefore;
+    uint256 newPositionLockedCollateral;
+    uint256 newPositionDebtShare;
+    uint256 wantStablecoinValueFromLiquidation;
+  }
+
   IBookKeeper public bookKeeper; // CDP Engine
 
   mapping(bytes32 => address) public override strategies; // Liquidation strategy for each collateral pool
@@ -55,7 +66,7 @@ contract LiquidationEngine is
   uint256 public live; // Active Flag
 
   // --- Events ---
-  event SetStrategy(address indexed caller, bytes32 collateralPoolId, address strategy);
+  event SetStrategy(address indexed caller, bytes32 _collateralPoolId, address strategy);
 
   // --- Init ---
   function initialize(address _bookKeeper, address _systemDebtEngine) external initializer {
@@ -92,57 +103,83 @@ contract LiquidationEngine is
     require(y == 0 || (z = x * y) / y == x);
   }
 
-  function setStrategy(bytes32 collateralPoolId, address strategy) external {
+  function setStrategy(bytes32 _collateralPoolId, address strategy) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "LiquidationEngine/not-live");
-    strategies[collateralPoolId] = strategy;
-    emit SetStrategy(msg.sender, collateralPoolId, strategy);
+    strategies[_collateralPoolId] = strategy;
+    emit SetStrategy(msg.sender, _collateralPoolId, strategy);
   }
 
   function liquidate(
-    bytes32 collateralPoolId,
-    address positionAddress,
-    uint256 debtShareToRepay, // [wad]
+    bytes32 _collateralPoolId,
+    address _positionAddress,
+    uint256 _debtShareToBeLiquidated, // [rad]
+    uint256 _maxDebtShareToBeLiquidated, // [rad]
+    address _collateralRecipient,
     bytes calldata data
-  ) external nonReentrant whenNotPaused returns (uint256 id) {
+  ) external nonReentrant whenNotPaused {
     require(live == 1, "LiquidationEngine/not-live");
-    require(debtShareToRepay != 0, "LiquidationEngine/zero-debtShareToRepay");
+    require(_debtShareToBeLiquidated != 0, "LiquidationEngine/zero-debt-value-to-be-liquidated");
+    require(_maxDebtShareToBeLiquidated != 0, "LiquidationEngine/zero-max-debt-value-to-be-liquidated");
 
-    (uint256 positionLockedCollateral, uint256 positionDebtShare) = bookKeeper.positions(
-      collateralPoolId,
-      positionAddress
+    LocalVars memory vars;
+
+    (vars.positionLockedCollateral, vars.positionDebtShare) = bookKeeper.positions(_collateralPoolId, _positionAddress);
+    require(strategies[_collateralPoolId] != address(0), "LiquidationEngine/not-set-strategy");
+    // 1. Check if the position is underwater
+    (, vars.debtAccumulatedRate, vars.priceWithSafetyMargin, , ) = bookKeeper.collateralPools(_collateralPoolId);
+    // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]
+    // (positionDebtShare [wad] * debtAccumulatedRate [ray]) [rad]
+    require(
+      vars.priceWithSafetyMargin > 0 &&
+        mul(vars.positionLockedCollateral, vars.priceWithSafetyMargin) <
+        mul(vars.positionDebtShare, vars.debtAccumulatedRate),
+      "LiquidationEngine/position-is-safe"
     );
-    address strategy = strategies[collateralPoolId];
-    require(strategy != address(0), "LiquidationEngine/not-setStrategy");
-    uint256 debtAccumulatedRate;
-    uint256 debtFloor;
-    {
-      // 1. Check if the position is underwater
-      uint256 priceWithSafetyMargin;
-      (, debtAccumulatedRate, priceWithSafetyMargin, , debtFloor) = bookKeeper.collateralPools(collateralPoolId);
-      // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]
-      // (positionDebtShare [wad] * debtAccumulatedRate [ray]) [rad]
-      require(
-        priceWithSafetyMargin > 0 &&
-          mul(positionLockedCollateral, priceWithSafetyMargin) < mul(positionDebtShare, debtAccumulatedRate),
-        "LiquidationEngine/not-unsafe"
-      );
-    }
 
-    ILiquidationStrategy(strategy).execute(
-      collateralPoolId,
-      positionDebtShare,
-      positionLockedCollateral,
-      positionAddress,
-      debtShareToRepay,
+    vars.systemDebtEngineStablecoinBefore = bookKeeper.stablecoin(address(systemDebtEngine));
+
+    ILiquidationStrategy(strategies[_collateralPoolId]).execute(
+      _collateralPoolId,
+      vars.positionDebtShare,
+      vars.positionLockedCollateral,
+      _positionAddress,
+      _debtShareToBeLiquidated,
+      _maxDebtShareToBeLiquidated,
       msg.sender,
+      _collateralRecipient,
       data
     );
 
-    //Get Alpaca Stablecoin from the liquidator for debt repayment
-    // debtShareToRepay [wad] * debtAccumulatedRate [ray]
-    uint256 debtValueToRepay = mul(debtShareToRepay, debtAccumulatedRate); // [rad]
-    bookKeeper.moveStablecoin(msg.sender, address(systemDebtEngine), debtValueToRepay);
+    (vars.newPositionLockedCollateral, vars.newPositionDebtShare) = bookKeeper.positions(
+      _collateralPoolId,
+      _positionAddress
+    );
+    require(vars.newPositionDebtShare < vars.positionDebtShare, "LiquidationEngine/debt-not-liquidated");
+
+    // (positionDebtShare [wad] - newPositionDebtShare [wad]) * debtAccumulatedRate [ray]
+    vars.wantStablecoinValueFromLiquidation = mul(
+      sub(vars.positionDebtShare, vars.newPositionDebtShare),
+      vars.debtAccumulatedRate
+    ); // [rad]
+    require(
+      sub(bookKeeper.stablecoin(address(systemDebtEngine)), vars.systemDebtEngineStablecoinBefore) >=
+        vars.wantStablecoinValueFromLiquidation,
+      "LiquidationEngine/payment-not-received"
+    );
+
+    // If collateral has been depleted from liquidation whilst there is remaining debt in the position
+    if (vars.newPositionLockedCollateral == 0 && vars.newPositionDebtShare > 0) {
+      // Record the bad debt to the system and close the position
+      bookKeeper.confiscatePosition(
+        _collateralPoolId,
+        _positionAddress,
+        _positionAddress,
+        address(systemDebtEngine),
+        -int256(vars.newPositionLockedCollateral),
+        -int256(vars.newPositionDebtShare)
+      );
+    }
   }
 
   function cage() external override {

@@ -232,6 +232,7 @@ contract IbTokenAdapter is
   /// @param from The position address that is owned and staked the collateral tokens
   /// @param to The address to receive the yields
   function harvest(address from, address to) internal {
+    require(to != address(0), "IbTokenAdapter/harvest-to-address-zero");
     // 1. Perform actual harvest. Calculate the new accRewardPerShare.
     if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvest(), totalShare));
     // 2. Calculate the rewards that "to" should get by:
@@ -242,7 +243,7 @@ contract IbTokenAdapter is
       uint256 back = sub(rewards, rewardDebt);
       uint256 treasuryFee = div(mul(back, treasuryFeeBps), 10000);
       address(rewardToken).safeTransfer(treasuryAccount, treasuryFee);
-      if (to != address(0)) address(rewardToken).safeTransfer(to, sub(back, treasuryFee));
+      address(rewardToken).safeTransfer(to, sub(back, treasuryFee));
     }
 
     // 3. Update accRewardBalance
@@ -275,7 +276,6 @@ contract IbTokenAdapter is
     bytes calldata data
   ) public payable override nonReentrant {
     _deposit(positionAddress, amount, data);
-    fairlaunch.deposit(address(this), pid, amount);
   }
 
   /// @dev Harvest rewardTokens and distribute to user,
@@ -305,6 +305,8 @@ contract IbTokenAdapter is
       stake[positionAddress] = add(stake[positionAddress], share);
     }
     rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
+
+    fairlaunch.deposit(address(this), pid, amount);
 
     emit Deposit(amount);
   }
@@ -446,7 +448,7 @@ contract IbTokenAdapter is
     uint256 share,
     bytes calldata data
   ) external override nonReentrant {
-    deposit(source, 0, data);
+    _deposit(source, 0, data);
     moveStake(source, destination, share, data);
   }
 
