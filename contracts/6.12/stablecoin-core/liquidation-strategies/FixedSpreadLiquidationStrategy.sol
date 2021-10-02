@@ -350,7 +350,7 @@ contract FixedSpreadLiquidationStrategy is
     address _liquidatorAddress,
     address _collateralRecipient,
     bytes calldata _data // Data to pass in external call; if length 0, no call is done
-  ) external override {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(LIQUIDATION_ENGINE_ROLE, msg.sender), "!liquidationEngingRole");
 
     // Input validation
@@ -463,5 +463,16 @@ contract FixedSpreadLiquidationStrategy is
       info.collateralAmountToBeLiquidated,
       info.treasuryFees
     );
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 }
