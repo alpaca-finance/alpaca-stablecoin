@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./PositionHandler.sol";
 import "../interfaces/IManager.sol";
@@ -11,7 +10,10 @@ import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IGenericTokenAdapter.sol";
 
 /// @title PositionManager is a contract for manging positions
-contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IManager {
+contract PositionManager is AccessControlUpgradeable, PausableUpgradeable, IManager {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+
   /// @dev Address of a BookKeeper
   address public override bookKeeper;
 
@@ -91,11 +93,14 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   /// @dev Initializer for intializing PositionManager
   /// @param _bookKeeper The address of the Book Keeper
   function initialize(address _bookKeeper) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
     bookKeeper = _bookKeeper;
+
+    // Grant the contract deployer the owner role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   function _safeAdd(uint256 x, uint256 y) internal pure returns (uint256 z) {
@@ -354,5 +359,16 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
       _safeToInt(debtShare)
     );
     emit MovePosition(sourceId, destinationId, lockedCollateral, debtShare);
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 }
