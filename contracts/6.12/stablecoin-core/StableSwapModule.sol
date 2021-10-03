@@ -24,12 +24,13 @@ import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IStablecoin.sol";
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IAuthTokenAdapter.sol";
+import "../interfaces/IStableSwapModule.sol";
 
-// Peg Stability Module
+// Stable Swap Module
 // Allows anyone to go between AUSD and the Token by pooling the liquidity
 // An optional fee is charged for incoming and outgoing transfers
 
-contract PegStabilityModule is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract StableSwapModule is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IStableSwapModule {
   // --- Auth ---
   mapping(address => uint256) public whitelist;
 
@@ -131,7 +132,7 @@ contract PegStabilityModule is OwnableUpgradeable, PausableUpgradeable, AccessCo
    * @param usr The address of the account to sell
    * @param tokenAmount The Amount of token to sell
    */
-  function sellToken(address usr, uint256 tokenAmount) external {
+  function swapTokenForStablecoin(address usr, uint256 tokenAmount) external override {
     uint256 tokenAmount18 = mul(tokenAmount, to18ConversionFactor);
     uint256 fee = mul(tokenAmount18, feeIn) / WAD;
     uint256 stablecoinAmount = sub(tokenAmount18, fee);
@@ -155,7 +156,7 @@ contract PegStabilityModule is OwnableUpgradeable, PausableUpgradeable, AccessCo
    * @param usr The address of the account to buy
    * @param tokenAmount The Amount of token to buy
    */
-  function buyToken(address usr, uint256 tokenAmount) external {
+  function swapStablecoinToToken(address usr, uint256 tokenAmount) external override {
     uint256 tokenAmount18 = mul(tokenAmount, to18ConversionFactor);
     uint256 fee = mul(tokenAmount18, feeOut) / WAD;
     uint256 stablecoinAmount = add(tokenAmount18, fee);

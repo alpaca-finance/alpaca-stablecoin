@@ -46,6 +46,8 @@
     "@openzeppelin/contracts-upgradeable": "^3.4.0",
     "@openzeppelin/hardhat-upgrades": "^1.9.0",
     "@openzeppelin/test-helpers": "^0.5.10",
+    "@pancakeswap-libs/pancake-swap-core": "^0.1.0",
+    "@pancakeswap/pancake-swap-periphery": "git+https://github.com/pancakeswap/pancake-swap-periphery",
     "@typechain/ethers-v5": "^5.0.0",
     "@types/chai": "^4.2.15",
     "@types/mocha": "^8.2.0",
