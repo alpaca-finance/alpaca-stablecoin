@@ -22,6 +22,8 @@ import {
   SystemDebtEngine,
   FlashMintArbitrager__factory,
   FlashMintArbitrager,
+  BookKeeperFlashMintArbitrager__factory,
+  BookKeeperFlashMintArbitrager,
 } from "../../../typechain"
 import {
   PancakeFactory__factory,
@@ -52,6 +54,7 @@ type fixture = {
   authTokenAdapter: AuthTokenAdapter
   flashMintArbitrager: FlashMintArbitrager
   routerV2: PancakeRouterV2
+  bookKeeperFlashMintArbitrager: BookKeeperFlashMintArbitrager
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
@@ -130,6 +133,15 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const flashMintArbitrager = (await upgrades.deployProxy(FlashMintArbitrager, [])) as FlashMintArbitrager
   await flashMintArbitrager.deployed()
 
+  const BookKeeperFlashMintArbitrager = (await ethers.getContractFactory(
+    "BookKeeperFlashMintArbitrager",
+    deployer
+  )) as BookKeeperFlashMintArbitrager__factory
+  const bookKeeperFlashMintArbitrager = (await upgrades.deployProxy(BookKeeperFlashMintArbitrager, [
+    alpacaStablecoin.address,
+  ])) as BookKeeperFlashMintArbitrager
+  await bookKeeperFlashMintArbitrager.deployed()
+
   // Setup Pancakeswap
   const PancakeFactoryV2 = (await ethers.getContractFactory("PancakeFactory", deployer)) as PancakeFactory__factory
   const factoryV2 = await PancakeFactoryV2.deploy(await deployer.getAddress())
@@ -158,6 +170,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     authTokenAdapter,
     flashMintArbitrager,
     routerV2,
+    bookKeeperFlashMintArbitrager,
   }
 }
 
@@ -181,6 +194,7 @@ describe("FlastMintModule", () => {
   let stableSwapModule: StableSwapModule
   let authTokenAdapter: AuthTokenAdapter
   let flashMintArbitrager: FlashMintArbitrager
+  let bookKeeperFlashMintArbitrager: BookKeeperFlashMintArbitrager
   let alpacaStablecoin: AlpacaStablecoin
   let systemDebtEngine: SystemDebtEngine
   let routerV2: PancakeRouterV2
@@ -203,6 +217,7 @@ describe("FlastMintModule", () => {
       authTokenAdapter,
       flashMintArbitrager,
       routerV2,
+      bookKeeperFlashMintArbitrager,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress] = await Promise.all([
@@ -292,6 +307,88 @@ describe("FlastMintModule", () => {
         )
 
         const profitFromArbitrage = await alpacaStablecoin.balanceOf(flashMintArbitrager.address)
+        expect(profitFromArbitrage).to.be.gt(0)
+
+        const feeCollectedFromFlashMint = await bookKeeper.stablecoin(flashMintModule.address)
+        expect(feeCollectedFromFlashMint).to.be.equal(ethers.utils.parseEther("0.125").mul(WeiPerRay))
+      })
+    })
+  })
+
+  describe("#bookKeeperFlashLoan", async () => {
+    context("AUSD price at $1", async () => {
+      it("should revert, because there is no arbitrage opportunity, thus no profit to pay for flash mint fee", async () => {
+        // Deployer adds 1000 BUSD + 1000 AUSD
+        await BUSD.mint(deployerAddress, ethers.utils.parseEther("1000"))
+        await bookKeeper.mintUnbackedStablecoin(
+          deployerAddress,
+          deployerAddress,
+          ethers.utils.parseEther("1000").mul(WeiPerRay)
+        )
+        await stablecoinAdapter.withdraw(deployerAddress, ethers.utils.parseEther("1000"), "0x")
+        await BUSD.approve(routerV2.address, ethers.utils.parseEther("1000"))
+        await alpacaStablecoin.approve(routerV2.address, ethers.utils.parseEther("1000"))
+        await routerV2.addLiquidity(
+          BUSD.address,
+          alpacaStablecoin.address,
+          ethers.utils.parseEther("1000"),
+          ethers.utils.parseEther("1000"),
+          "0",
+          "0",
+          await deployerAddress,
+          FOREVER
+        )
+
+        // Current AUSD price is $1
+        // Perform flash mint to arbitrage
+        await expect(
+          flashMintModule.bookKeeperFlashLoan(
+            bookKeeperFlashMintArbitrager.address,
+            ethers.utils.parseEther("10"),
+            ethers.utils.defaultAbiCoder.encode(
+              ["address", "address", "address"],
+              [routerV2.address, BUSD.address, stableSwapModule.address]
+            )
+          )
+        ).to.be.reverted
+      })
+    })
+
+    context("AUSD price at $1.5", async () => {
+      it("should success", async () => {
+        // Deployer adds 1500 BUSD + 1000 AUSD
+        await BUSD.mint(deployerAddress, ethers.utils.parseEther("1500"))
+        await bookKeeper.mintUnbackedStablecoin(
+          deployerAddress,
+          deployerAddress,
+          ethers.utils.parseEther("1000").mul(WeiPerRay)
+        )
+        await stablecoinAdapter.withdraw(deployerAddress, ethers.utils.parseEther("1000"), "0x")
+        await BUSD.approve(routerV2.address, ethers.utils.parseEther("1500"))
+        await alpacaStablecoin.approve(routerV2.address, ethers.utils.parseEther("1000"))
+        await routerV2.addLiquidity(
+          BUSD.address,
+          alpacaStablecoin.address,
+          ethers.utils.parseEther("1500"),
+          ethers.utils.parseEther("1000"),
+          "0",
+          "0",
+          await deployerAddress,
+          FOREVER
+        )
+
+        // Current AUSD price is $1.5
+        // Perform flash mint to arbitrage
+        await flashMintModule.bookKeeperFlashLoan(
+          bookKeeperFlashMintArbitrager.address,
+          ethers.utils.parseEther("50").mul(WeiPerRay),
+          ethers.utils.defaultAbiCoder.encode(
+            ["address", "address", "address"],
+            [routerV2.address, BUSD.address, stableSwapModule.address]
+          )
+        )
+
+        const profitFromArbitrage = await alpacaStablecoin.balanceOf(bookKeeperFlashMintArbitrager.address)
         expect(profitFromArbitrage).to.be.gt(0)
 
         const feeCollectedFromFlashMint = await bookKeeper.stablecoin(flashMintModule.address)

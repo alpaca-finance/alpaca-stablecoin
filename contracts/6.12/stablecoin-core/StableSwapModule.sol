@@ -52,7 +52,7 @@ contract StableSwapModule is OwnableUpgradeable, PausableUpgradeable, AccessCont
   IBookKeeper public bookKeeper;
   IAuthTokenAdapter public override authTokenAdapter;
   IStablecoin public stablecoin;
-  IStablecoinAdapter public stablecoinAdapter;
+  IStablecoinAdapter public override stablecoinAdapter;
   bytes32 public collateralPoolId;
   address public systemDebtEngine;
 
