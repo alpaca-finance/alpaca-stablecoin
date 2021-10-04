@@ -33,7 +33,6 @@ import "../../interfaces/ICagable.sol";
 // Authed TokenAdapter for a token that has a lower precision than 18 and it has decimals (like USDC)
 
 contract AuthTokenAdapter is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
@@ -62,7 +61,6 @@ contract AuthTokenAdapter is
     bytes32 collateralPoolId_,
     address token_
   ) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
