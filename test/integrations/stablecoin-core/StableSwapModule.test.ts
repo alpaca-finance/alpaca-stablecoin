@@ -38,6 +38,7 @@ type fixture = {
   flashMintModule: FlashMintModule
   stableSwapModule: StableSwapModule
   authTokenAdapter: AuthTokenAdapter
+  systemDebtEngine: SystemDebtEngine
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
@@ -96,6 +97,8 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     systemDebtEngine.address,
   ])) as StableSwapModule
   await stableSwapModule.deployed()
+  await stableSwapModule.setFeeIn(ethers.utils.parseEther("0.001"))
+  await stableSwapModule.setFeeOut(ethers.utils.parseEther("0.001"))
   await authTokenAdapter.grantRole(await authTokenAdapter.WHITELISTED(), stableSwapModule.address)
   await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), stableSwapModule.address)
 
@@ -117,6 +120,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     flashMintModule,
     stableSwapModule,
     authTokenAdapter,
+    systemDebtEngine,
   }
 }
 
@@ -150,8 +154,16 @@ describe("FlastMintModule", () => {
   let bookKeeperAsBob: BookKeeper
 
   beforeEach(async () => {
-    ;({ stablecoinAdapter, bookKeeper, BUSD, alpacaStablecoin, flashMintModule, stableSwapModule, authTokenAdapter } =
-      await waffle.loadFixture(loadFixtureHandler))
+    ;({
+      stablecoinAdapter,
+      bookKeeper,
+      BUSD,
+      alpacaStablecoin,
+      flashMintModule,
+      stableSwapModule,
+      authTokenAdapter,
+      systemDebtEngine,
+    } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress] = await Promise.all([
       deployer.getAddress(),
@@ -164,168 +176,90 @@ describe("FlastMintModule", () => {
 
     bookKeeperAsBob = BookKeeper__factory.connect(bookKeeper.address, bob)
   })
-  describe("#flashLoan", async () => {
-    context("AUSD price at $1", async () => {
-      it("should revert, because there is no arbitrage opportunity, thus no profit to pay for flash mint fee", async () => {
-        // Deployer adds 1000 BUSD + 1000 AUSD
-        await BUSD.mint(deployerAddress, ethers.utils.parseEther("1000"))
-        await bookKeeper.mintUnbackedStablecoin(
-          deployerAddress,
-          deployerAddress,
-          ethers.utils.parseEther("1000").mul(WeiPerRay)
-        )
-        await stablecoinAdapter.withdraw(deployerAddress, ethers.utils.parseEther("1000"), "0x")
-        await BUSD.approve(routerV2.address, ethers.utils.parseEther("1000"))
-        await alpacaStablecoin.approve(routerV2.address, ethers.utils.parseEther("1000"))
-        await routerV2.addLiquidity(
-          BUSD.address,
-          alpacaStablecoin.address,
-          ethers.utils.parseEther("1000"),
-          ethers.utils.parseEther("1000"),
-          "0",
-          "0",
-          await deployerAddress,
-          FOREVER
-        )
+  describe("#swapTokenToStablecoin", async () => {
+    context("exceed debtCeiling", async () => {
+      it("should revert", async () => {
+        // Set debtCeiling of StableSwapModule to 0
+        await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID, 0)
 
-        // Current AUSD price is $1
-        // Perform flash mint to arbitrage
+        // Mint 1000 BUSD to deployer
+        await BUSD.mint(deployerAddress, ethers.utils.parseEther("1000"))
+
+        // Swap 1000 BUSD to AUSD
+        await BUSD.approve(authTokenAdapter.address, MaxUint256)
         await expect(
-          flashMintModule.flashLoan(
-            flashMintArbitrager.address,
-            alpacaStablecoin.address,
-            ethers.utils.parseEther("10"),
-            ethers.utils.defaultAbiCoder.encode(
-              ["address", "address", "address"],
-              [routerV2.address, BUSD.address, stableSwapModule.address]
-            )
-          )
-        ).to.be.revertedWith("AlpacaStablecoin/insufficient-balance")
+          stableSwapModule.swapTokenToStablecoin(deployerAddress, ethers.utils.parseEther("1000"))
+        ).to.be.revertedWith("BookKeeper/ceiling-exceeded")
       })
     })
 
-    context("AUSD price at $1.5", async () => {
+    context("swap BUSD to AUSD", async () => {
       it("should success", async () => {
-        // Deployer adds 1500 BUSD + 1000 AUSD
-        await BUSD.mint(deployerAddress, ethers.utils.parseEther("1500"))
-        await bookKeeper.mintUnbackedStablecoin(
-          deployerAddress,
-          deployerAddress,
-          ethers.utils.parseEther("1000").mul(WeiPerRay)
-        )
-        await stablecoinAdapter.withdraw(deployerAddress, ethers.utils.parseEther("1000"), "0x")
-        await BUSD.approve(routerV2.address, ethers.utils.parseEther("1500"))
-        await alpacaStablecoin.approve(routerV2.address, ethers.utils.parseEther("1000"))
-        await routerV2.addLiquidity(
-          BUSD.address,
-          alpacaStablecoin.address,
-          ethers.utils.parseEther("1500"),
-          ethers.utils.parseEther("1000"),
-          "0",
-          "0",
-          await deployerAddress,
-          FOREVER
-        )
+        // Mint 1000 BUSD to deployer
+        await BUSD.mint(deployerAddress, ethers.utils.parseEther("1000"))
 
-        // Current AUSD price is $1.5
-        // Perform flash mint to arbitrage
-        await flashMintModule.flashLoan(
-          flashMintArbitrager.address,
-          alpacaStablecoin.address,
-          ethers.utils.parseEther("50"),
-          ethers.utils.defaultAbiCoder.encode(
-            ["address", "address", "address"],
-            [routerV2.address, BUSD.address, stableSwapModule.address]
-          )
-        )
+        // Swap 1000 BUSD to AUSD
+        await BUSD.approve(authTokenAdapter.address, MaxUint256)
+        await stableSwapModule.swapTokenToStablecoin(deployerAddress, ethers.utils.parseEther("1000"))
 
-        const profitFromArbitrage = await alpacaStablecoin.balanceOf(flashMintArbitrager.address)
-        expect(profitFromArbitrage).to.be.gt(0)
+        // 1000 * 0.001 = 1
+        const feeFromSwap = await bookKeeper.stablecoin(systemDebtEngine.address)
+        expect(feeFromSwap).to.be.equal(ethers.utils.parseEther("1").mul(WeiPerRay))
 
-        const feeCollectedFromFlashMint = await bookKeeper.stablecoin(flashMintModule.address)
-        expect(feeCollectedFromFlashMint).to.be.equal(ethers.utils.parseEther("0.125").mul(WeiPerRay))
+        // stablecoinReceived = swapAmount - fee = 1000 - 1 = 999
+        const stablecoinReceived = await alpacaStablecoin.balanceOf(deployerAddress)
+        expect(stablecoinReceived).to.be.equal(ethers.utils.parseEther("999"))
+
+        const busdCollateralAmount = (await bookKeeper.positions(COLLATERAL_POOL_ID, stableSwapModule.address))
+          .lockedCollateral
+        expect(busdCollateralAmount).to.be.equal(ethers.utils.parseEther("1000"))
       })
     })
   })
 
-  describe("#bookKeeperFlashLoan", async () => {
-    context("AUSD price at $1", async () => {
-      it("should revert, because there is no arbitrage opportunity, thus no profit to pay for flash mint fee", async () => {
-        // Deployer adds 1000 BUSD + 1000 AUSD
-        await BUSD.mint(deployerAddress, ethers.utils.parseEther("1000"))
+  describe("#swapStablecoinToToken", async () => {
+    context("collateral not enough", async () => {
+      it("should revert", async () => {
+        // Mint 1000 AUSD to deployer
         await bookKeeper.mintUnbackedStablecoin(
           deployerAddress,
           deployerAddress,
-          ethers.utils.parseEther("1000").mul(WeiPerRay)
+          ethers.utils.parseEther("1001").mul(WeiPerRay)
         )
-        await stablecoinAdapter.withdraw(deployerAddress, ethers.utils.parseEther("1000"), "0x")
-        await BUSD.approve(routerV2.address, ethers.utils.parseEther("1000"))
-        await alpacaStablecoin.approve(routerV2.address, ethers.utils.parseEther("1000"))
-        await routerV2.addLiquidity(
-          BUSD.address,
-          alpacaStablecoin.address,
-          ethers.utils.parseEther("1000"),
-          ethers.utils.parseEther("1000"),
-          "0",
-          "0",
-          await deployerAddress,
-          FOREVER
-        )
+        await stablecoinAdapter.withdraw(deployerAddress, ethers.utils.parseEther("1001"), "0x")
 
-        // Current AUSD price is $1
-        // Perform flash mint to arbitrage
-        await expect(
-          flashMintModule.bookKeeperFlashLoan(
-            bookKeeperFlashMintArbitrager.address,
-            ethers.utils.parseEther("10"),
-            ethers.utils.defaultAbiCoder.encode(
-              ["address", "address", "address"],
-              [routerV2.address, BUSD.address, stableSwapModule.address]
-            )
-          )
-        ).to.be.reverted
+        // Swap 1000 AUSD to BUSD
+        await alpacaStablecoin.approve(stableSwapModule.address, MaxUint256)
+        await expect(stableSwapModule.swapStablecoinToToken(deployerAddress, ethers.utils.parseEther("1000"))).to.be
+          .reverted
       })
     })
 
-    context("AUSD price at $1.5", async () => {
+    context("swap AUSD to BUSD", async () => {
       it("should success", async () => {
-        // Deployer adds 1500 BUSD + 1000 AUSD
-        await BUSD.mint(deployerAddress, ethers.utils.parseEther("1500"))
-        await bookKeeper.mintUnbackedStablecoin(
-          deployerAddress,
-          deployerAddress,
-          ethers.utils.parseEther("1000").mul(WeiPerRay)
-        )
-        await stablecoinAdapter.withdraw(deployerAddress, ethers.utils.parseEther("1000"), "0x")
-        await BUSD.approve(routerV2.address, ethers.utils.parseEther("1500"))
-        await alpacaStablecoin.approve(routerV2.address, ethers.utils.parseEther("1000"))
-        await routerV2.addLiquidity(
-          BUSD.address,
-          alpacaStablecoin.address,
-          ethers.utils.parseEther("1500"),
-          ethers.utils.parseEther("1000"),
-          "0",
-          "0",
-          await deployerAddress,
-          FOREVER
-        )
+        // Mint 1000 BUSD to deployer
+        await BUSD.mint(deployerAddress, ethers.utils.parseEther("1000"))
 
-        // Current AUSD price is $1.5
-        // Perform flash mint to arbitrage
-        await flashMintModule.bookKeeperFlashLoan(
-          bookKeeperFlashMintArbitrager.address,
-          ethers.utils.parseEther("50").mul(WeiPerRay),
-          ethers.utils.defaultAbiCoder.encode(
-            ["address", "address", "address"],
-            [routerV2.address, BUSD.address, stableSwapModule.address]
-          )
-        )
+        // Swap 1000 BUSD to AUSD
+        await BUSD.approve(authTokenAdapter.address, MaxUint256)
+        await stableSwapModule.swapTokenToStablecoin(deployerAddress, ethers.utils.parseEther("1000"))
 
-        const profitFromArbitrage = await alpacaStablecoin.balanceOf(bookKeeperFlashMintArbitrager.address)
-        expect(profitFromArbitrage).to.be.gt(0)
+        // Swap 998 AUSD to BUSD
+        await alpacaStablecoin.approve(stableSwapModule.address, MaxUint256)
+        await stableSwapModule.swapStablecoinToToken(deployerAddress, ethers.utils.parseEther("998"))
 
-        const feeCollectedFromFlashMint = await bookKeeper.stablecoin(flashMintModule.address)
-        expect(feeCollectedFromFlashMint).to.be.equal(ethers.utils.parseEther("0.125").mul(WeiPerRay))
+        // first swap = 1000 * 0.001 = 1 AUSD
+        // second swap = 998 * 0.001 = 0.998 AUSD
+        // total fee = 1 + 0.998 = 1.998
+        const feeFromSwap = await bookKeeper.stablecoin(systemDebtEngine.address)
+        expect(feeFromSwap).to.be.equal(ethers.utils.parseEther("1.998").mul(WeiPerRay))
+
+        const busdReceived = await BUSD.balanceOf(deployerAddress)
+        expect(busdReceived).to.be.equal(ethers.utils.parseEther("998"))
+
+        const busdCollateralAmount = (await bookKeeper.positions(COLLATERAL_POOL_ID, stableSwapModule.address))
+          .lockedCollateral
+        expect(busdCollateralAmount).to.be.equal(ethers.utils.parseEther("2"))
       })
     })
   })
