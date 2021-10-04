@@ -126,8 +126,8 @@ contract StableSwapModule is PausableUpgradeable, AccessControlUpgradeable, ISta
    */
   function swapTokenToStablecoin(address _usr, uint256 _tokenAmount) external override {
     uint256 _tokenAmount18 = mul(_tokenAmount, to18ConversionFactor);
-    uint256 fee = mul(_tokenAmount18, feeIn) / WAD;
-    uint256 stablecoinAmount = sub(_tokenAmount18, fee);
+    uint256 _fee = mul(_tokenAmount18, feeIn) / WAD;
+    uint256 _stablecoinAmount = sub(_tokenAmount18, _fee);
     authTokenAdapter.deposit(address(this), _tokenAmount, msg.sender);
     bookKeeper.adjustPosition(
       collateralPoolId,
@@ -137,10 +137,10 @@ contract StableSwapModule is PausableUpgradeable, AccessControlUpgradeable, ISta
       int256(_tokenAmount18),
       int256(_tokenAmount18)
     );
-    bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(fee, RAY));
-    stablecoinAdapter.withdraw(_usr, stablecoinAmount, abi.encode(0));
+    bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(_fee, RAY));
+    stablecoinAdapter.withdraw(_usr, _stablecoinAmount, abi.encode(0));
 
-    emit SwapTokenToStablecoin(_usr, _tokenAmount, fee);
+    emit SwapTokenToStablecoin(_usr, _tokenAmount, _fee);
   }
 
   /**
@@ -150,10 +150,10 @@ contract StableSwapModule is PausableUpgradeable, AccessControlUpgradeable, ISta
    */
   function swapStablecoinToToken(address _usr, uint256 _tokenAmount) external override {
     uint256 _tokenAmount18 = mul(_tokenAmount, to18ConversionFactor);
-    uint256 fee = mul(_tokenAmount18, feeOut) / WAD;
-    uint256 stablecoinAmount = add(_tokenAmount18, fee);
-    require(stablecoin.transferFrom(msg.sender, address(this), stablecoinAmount), "StableSwapModule/failed-transfer");
-    stablecoinAdapter.deposit(address(this), stablecoinAmount, abi.encode(0));
+    uint256 _fee = mul(_tokenAmount18, feeOut) / WAD;
+    uint256 _stablecoinAmount = add(_tokenAmount18, _fee);
+    require(stablecoin.transferFrom(msg.sender, address(this), _stablecoinAmount), "StableSwapModule/failed-transfer");
+    stablecoinAdapter.deposit(address(this), _stablecoinAmount, abi.encode(0));
     bookKeeper.adjustPosition(
       collateralPoolId,
       address(this),
@@ -163,9 +163,9 @@ contract StableSwapModule is PausableUpgradeable, AccessControlUpgradeable, ISta
       -int256(_tokenAmount18)
     );
     authTokenAdapter.withdraw(_usr, _tokenAmount);
-    bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(fee, RAY));
+    bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(_fee, RAY));
 
-    emit SwapStablecoinToToken(_usr, _tokenAmount, fee);
+    emit SwapStablecoinToToken(_usr, _tokenAmount, _fee);
   }
 
   // --- pause ---
