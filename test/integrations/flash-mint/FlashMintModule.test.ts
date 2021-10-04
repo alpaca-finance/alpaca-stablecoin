@@ -22,6 +22,8 @@ import {
   SystemDebtEngine,
   FlashMintArbitrager__factory,
   FlashMintArbitrager,
+} from "../../../typechain"
+import {
   PancakeFactory__factory,
   PancakeFactory,
   PancakePair__factory,
@@ -30,7 +32,7 @@ import {
   PancakeRouterV2,
   WETH__factory,
   WETH,
-} from "../../../typechain"
+} from "@alpaca-finance/alpaca-contract/typechain"
 import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 
@@ -133,11 +135,11 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const factoryV2 = await PancakeFactoryV2.deploy(await deployer.getAddress())
   await factoryV2.deployed()
 
-  const WBNB = (await ethers.getContractFactory("WETH", deployer)) as WETH__factory
+  const WBNB = new WETH__factory(deployer)
   const wbnb = await WBNB.deploy()
   await wbnb.deployed()
 
-  const PancakeRouterV2 = (await ethers.getContractFactory("PancakeRouterV2", deployer)) as PancakeRouterV2__factory
+  const PancakeRouterV2 = new PancakeRouterV2__factory(deployer)
   const routerV2 = await PancakeRouterV2.deploy(factoryV2.address, wbnb.address)
   await routerV2.deployed()
 

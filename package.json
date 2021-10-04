@@ -3,9 +3,7 @@
   "version": "0.0.1",
   "scripts": {
     "hardhat": "hardhat",
-    "compile": "hardhat typechain --config hardhat.config.ts && hardhat typechain --config hardhat.config.5.ts && hardhat typechain --config hardhat.config.6.ts",
-    "compile5": "hardhat typechain --config hardhat.config.5.ts",
-    "compile612": "hardhat typechain --config hardhat.config.ts",
+    "compile": "hardhat typechain --config hardhat.config.ts",
     "mainnet": "hardhat console --no-compile --network mainnet",
     "test:case": "mocha --require hardhat/register --extension ts -g",
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
