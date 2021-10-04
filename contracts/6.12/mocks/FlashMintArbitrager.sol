@@ -2,15 +2,24 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@pancakeswap/pancake-swap-periphery/contracts/interfaces/IPancakeRouter02.sol";
+import "../../6/apis/pancake/IPancakeRouter02.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "../interfaces/IERC3156FlashBorrower.sol";
 import "../interfaces/IStableSwapModule.sol";
+import "../interfaces/IStablecoinAdapter.sol";
+import "../utils/SafeToken.sol";
 
 contract FlashMintArbitrager is OwnableUpgradeable, IERC3156FlashBorrower {
   using SafeMathUpgradeable for uint256;
+  using SafeToken for address;
+
+  // --- Init ---
+  function initialize() external initializer {
+    // 1. Initialized all dependencies
+    OwnableUpgradeable.__Ownable_init();
+  }
 
   function onFlashLoan(
     address initiator,
@@ -25,14 +34,20 @@ contract FlashMintArbitrager is OwnableUpgradeable, IERC3156FlashBorrower {
     path[1] = stableSwapToken;
 
     // 1. Swap AUSD to BUSD at a DEX
-    uint256 balanceBefore = IERC20(stableSwapToken).balanceOf(address(this));
+    uint256 balanceBefore = stableSwapToken.myBalance();
+    token.safeApprove(router, uint256(-1));
     IPancakeRouter02(router).swapExactTokensForTokens(amount, 0, path, address(this), now);
-    uint256 balanceAfter = IERC20(stableSwapToken).balanceOf(address(this));
+    token.safeApprove(router, 0);
+    uint256 balanceAfter = stableSwapToken.myBalance();
 
     // 2. Swap BUSD to AUSD at StableSwapModule
+    stableSwapToken.safeApprove(address(IStableSwapModule(stableSwapModule).authTokenAdapter()), uint256(-1));
     IStableSwapModule(stableSwapModule).swapTokenForStablecoin(address(this), balanceAfter.sub(balanceBefore));
+    stableSwapToken.safeApprove(address(IStableSwapModule(stableSwapModule).authTokenAdapter()), 0);
 
     // 3. Approve AUSD for FlashMintModule
-    IERC20(token).approve(initiator, amount.add(fee));
+    token.safeApprove(msg.sender, amount.add(fee));
+
+    return keccak256("ERC3156FlashBorrower.onFlashLoan");
   }
 }

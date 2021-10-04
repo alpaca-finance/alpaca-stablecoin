@@ -50,7 +50,7 @@ contract StableSwapModule is OwnableUpgradeable, PausableUpgradeable, AccessCont
   }
 
   IBookKeeper public bookKeeper;
-  IAuthTokenAdapter public authTokenAdapter;
+  IAuthTokenAdapter public override authTokenAdapter;
   IStablecoin public stablecoin;
   IStablecoinAdapter public stablecoinAdapter;
   bytes32 public collateralPoolId;
