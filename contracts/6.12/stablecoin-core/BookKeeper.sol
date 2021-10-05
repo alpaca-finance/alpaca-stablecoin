@@ -5,7 +5,6 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/ICagable.sol";
-import "hardhat/console.sol";
 
 /// @title BookKeeper
 /// @author Alpaca Fin Corporation
@@ -269,7 +268,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     CollateralPool memory collateralPool = collateralPools[collateralPoolId];
     // collateralPool has been initialised
     require(collateralPool.debtAccumulatedRate != 0, "BookKeeper/collateralPool-not-init");
-
     position.lockedCollateral = add(position.lockedCollateral, collateralValue);
     position.debtShare = add(position.debtShare, debtShare);
     collateralPool.totalDebtShare = add(collateralPool.totalDebtShare, debtShare);
@@ -310,7 +308,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
 
     // position has no debt, or a non-debtFloory amount
     require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "BookKeeper/debt-floor");
-
     collateralToken[collateralPoolId][collateralOwner] = sub(
       collateralToken[collateralPoolId][collateralOwner],
       collateralValue
