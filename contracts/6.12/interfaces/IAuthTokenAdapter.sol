@@ -17,4 +17,6 @@ interface IAuthTokenAdapter {
   ) external;
 
   function withdraw(address, uint256) external;
+
+  function token() external returns (IToken);
 }
