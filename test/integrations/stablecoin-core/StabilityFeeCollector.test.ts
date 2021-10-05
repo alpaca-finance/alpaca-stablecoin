@@ -27,7 +27,7 @@ import {
 } from "../../../typechain"
 import { expect } from "chai"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
-import { formatBytes32String } from "ethers/lib/utils"
+import { formatBytes32String, parseEther, parseUnits } from "ethers/lib/utils"
 import {
   DebtToken__factory,
   MockWBNB,
@@ -107,7 +107,8 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     bookKeeper.address,
   ])) as StabilityFeeCollector
 
-  await stabilityFeeCollector.init(formatBytes32String("ibBUSD"))
+  await stabilityFeeCollector.setSystemDebtEngine(await dev.getAddress())
+  await stabilityFeeCollector.init(formatBytes32String("BUSD"))
 
   await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), busdTokenAdapter.address)
   await bookKeeper.grantRole(
@@ -137,10 +138,12 @@ describe("Stability Fee", () => {
   // Accounts
   let deployer: Signer
   let alice: Signer
+  let dev: Signer
 
   // Account Addresses
   let deployerAddress: string
   let aliceAddress: string
+  let devAddress: string
 
   // Proxy wallet
   let deployerProxyWallet: ProxyWallet
@@ -159,8 +162,12 @@ describe("Stability Fee", () => {
   let alpacaStablecoin: AlpacaStablecoin
 
   beforeEach(async () => {
-    ;[deployer, alice] = await ethers.getSigners()
-    ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
+    ;[deployer, alice, , dev] = await ethers.getSigners()
+    ;[deployerAddress, aliceAddress, devAddress] = await Promise.all([
+      deployer.getAddress(),
+      alice.getAddress(),
+      dev.getAddress(),
+    ])
     ;({
       proxyWallets: [deployerProxyWallet, aliceProxyWallet, bobProxyWallet],
     } = await loadProxyWalletFixtureHandler())
@@ -186,101 +193,159 @@ describe("Stability Fee", () => {
     await busdTokenAsAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
     await alpacaStablecoinAsAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
   })
-  //   describe("user mint AUSD and repay AUSD (fee 20%)", () => {
-  //     context("alice mint AUSD and repay AUSD", () => {
-  //       it("should be able to mint and repay", async () => {
-  //         // set stability fee rate 20% per year
-  //         await stabilityFeeCollector.setStabilityFeeRate(
-  //           formatBytes32String("ibBUSD"),
-  //           BigNumber.from("1000000005781378656804591713")
-  //         )
+  describe("#collect", () => {
+    context("when call collect directly and call diposit", () => {
+      it("should be success", async () => {
+        // set stability fee rate 20% per year
+        await stabilityFeeCollector.setStabilityFeeRate(
+          formatBytes32String("BUSD"),
+          BigNumber.from("1000000005781378656804591713")
+        )
 
-  //         // 1.
-  //         //  a. convert BUSD to ibBUSD
-  //         //  b. open a new position
-  //         //  c. lock ibBUSD
-  //         //  d. mint AUSD
-  //         const convertOpenLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
-  //           "convertOpenLockTokenAndDraw",
-  //           [
-  //             vault.address,
-  //             positionManager.address,
-  //             stabilityFeeCollector.address,
-  //             ibTokenAdapter.address,
-  //             stablecoinAdapter.address,
-  //             formatBytes32String("ibBUSD"),
-  //             WeiPerWad.mul(10),
-  //             WeiPerWad.mul(5),
-  //             true,
-  //             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
-  //           ]
-  //         )
-  //         const convertOpenLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
-  //           alpacaStablecoinProxyActions.address,
-  //           convertOpenLockTokenAndDrawCall
-  //         )
+        // time increase 6 month
+        await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from("15768000")))
+        await stabilityFeeCollector.collect(formatBytes32String("BUSD"))
 
-  //         const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
-  //         const positionAddress = await positionManager.positions(positionId)
+        // debtAccumulatedRate = RAY(1000000005781378656804591713^15768000) = 1095445115010332226911367294
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper["collateralPools(bytes32)"](formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
+          "1095445115010332226911367294"
+        )
+        AssertHelpers.assertAlmostEqual((await bookKeeper.stablecoin(devAddress)).toString(), "0")
 
-  //         const [, debtAccumulatedRateBefore] = await bookKeeper["collateralPools(bytes32)"](
-  //           formatBytes32String("ibBUSD")
-  //         )
+        // position 1
+        //  a. open a new position
+        //  b. lock ibBUSD
+        //  c. mint AUSD
+        const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "openLockTokenAndDraw",
+          [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            tokenAdapter.address,
+            stablecoinAdapter.address,
+            formatBytes32String("BUSD"),
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(5),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+          alpacaStablecoinProxyActions.address,
+          openLockTokenAndDrawCall
+        )
+        const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+        const positionAddress = await positionManager.positions(positionId)
 
-  //         // time increase 1 year
-  //         await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from("31536000")))
+        // position debtShare = 5000000000000000000000000000000000000000000000 / 1095445115010332226911367294 = 4564354645876384278
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper.positions(formatBytes32String("BUSD"), positionAddress)).debtShare.toString(),
+          "4564354645876384278"
+        )
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper.collateralPools(formatBytes32String("BUSD"))).totalDebtShare.toString(),
+          "4564354645876384278"
+        )
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper.collateralPools(formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
+          "1095445115010332226911367294"
+        )
 
-  //         // debtAccumulatedRate ~ 20%
-  //         await stabilityFeeCollector.collect(formatBytes32String("ibBUSD"))
+        // time increase 1 year
+        await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from("31536000")))
 
-  //         const alpacaStablecoinBefore = await alpacaStablecoin.balanceOf(aliceAddress)
+        // position 2
+        //  a. open a new position
+        //  b. lock ibBUSD
+        //  c. mint AUSD
+        const openLockTokenAndDraw2Call = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "openLockTokenAndDraw",
+          [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            tokenAdapter.address,
+            stablecoinAdapter.address,
+            formatBytes32String("BUSD"),
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(5),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        const openLockTokenAndDraw2Tx = await aliceProxyWallet["execute(address,bytes)"](
+          alpacaStablecoinProxyActions.address,
+          openLockTokenAndDrawCall
+        )
+        const positionId2 = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+        const positionAddress2 = await positionManager.positions(positionId2)
 
-  //         const baseTokenBefore = await baseToken.balanceOf(aliceAddress)
+        // debtAccumulatedRate = RAY((1000000005781378656804591713^31536000) * 1095445115010332226911367294) = 1314534138012398672287467301
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper["collateralPools(bytes32)"](formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
+          "1314534138012398672287467301"
+        )
+        // debtShare * diffDebtAccumulatedRate =  4564354645876384278 * (1314534138012398672287467301 - 1095445115010332226911367294) = 999999999999999999792432233173942358090489946
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper.stablecoin(devAddress)).toString(),
+          "999999999999999999792432233173942358090489946"
+        )
 
-  //         const [lockedCollateralBefore, debtShareBefore] = await bookKeeper.positions(
-  //           formatBytes32String("ibBUSD"),
-  //           positionAddress
-  //         )
+        // position debtShare = 5000000000000000000000000000000000000000000000 / 1314534138012398672287467301 = 3803628871563653565
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper.positions(formatBytes32String("BUSD"), positionAddress2)).debtShare.toString(),
+          "3803628871563653565"
+        )
+        // 4564354645876384278 + 3803628871563653565 = 8367983517440037843
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper.collateralPools(formatBytes32String("BUSD"))).totalDebtShare.toString(),
+          "8367983517440037843"
+        )
 
-  //         const [, debtAccumulatedRateAfter] = await bookKeeper["collateralPools(bytes32)"](formatBytes32String("ibBUSD"))
+        // time increase 1 year
+        await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from("31536000")))
 
-  //         // 2.
-  //         //  a. repay some AUSD
-  //         //  b. alice unlock some ibBUSD
-  //         //  c. convert BUSD to ibBUSD
-  //         const wipeUnlockTokenAndConvertCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
-  //           "wipeUnlockTokenAndConvert",
-  //           [
-  //             vault.address,
-  //             positionManager.address,
-  //             ibTokenAdapter.address,
-  //             stablecoinAdapter.address,
-  //             positionId,
-  //             WeiPerWad.mul(1),
-  //             WeiPerWad.mul(1),
-  //             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
-  //           ]
-  //         )
-  //         const wipeUnlockTokenAndConvertTx = await aliceProxyWallet["execute(address,bytes)"](
-  //           alpacaStablecoinProxyActions.address,
-  //           wipeUnlockTokenAndConvertCall
-  //         )
+        // debtAccumulatedRate ~ 20%
+        await stabilityFeeCollector.collect(formatBytes32String("BUSD"))
 
-  //         const alpacaStablecoinAfter = await alpacaStablecoin.balanceOf(aliceAddress)
+        // debtAccumulatedRate = RAY((1000000005781378656804591713^31536000) * 1314534138012398672287467301) = 1577440965614878406737552619
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper["collateralPools(bytes32)"](formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
+          "1577440965614878406737552619"
+        )
+        // debtShare * diffDebtAccumulatedRate =  8367983517440037843 * (1577440965614878406737552619 - 1314534138012398672287467301) = 2199999999999999999533019044066331740498689074
+        // 2199999999999999999533019044066331740498689074 + 999999999999999999792432233173942358090489946 = 3199999999999999999325451277240274098589179020
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper.stablecoin(devAddress)).toString(),
+          "3199999999999999999325451277240274098589179020"
+        )
 
-  //         const baseTokenAfter = await baseToken.balanceOf(aliceAddress)
+        //  a. repay some AUSD
+        //  b. alice unlock some ibBUSD
+        //  c. convert BUSD to ibBUSD
+        const wipeAndUnlockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("wipeAndUnlockToken", [
+          positionManager.address,
+          tokenAdapter.address,
+          stablecoinAdapter.address,
+          positionId,
+          WeiPerWad.mul(1),
+          WeiPerWad.mul(1),
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+        ])
+        const wipeAndUnlockTokenTx = await aliceProxyWallet["execute(address,bytes)"](
+          alpacaStablecoinProxyActions.address,
+          wipeAndUnlockTokenCall
+        )
 
-  //         const [lockedCollateralAfter, debtShareAfter] = await bookKeeper.positions(
-  //           formatBytes32String("ibBUSD"),
-  //           positionAddress
-  //         )
-
-  //         expect(alpacaStablecoinBefore.sub(alpacaStablecoinAfter)).to.be.equal(WeiPerWad.mul(1))
-  //         expect(baseTokenAfter.sub(baseTokenBefore)).to.be.equal(WeiPerWad.mul(1))
-  //         expect(lockedCollateralBefore.sub(lockedCollateralAfter)).to.be.equal(WeiPerWad.mul(1))
-  //         // debtShareToRepay = 1 rad / 1.2 ray = 0.833333333333333333 wad
-  //         AssertHelpers.assertAlmostEqual(debtShareBefore.sub(debtShareAfter).toString(), "833333333333333333")
-  //       })
-  //     })
-  //   })
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper["collateralPools(bytes32)"](formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
+          "1577440965614878406737552619"
+        )
+        AssertHelpers.assertAlmostEqual(
+          (await bookKeeper.stablecoin(devAddress)).toString(),
+          "3199999999999999999325451277240274098589179020"
+        )
+      })
+    })
+  })
 })
