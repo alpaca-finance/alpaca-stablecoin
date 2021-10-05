@@ -15,12 +15,19 @@ contract AlpacaStablecoinFlashLiquidator is OwnableUpgradeable, IFlashLendingCal
   using SafeToken for address;
   using SafeMathUpgradeable for uint256;
 
-  IBookKeeper bookKeeper;
+  // --- Math ---
+  uint256 constant WAD = 10**18;
+  uint256 constant RAY = 10**27;
+  uint256 constant RAD = 10**45;
 
-  function initialize(address _bookKeeper) external initializer {
+  IBookKeeper public bookKeeper;
+  address public alpacaStablecoin;
+
+  function initialize(address _bookKeeper, address _alpacaStablecoin) external initializer {
     OwnableUpgradeable.__Ownable_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
+    alpacaStablecoin = _alpacaStablecoin;
   }
 
   function flashLendingCall(
@@ -30,27 +37,44 @@ contract AlpacaStablecoinFlashLiquidator is OwnableUpgradeable, IFlashLendingCal
     bytes calldata data
   ) external override {
     (
+      address liquidatorAddress,
       IGenericTokenAdapter tokenAdapter,
       address vaultAddress,
       IPancakeRouter02 router,
       IStableSwapModule stableSwapModule
-    ) = abi.decode(data, (IGenericTokenAdapter, address, IPancakeRouter02, IStableSwapModule));
+    ) = abi.decode(data, (address, IGenericTokenAdapter, address, IPancakeRouter02, IStableSwapModule));
+
+    // Retrieve collateral token
     bookKeeper.whitelist(address(tokenAdapter));
     tokenAdapter.withdraw(address(this), collateralAmountToLiquidate, abi.encode(address(this)));
+    address token = tokenAdapter.collateralToken();
     if (vaultAddress != address(0)) {
       uint256 vaultBaseTokenBalanceBefore = IAlpacaVault(vaultAddress).token().myBalance();
       IAlpacaVault(vaultAddress).withdraw(collateralAmountToLiquidate);
       uint256 vaultBaseTokenBalanceAfter = IAlpacaVault(vaultAddress).token().myBalance();
       collateralAmountToLiquidate = vaultBaseTokenBalanceAfter.sub(vaultBaseTokenBalanceBefore);
+      token = IAlpacaVault(vaultAddress).token();
     }
+
+    // Dump collateral token to DEX for BUSD
     address stableSwapToken;
     address[] memory path = new address[](2);
-    path[0] = IAlpacaVault(vaultAddress).token();
+    path[0] = token;
     path[1] = stableSwapToken = address(stableSwapModule.authTokenAdapter().token());
-    path[0].safeApprove(address(router), uint256(-1));
+    token.safeApprove(address(router), uint256(-1));
     uint256 stableSwapTokenBalanceBefore = stableSwapToken.myBalance();
     router.swapExactTokensForTokens(collateralAmountToLiquidate, 0, path, address(this), now);
     uint256 stableSwapTokenBalanceAfter = stableSwapToken.myBalance();
-    stableSwapModule.swap
+
+    // Swap BUSD to AUSD
+    token.safeApprove(address(stableSwapModule.authTokenAdapter()), uint256(-1));
+    uint256 _alpacaStablecoinBalanceBefore = alpacaStablecoin.myBalance();
+    stableSwapModule.swapTokenToStablecoin(
+      address(this),
+      stableSwapTokenBalanceAfter.sub(stableSwapTokenBalanceBefore)
+    );
+    uint256 _alpacaStablecoinBalanceAfter = alpacaStablecoin.myBalance();
+
+    require();
   }
 }

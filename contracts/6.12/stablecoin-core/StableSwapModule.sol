@@ -30,24 +30,9 @@ import "../interfaces/IStableSwapModule.sol";
 // Allows anyone to go between AUSD and the Token by pooling the liquidity
 // An optional fee is charged for incoming and outgoing transfers
 
-contract StableSwapModule is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IStableSwapModule {
-  // --- Auth ---
-  mapping(address => uint256) public whitelist;
-
-  function rely(address usr) external auth {
-    whitelist[usr] = 1;
-    emit Rely(usr);
-  }
-
-  function deny(address usr) external auth {
-    whitelist[usr] = 0;
-    emit Deny(usr);
-  }
-
-  modifier auth() {
-    require(whitelist[msg.sender] == 1);
-    _;
-  }
+contract StableSwapModule is PausableUpgradeable, AccessControlUpgradeable, IStableSwapModule {
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
   IBookKeeper public bookKeeper;
   IAuthTokenAdapter public override authTokenAdapter;
@@ -62,33 +47,33 @@ contract StableSwapModule is OwnableUpgradeable, PausableUpgradeable, AccessCont
   uint256 public feeOut; // fee out [wad]
 
   // --- Events ---
-  event Rely(address indexed usr);
-  event Deny(address indexed usr);
-  event File(bytes32 indexed what, uint256 data);
-  event SellToken(address indexed owner, uint256 value, uint256 fee);
-  event BuyToken(address indexed owner, uint256 value, uint256 fee);
+  event SetFeeIn(address indexed _caller, uint256 _feeIn);
+  event SetFeeOut(address indexed _caller, uint256 _feeOut);
+  event SwapTokenToStablecoin(address indexed owner, uint256 value, uint256 fee);
+  event SwapStablecoinToToken(address indexed owner, uint256 value, uint256 fee);
 
   // --- Init ---
   function initialize(
-    address authTokenAdapter_,
-    address stablecoinAdapter_,
-    address systemDebtEngine_
+    address _authTokenAdapter,
+    address _stablecoinAdapter,
+    address _systemDebtEngine
   ) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
-    whitelist[msg.sender] = 1;
-    emit Rely(msg.sender);
-    IAuthTokenAdapter authTokenAdapter__ = authTokenAdapter = IAuthTokenAdapter(authTokenAdapter_);
-    IStablecoinAdapter stablecoinAdapter__ = stablecoinAdapter = IStablecoinAdapter(stablecoinAdapter_);
-    IBookKeeper bookKeeper__ = bookKeeper = IBookKeeper(address(authTokenAdapter__.bookKeeper()));
-    IStablecoin stablecoin__ = stablecoin = IStablecoin(address(stablecoinAdapter__.stablecoin()));
-    collateralPoolId = authTokenAdapter__.collateralPoolId();
-    systemDebtEngine = systemDebtEngine_;
-    to18ConversionFactor = 10**(18 - authTokenAdapter__.decimals());
-    stablecoin__.approve(stablecoinAdapter_, uint256(-1));
-    bookKeeper__.whitelist(stablecoinAdapter_);
+    IAuthTokenAdapter __authTokenAdapter = authTokenAdapter = IAuthTokenAdapter(_authTokenAdapter);
+    IStablecoinAdapter __stablecoinAdapter = stablecoinAdapter = IStablecoinAdapter(_stablecoinAdapter);
+    IBookKeeper _bookKeeper = bookKeeper = IBookKeeper(address(__authTokenAdapter.bookKeeper()));
+    IStablecoin _stablecoin = stablecoin = IStablecoin(address(__stablecoinAdapter.stablecoin()));
+    collateralPoolId = __authTokenAdapter.collateralPoolId();
+    systemDebtEngine = _systemDebtEngine;
+    to18ConversionFactor = 10**(18 - __authTokenAdapter.decimals());
+    _stablecoin.approve(_stablecoinAdapter, uint256(-1));
+    _bookKeeper.whitelist(_stablecoinAdapter);
+
+    // Grant the contract deployer the owner role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -107,72 +92,90 @@ contract StableSwapModule is OwnableUpgradeable, PausableUpgradeable, AccessCont
     require(y == 0 || (z = x * y) / y == x);
   }
 
-  // --- Administration ---
-  function file(bytes32 what, uint256 data) external auth {
-    if (what == "feeIn") feeIn = data;
-    else if (what == "feeOut") feeOut = data;
-    else revert("PegStabilityModule/file-unrecognized-param");
+  function setFeeIn(uint256 _feeIn) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(_feeIn <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeIn is 0.5 Ethers or 50%
+    feeIn = _feeIn;
+    emit SetFeeIn(msg.sender, _feeIn);
+  }
 
-    emit File(what, data);
+  function setFeeOut(uint256 _feeOut) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(_feeOut <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeOut is 0.5 Ethers or 50%
+    feeOut = _feeOut;
+    emit SetFeeOut(msg.sender, _feeOut);
   }
 
   // hope can be used to transfer control of the PSM vault to another contract
   // This can be used to upgrade the contract
-  function hope(address usr) external auth {
-    bookKeeper.whitelist(usr);
+  function whitelist(address _usr) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    bookKeeper.whitelist(_usr);
   }
 
-  function nope(address usr) external auth {
-    bookKeeper.blacklist(usr);
+  function blacklist(address _usr) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    bookKeeper.blacklist(_usr);
   }
 
   // --- Primary Functions ---
   /**
    * @dev Deposit token into the system and withdraw to receive stablecoin
-   * @param usr The address of the account to sell
-   * @param tokenAmount The Amount of token to sell
+   * @param _usr The address of the account to sell
+   * @param _tokenAmount The Amount of token to sell
    */
-  function swapTokenForStablecoin(address usr, uint256 tokenAmount) external override {
-    uint256 tokenAmount18 = mul(tokenAmount, to18ConversionFactor);
-    uint256 fee = mul(tokenAmount18, feeIn) / WAD;
-    uint256 stablecoinAmount = sub(tokenAmount18, fee);
-    authTokenAdapter.deposit(address(this), tokenAmount, msg.sender);
+  function swapTokenToStablecoin(address _usr, uint256 _tokenAmount) external override {
+    uint256 _tokenAmount18 = mul(_tokenAmount, to18ConversionFactor);
+    uint256 _fee = mul(_tokenAmount18, feeIn) / WAD;
+    uint256 _stablecoinAmount = sub(_tokenAmount18, _fee);
+    authTokenAdapter.deposit(address(this), _tokenAmount, msg.sender);
     bookKeeper.adjustPosition(
       collateralPoolId,
       address(this),
       address(this),
       address(this),
-      int256(tokenAmount18),
-      int256(tokenAmount18)
+      int256(_tokenAmount18),
+      int256(_tokenAmount18)
     );
-    bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(fee, RAY));
-    stablecoinAdapter.withdraw(usr, stablecoinAmount, abi.encode(0));
+    bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(_fee, RAY));
+    stablecoinAdapter.withdraw(_usr, _stablecoinAmount, abi.encode(0));
 
-    emit SellToken(usr, tokenAmount, fee);
+    emit SwapTokenToStablecoin(_usr, _tokenAmount, _fee);
   }
 
   /**
    * @dev Deposit stablecoin into the system and withdraw to receive token
-   * @param usr The address of the account to buy
-   * @param tokenAmount The Amount of token to buy
+   * @param _usr The address of the account to buy
+   * @param _tokenAmount The Amount of token to buy
    */
-  function swapStablecoinToToken(address usr, uint256 tokenAmount) external override {
-    uint256 tokenAmount18 = mul(tokenAmount, to18ConversionFactor);
-    uint256 fee = mul(tokenAmount18, feeOut) / WAD;
-    uint256 stablecoinAmount = add(tokenAmount18, fee);
-    require(stablecoin.transferFrom(msg.sender, address(this), stablecoinAmount), "PegStabilityModule/failed-transfer");
-    stablecoinAdapter.deposit(address(this), stablecoinAmount, abi.encode(0));
+  function swapStablecoinToToken(address _usr, uint256 _tokenAmount) external override {
+    uint256 _tokenAmount18 = mul(_tokenAmount, to18ConversionFactor);
+    uint256 _fee = mul(_tokenAmount18, feeOut) / WAD;
+    uint256 _stablecoinAmount = add(_tokenAmount18, _fee);
+    require(stablecoin.transferFrom(msg.sender, address(this), _stablecoinAmount), "StableSwapModule/failed-transfer");
+    stablecoinAdapter.deposit(address(this), _stablecoinAmount, abi.encode(0));
     bookKeeper.adjustPosition(
       collateralPoolId,
       address(this),
       address(this),
       address(this),
-      -int256(tokenAmount18),
-      -int256(tokenAmount18)
+      -int256(_tokenAmount18),
+      -int256(_tokenAmount18)
     );
-    authTokenAdapter.withdraw(usr, tokenAmount);
-    bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(fee, RAY));
+    authTokenAdapter.withdraw(_usr, _tokenAmount);
+    bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(_fee, RAY));
 
-    emit BuyToken(usr, tokenAmount, fee);
+    emit SwapStablecoinToToken(_usr, _tokenAmount, _fee);
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 }

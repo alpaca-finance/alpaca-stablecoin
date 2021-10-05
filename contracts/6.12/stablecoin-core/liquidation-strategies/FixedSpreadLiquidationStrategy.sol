@@ -436,7 +436,7 @@ contract FixedSpreadLiquidationStrategy is
     ) {
       IFlashLendingCallee(_collateralRecipient).flashLendingCall(
         msg.sender,
-        info.actualDebtShareToBeLiquidated,
+        info.actualDebtValueToBeLiquidated,
         sub(info.collateralAmountToBeLiquidated, info.treasuryFees),
         _data
       );
