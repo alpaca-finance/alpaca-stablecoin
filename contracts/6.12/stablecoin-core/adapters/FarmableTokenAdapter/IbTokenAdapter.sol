@@ -23,6 +23,7 @@ import "../../../interfaces/IFarmableTokenAdapter.sol";
 import "../../../interfaces/ITimeLock.sol";
 import "../../../interfaces/IShield.sol";
 import "../../../interfaces/ICagable.sol";
+import "../../../interfaces/IManager.sol";
 import "../../../utils/SafeToken.sol";
 
 /// @title IbTokenAdapter is the adapter that inherited BaseFarmableTokenAdapter.
@@ -65,6 +66,8 @@ contract IbTokenAdapter is
   /// @dev The token that will get after collateral has been staked
   IToken public rewardToken;
 
+  IManager positionManager;
+
   /// @dev Rewards per collateralToken in RAY
   uint256 public accRewardPerShare;
   /// @dev Total CollateralTokens that has been staked in WAD
@@ -104,7 +107,8 @@ contract IbTokenAdapter is
     address _shield,
     address _timelock,
     uint256 _treasuryFeeBps,
-    address _treasuryAccount
+    address _treasuryAccount,
+    address _positionManager
   ) external initializer {
     // 1. Initialized all dependencies
     PausableUpgradeable.__Pausable_init();
@@ -140,6 +144,8 @@ contract IbTokenAdapter is
     require(_treasuryAccount != address(0), "IbTokenAdapter/bad treasury account");
     treasuryFeeBps = _treasuryFeeBps;
     treasuryAccount = _treasuryAccount;
+
+    positionManager = IManager(_positionManager);
 
     address(collateralToken).safeApprove(address(fairlaunch), uint256(-1));
 
@@ -228,16 +234,20 @@ contract IbTokenAdapter is
     return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
   }
 
-  /// @dev Harvest rewards for "from" and send to "to"
-  /// @param from The position address that is owned and staked the collateral tokens
+  /// @dev Harvest rewards for "_positionAddress" and send to "to"
+  /// @param _positionAddress The position address that is owned and staked the collateral tokens
   /// @param to The address to receive the yields
-  function harvest(address from, address to) internal {
+  function harvest(address _positionAddress, address to) internal {
+    address _harvestTo = msg.sender == _positionAddress
+      ? _positionAddress
+      : positionManager.mapPositionHandlerToOwner(_positionAddress);
+    require(to != address(0), "IbTokenAdapter/harvest-to-address-zero");
     // 1. Perform actual harvest. Calculate the new accRewardPerShare.
     if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvest(), totalShare));
     // 2. Calculate the rewards that "to" should get by:
-    // stake[from] * accRewardPerShare (rewards that each share should get) - rewardDebts (what already paid)
-    uint256 rewardDebt = rewardDebts[from];
-    uint256 rewards = rmul(stake[from], accRewardPerShare);
+    // stake[_positionAddress] * accRewardPerShare (rewards that each share should get) - rewardDebts (what already paid)
+    uint256 rewardDebt = rewardDebts[_positionAddress];
+    uint256 rewards = rmul(stake[_positionAddress], accRewardPerShare);
     if (rewards > rewardDebt) {
       uint256 back = sub(rewards, rewardDebt);
       uint256 treasuryFee = div(mul(back, treasuryFeeBps), 10000);
