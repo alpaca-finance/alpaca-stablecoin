@@ -236,15 +236,19 @@ contract IbTokenAdapter is
 
   /// @dev Harvest rewards for "_positionAddress" and send to "to"
   /// @param _positionAddress The position address that is owned and staked the collateral tokens
-  /// @param to The address to receive the yields
-  function harvest(address _positionAddress, address to) internal {
-    address _harvestTo = msg.sender == _positionAddress
-      ? _positionAddress
-      : positionManager.mapPositionHandlerToOwner(_positionAddress);
-    require(to != address(0), "IbTokenAdapter/harvest-to-address-zero");
-    // 1. Perform actual harvest. Calculate the new accRewardPerShare.
+  /// @param _to The address to receive the yields
+  function harvest(address _positionAddress, address _to) internal {
+    // 1. Define the address to receive the harvested rewards
+    // Give the rewards to the proxy wallet that owns this position address if there is any
+    address _harvestTo = positionManager.mapPositionHandlerToOwner(_positionAddress);
+    // if the position owner is not recognized by the position manager,
+    // check if the msg.sender is the owner of this position and harvest to msg.sender.
+    // or else, harvest to _to address decoded from additional calldata
+    if (_harvestTo == address(0)) _harvestTo = msg.sender == _positionAddress ? msg.sender : _to;
+    require(_harvestTo != address(0), "IbTokenAdapter/harvest-to-address-zero");
+    // 2. Perform actual harvest. Calculate the new accRewardPerShare.
     if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvest(), totalShare));
-    // 2. Calculate the rewards that "to" should get by:
+    // 3. Calculate the rewards that "to" should get by:
     // stake[_positionAddress] * accRewardPerShare (rewards that each share should get) - rewardDebts (what already paid)
     uint256 rewardDebt = rewardDebts[_positionAddress];
     uint256 rewards = rmul(stake[_positionAddress], accRewardPerShare);
@@ -252,7 +256,7 @@ contract IbTokenAdapter is
       uint256 back = sub(rewards, rewardDebt);
       uint256 treasuryFee = div(mul(back, treasuryFeeBps), 10000);
       address(rewardToken).safeTransfer(treasuryAccount, treasuryFee);
-      if (to != address(0)) address(rewardToken).safeTransfer(to, sub(back, treasuryFee));
+      if (_harvestTo != address(0)) address(rewardToken).safeTransfer(_harvestTo, sub(back, treasuryFee));
     }
 
     // 3. Update accRewardBalance
@@ -285,7 +289,6 @@ contract IbTokenAdapter is
     bytes calldata data
   ) public payable override nonReentrant {
     _deposit(positionAddress, amount, data);
-    fairlaunch.deposit(address(this), pid, amount);
   }
 
   /// @dev Harvest rewardTokens and distribute to user,
@@ -299,8 +302,13 @@ contract IbTokenAdapter is
     bytes calldata data
   ) private {
     require(live == 1, "IbTokenAdapter/not live");
-    address user = abi.decode(data, (address));
+
+    // Try to decode user address for harvested rewards from calldata
+    // if the user address is not passed, then send zero address to `harvest` and let it handle
+    address user = address(0);
+    if (data.length > 0) user = abi.decode(data, (address));
     harvest(positionAddress, user);
+
     if (amount > 0) {
       uint256 share = wdiv(mul(amount, to18ConversionFactor), netAssetPerShare()); // [wad]
 
@@ -315,6 +323,8 @@ contract IbTokenAdapter is
       stake[positionAddress] = add(stake[positionAddress], share);
     }
     rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
+
+    fairlaunch.deposit(address(this), pid, amount);
 
     emit Deposit(amount);
   }
@@ -344,8 +354,12 @@ contract IbTokenAdapter is
     uint256 amount,
     bytes calldata data
   ) private {
-    address user = abi.decode(data, (address));
+    // Try to decode user address for harvested rewards from calldata
+    // if the user address is not passed, then send zero address to `harvest` and let it handle
+    address user = address(0);
+    if (data.length > 0) user = abi.decode(data, (address));
     harvest(positionAddress, user);
+
     if (amount > 0) {
       uint256 share = wdivup(mul(amount, to18ConversionFactor), netAssetPerShare()); // [wad]
 
@@ -456,7 +470,7 @@ contract IbTokenAdapter is
     uint256 share,
     bytes calldata data
   ) external override nonReentrant {
-    deposit(source, 0, data);
+    _deposit(source, 0, data);
     moveStake(source, destination, share, data);
   }
 
