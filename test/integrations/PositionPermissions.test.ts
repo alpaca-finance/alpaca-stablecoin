@@ -521,7 +521,7 @@ describe("PositionPermissions", () => {
               ).to.be.equal(WeiPerWad)
               expect(
                 await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
-                "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY into the position"
+                "collateralToken inside Alice's Position#2 address should be 1 ibDUMMY, because Alice unlocked 1 ibDUMMY from the position"
               ).to.be.equal(WeiPerWad)
               // 4. Alice try to move collateral from second position to first position
               const moveCollateral = alpacaStablecoinProxyActions.interface.encodeFunctionData("moveCollateral", [
