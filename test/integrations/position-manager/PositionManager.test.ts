@@ -168,7 +168,10 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100))
 
   const PositionManager = new PositionManager__factory(deployer)
-  const positionManager = (await upgrades.deployProxy(PositionManager, [bookKeeper.address])) as PositionManager
+  const positionManager = (await upgrades.deployProxy(PositionManager, [
+    bookKeeper.address,
+    bookKeeper.address,
+  ])) as PositionManager
 
   const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
   const alpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
