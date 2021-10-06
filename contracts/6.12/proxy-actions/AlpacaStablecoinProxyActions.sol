@@ -954,4 +954,16 @@ contract AlpacaStablecoinProxyActions {
     wipeAllAndUnlockToken(manager, tokenAdapter, stablecoinAdapter, positionId, collateralAmount, data);
     ibTokenToToken(vault, convertTo18(tokenAdapter, collateralAmount));
   }
+
+  function harvest(
+    address manager,
+    address tokenAdapter,
+    uint256 positionId,
+    address harvestTo,
+    address harvestToken
+  ) external {
+    address positionAddress = IManager(manager).positions(positionId);
+    IGenericTokenAdapter(tokenAdapter).deposit(positionAddress, 0, abi.encode(harvestTo));
+    transfer(harvestToken, msg.sender, harvestToken.myBalance());
+  }
 }
