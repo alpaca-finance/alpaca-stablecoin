@@ -369,8 +369,8 @@ describe("PositionPermissions", () => {
     positionManagerAsBob = PositionManager__factory.connect(positionManager.address, bob)
   })
   describe("#permissions", async () => {
-    context("owner position able to", async () => {
-      context("lock collateral", async () => {
+    context("position owner is able to", async () => {
+      context("lock collateral into their own position", async () => {
         it("should success", async () => {
           // 1. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
           const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
