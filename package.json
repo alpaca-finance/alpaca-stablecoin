@@ -31,6 +31,7 @@
     "test:integrations:getpositions": "hardhat test --no-compile ./test/integrations/manager/GetPositions.test.ts",
     "test:integrations:stableswapmodule": "hardhat test --no-compile ./test/integrations/stablecoin-core/StableSwapModule.test.ts",
     "test:integrations:flashmintmodule": "hardhat test --no-compile ./test/integrations/flash-mint/FlashMintModule.test.ts",
+    "test:integrations:flashliquidation": "hardhat test --no-compile ./test/units/stablecoin-core/FlashLiquidation.test.ts",
     "coverage": "hardhat coverage",
     "solhint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
     "prettier:solidity": "./node_modules/.bin/prettier --write contracts/**/*.sol"
