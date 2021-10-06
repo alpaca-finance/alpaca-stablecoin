@@ -553,7 +553,7 @@ describe("PositionPermissions", () => {
               ).to.be.equal(WeiPerWad.mul(2))
             })
           })
-          context("open position and deposit collateral", async () => {
+          context("open position, deposit collateral and move collateral from one position to another position", async () => {
             it("should success", async () => {
               // 1. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
               const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
