@@ -866,7 +866,7 @@ describe("PositionPermissions", () => {
               ).to.be.equal(WeiPerWad)
               expect(
                 await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
-                "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice can't move 1 ibDUMMY at second position into first position across collater pool"
+                "collateralToken from Collateral Pool #1 inside Alice's Position #1 address should be 0 ibDUMMY, because Alice can't move collateral from Position #2 to Position #1 as they are not from the same Collateral Pool."
               ).to.be.equal(0)
               expect(
                 await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, alicePositionAddress2),
