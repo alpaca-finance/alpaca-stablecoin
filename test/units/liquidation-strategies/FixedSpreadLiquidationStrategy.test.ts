@@ -424,7 +424,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               deployerAddress,
               "0x"
             )
-          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-collateralAmount")
+          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-collateral-amount")
         })
       })
 
@@ -442,6 +442,36 @@ describe("FixedSpreadLiquidationStrategy", () => {
               UnitHelpers.WeiPerWad,
               AddressZero,
               UnitHelpers.WeiPerWad,
+              deployerAddress,
+              deployerAddress,
+              ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
+            )
+          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-position-address")
+        })
+      })
+    })
+    context("when close factor is invalid", () => {
+      context("closeFactorBps is 0", () => {
+        it("should be revert", async () => {
+          await fixedSpreadLiquidationStrategy.grantRole(
+            await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
+            deployerAddress
+          )
+          // mock contract
+          mockedBookKeeper.smocked.collateralPools.will.return.with([
+            BigNumber.from(0),
+            UnitHelpers.WeiPerRay.mul(2),
+            UnitHelpers.WeiPerRay,
+            BigNumber.from(0),
+            BigNumber.from(0),
+          ])
+
+          await expect(
+            fixedSpreadLiquidationStrategy.execute(
+              formatBytes32String("BNB"),
+              UnitHelpers.WeiPerRad,
+              UnitHelpers.WeiPerWad,
+              aliceAddress,
               UnitHelpers.WeiPerWad,
               deployerAddress,
               deployerAddress,
@@ -522,7 +552,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               deployerAddress,
               "0x"
             )
-          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-starting-price")
+          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-collateral-price")
         })
       })
     })

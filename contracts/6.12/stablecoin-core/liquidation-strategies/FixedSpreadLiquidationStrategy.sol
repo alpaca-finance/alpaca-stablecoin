@@ -236,8 +236,6 @@ contract FixedSpreadLiquidationStrategy is
     emit SetFlashLendingEnabled(msg.sender, _flashLendingEnabled);
   }
 
-  // --- Auction ---
-
   // get the price directly from the PriceOracle
   // Could get this from rmul(BookKeeper.collateralPools(collateralPoolId).spot, Spotter.mat()) instead, but
   // if mat has changed since the last poke, the resulting value will be
