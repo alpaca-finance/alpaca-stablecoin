@@ -177,7 +177,7 @@ contract FixedSpreadLiquidationStrategy is
       _liquidatorIncentiveBps >= 10000 && _liquidatorIncentiveBps <= 19000,
       "FixedSpreadLiquidationStrategy/invalid-liquidator-incentive-bps"
     );
-    require(_treasuryFeesBps <= 2500, "FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps-more");
+    require(_treasuryFeesBps <= 9000, "FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps-more");
 
     collateralPools[collateralPoolId].adapter = IGenericTokenAdapter(_adapter);
     collateralPools[collateralPoolId].closeFactorBps = _closeFactorBps;
@@ -219,7 +219,7 @@ contract FixedSpreadLiquidationStrategy is
 
   function setTreasuryFeesBps(bytes32 collateralPoolId, uint256 _treasuryFeesBps) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(_treasuryFeesBps <= 2500, "FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps");
+    require(_treasuryFeesBps <= 9000, "FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps");
     collateralPools[collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
     emit SetTreasuryFeesBps(msg.sender, collateralPoolId, _treasuryFeesBps);
   }
@@ -332,8 +332,13 @@ contract FixedSpreadLiquidationStrategy is
 
     info.actualDebtShareToBeLiquidated = div(info.actualDebtValueToBeLiquidated, info.debtAccumulatedRate); // [wad]
 
+    // collateralAmountToBeLiquidated - (collateralAmountToBeLiquidated * 10000 / liquidatorIncentiveBps)
+    uint256 liquidatorIncentiveCollectedFromPosition = sub(
+      info.collateralAmountToBeLiquidated,
+      div(mul(info.collateralAmountToBeLiquidated, 10000), collateralPools[_collateralPoolId].liquidatorIncentiveBps)
+    );
     info.treasuryFees = div(
-      mul(info.collateralAmountToBeLiquidated, collateralPools[_collateralPoolId].treasuryFeesBps),
+      mul(liquidatorIncentiveCollectedFromPosition, collateralPools[_collateralPoolId].treasuryFeesBps),
       10000
     ); // [wad]
   }

@@ -72,7 +72,7 @@ const ALPACA_PER_BLOCK = ethers.utils.parseEther("100")
 const COLLATERAL_POOL_ID = formatBytes32String("ibDUMMY")
 const CLOSE_FACTOR_BPS = BigNumber.from(5000)
 const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(10250)
-const TREASURY_FEE_BPS = BigNumber.from(100)
+const TREASURY_FEE_BPS = BigNumber.from(5000)
 const BPS = BigNumber.from(10000)
 
 const loadFixtureHandler = async (): Promise<fixture> => {
@@ -510,7 +510,10 @@ describe("LiquidationEngine", () => {
         await bookKeeper.mintUnbackedStablecoin(deployerAddress, bobAddress, WeiPerRad.mul(100))
         const bobStablecoinBeforeLiquidation = await bookKeeper.stablecoin(bobAddress)
         const expectedSeizedCollateral = debtShareToRepay.mul(LIQUIDATOR_INCENTIVE_BPS).div(BPS)
-        const expectedTreasuryFee = expectedSeizedCollateral.mul(TREASURY_FEE_BPS).div(BPS)
+        const expectedLiquidatorIncentive = expectedSeizedCollateral.sub(
+          expectedSeizedCollateral.mul(BPS).div(LIQUIDATOR_INCENTIVE_BPS)
+        )
+        const expectedTreasuryFee = expectedLiquidatorIncentive.mul(TREASURY_FEE_BPS).div(BPS)
         const expectedCollateralBobShouldReceive = expectedSeizedCollateral.sub(expectedTreasuryFee)
         await expect(
           liquidationEngineAsBob.liquidate(
@@ -559,19 +562,19 @@ describe("LiquidationEngine", () => {
           await bookKeeper.systemBadDebt(systemDebtEngine.address),
           "System bad debt should be 0 AUSD"
         ).to.be.equal(0)
-        expect(await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress), "Bob should receive 0.507375 ibDUMMY")
+        expect(await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress), "Bob should receive 0.50625 ibDUMMY")
           .to.be.equal(expectedCollateralBobShouldReceive)
-          .to.be.equal(ethers.utils.parseEther("0.507375"))
+          .to.be.equal(ethers.utils.parseEther("0.50625"))
         expect(
           bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation),
           "Bob should pay 0.5 AUSD for this liquidation"
         ).to.be.equal(ethers.utils.parseEther("0.5").mul(WeiPerRay))
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address),
-          "SystemDebtEngine should receive 0.005125 ibDUMMY as treasury fee"
+          "SystemDebtEngine should receive 0.00625 ibDUMMY as treasury fee"
         )
           .to.be.equal(expectedTreasuryFee)
-          .to.be.equal(ethers.utils.parseEther("0.005125"))
+          .to.be.equal(ethers.utils.parseEther("0.00625"))
         expect(
           await alpacaToken.balanceOf(aliceProxyWallet.address),
           "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"
@@ -645,7 +648,10 @@ describe("LiquidationEngine", () => {
 
         const alicePositionAfterLiquidation = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
         const expectedSeizedCollateral = debtShareToRepay.mul(LIQUIDATOR_INCENTIVE_BPS).div(BPS)
-        const expectedTreasuryFee = expectedSeizedCollateral.mul(TREASURY_FEE_BPS).div(BPS)
+        const expectedLiquidatorIncentive = expectedSeizedCollateral.sub(
+          expectedSeizedCollateral.mul(BPS).div(LIQUIDATOR_INCENTIVE_BPS)
+        )
+        const expectedTreasuryFee = expectedLiquidatorIncentive.mul(TREASURY_FEE_BPS).div(BPS)
         const expectedCollateralBobShouldReceive = expectedSeizedCollateral.sub(expectedTreasuryFee)
 
         expect(
@@ -664,19 +670,19 @@ describe("LiquidationEngine", () => {
           await bookKeeper.systemBadDebt(systemDebtEngine.address),
           "System bad debt should be 0 AUSD"
         ).to.be.equal(0)
-        expect(await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress), "Bob should receive 0.101475 ibDUMMY")
+        expect(await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress), "Bob should receive 0.10125 ibDUMMY")
           .to.be.equal(expectedCollateralBobShouldReceive)
-          .to.be.equal(ethers.utils.parseEther("0.101475"))
+          .to.be.equal(ethers.utils.parseEther("0.10125"))
         expect(
           bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation),
           "Bob should pay 0.1 AUSD for this liquidation"
         ).to.be.equal(ethers.utils.parseEther("0.1").mul(WeiPerRay))
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address),
-          "SystemDebtEngine should receive 0.001025 ibDUMMY as treasury fee"
+          "SystemDebtEngine should receive 0.00125 ibDUMMY as treasury fee"
         )
           .to.be.equal(expectedTreasuryFee)
-          .to.be.equal(ethers.utils.parseEther("0.001025"))
+          .to.be.equal(ethers.utils.parseEther("0.00125"))
         expect(
           await alpacaToken.balanceOf(aliceProxyWallet.address),
           "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"
@@ -750,7 +756,10 @@ describe("LiquidationEngine", () => {
 
         const alicePositionAfterLiquidation = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
         const expectedSeizedCollateral = ethers.utils.parseEther("0.5").mul(LIQUIDATOR_INCENTIVE_BPS).div(BPS)
-        const expectedTreasuryFee = expectedSeizedCollateral.mul(TREASURY_FEE_BPS).div(BPS)
+        const expectedLiquidatorIncentive = expectedSeizedCollateral.sub(
+          expectedSeizedCollateral.mul(BPS).div(LIQUIDATOR_INCENTIVE_BPS)
+        )
+        const expectedTreasuryFee = expectedLiquidatorIncentive.mul(TREASURY_FEE_BPS).div(BPS)
         const expectedCollateralBobShouldReceive = expectedSeizedCollateral.sub(expectedTreasuryFee)
 
         expect(
@@ -767,19 +776,19 @@ describe("LiquidationEngine", () => {
           await bookKeeper.systemBadDebt(systemDebtEngine.address),
           "System bad debt should be 0 AUSD"
         ).to.be.equal(0)
-        expect(await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress), "Bob should receive 0.507375 ibDUMMY")
+        expect(await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress), "Bob should receive 0.50625 ibDUMMY")
           .to.be.equal(expectedCollateralBobShouldReceive)
-          .to.be.equal(ethers.utils.parseEther("0.507375"))
+          .to.be.equal(ethers.utils.parseEther("0.50625"))
         expect(
           bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation),
           "Bob should pay 0.5 AUSD for this liquidation"
         ).to.be.equal(ethers.utils.parseEther("0.5").mul(WeiPerRay))
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address),
-          "SystemDebtEngine should receive 0.005125 ibDUMMY as treasury fee"
+          "SystemDebtEngine should receive 0.00625 ibDUMMY as treasury fee"
         )
           .to.be.equal(expectedTreasuryFee)
-          .to.be.equal(ethers.utils.parseEther("0.005125"))
+          .to.be.equal(ethers.utils.parseEther("0.00625"))
         expect(
           await alpacaToken.balanceOf(aliceProxyWallet.address),
           "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"
@@ -853,7 +862,10 @@ describe("LiquidationEngine", () => {
 
         const alicePositionAfterLiquidation = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
         const expectedSeizedCollateral = ethers.utils.parseEther("0.625").mul(LIQUIDATOR_INCENTIVE_BPS).div(BPS)
-        const expectedTreasuryFee = expectedSeizedCollateral.mul(TREASURY_FEE_BPS).div(BPS)
+        const expectedLiquidatorIncentive = expectedSeizedCollateral.sub(
+          expectedSeizedCollateral.mul(BPS).div(LIQUIDATOR_INCENTIVE_BPS)
+        )
+        const expectedTreasuryFee = expectedLiquidatorIncentive.mul(TREASURY_FEE_BPS).div(BPS)
         const expectedCollateralBobShouldReceive = expectedSeizedCollateral.sub(expectedTreasuryFee)
 
         expect(
@@ -872,22 +884,19 @@ describe("LiquidationEngine", () => {
           await bookKeeper.systemBadDebt(systemDebtEngine.address),
           "System bad debt should be 0 AUSD"
         ).to.be.equal(0)
-        expect(
-          await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress),
-          "Bob should receive 0.63421875 ibDUMMY"
-        )
+        expect(await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress), "Bob should receive 0.6328125 ibDUMMY")
           .to.be.equal(expectedCollateralBobShouldReceive)
-          .to.be.equal(ethers.utils.parseEther("0.63421875"))
+          .to.be.equal(ethers.utils.parseEther("0.6328125"))
         expect(
           bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation),
           "Bob should pay 0.5 AUSD for this liquidation"
         ).to.be.equal(ethers.utils.parseEther("0.5").mul(WeiPerRay))
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address),
-          "SystemDebtEngine should receive 0.00640625 ibDUMMY as treasury fee"
+          "SystemDebtEngine should receive 0.0078125 ibDUMMY as treasury fee"
         )
           .to.be.equal(expectedTreasuryFee)
-          .to.be.equal(ethers.utils.parseEther("0.00640625"))
+          .to.be.equal(ethers.utils.parseEther("0.0078125"))
         expect(
           await alpacaToken.balanceOf(aliceProxyWallet.address),
           "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"
@@ -961,7 +970,10 @@ describe("LiquidationEngine", () => {
 
         const alicePositionAfterLiquidation = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
         const expectedSeizedCollateral = ethers.utils.parseEther("0.125").mul(LIQUIDATOR_INCENTIVE_BPS).div(BPS)
-        const expectedTreasuryFee = expectedSeizedCollateral.mul(TREASURY_FEE_BPS).div(BPS)
+        const expectedLiquidatorIncentive = expectedSeizedCollateral.sub(
+          expectedSeizedCollateral.mul(BPS).div(LIQUIDATOR_INCENTIVE_BPS)
+        )
+        const expectedTreasuryFee = expectedLiquidatorIncentive.mul(TREASURY_FEE_BPS).div(BPS)
         const expectedCollateralBobShouldReceive = expectedSeizedCollateral.sub(expectedTreasuryFee)
 
         expect(
@@ -980,22 +992,19 @@ describe("LiquidationEngine", () => {
           await bookKeeper.systemBadDebt(systemDebtEngine.address),
           "System bad debt should be 0 AUSD"
         ).to.be.equal(0)
-        expect(
-          await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress),
-          "Bob should receive 0.12684375 ibDUMMY"
-        )
+        expect(await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress), "Bob should receive 0.1265625 ibDUMMY")
           .to.be.equal(expectedCollateralBobShouldReceive)
-          .to.be.equal(ethers.utils.parseEther("0.12684375"))
+          .to.be.equal(ethers.utils.parseEther("0.1265625"))
         expect(
           bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation),
           "Bob should pay 0.1 AUSD for this liquidation"
         ).to.be.equal(ethers.utils.parseEther("0.1").mul(WeiPerRay))
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address),
-          "SystemDebtEngine should receive 0.00128125 ibDUMMY as treasury fee"
+          "SystemDebtEngine should receive 0.0015625 ibDUMMY as treasury fee"
         )
           .to.be.equal(expectedTreasuryFee)
-          .to.be.equal(ethers.utils.parseEther("0.00128125"))
+          .to.be.equal(ethers.utils.parseEther("0.0015625"))
         expect(
           await alpacaToken.balanceOf(aliceProxyWallet.address),
           "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"
@@ -1083,16 +1092,16 @@ describe("LiquidationEngine", () => {
         ) // System bad debt should be 0.51219512 AUSD
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress),
-          "Bob should receive 0.99 ibDUMMY"
-        ).to.be.equal(ethers.utils.parseEther("0.99"))
+          "Bob should receive 0.987804878048780488 ibDUMMY"
+        ).to.be.equal(ethers.utils.parseEther("0.987804878048780488"))
         AssertHelpers.assertAlmostEqual(
           bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation).toString(),
           ethers.utils.parseEther("0.487804878048780487").mul(WeiPerRay).toString()
         ) // Bob should pay 0.487804878048780487 AUSD for this liquidation
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address),
-          "SystemDebtEngine should receive 0.01 ibDUMMY as treasury fee"
-        ).to.be.equal(ethers.utils.parseEther("0.01"))
+          "SystemDebtEngine should receive 0.012195121951219512 ibDUMMY as treasury fee"
+        ).to.be.equal(ethers.utils.parseEther("0.012195121951219512"))
         expect(
           await alpacaToken.balanceOf(aliceProxyWallet.address),
           "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"
@@ -1169,7 +1178,10 @@ describe("LiquidationEngine", () => {
           .parseEther("0.966183574879227054")
           .mul(LIQUIDATOR_INCENTIVE_BPS)
           .div(BPS)
-        const expectedTreasuryFee = expectedSeizedCollateral.mul(TREASURY_FEE_BPS).div(BPS)
+        const expectedLiquidatorIncentive = expectedSeizedCollateral.sub(
+          expectedSeizedCollateral.mul(BPS).div(LIQUIDATOR_INCENTIVE_BPS)
+        )
+        const expectedTreasuryFee = expectedLiquidatorIncentive.mul(TREASURY_FEE_BPS).div(BPS)
         const expectedCollateralBobShouldReceive = expectedSeizedCollateral.sub(expectedTreasuryFee)
 
         expect(
@@ -1190,20 +1202,20 @@ describe("LiquidationEngine", () => {
         ).to.be.equal(0)
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress),
-          "Bob should receive 0.980434782608695653 ibDUMMY"
+          "Bob should receive 0.978260869565217392 ibDUMMY"
         )
           .to.be.equal(expectedCollateralBobShouldReceive)
-          .to.be.equal(ethers.utils.parseEther("0.980434782608695653"))
+          .to.be.equal(ethers.utils.parseEther("0.978260869565217392"))
         expect(
           bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation),
           "Bob should pay 0.483091787439613527 AUSD for this liquidation"
         ).to.be.equal(ethers.utils.parseEther("0.483091787439613527").mul(WeiPerRay))
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address),
-          "SystemDebtEngine should receive 0.009903381642512077 ibDUMMY as treasury fee"
+          "SystemDebtEngine should receive 0.012077294685990338 ibDUMMY as treasury fee"
         )
           .to.be.equal(expectedTreasuryFee)
-          .to.be.equal(ethers.utils.parseEther("0.009903381642512077"))
+          .to.be.equal(ethers.utils.parseEther("0.012077294685990338"))
         expect(
           await alpacaToken.balanceOf(aliceProxyWallet.address),
           "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"
@@ -1401,7 +1413,7 @@ describe("LiquidationEngine", () => {
         ).to.be.equal(0)
         AssertHelpers.assertAlmostEqual(
           (await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress)).toString(),
-          ethers.utils.parseEther("0.4685472").toString()
+          ethers.utils.parseEther("0.4675108").toString()
         )
         expect(
           bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation),
@@ -1409,7 +1421,7 @@ describe("LiquidationEngine", () => {
         ).to.be.equal(ethers.utils.parseEther("1062").mul(WeiPerRay))
         AssertHelpers.assertAlmostEqual(
           (await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address)).toString(),
-          ethers.utils.parseEther("0.004732826").toString()
+          ethers.utils.parseEther("0.00577174").toString()
         )
         expect(
           await alpacaToken.balanceOf(aliceProxyWallet.address),
@@ -1602,16 +1614,16 @@ describe("LiquidationEngine", () => {
           ).to.be.equal(0)
           AssertHelpers.assertAlmostEqual(
             (await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress)).toString(),
-            ethers.utils.parseEther("637.38984").toString()
-          ) // Bob should receive 637.38984 ibDUMMY
+            ethers.utils.parseEther("635.97655756").toString()
+          ) // Bob should receive 635.97655756 ibDUMMY
           AssertHelpers.assertAlmostEqual(
             bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation).toString(),
             ethers.utils.parseEther("502.5").mul(WeiPerRay).toString()
           ) // Bob should pay 502.5 AUSD for this liquidation
           AssertHelpers.assertAlmostEqual(
             (await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address)).toString(),
-            ethers.utils.parseEther("6.43828").toString()
-          ) // SystemDebtEngine should receive 6.43828 ibDUMMY as treasury fee
+            ethers.utils.parseEther("7.85156244").toString()
+          ) // SystemDebtEngine should receive 7.85156244 ibDUMMY as treasury fee
           expect(
             await alpacaToken.balanceOf(aliceProxyWallet.address),
             "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"
@@ -1728,8 +1740,8 @@ describe("LiquidationEngine", () => {
 
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress),
-          "Bob should receive 990 ibDUMMY"
-        ).to.be.equal(ethers.utils.parseEther("990"))
+          "Bob should receive 987.804878048780487805 ibDUMMY"
+        ).to.be.equal(ethers.utils.parseEther("987.804878048780487805"))
 
         // actualDebtValueToBeLiquidated = currentCollateralPrice * positionCollateralAmount * 10000 / liquidatorIncentiveBps
         // actualDebtValueToBeLiquidated = 0.8 * 1000 * 10000 / 10250
@@ -1742,8 +1754,8 @@ describe("LiquidationEngine", () => {
 
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address),
-          "SystemDebtEngine should receive 10 ibDUMMY as treasury fee"
-        ).to.be.equal(ethers.utils.parseEther("10"))
+          "SystemDebtEngine should receive 12.195121951219512195 ibDUMMY as treasury fee"
+        ).to.be.equal(ethers.utils.parseEther("12.195121951219512195"))
 
         expect(
           await alpacaToken.balanceOf(aliceProxyWallet.address),
@@ -1855,11 +1867,11 @@ describe("LiquidationEngine", () => {
         expect(await bookKeeper.systemBadDebt(systemDebtEngine.address), "System bad debt should be 0").to.be.equal(0)
 
         // collateralAmountToBeLiquidated = 792.40384615
-        // Bob should receive = collateralAmountToBeLiquidated * (1 - treasuryFeesBps) = 792.40384615 * (1-0.01) = 784.47980769
-        // Bob should receive 784.47980769 ibDUMMY
+        // Bob should receive = collateralAmountToBeLiquidated - (collateralAmountToBeLiquidated - (collateralAmountToBeLiquidated / liquidatorIncentiveBps) * treasuryFeeBps) = 792.40384615 - ((792.40384615 - (792.40384615/1.025)) * 0.5) = 782.74038461
+        // Bob should receive 782.74038461 ibDUMMY
         AssertHelpers.assertAlmostEqual(
           (await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress)).toString(),
-          ethers.utils.parseEther("784.47980769").toString()
+          ethers.utils.parseEther("782.74038461").toString()
         )
 
         // Bob should pay 1005 AUSD for this liquidation
@@ -1869,11 +1881,11 @@ describe("LiquidationEngine", () => {
         )
 
         // collateralAmountToBeLiquidated = 792.40384615
-        // = 792.40384615 * 0.01 = 7.92403846
-        // SystemDebtEngine should receive 7.92403846 ibDUMMY as treasury fee
+        // (collateralAmountToBeLiquidated - (collateralAmountToBeLiquidated / liquidatorIncentiveBps) * treasuryFeeBps) = (792.40384615 - (792.40384615/1.025)) * 0.5 = 9.66346154
+        // SystemDebtEngine should receive 9.66346154 ibDUMMY as treasury fee
         AssertHelpers.assertAlmostEqual(
           (await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address)).toString(),
-          ethers.utils.parseEther("7.92403846").toString()
+          ethers.utils.parseEther("9.66346154").toString()
         )
 
         expect(
