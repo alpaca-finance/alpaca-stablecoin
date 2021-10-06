@@ -143,7 +143,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await bookKeeperFlashMintArbitrager.deployed()
 
   // Setup Pancakeswap
-  const PancakeFactoryV2 = (await ethers.getContractFactory("PancakeFactory", deployer)) as PancakeFactory__factory
+  const PancakeFactoryV2 = new PancakeFactory__factory(deployer)
   const factoryV2 = await PancakeFactoryV2.deploy(await deployer.getAddress())
   await factoryV2.deployed()
 
