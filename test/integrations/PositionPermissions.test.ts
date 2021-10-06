@@ -537,7 +537,7 @@ describe("PositionPermissions", () => {
               const alpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(aliceAddress)
               expect(
                 aliceMoveCollateral.lockedCollateral,
-                "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+                "Alice's Position #1 lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
               ).to.be.equal(WeiPerWad)
               expect(
                 aliceMoveCollateral.debtShare,
