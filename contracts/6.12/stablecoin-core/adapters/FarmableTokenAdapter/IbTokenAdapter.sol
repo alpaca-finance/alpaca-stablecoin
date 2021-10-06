@@ -228,8 +228,8 @@ contract IbTokenAdapter is
   function _harvest() internal returns (uint256) {
     if (live == 1) {
       // Withdraw all rewards
-      (uint256 stakedBalance, , , ) = fairlaunch.userInfo(pid, address(this));
-      if (stakedBalance > 0) fairlaunch.withdraw(address(this), pid, 0);
+      (uint256 _stakedBalance, , , ) = fairlaunch.userInfo(pid, address(this));
+      if (_stakedBalance > 0) fairlaunch.withdraw(address(this), pid, 0);
     }
     return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
   }
@@ -250,13 +250,13 @@ contract IbTokenAdapter is
     if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvest(), totalShare));
     // 3. Calculate the rewards that "to" should get by:
     // stake[_positionAddress] * accRewardPerShare (rewards that each share should get) - rewardDebts (what already paid)
-    uint256 rewardDebt = rewardDebts[_positionAddress];
-    uint256 rewards = rmul(stake[_positionAddress], accRewardPerShare);
-    if (rewards > rewardDebt) {
-      uint256 back = sub(rewards, rewardDebt);
-      uint256 treasuryFee = div(mul(back, treasuryFeeBps), 10000);
-      address(rewardToken).safeTransfer(treasuryAccount, treasuryFee);
-      address(rewardToken).safeTransfer(_harvestTo, sub(back, treasuryFee));
+    uint256 _rewardDebt = rewardDebts[_positionAddress];
+    uint256 _rewards = rmul(stake[_positionAddress], accRewardPerShare);
+    if (_rewards > _rewardDebt) {
+      uint256 _back = sub(_rewards, _rewardDebt);
+      uint256 _treasuryFee = div(mul(_back, treasuryFeeBps), 10000);
+      address(rewardToken).safeTransfer(treasuryAccount, _treasuryFee);
+      address(rewardToken).safeTransfer(_harvestTo, sub(_back, _treasuryFee));
     }
 
     // 3. Update accRewardBalance
