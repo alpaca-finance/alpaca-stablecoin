@@ -232,10 +232,12 @@ describe("position manager", () => {
   // Accounts
   let deployer: Signer
   let alice: Signer
+  let bob: Signer
 
   // Account Addresses
   let deployerAddress: string
   let aliceAddress: string
+  let bobAddress: string
 
   // Proxy wallet
   let deployerProxyWallet: ProxyWallet
@@ -257,8 +259,12 @@ describe("position manager", () => {
   let alpacaStablecoin: AlpacaStablecoin
 
   beforeEach(async () => {
-    ;[deployer, alice] = await ethers.getSigners()
-    ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
+    ;[deployer, alice, bob] = await ethers.getSigners()
+    ;[deployerAddress, aliceAddress, bobAddress] = await Promise.all([
+      deployer.getAddress(),
+      alice.getAddress(),
+      bob.getAddress(),
+    ])
     ;({
       proxyWallets: [deployerProxyWallet, aliceProxyWallet, bobProxyWallet],
     } = await loadProxyWalletFixtureHandler())
@@ -490,28 +496,33 @@ describe("position manager", () => {
       )
     })
     describe("user opens a new position and convert token to ibToken and lock ibToken and mint AUSD in single transactions", () => {
-      context("alice doesn't have collateral token", () => {
+      context("bob doesn't have collateral token", () => {
         it("should be revert", async () => {
-          // 1.
-          //  a. open a new position
-          //  b. lock ibBUSD
-          //  c. mint AUSD
-          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
-            "openLockTokenAndDraw",
+          /// 1.
+          //  a. convert BUSD to ibBUSD
+          //  b. open a new position
+          //  c. lock ibBUSD
+          //  d. mint AUSD
+          const convertOpenLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertOpenLockTokenAndDraw",
             [
+              vault.address,
               positionManager.address,
               stabilityFeeCollector.address,
               ibTokenAdapter.address,
               stablecoinAdapter.address,
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
-              WeiPerWad.mul(5),
+              WeiPerWad.mul(15),
               true,
-              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+              ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]),
             ]
           )
           await expect(
-            aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
+            bobProxyWallet["execute(address,bytes)"](
+              alpacaStablecoinProxyActions.address,
+              convertOpenLockTokenAndDrawCall
+            )
           ).to.be.revertedWith("!safeTransferFrom")
         })
       })
