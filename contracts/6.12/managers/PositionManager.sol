@@ -95,7 +95,7 @@ contract PositionManager is AccessControlUpgradeable, PausableUpgradeable, IMana
 
   /// @dev Initializer for intializing PositionManager
   /// @param _bookKeeper The address of the Book Keeper
-  function initialize(address _bookKeeper) external initializer {
+  function initialize(address _bookKeeper, address _showStopper) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
