@@ -517,7 +517,7 @@ describe("PositionPermissions", () => {
               ).to.be.equal(WeiPerWad)
               expect(
                 aliceAdjustPosition.debtShare,
-                "debtShare should be 1 AUSD, because Alice doesn't draw more"
+                "debtShare should be 1 AUSD, because Alice didn't draw more"
               ).to.be.equal(WeiPerWad)
               expect(
                 await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
