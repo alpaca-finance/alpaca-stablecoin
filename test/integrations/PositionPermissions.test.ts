@@ -736,7 +736,7 @@ describe("PositionPermissions", () => {
               const bobAlpacaStablecoinBalancefinal = await alpacaStablecoin.balanceOf(bobAddress)
               expect(
                 await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
-                "collateralToken inside Alice's position address should be 2 ibDUMMY, because Alice move 1 ibDUMMY at second position into first position"
+                "collateralToken inside Alice's Position address should be 2 ibDUMMY, because Alice move 1 ibDUMMY from Alice's Position to Bob's Position."
               ).to.be.equal(WeiPerWad.mul(2))
               expect(
                 await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobPositionAddress),
