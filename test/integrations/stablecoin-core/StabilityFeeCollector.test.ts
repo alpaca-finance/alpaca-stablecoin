@@ -194,7 +194,7 @@ describe("Stability Fee", () => {
     await alpacaStablecoinAsAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
   })
   describe("#collect", () => {
-    context("when call collect directly and call diposit", () => {
+    context("when call collect directly and call deposit", () => {
       it("should be success", async () => {
         // set stability fee rate 20% per year
         await stabilityFeeCollector.setStabilityFeeRate(
