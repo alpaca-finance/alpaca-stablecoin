@@ -353,12 +353,12 @@ contract FixedSpreadLiquidationStrategy is
 
     // Input validation
     require(_positionDebtShare > 0, "FixedSpreadLiquidationStrategy/zero-debt");
-    require(_positionCollateralAmount > 0, "FixedSpreadLiquidationStrategy/zero-collateralAmount");
-    require(_positionAddress != address(0), "FixedSpreadLiquidationStrategy/zero-positionAddress");
+    require(_positionCollateralAmount > 0, "FixedSpreadLiquidationStrategy/zero-collateral-amount");
+    require(_positionAddress != address(0), "FixedSpreadLiquidationStrategy/zero-position-address");
 
     // 1. Get current collateral price from Oracle
     uint256 _currentCollateralPrice = getFeedPrice(_collateralPoolId); // [ray]
-    require(_currentCollateralPrice > 0, "FixedSpreadLiquidationStrategy/zero-starting-price");
+    require(_currentCollateralPrice > 0, "FixedSpreadLiquidationStrategy/zero-collateral-price");
 
     // 2.. Calculate collateral amount to be liquidated according to the current price and liquidator incentive
     LiquidationInfo memory info = _calculateLiquidationInfo(
