@@ -753,7 +753,7 @@ describe("PositionPermissions", () => {
           })
         })
         context("between 2 collateral pool", async () => {
-          context("call openLockTokenAndDraw and unlock collateral", async () => {
+          context("Alice opens 2 positions on 2 collateral pools (one position for each collateral pool) and Alice move collateral from one position to another position", async () => {
             it("should success", async () => {
               // 1. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
               const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
