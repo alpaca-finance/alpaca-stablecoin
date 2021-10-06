@@ -418,7 +418,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               deployerAddress,
               ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
             )
-          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-collateralAmount")
+          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-collateral-amount")
         })
       })
 
@@ -439,7 +439,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               deployerAddress,
               ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
             )
-          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-positionAddress")
+          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-position-address")
         })
       })
     })
@@ -579,7 +579,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
               deployerAddress,
               ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [deployerAddress, []])
             )
-          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-starting-price")
+          ).to.be.revertedWith("FixedSpreadLiquidationStrategy/zero-collateral-price")
         })
       })
     })
