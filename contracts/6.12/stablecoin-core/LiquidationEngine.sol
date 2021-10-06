@@ -170,6 +170,8 @@ contract LiquidationEngine is
 
     // If collateral has been depleted from liquidation whilst there is remaining debt in the position
     if (vars.newPositionLockedCollateral == 0 && vars.newPositionDebtShare > 0) {
+      // Overflow check
+      require(vars.newPositionDebtShare <= 2**255, "LiquidationEngine/overflow");
       // Record the bad debt to the system and close the position
       bookKeeper.confiscatePosition(
         _collateralPoolId,
