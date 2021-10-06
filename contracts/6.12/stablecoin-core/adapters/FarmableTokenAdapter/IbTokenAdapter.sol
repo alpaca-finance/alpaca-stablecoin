@@ -91,6 +91,7 @@ contract IbTokenAdapter is
 
   // --- Auth ---
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
   modifier onlyOwner() {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
@@ -154,15 +155,15 @@ contract IbTokenAdapter is
     _setupRole(OWNER_ROLE, msg.sender);
   }
 
-  function add(uint256 x, uint256 y) public pure returns (uint256 z) {
+  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
     require((z = x + y) >= x, "ds-math-add-overflow");
   }
 
-  function sub(uint256 x, uint256 y) public pure returns (uint256 z) {
+  function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
     require((z = x - y) <= x, "ds-math-sub-underflow");
   }
 
-  function mul(uint256 x, uint256 y) public pure returns (uint256 z) {
+  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
     require(y == 0 || (z = x * y) / y == x, "ds-math-mul-overflow");
   }
 
@@ -175,27 +176,27 @@ contract IbTokenAdapter is
     z = add(x, sub(y, 1)) / y;
   }
 
-  function wmul(uint256 x, uint256 y) public pure returns (uint256 z) {
+  function wmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
     z = mul(x, y) / WAD;
   }
 
-  function wdiv(uint256 x, uint256 y) public pure returns (uint256 z) {
+  function wdiv(uint256 x, uint256 y) internal pure returns (uint256 z) {
     z = mul(x, WAD) / y;
   }
 
-  function wdivup(uint256 x, uint256 y) public pure returns (uint256 z) {
+  function wdivup(uint256 x, uint256 y) internal pure returns (uint256 z) {
     z = divup(mul(x, WAD), y);
   }
 
-  function rmul(uint256 x, uint256 y) public pure returns (uint256 z) {
+  function rmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
     z = mul(x, y) / RAY;
   }
 
-  function rmulup(uint256 x, uint256 y) public pure returns (uint256 z) {
+  function rmulup(uint256 x, uint256 y) internal pure returns (uint256 z) {
     z = divup(mul(x, y), RAY);
   }
 
-  function rdiv(uint256 x, uint256 y) public pure returns (uint256 z) {
+  function rdiv(uint256 x, uint256 y) internal pure returns (uint256 z) {
     z = mul(x, RAY) / y;
   }
 
@@ -287,7 +288,7 @@ contract IbTokenAdapter is
     address positionAddress,
     uint256 amount,
     bytes calldata data
-  ) public payable override nonReentrant {
+  ) external payable override nonReentrant whenNotPaused {
     _deposit(positionAddress, amount, data);
   }
 
@@ -334,7 +335,7 @@ contract IbTokenAdapter is
     address positionAddress,
     uint256 amount,
     bytes calldata data
-  ) public override nonReentrant {
+  ) external override nonReentrant whenNotPaused {
     if (live == 1) {
       fairlaunch.withdraw(address(this), pid, amount);
     }
@@ -374,7 +375,7 @@ contract IbTokenAdapter is
   }
 
   /// @dev EMERGENCY ONLY. Withdraw ibToken from FairLaunch with invoking "_harvest"
-  function emergencyWithdraw(address positionAddress, address to) public nonReentrant {
+  function emergencyWithdraw(address positionAddress, address to) external nonReentrant whenNotPaused {
     if (live == 1) {
       uint256 amount = bookKeeper.collateralToken(collateralPoolId, positionAddress);
       fairlaunch.withdraw(address(this), pid, amount);
@@ -397,17 +398,26 @@ contract IbTokenAdapter is
     emit EmergencyWithdaraw();
   }
 
+  function moveStake(
+    address source,
+    address destination,
+    uint256 share,
+    bytes calldata data
+  ) external override nonReentrant whenNotPaused {
+    _moveStake(source, destination, share, data);
+  }
+
   /// @dev Move wad amount of staked balance from source to destination.
   /// Can only be moved if underlaying assets make sense.
   /// @param source The address to be moved staked balance from
   /// @param destination The address to be moved staked balance to
   /// @param share The amount of staked balance to be moved
-  function moveStake(
+  function _moveStake(
     address source,
     address destination,
     uint256 share,
     bytes calldata /* data */
-  ) public override {
+  ) internal {
     // 1. Update collateral tokens for source and destination
     uint256 stakedAmount = stake[source];
     stake[source] = sub(stakedAmount, share);
@@ -446,9 +456,9 @@ contract IbTokenAdapter is
     int256 collateralValue,
     int256, /* debtShare */
     bytes calldata data
-  ) external override nonReentrant {
+  ) external override nonReentrant whenNotPaused {
     uint256 unsignedCollateralValue = collateralValue < 0 ? uint256(-collateralValue) : uint256(collateralValue);
-    moveStake(source, destination, unsignedCollateralValue, data);
+    _moveStake(source, destination, unsignedCollateralValue, data);
   }
 
   function onMoveCollateral(
@@ -456,13 +466,13 @@ contract IbTokenAdapter is
     address destination,
     uint256 share,
     bytes calldata data
-  ) external override nonReentrant {
+  ) external override nonReentrant whenNotPaused {
     _deposit(source, 0, data);
-    moveStake(source, destination, share, data);
+    _moveStake(source, destination, share, data);
   }
 
   /// @dev Pause ibTokenAdapter when assumptions change
-  function cage() public override nonReentrant {
+  function cage() external override nonReentrant {
     // Allow caging if
     // - msg.sender is whitelisted to do so
     // - Shield's owner has been changed
@@ -479,5 +489,16 @@ contract IbTokenAdapter is
     fairlaunch.deposit(address(this), pid, totalShare);
     live = 1;
     emit Uncage();
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 }
