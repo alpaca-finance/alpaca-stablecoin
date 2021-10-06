@@ -176,7 +176,7 @@ contract LiquidationEngine is
         _positionAddress,
         _positionAddress,
         address(systemDebtEngine),
-        -int256(vars.newPositionLockedCollateral),
+        0,
         -int256(vars.newPositionDebtShare)
       );
     }
