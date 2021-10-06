@@ -642,7 +642,7 @@ describe("PositionPermissions", () => {
               ).to.be.equal(WeiPerWad)
               expect(
                 await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
-                "collateralToken inside Alice's position address should be 1 ibDUMMY, because Alice move 1 ibDUMMY at second position into first position"
+                "collateralToken inside Alice's Position #1 address should be 1 ibDUMMY, because Alice moved 1 ibDUMMY from Position #2 to Position #1."
               ).to.be.equal(WeiPerWad)
               expect(
                 await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress2),
