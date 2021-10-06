@@ -654,7 +654,7 @@ describe("PositionPermissions", () => {
               ).to.be.equal(WeiPerWad)
             })
           })
-          context("and move to Bob", async () => {
+          context("Alice open a position, lock collateral and move collateral to Bob's position", async () => {
             it("should success", async () => {
               // 1. Alice open position
               const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("open", [
