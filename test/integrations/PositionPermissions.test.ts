@@ -1857,7 +1857,9 @@ describe("PositionPermissions", () => {
             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
           ).to.be.equal(0)
           expect(alpacaStablecoinBalance2, "Alice should receive 1 AUSD from Alice drew 1 time").to.be.equal(WeiPerWad)
-          expect(BobAlpacaStablecoinBalance, "Bob should receive 1 AUSD from Alice position").to.be.equal(WeiPerWad)
+          expect(BobAlpacaStablecoinBalance, "Bob should receive 1 AUSD from mint Ausd at Alice position").to.be.equal(
+            WeiPerWad
+          )
         })
       })
       context("move position", async () => {
@@ -1882,11 +1884,12 @@ describe("PositionPermissions", () => {
             const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
             expect(
               alicePosition.lockedCollateral,
-              "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+              "Collateral Pool #1 inside Alice's Position #1 lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
             ).to.be.equal(WeiPerWad)
-            expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
-              WeiPerWad
-            )
+            expect(
+              alicePosition.debtShare,
+              "Collateral Pool #1 inside Alice's Position #1 debtShare should be 1 AUSD, because Alice drew 1 AUSD"
+            ).to.be.equal(WeiPerWad)
             expect(
               await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
               "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
@@ -1914,9 +1917,12 @@ describe("PositionPermissions", () => {
             const bobPosition = await bookKeeper.positions(COLLATERAL_POOL_ID, bobPositionAddress)
             expect(
               bobPosition.lockedCollateral,
-              "lockedCollateral should be 1 ibDUMMY, because Bob locked 1 ibDUMMY"
+              "Collateral Pool #1 inside Bob's Position #1 lockedCollateral should be 1 ibDUMMY, because Bob locked 1 ibDUMMY"
             ).to.be.equal(WeiPerWad)
-            expect(bobPosition.debtShare, "debtShare should be 1 AUSD, because Bob drew 1 AUSD").to.be.equal(WeiPerWad)
+            expect(
+              bobPosition.debtShare,
+              "Collateral Pool #1 inside Bob's Position #1 debtShare should be 1 AUSD, because Bob drew 1 AUSD"
+            ).to.be.equal(WeiPerWad)
             expect(
               await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobPositionAddress),
               "collateralToken inside Bob's position address should be 0 ibDUMMY, because Bob locked all ibDUMMY into the position"
@@ -1943,11 +1949,11 @@ describe("PositionPermissions", () => {
             const alicePositionAfterMovePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
             expect(
               alicePositionAfterMovePosition.lockedCollateral,
-              "lockedCollateral should be 2 ibDUMMY, because Bob move locked 1 ibDUMMY to Alice"
+              "Collateral Pool #1 inside Alice's Position #1 lockedCollateral should be 2 ibDUMMY, because Bob move locked 1 ibDUMMY to Alice"
             ).to.be.equal(WeiPerWad.mul(2))
             expect(
               alicePositionAfterMovePosition.debtShare,
-              "debtShare should be 1 AUSD, because Bob move DebtShare to Alice"
+              "Collateral Pool #1 inside Alice's Position #1 debtShare should be 1 AUSD, because Bob move DebtShare to Alice"
             ).to.be.equal(WeiPerWad.mul(2))
             expect(
               await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
@@ -1987,11 +1993,12 @@ describe("PositionPermissions", () => {
             const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
             expect(
               alicePosition.lockedCollateral,
-              "lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
+              "Collateral Pool #1 inside Alice's Position #1 lockedCollateral should be 1 ibDUMMY, because Alice locked 1 ibDUMMY"
             ).to.be.equal(WeiPerWad)
-            expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
-              WeiPerWad
-            )
+            expect(
+              alicePosition.debtShare,
+              "Collateral Pool #1 inside Bob's Position #1 debtShare should be 1 AUSD, because Alice drew 1 AUSD"
+            ).to.be.equal(WeiPerWad)
             expect(
               await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
               "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
@@ -2019,9 +2026,12 @@ describe("PositionPermissions", () => {
             const bobPosition = await bookKeeper.positions(COLLATERAL_POOL_ID2, bobPositionAddress)
             expect(
               bobPosition.lockedCollateral,
-              "lockedCollateral should be 1 ibDUMMY, because Bob locked 1 ibDUMMY"
+              "Collateral Pool #1 inside Bob's Position #1 lockedCollateral should be 1 ibDUMMY, because Bob locked 1 ibDUMMY"
             ).to.be.equal(WeiPerWad)
-            expect(bobPosition.debtShare, "debtShare should be 1 AUSD, because Bob drew 1 AUSD").to.be.equal(WeiPerWad)
+            expect(
+              bobPosition.debtShare,
+              "Collateral Pool #1 inside Bob's Position #1 debtShare should be 1 AUSD, because Bob drew 1 AUSD"
+            ).to.be.equal(WeiPerWad)
             expect(
               await bookKeeper.collateralToken(COLLATERAL_POOL_ID2, bobPositionAddress),
               "collateralToken inside Bob's position address should be 0 ibDUMMY, because Bob locked all ibDUMMY into the position"
@@ -2051,7 +2061,7 @@ describe("PositionPermissions", () => {
     })
 
     context("owner position not allow other user to manage position with proxy wallet", async () => {
-      context("lock collateral", async () => {
+      context("lock collateral into their own position", async () => {
         it("should revert", async () => {
           // 1. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
           const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
