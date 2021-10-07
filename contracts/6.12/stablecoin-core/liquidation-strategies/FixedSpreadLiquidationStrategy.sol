@@ -70,7 +70,7 @@ contract FixedSpreadLiquidationStrategy is
   /// @param _actualDebtValueToBeLiquidated [rad]
   /// @param _collateralAmountToBeLiquidated [wad]
   /// @param _treasuryFees [wad]
-  event FixedSpreadLiquidate(
+  event LogLogSetCollateralPool(
     bytes32 indexed _collateralPoolId,
     uint256 _positionDebtShare,
     uint256 _positionCollateralAmount,
@@ -84,7 +84,7 @@ contract FixedSpreadLiquidationStrategy is
     uint256 _collateralAmountToBeLiquidated,
     uint256 _treasuryFees
   );
-  event SetCollateralPool(
+  event LogSetCollateralPool(
     address indexed caller,
     bytes32 collateralPoolId,
     address _adapter,
@@ -92,12 +92,16 @@ contract FixedSpreadLiquidationStrategy is
     uint256 _liquidatorIncentiveBps,
     uint256 _treasuryFeeBps
   );
-  event SetAdapter(address indexed caller, bytes32 collateralPoolId, address _adapter);
-  event SetCloseFactorBps(address indexed caller, bytes32 collateralPoolId, uint256 _closeFactorBps);
-  event SetLiquidatorIncentiveBps(address indexed caller, bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps);
-  event SetTreasuryFeesBps(address indexed caller, bytes32 collateralPoolId, uint256 _treasuryFeeBps);
-  event SetPositionManager(address indexed caller, address _positionManager);
-  event SetFlashLendingEnabled(address indexed caller, uint256 _flashLendingEnabled);
+  event LogSetAdapter(address indexed caller, bytes32 collateralPoolId, address _adapter);
+  event LogSetCloseFactorBps(address indexed caller, bytes32 collateralPoolId, uint256 _closeFactorBps);
+  event LogSetLiquidatorIncentiveBps(address indexed caller, bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps);
+  event LogSetTreasuryFeesBpsLiquidatorIncentiveBps(
+    address indexed caller,
+    bytes32 collateralPoolId,
+    uint256 _treasuryFeeBps
+  );
+  event LogSetPositionManager(address indexed caller, address _positionManager);
+  event LogSetFlashLendingEnabled(address indexed caller, uint256 _flashLendingEnabled);
 
   // --- Init ---
   function initialize(
@@ -157,7 +161,7 @@ contract FixedSpreadLiquidationStrategy is
     collateralPools[collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
     collateralPools[collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
 
-    emit SetCollateralPool(
+    emit LogSetCollateralPool(
       msg.sender,
       collateralPoolId,
       _adapter,
@@ -170,14 +174,14 @@ contract FixedSpreadLiquidationStrategy is
   function setAdapter(bytes32 collateralPoolId, address _adapter) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     collateralPools[collateralPoolId].adapter = IGenericTokenAdapter(_adapter);
-    emit SetAdapter(msg.sender, collateralPoolId, _adapter);
+    emit LogSetAdapter(msg.sender, collateralPoolId, _adapter);
   }
 
   function setCloseFactorBps(bytes32 collateralPoolId, uint256 _closeFactorBps) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(_closeFactorBps <= 10000, "FixedSpreadLiquidationStrategy/invalid-close-factor-bps");
     collateralPools[collateralPoolId].closeFactorBps = _closeFactorBps;
-    emit SetCloseFactorBps(msg.sender, collateralPoolId, _closeFactorBps);
+    emit LogSetCloseFactorBps(msg.sender, collateralPoolId, _closeFactorBps);
   }
 
   function setLiquidatorIncentiveBps(bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps) external {
@@ -187,26 +191,26 @@ contract FixedSpreadLiquidationStrategy is
       "FixedSpreadLiquidationStrategy/invalid-liquidator-incentive-bps"
     );
     collateralPools[collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
-    emit SetLiquidatorIncentiveBps(msg.sender, collateralPoolId, _liquidatorIncentiveBps);
+    emit LogSetLiquidatorIncentiveBps(msg.sender, collateralPoolId, _liquidatorIncentiveBps);
   }
 
   function setTreasuryFeesBps(bytes32 collateralPoolId, uint256 _treasuryFeesBps) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(_treasuryFeesBps <= 9000, "FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps");
     collateralPools[collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
-    emit SetTreasuryFeesBps(msg.sender, collateralPoolId, _treasuryFeesBps);
+    emit LogSetTreasuryFeesBpsLiquidatorIncentiveBps(msg.sender, collateralPoolId, _treasuryFeesBps);
   }
 
   function setPositionManager(address _positionManager) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     positionManager = IManager(_positionManager);
-    emit SetPositionManager(msg.sender, _positionManager);
+    emit LogSetPositionManager(msg.sender, _positionManager);
   }
 
   function setFlashLendingEnabled(uint256 _flashLendingEnabled) external {
     require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
     flashLendingEnabled = _flashLendingEnabled;
-    emit SetFlashLendingEnabled(msg.sender, _flashLendingEnabled);
+    emit LogSetFlashLendingEnabled(msg.sender, _flashLendingEnabled);
   }
 
   // get the price directly from the PriceOracle
@@ -420,7 +424,7 @@ contract FixedSpreadLiquidationStrategy is
     info.positionCollateralAmount = _positionCollateralAmount;
     info.debtShareToBeLiquidated = _debtShareToBeLiquidated;
     info.maxDebtShareToBeLiquidated = _maxDebtShareToBeLiquidated;
-    emit FixedSpreadLiquidate(
+    emit LogLogSetCollateralPool(
       _collateralPoolId,
       info.positionDebtShare,
       info.positionCollateralAmount,

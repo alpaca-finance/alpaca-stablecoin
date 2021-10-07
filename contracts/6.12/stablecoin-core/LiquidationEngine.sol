@@ -69,7 +69,7 @@ contract LiquidationEngine is
   uint256 public live; // Active Flag
 
   // --- Events ---
-  event SetStrategy(address indexed caller, bytes32 _collateralPoolId, address strategy);
+  event LogSetStrategy(address indexed caller, bytes32 _collateralPoolId, address strategy);
 
   // --- Init ---
   function initialize(address _bookKeeper, address _systemDebtEngine) external initializer {
@@ -79,6 +79,9 @@ contract LiquidationEngine is
 
     bookKeeper = IBookKeeper(_bookKeeper);
     systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
+
+    // Sanity check
+    bookKeeper.totalStablecoinIssued();
 
     live = 1;
 
@@ -90,11 +93,11 @@ contract LiquidationEngine is
   // --- Math ---
   uint256 constant WAD = 10**18;
 
-  function setStrategy(bytes32 _collateralPoolId, address strategy) external {
+  function setStrategy(bytes32 _collateralPoolId, address _strategy) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "LiquidationEngine/not-live");
-    strategies[_collateralPoolId] = strategy;
-    emit SetStrategy(msg.sender, _collateralPoolId, strategy);
+    strategies[_collateralPoolId] = _strategy;
+    emit LogSetStrategy(msg.sender, _collateralPoolId, _strategy);
   }
 
   function liquidate(
