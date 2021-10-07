@@ -1458,7 +1458,7 @@ describe("PositionPermissions", () => {
       })
     })
 
-    context("owner position allow other user to manage position with proxy wallet", async () => {
+    context("position owner allow other user to manage position with proxy wallet", async () => {
       context("lock collateral into their own position", async () => {
         it("should success", async () => {
           // 1. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
@@ -2060,7 +2060,7 @@ describe("PositionPermissions", () => {
       })
     })
 
-    context("owner position not allow other user to manage position with proxy wallet", async () => {
+    context("position owner not allow other user to manage position with proxy wallet", async () => {
       context("lock collateral into their own position", async () => {
         it("should revert", async () => {
           // 1. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
@@ -2550,7 +2550,7 @@ describe("PositionPermissions", () => {
       })
     })
 
-    context("owner position allow other user to manage position with user wallet address", async () => {
+    context("position owner allow other user to manage position with user wallet address", async () => {
       context("move collateral", async () => {
         context("same collateral pool", async () => {
           context("and Bob move collateral of Alice to himself", async () => {
@@ -3096,7 +3096,7 @@ describe("PositionPermissions", () => {
       })
     })
 
-    context("owner position can export and can import", async () => {
+    context("position owner can export and can import", async () => {
       it("should success", async () => {
         // 1. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
         const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
