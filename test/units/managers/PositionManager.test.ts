@@ -11,6 +11,7 @@ import {
   TokenAdapter__factory,
   BEP20__factory,
   TokenAdapter,
+  ShowStopper__factory,
 } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
@@ -25,6 +26,7 @@ type fixture = {
   mockedBookKeeper: MockContract
   mockedDummyToken: MockContract
   mockedTokenAdapter: MockContract
+  mockedShowStopper: MockContract
 }
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
@@ -52,12 +54,21 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   await tokenAdapter.deployed()
   const mockedTokenAdapter = await smockit(tokenAdapter)
 
+  // Deploy mocked ShowStopper
+  const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
+  const showStopper = await upgrades.deployProxy(ShowStopper, [])
+  await showStopper.deployed()
+  const mockedShowStopper = await smockit(showStopper)
+
   // Deploy PositionManager
   const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
-  const positionManager = (await upgrades.deployProxy(PositionManager, [mockedBookKeeper.address])) as PositionManager
+  const positionManager = (await upgrades.deployProxy(PositionManager, [
+    mockedBookKeeper.address,
+    mockedShowStopper.address,
+  ])) as PositionManager
   await positionManager.deployed()
 
-  return { positionManager, mockedBookKeeper, mockedDummyToken, mockedTokenAdapter }
+  return { positionManager, mockedBookKeeper, mockedDummyToken, mockedTokenAdapter, mockedShowStopper }
 }
 
 describe("PositionManager", () => {
@@ -79,15 +90,15 @@ describe("PositionManager", () => {
   let mockedBookKeeper: MockContract
   let mockedDummyToken: MockContract
   let mockedTokenAdapter: MockContract
+  let mockedShowStopper: MockContract
 
   // Signer
   let positionManagerAsAlice: PositionManager
   let positionManagerAsBob: PositionManager
 
   beforeEach(async () => {
-    ;({ positionManager, mockedBookKeeper, mockedDummyToken, mockedTokenAdapter } = await waffle.loadFixture(
-      loadFixtureHandler
-    ))
+    ;({ positionManager, mockedBookKeeper, mockedDummyToken, mockedTokenAdapter, mockedShowStopper } =
+      await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
       deployer.getAddress(),
@@ -676,6 +687,31 @@ describe("PositionManager", () => {
         expect(movePositionCalls[0].dst).to.be.equal(position2Address)
         expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
         expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+      })
+    })
+  })
+
+  describe("#redeemLockedCollateral()", () => {
+    context("when caller has no access to the position (or have no allowance)", () => {
+      it("should revert", async () => {
+        await positionManager.open(formatBytes32String("BNB"), aliceAddress)
+        await expect(positionManager.redeemLockedCollateral(1, mockedTokenAdapter.address, "0x")).to.be.revertedWith(
+          "owner not allowed"
+        )
+      })
+    })
+    context("when parameters are valid", () => {
+      it("should be able to redeemLockedCollateral", async () => {
+        await positionManager.open(formatBytes32String("BNB"), aliceAddress)
+        const position1Address = await positionManager.positions(1)
+        await positionManagerAsAlice.redeemLockedCollateral(1, mockedTokenAdapter.address, "0x")
+
+        const { calls: redeemLockedCollateralCalls } = mockedShowStopper.smocked.redeemLockedCollateral
+        expect(redeemLockedCollateralCalls.length).to.be.equal(1)
+        expect(redeemLockedCollateralCalls[0][0]).to.be.equal(formatBytes32String("BNB"))
+        expect(redeemLockedCollateralCalls[0][1]).to.be.equal(mockedTokenAdapter.address)
+        expect(redeemLockedCollateralCalls[0][2]).to.be.equal(position1Address)
+        expect(redeemLockedCollateralCalls[0][3]).to.be.equal("0x")
       })
     })
   })
