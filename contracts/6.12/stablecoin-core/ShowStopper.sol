@@ -30,6 +30,7 @@ import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IPriceOracle.sol";
 import "../interfaces/ISystemDebtEngine.sol";
+import "../interfaces/IGenericTokenAdapter.sol";
 import "../interfaces/ICagable.sol";
 
 /*
@@ -343,20 +344,29 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
       the owner of the position will have to move the collateral inside the position to the owner address first before calling `redeemLockedCollateral`.
   */
   /// @param collateralPoolId Collateral pool id
-  function redeemLockedCollateral(bytes32 collateralPoolId) external {
-    // TODO: revise whether to accept position addres as an argument
+  function redeemLockedCollateral(
+    bytes32 collateralPoolId,
+    IGenericTokenAdapter adapter,
+    address positionAddress,
+    bytes calldata data
+  ) external {
     require(live == 0, "ShowStopper/still-live");
-    (uint256 lockedCollateralAmount, uint256 debtShare) = bookKeeper.positions(collateralPoolId, msg.sender);
+    require(
+      positionAddress == msg.sender || bookKeeper.positionWhitelist(positionAddress, msg.sender) == 1,
+      "ShowStopper/not-allowed"
+    );
+    (uint256 lockedCollateralAmount, uint256 debtShare) = bookKeeper.positions(collateralPoolId, positionAddress);
     require(debtShare == 0, "ShowStopper/debtShare-not-zero");
     require(lockedCollateralAmount <= 2**255, "ShowStopper/overflow");
     bookKeeper.confiscatePosition(
       collateralPoolId,
       msg.sender,
-      msg.sender,
+      positionAddress,
       address(systemDebtEngine),
       -int256(lockedCollateralAmount),
       0
     );
+    adapter.onMoveCollateral(positionAddress, msg.sender, lockedCollateralAmount, data);
     emit RedeemLockedCollateral(collateralPoolId, msg.sender, lockedCollateralAmount);
   }
 
