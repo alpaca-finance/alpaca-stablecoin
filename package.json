@@ -13,6 +13,7 @@
     "test:integrations:positionmanager": "hardhat test --no-compile ./test/integrations/position-manager/PositionManager.test.ts",
     "test:collateral-auctioneer": "hardhat test --no-compile ./test/units/stablecoin-core/auctioneers/CollateralAuctioneer.test.ts",
     "test:positionmanager": "hardhat test --no-compile ./test/units/managers/PositionManager.test.ts",
+    "test:position-manager": "hardhat test --no-compile ./test/units/managers/PositionManager.test.ts",
     "testnet": "hardhat console --no-compile --network testnet",
     "test:bookkeeper": "hardhat test --no-compile ./test/units/stablecoin-core/BookKeeper.test.ts",
     "test:exponentialdecrease": "hardhat test --no-compile ./test/units/calculators/ExponentialDecrease.test.ts",
