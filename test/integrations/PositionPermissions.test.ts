@@ -2897,7 +2897,9 @@ describe("PositionPermissions", () => {
             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, alicePositionAddress),
             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
           ).to.be.equal(0)
-          expect(alpacaStablecoinBalance2, "Alice should receive 1 AUSD from Alice drew 1 time").to.be.equal(WeiPerWad)
+          expect(alpacaStablecoinBalance2, "Alice should receive 1 AUSD, because Alice drew 1 time").to.be.equal(
+            WeiPerWad
+          )
           expect(BobAlpacaStablecoinBalance, "Bob should receive 1 AUSD from Alice position").to.be.equal(WeiPerWad)
         })
       })
