@@ -2867,17 +2867,17 @@ describe("PositionPermissions", () => {
             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
           )
 
-          // move stablecoin of alice to bob
+          // 4. move stablecoin of alice to bob
           await positionManagerAsBob.moveStablecoin(
             await positionManager.ownerLastPositionId(aliceProxyWallet.address),
             bobAddress,
             WeiPerRad
           )
 
-          // allow bob to window
+          // 5. allow bob to window
           await bookKeeperAsBob.whitelist(stablecoinAdapter.address)
 
-          // mint ausd
+          // 6. mint ausd
           await stablecoinAdapterAsBob.withdraw(
             bobAddress,
             WeiPerWad,
