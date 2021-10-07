@@ -1035,7 +1035,7 @@ describe("PositionPermissions", () => {
                 const alicePosition = await bookKeeper.positions(COLLATERAL_POOL_ID, alicePositionAddress)
                 expect(
                   alicePosition.lockedCollateral,
-                  "Alice's Position #1 lockedCollateral should be 0 ibDUMMY, because Alice didn't locked ibDUMMY"
+                  "Alice's Position #1 lockedCollateral should be 0 ibDUMMY, because Alice didn't lock ibDUMMY"
                 ).to.be.equal(0)
                 expect(
                   alicePosition.debtShare,
