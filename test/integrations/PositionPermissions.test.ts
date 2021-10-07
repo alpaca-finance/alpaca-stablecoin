@@ -1020,7 +1020,7 @@ describe("PositionPermissions", () => {
             }
           )
           context(
-            "Alice open a position, lock collateral and move collateral to Bob's position at another collateral pool",
+            "Alice open a position, lock collateral and move collateral to Bob's position at another collateral pool by calling openLockTokenAndDraw() once and open() once",
             async () => {
               it("should success", async () => {
                 // 1. Alice open position
