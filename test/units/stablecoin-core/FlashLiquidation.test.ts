@@ -276,7 +276,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   }
 }
 
-describe("LiquidationEngine", () => {
+describe("FlashLiquidation", () => {
   // Accounts
   let deployer: Signer
   let alice: Signer
