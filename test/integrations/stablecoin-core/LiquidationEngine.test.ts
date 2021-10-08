@@ -1839,7 +1839,7 @@ describe("LiquidationEngine", () => {
         await bookKeeperAsBob.whitelist(fixedSpreadLiquidationStrategy.address)
         await bookKeeper.mintUnbackedStablecoin(deployerAddress, bobAddress, WeiPerRad.mul(10000))
         const bobStablecoinBeforeLiquidation = await bookKeeper.stablecoin(bobAddress)
-        await liquidationEngineAsBob.liquidate(
+        const tx = await liquidationEngineAsBob.liquidate(
           COLLATERAL_POOL_ID,
           alicePositionAddress,
           debtShareToRepay,
@@ -1847,6 +1847,8 @@ describe("LiquidationEngine", () => {
           bobAddress,
           ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [bobAddress, []])
         )
+        const txReceipt = await tx.wait()
+        console.log("Liquidation gas used", txReceipt.gasUsed.toString())
 
         // 5. Settle system bad debt
         await systemDebtEngine.settleSystemBadDebt(await bookKeeper.systemBadDebt(systemDebtEngine.address))

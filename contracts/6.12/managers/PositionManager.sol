@@ -11,10 +11,7 @@ import "../interfaces/IGenericTokenAdapter.sol";
 import "../interfaces/IShowStopper.sol";
 
 /// @title PositionManager is a contract for manging positions
-contract PositionManager is AccessControlUpgradeable, PausableUpgradeable, IManager {
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-
+contract PositionManager is PausableUpgradeable, AccessControlUpgradeable, IManager {
   /// @dev Address of a BookKeeper
   address public override bookKeeper;
 

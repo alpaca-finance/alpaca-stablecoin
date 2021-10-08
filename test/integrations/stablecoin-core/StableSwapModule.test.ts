@@ -193,6 +193,18 @@ describe("FlastMintModule", () => {
       })
     })
 
+    context("swap BUSD when BUSD is insufficient", async () => {
+      it("should revert", async () => {
+        // Mint 1000 BUSD to deployer
+        await BUSD.mint(deployerAddress, ethers.utils.parseEther("1000"))
+
+        // Swap 1000 BUSD to AUSD
+        await BUSD.approve(authTokenAdapter.address, MaxUint256)
+        await expect(
+          stableSwapModule.swapTokenToStablecoin(deployerAddress, ethers.utils.parseEther("1001"))
+        ).to.be.revertedWith("ERC20: transfer amount exceeds balance")
+      })
+    })
     context("swap BUSD to AUSD", async () => {
       it("should success", async () => {
         // Mint 1000 BUSD to deployer
