@@ -3,9 +3,10 @@ import { Signer, BigNumber } from "ethers"
 import chai from "chai"
 import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import { PegStabilityModule, PegStabilityModule__factory } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 import { WeiPerRay, WeiPerWad } from "../../helper/unit"
+import { PegStabilityModule } from "../../../typechain/PegStabilityModule"
+import { PegStabilityModule__factory } from "../../../typechain/factories/PegStabilityModule__factory"
 
 chai.use(solidity)
 const { expect } = chai
