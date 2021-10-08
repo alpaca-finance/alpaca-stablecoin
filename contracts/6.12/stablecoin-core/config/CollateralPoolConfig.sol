@@ -14,6 +14,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant PRICE_ORACLE_ROLE = keccak256("PRICE_ORACLE_ROLE");
   bytes32 public constant BOOK_KEEPER_ROLE = keccak256("BOOK_KEEPER_ROLE");
+  bytes32 public constant STABILITY_FEE_COLLECTOR_ROLE = keccak256("STABILITY_FEE_COLLECTOR_ROLE");
 
   event LogSetPriceWithSafetyMargin(address indexed caller, bytes32 collateralPoolId, uint256 priceWithSafetyMargin);
   event LogSetDebtCeiling(address indexed caller, bytes32 collateralPoolId, uint256 debtCeiling);
@@ -168,5 +169,10 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
   function setDebtAccumulatedRate(bytes32 _collateralPoolId, uint256 _debtAccumulatedRate) external override {
     require(hasRole(BOOK_KEEPER_ROLE, msg.sender), "!bookKeeperRole");
     collateralPools[_collateralPoolId].debtAccumulatedRate = _debtAccumulatedRate;
+  }
+
+  function updateLastAccumulationTime(bytes32 _collateralPoolId) external override {
+    require(hasRole(STABILITY_FEE_COLLECTOR_ROLE, msg.sender), "!stabilityFeeCollectorRole");
+    collateralPools[_collateralPoolId].lastAccumulationTime = now;
   }
 }
