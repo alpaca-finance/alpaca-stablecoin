@@ -3,7 +3,13 @@ import { Signer, BigNumber } from "ethers"
 import chai from "chai"
 import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import { ShowStopper, ShowStopper__factory } from "../../../typechain"
+import {
+  ShowStopper,
+  ShowStopper__factory,
+  BEP20__factory,
+  TokenAdapter__factory,
+  TokenAdapter,
+} from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 
 import * as UnitHelpers from "../../helper/unit"
@@ -21,6 +27,7 @@ type fixture = {
   mockedSystemDebtEngine: MockContract
   mockedPriceOracle: MockContract
   mockedPriceFeed: MockContract
+  mockedTokenAdapter: MockContract
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
@@ -28,6 +35,22 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   // Deploy mocked BookKeeper
   const mockedBookKeeper = await smockit(await ethers.getContractFactory("BookKeeper", deployer))
+
+  // Deploy mocked BEP20
+  const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
+  const dummyToken = await BEP20.deploy("dummy", "DUMP")
+  await dummyToken.deployed()
+  const mockedDummyToken = await smockit(dummyToken)
+
+  // Deploy mocked TokenAdapter
+  const TokenAdapter = (await ethers.getContractFactory("TokenAdapter", deployer)) as TokenAdapter__factory
+  const tokenAdapter = (await upgrades.deployProxy(TokenAdapter, [
+    mockedBookKeeper.address,
+    formatBytes32String("DUMMY"),
+    mockedDummyToken.address,
+  ])) as TokenAdapter
+  await tokenAdapter.deployed()
+  const mockedTokenAdapter = await smockit(tokenAdapter)
 
   // Deploy mocked LiquidationEngine
   const mockedLiquidationEngine = await smockit(await ethers.getContractFactory("LiquidationEngine", deployer))
@@ -53,6 +76,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     mockedSystemDebtEngine,
     mockedPriceOracle,
     mockedPriceFeed,
+    mockedTokenAdapter,
   }
 }
 
@@ -73,6 +97,7 @@ describe("ShowStopper", () => {
   let mockedSystemDebtEngine: MockContract
   let mockedPriceOracle: MockContract
   let mockedPriceFeed: MockContract
+  let mockedTokenAdapter: MockContract
 
   let showStopper: ShowStopper
   let showStopperAsAlice: ShowStopper
@@ -110,6 +135,7 @@ describe("ShowStopper", () => {
       mockedSystemDebtEngine,
       mockedPriceOracle,
       mockedPriceFeed,
+      mockedTokenAdapter,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, devAddress] = await Promise.all([
@@ -252,9 +278,14 @@ describe("ShowStopper", () => {
 
             mockedBookKeeper.smocked.positions.will.return.with([UnitHelpers.WeiPerRay, BigNumber.from("1")])
 
-            await expect(showStopper.redeemLockedCollateral(formatBytes32String("BNB"))).to.be.revertedWith(
-              "ShowStopper/debtShare-not-zero"
-            )
+            await expect(
+              showStopper.redeemLockedCollateral(
+                formatBytes32String("BNB"),
+                mockedTokenAdapter.address,
+                deployerAddress,
+                "0x"
+              )
+            ).to.be.revertedWith("ShowStopper/debtShare-not-zero")
           })
         })
 
@@ -264,9 +295,30 @@ describe("ShowStopper", () => {
 
             mockedBookKeeper.smocked.positions.will.return.with([ethers.constants.MaxUint256, BigNumber.from("0")])
 
-            await expect(showStopper.redeemLockedCollateral(formatBytes32String("BNB"))).to.be.revertedWith(
-              "ShowStopper/overflow"
-            )
+            await expect(
+              showStopper.redeemLockedCollateral(
+                formatBytes32String("BNB"),
+                mockedTokenAdapter.address,
+                deployerAddress,
+                "0x"
+              )
+            ).to.be.revertedWith("ShowStopper/overflow")
+          })
+        })
+
+        context("when the caller has no access to the position", () => {
+          it("should revert", async () => {
+            await setup()
+
+            mockedBookKeeper.smocked.positions.will.return.with([UnitHelpers.WeiPerRay, BigNumber.from("0")])
+            await expect(
+              showStopperAsAlice.redeemLockedCollateral(
+                formatBytes32String("BNB"),
+                mockedTokenAdapter.address,
+                deployerAddress,
+                "0x"
+              )
+            ).to.be.revertedWith("ShowStopper/not-allowed")
           })
         })
 
@@ -277,7 +329,14 @@ describe("ShowStopper", () => {
             mockedBookKeeper.smocked.positions.will.return.with([UnitHelpers.WeiPerRay, BigNumber.from("0")])
             mockedBookKeeper.smocked.confiscatePosition.will.return.with()
 
-            await expect(showStopper.redeemLockedCollateral(formatBytes32String("BNB")))
+            await expect(
+              showStopper.redeemLockedCollateral(
+                formatBytes32String("BNB"),
+                mockedTokenAdapter.address,
+                deployerAddress,
+                "0x"
+              )
+            )
               .to.emit(showStopper, "RedeemLockedCollateral")
               .withArgs(formatBytes32String("BNB"), deployerAddress, UnitHelpers.WeiPerRay)
 
@@ -295,13 +354,75 @@ describe("ShowStopper", () => {
             expect(confiscatePosition[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerRay.mul("-1"))
           })
         })
+
+        context(
+          "and debtShare is 0 and lockedCollateral is 1 ray, but the caller does not have access to the position",
+          () => {
+            it("should be success", async () => {
+              await setup()
+
+              mockedBookKeeper.smocked.positions.will.return.with([UnitHelpers.WeiPerRay, BigNumber.from("0")])
+              mockedBookKeeper.smocked.confiscatePosition.will.return.with()
+
+              await expect(
+                showStopperAsAlice.redeemLockedCollateral(
+                  formatBytes32String("BNB"),
+                  mockedTokenAdapter.address,
+                  deployerAddress,
+                  "0x"
+                )
+              ).to.be.revertedWith("ShowStopper/not-allowed")
+            })
+          }
+        )
+
+        context(
+          "and debtShare is 0 and lockedCollateral is 1 ray, the caller is not the owner of the address but has access to",
+          () => {
+            it("should be success", async () => {
+              await setup()
+
+              mockedBookKeeper.smocked.positions.will.return.with([UnitHelpers.WeiPerRay, BigNumber.from("0")])
+              mockedBookKeeper.smocked.positionWhitelist.will.return.with(BigNumber.from(1))
+              mockedBookKeeper.smocked.confiscatePosition.will.return.with()
+
+              await expect(
+                showStopper.redeemLockedCollateral(
+                  formatBytes32String("BNB"),
+                  mockedTokenAdapter.address,
+                  aliceAddress,
+                  "0x"
+                )
+              )
+                .to.emit(showStopper, "RedeemLockedCollateral")
+                .withArgs(formatBytes32String("BNB"), deployerAddress, UnitHelpers.WeiPerRay)
+
+              const { calls: positions } = mockedBookKeeper.smocked.positions
+              const { calls: confiscatePosition } = mockedBookKeeper.smocked.confiscatePosition
+              expect(positions.length).to.be.equal(1)
+              expect(positions[0][0]).to.be.equal(formatBytes32String("BNB"))
+              expect(positions[0][1]).to.be.equal(aliceAddress)
+
+              expect(confiscatePosition.length).to.be.equal(1)
+              expect(confiscatePosition[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+              expect(confiscatePosition[0].collateralCreditor).to.be.equal(aliceAddress)
+              expect(confiscatePosition[0].positionAddress).to.be.equal(deployerAddress)
+              expect(confiscatePosition[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerRay.mul("-1"))
+            })
+          }
+        )
       })
 
       context("pool is active", () => {
         it("should revert", async () => {
-          await expect(showStopper.redeemLockedCollateral(formatBytes32String("BNB"))).to.be.revertedWith(
-            "ShowStopper/still-live"
-          )
+          await expect(
+            showStopper.redeemLockedCollateral(
+              formatBytes32String("BNB"),
+              mockedTokenAdapter.address,
+              deployerAddress,
+              "0x"
+            )
+          ).to.be.revertedWith("ShowStopper/still-live")
         })
       })
     })
