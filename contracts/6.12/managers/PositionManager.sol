@@ -11,10 +11,7 @@ import "../interfaces/IGenericTokenAdapter.sol";
 import "../interfaces/IShowStopper.sol";
 
 /// @title PositionManager is a contract for manging positions
-contract PositionManager is AccessControlUpgradeable, PausableUpgradeable, IManager {
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-
+contract PositionManager is PausableUpgradeable, AccessControlUpgradeable, IManager {
   /// @dev Address of a BookKeeper
   address public override bookKeeper;
 
@@ -95,11 +92,12 @@ contract PositionManager is AccessControlUpgradeable, PausableUpgradeable, IMana
 
   /// @dev Initializer for intializing PositionManager
   /// @param _bookKeeper The address of the Book Keeper
-  function initialize(address _bookKeeper) external initializer {
+  function initialize(address _bookKeeper, address _showStopper) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
     bookKeeper = _bookKeeper;
+    showStopper = _showStopper;
 
     // Grant the contract deployer the owner role: it will be able
     // to grant and revoke any roles
