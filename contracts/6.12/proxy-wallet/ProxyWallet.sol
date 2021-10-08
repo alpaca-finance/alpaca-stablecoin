@@ -64,10 +64,10 @@ contract ProxyWallet is AlpacaAuth, AlpacaNote {
       returndatacopy(add(response, 0x20), 0, size)
 
       switch iszero(succeeded)
-        case 1 {
-          // throw if delegatecall failed
-          revert(add(response, 0x20), size)
-        }
+      case 1 {
+        // throw if delegatecall failed
+        revert(add(response, 0x20), size)
+      }
     }
   }
 

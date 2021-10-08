@@ -235,7 +235,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     ICollateralPoolConfig.CollateralPool memory collateralPool = collateralPoolConfig.collateralPools(collateralPoolId);
     // collateralPool has been initialised
     require(collateralPool.debtAccumulatedRate != 0, "BookKeeper/collateralPool-not-init");
-
     position.lockedCollateral = add(position.lockedCollateral, collateralValue);
     position.debtShare = add(position.debtShare, debtShare);
     collateralPool.totalDebtShare = add(collateralPool.totalDebtShare, debtShare);
@@ -277,7 +276,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
 
     // position has no debt, or a non-debtFloory amount
     require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "BookKeeper/debt-floor");
-
     collateralToken[collateralPoolId][collateralOwner] = sub(
       collateralToken[collateralPoolId][collateralOwner],
       collateralValue
