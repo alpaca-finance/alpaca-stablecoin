@@ -11,12 +11,14 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
 
   uint256 public price;
   uint256 public lastUpdate;
-  uint256 public priceLife = 1 days; //[seconds] how old the price is considered stale, default 1 day
+  uint256 public priceLife; //[seconds] how old the price is considered stale, default 1 day
 
   // --- Init ---
   function initialize() external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+
+    priceLife = 1 days;
 
     // Grant the contract deployer OWNER role: it will be able
     // to grant and revoke any roles afterward
