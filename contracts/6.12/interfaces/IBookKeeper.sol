@@ -47,8 +47,6 @@ interface IBookKeeper {
     int256 debtShare
   ) external;
 
-  function setPriceWithSafetyMargin(bytes32 collateralPoolId, uint256 priceWithSafetyMargin) external;
-
   function stablecoin(address ownerAddress) external view returns (uint256);
 
   function positions(bytes32 collateralPoolId, address positionAddress)
@@ -88,17 +86,6 @@ interface IBookKeeper {
     address to,
     uint256 value // [rad]
   ) external;
-
-  function collateralPools(bytes32 collateralPoolId)
-    external
-    view
-    returns (
-      uint256 totalDebtShare, // [wad]
-      uint256 debtAccumulatedRate, // [ray]
-      uint256 priceWithSafetyMargin, // [ray]
-      uint256 debtCeiling, // [rad]
-      uint256 debtFloor // [rad]
-    );
 
   function accrueStabilityFee(
     bytes32 collateralPoolId,
