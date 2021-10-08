@@ -20,11 +20,16 @@ import {
   AuthTokenAdapter,
   SystemDebtEngine__factory,
   SystemDebtEngine,
+  CollateralPoolConfig__factory,
+  CollateralPoolConfig,
+  SimplePriceFeed__factory,
+  SimplePriceFeed,
 } from "../../../typechain"
 import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 
 import * as AssertHelpers from "../../helper/assert"
+import { AddressZero } from "../../helper/address"
 
 const { formatBytes32String } = ethers.utils
 const COLLATERAL_POOL_ID = formatBytes32String("BUSD-StableSwap")
@@ -39,21 +44,28 @@ type fixture = {
   stableSwapModule: StableSwapModule
   authTokenAdapter: AuthTokenAdapter
   systemDebtEngine: SystemDebtEngine
+  collateralPoolConfig: CollateralPoolConfig
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer, alice, bob, dev] = await ethers.getSigners()
 
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [])) as CollateralPoolConfig
+
   // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [collateralPoolConfig.address])) as BookKeeper
   await bookKeeper.deployed()
 
-  await bookKeeper.init(COLLATERAL_POOL_ID)
-  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100000000000000))
-  await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID, WeiPerRad.mul(100000000000000))
-  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
-  await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
+  await collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
+
+  const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
+  await simplePriceFeed.deployed()
 
   // Deploy mocked BEP20
   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
@@ -69,6 +81,23 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await authTokenAdapter.deployed()
   await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), authTokenAdapter.address)
   await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployer.address)
+
+  await collateralPoolConfig.initCollateralPool(
+    COLLATERAL_POOL_ID,
+    WeiPerRad.mul(100000000000000),
+    0,
+    simplePriceFeed.address,
+    0,
+    WeiPerRay,
+    authTokenAdapter.address,
+    0,
+    0,
+    0,
+    AddressZero
+  )
+  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100000000000000))
+  await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
+  await collateralPoolConfig.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
 
   // Deploy Alpaca Stablecoin
   const AlpacaStablecoin = (await ethers.getContractFactory("AlpacaStablecoin", deployer)) as AlpacaStablecoin__factory
@@ -121,6 +150,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     stableSwapModule,
     authTokenAdapter,
     systemDebtEngine,
+    collateralPoolConfig,
   }
 }
 
@@ -145,6 +175,7 @@ describe("FlastMintModule", () => {
   let authTokenAdapter: AuthTokenAdapter
   let alpacaStablecoin: AlpacaStablecoin
   let systemDebtEngine: SystemDebtEngine
+  let collateralPoolConfig: CollateralPoolConfig
 
   // Signer
 
@@ -163,6 +194,7 @@ describe("FlastMintModule", () => {
       stableSwapModule,
       authTokenAdapter,
       systemDebtEngine,
+      collateralPoolConfig,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress] = await Promise.all([
@@ -180,7 +212,7 @@ describe("FlastMintModule", () => {
     context("exceed debtCeiling", async () => {
       it("should revert", async () => {
         // Set debtCeiling of StableSwapModule to 0
-        await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID, 0)
+        await collateralPoolConfig.setDebtCeiling(COLLATERAL_POOL_ID, 0)
 
         // Mint 1000 BUSD to deployer
         await BUSD.mint(deployerAddress, ethers.utils.parseEther("1000"))

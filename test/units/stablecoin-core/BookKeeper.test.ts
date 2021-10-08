@@ -123,11 +123,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
         ).to.be.revertedWith("!ownerRole")
       })
@@ -144,11 +145,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
           const pool = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
           expect(pool.debtAccumulatedRate).equal(WeiPerRay)
@@ -165,11 +167,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
           // second initialize BNB colleteral pool
           await expect(
@@ -179,11 +182,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
           ).to.be.revertedWith("CollateralPoolConfig/collateral-pool-already-init")
         })
@@ -198,11 +202,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
           ).to.be.revertedWith("!ownerRole")
         })
@@ -232,11 +237,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
 
           const collateralTokenBefore = await bookKeeper.collateralToken(formatBytes32String("BNB"), deployerAddress)
@@ -263,11 +269,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
 
           // add collateral 1 BNB
@@ -475,11 +482,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
 
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
@@ -508,11 +516,12 @@ describe("BookKeeper", () => {
                   0,
                   simplePriceFeed.address,
                   0,
-                  0,
+                  WeiPerRay,
                   tokenAdapter.address,
                   0,
                   0,
-                  0
+                  0,
+                  AddressZero
                 )
 
                 // alice allow bob to move stablecoin
@@ -545,11 +554,12 @@ describe("BookKeeper", () => {
                   0,
                   simplePriceFeed.address,
                   0,
-                  0,
+                  WeiPerRay,
                   tokenAdapter.address,
                   0,
                   0,
-                  0
+                  0,
+                  AddressZero
                 )
 
                 // add collateral to bob 10 BNB
@@ -591,11 +601,12 @@ describe("BookKeeper", () => {
                 0,
                 simplePriceFeed.address,
                 0,
-                0,
+                WeiPerRay,
                 tokenAdapter.address,
                 0,
                 0,
-                0
+                0,
+                AddressZero
               )
 
               await expect(
@@ -625,11 +636,12 @@ describe("BookKeeper", () => {
                 0,
                 simplePriceFeed.address,
                 0,
-                0,
+                WeiPerRay,
                 tokenAdapter.address,
                 0,
                 0,
-                0
+                0,
+                AddressZero
               )
 
               // add collateral to bob 10 BNB
@@ -669,11 +681,12 @@ describe("BookKeeper", () => {
                 0,
                 simplePriceFeed.address,
                 0,
-                0,
+                WeiPerRay,
                 tokenAdapter.address,
                 0,
                 0,
-                0
+                0,
+                AddressZero
               )
 
               // free collateral
@@ -704,11 +717,12 @@ describe("BookKeeper", () => {
                 0,
                 simplePriceFeed.address,
                 0,
-                0,
+                WeiPerRay,
                 tokenAdapter.address,
                 0,
                 0,
-                0
+                0,
+                AddressZero
               )
 
               // add collateral to alice 10 BNB
@@ -766,11 +780,12 @@ describe("BookKeeper", () => {
                 0,
                 simplePriceFeed.address,
                 0,
-                0,
+                WeiPerRay,
                 tokenAdapter.address,
                 0,
                 0,
-                0
+                0,
+                AddressZero
               )
 
               // free collateral
@@ -800,11 +815,12 @@ describe("BookKeeper", () => {
                 0,
                 simplePriceFeed.address,
                 0,
-                0,
+                WeiPerRay,
                 tokenAdapter.address,
                 0,
                 0,
-                0
+                0,
+                AddressZero
               )
 
               // add collateral to alice 10 BNB
@@ -860,11 +876,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 1 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad)
@@ -896,11 +913,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -934,11 +952,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
           // set pool debt ceiling 10 rad
           await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -978,11 +997,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1032,11 +1052,12 @@ describe("BookKeeper", () => {
                 0,
                 simplePriceFeed.address,
                 0,
-                0,
+                WeiPerRay,
                 tokenAdapter.address,
                 0,
                 0,
-                0
+                0,
+                AddressZero
               )
               // set pool debt ceiling 10 rad
               await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1103,11 +1124,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1170,11 +1192,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1229,11 +1252,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1306,11 +1330,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1378,11 +1403,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
           // set pool debt ceiling 10 rad
           await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1433,11 +1459,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1490,11 +1517,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1547,11 +1575,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1604,11 +1633,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1661,11 +1691,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1754,11 +1785,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -1837,11 +1869,12 @@ describe("BookKeeper", () => {
               0,
               simplePriceFeed.address,
               0,
-              0,
+              WeiPerRay,
               tokenAdapter.address,
               0,
               0,
-              0
+              0,
+              AddressZero
             )
             // set pool debt ceiling 10 rad
             await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -2018,11 +2051,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
           // set pool debt ceiling 10 rad
           await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
@@ -2093,11 +2127,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
           // set total debt ceiling 1 rad
           await expect(bookKeeper.setTotalDebtCeiling(WeiPerRad))
@@ -2128,11 +2163,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
 
           await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
@@ -2165,11 +2201,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
           // set total debt ceiling 1 rad
           await expect(collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay))
@@ -2200,11 +2237,12 @@ describe("BookKeeper", () => {
             0,
             simplePriceFeed.address,
             0,
-            0,
+            WeiPerRay,
             tokenAdapter.address,
             0,
             0,
-            0
+            0,
+            AddressZero
           )
           // set total debt ceiling 1 rad
           await expect(collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRay))
@@ -2280,11 +2318,12 @@ describe("BookKeeper", () => {
           0,
           simplePriceFeed.address,
           0,
-          0,
+          WeiPerRay,
           tokenAdapter.address,
           0,
           0,
-          0
+          0,
+          AddressZero
         )
         const pool = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
         expect(pool.debtAccumulatedRate).equal(WeiPerRay)

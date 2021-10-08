@@ -12,6 +12,8 @@ import "../../interfaces/ILiquidationStrategy.sol";
 contract CollateralPoolConfig is AccessControlUpgradeable {
   using SafeMathUpgradeable for uint256;
 
+  uint256 constant RAY = 10**27;
+
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant PRICE_ORACLE_ROLE = keccak256("PRICE_ORACLE_ROLE");
   bytes32 public constant BOOK_KEEPER_ROLE = keccak256("BOOK_KEEPER_ROLE");
@@ -85,6 +87,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
     _priceFeed.peekPrice(); // Sanity Check Call
     collateralPools[_collateralPoolId].priceFeed = _priceFeed;
     collateralPools[_collateralPoolId].liquidationRatio = _liquidationRatio;
+    require(_stabilityFeeRate >= RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
     collateralPools[_collateralPoolId].stabilityFeeRate = _stabilityFeeRate;
     collateralPools[_collateralPoolId].lastAccumulationTime = now;
     _adapter.decimals(); // Sanity Check Call
@@ -92,6 +95,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
     collateralPools[_collateralPoolId].closeFactorBps = _closeFactorBps;
     collateralPools[_collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
     collateralPools[_collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
+    collateralPools[_collateralPoolId].strategy = _strategy;
   }
 
   function setPriceWithSafetyMargin(bytes32 _collateralPoolId, uint256 _priceWithSafetyMargin) external {
@@ -150,6 +154,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
   /// @param _stabilityFeeRate the new stability fee rate [ray]
   function setStabilityFeeRate(bytes32 _collateralPool, uint256 _stabilityFeeRate) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(_stabilityFeeRate > RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
     collateralPools[_collateralPool].stabilityFeeRate = _stabilityFeeRate;
     emit LogSetStabilityFeeRate(msg.sender, _collateralPool, _stabilityFeeRate);
   }

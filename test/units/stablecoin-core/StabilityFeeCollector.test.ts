@@ -79,11 +79,12 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     0,
     simplePriceFeed.address,
     0,
-    0,
+    UnitHelpers.WeiPerRay,
     tokenAdapter.address,
     0,
     0,
-    0
+    0,
+    AddressZero
   )
 
   return { stabilityFeeCollector, bookKeeper, collateralPoolConfig }

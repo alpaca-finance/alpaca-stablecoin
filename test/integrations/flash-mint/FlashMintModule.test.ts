@@ -45,6 +45,7 @@ import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 
 import * as AssertHelpers from "../../helper/assert"
+import { AddressZero } from "../../helper/address"
 
 const { formatBytes32String } = ethers.utils
 const COLLATERAL_POOL_ID = formatBytes32String("BUSD-StableSwap")
@@ -108,7 +109,8 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     authTokenAdapter.address,
     0,
     0,
-    0
+    0,
+    AddressZero
   )
   await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100000000000000))
   await collateralPoolConfig.setDebtCeiling(COLLATERAL_POOL_ID, WeiPerRad.mul(100000000000000))

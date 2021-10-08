@@ -48,6 +48,7 @@ import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
 
 import * as AssertHelpers from "../../helper/assert"
+import { AddressZero } from "../../helper/address"
 
 const { formatBytes32String } = ethers.utils
 
@@ -162,7 +163,8 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     ibTokenAdapter.address,
     CLOSE_FACTOR_BPS,
     LIQUIDATOR_INCENTIVE_BPS,
-    TREASURY_FEE_BPS
+    TREASURY_FEE_BPS,
+    AddressZero
   )
   await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10000000))
   await collateralPoolConfig.setDebtCeiling(COLLATERAL_POOL_ID, WeiPerRad.mul(10000000))
@@ -239,7 +241,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     systemDebtEngine.address,
     positionManager.address,
   ])) as FixedSpreadLiquidationStrategy
-  await liquidationEngine.setStrategy(COLLATERAL_POOL_ID, fixedSpreadLiquidationStrategy.address)
+  await collateralPoolConfig.setStrategy(COLLATERAL_POOL_ID, fixedSpreadLiquidationStrategy.address)
   await fixedSpreadLiquidationStrategy.grantRole(
     await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
     liquidationEngine.address
