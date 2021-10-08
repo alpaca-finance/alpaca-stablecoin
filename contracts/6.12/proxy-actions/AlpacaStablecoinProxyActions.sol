@@ -976,4 +976,13 @@ contract AlpacaStablecoinProxyActions {
     wipeAllAndUnlockToken(manager, tokenAdapter, stablecoinAdapter, positionId, collateralAmount, data);
     ibTokenToToken(vault, convertTo18(tokenAdapter, collateralAmount));
   }
+
+  function redeemLockedCollateral(
+    address manager,
+    uint256 positionId,
+    address tokenAdapter,
+    bytes calldata data
+  ) public {
+    IManager(manager).redeemLockedCollateral(positionId, tokenAdapter, address(this), data);
+  }
 }

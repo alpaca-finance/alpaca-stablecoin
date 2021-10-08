@@ -57,4 +57,11 @@ interface IManager {
   function importPosition(address, uint256) external;
 
   function movePosition(uint256, uint256) external;
+
+  function redeemLockedCollateral(
+    uint256,
+    address,
+    address,
+    bytes calldata
+  ) external;
 }
