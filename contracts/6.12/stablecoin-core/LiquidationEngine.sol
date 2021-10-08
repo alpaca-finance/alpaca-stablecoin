@@ -32,8 +32,6 @@ import "../interfaces/ISystemDebtEngine.sol";
 import "../interfaces/ILiquidationStrategy.sol";
 import "../interfaces/ICagable.sol";
 
-import "hardhat/console.sol";
-
 /// @title LiquidationEngine
 /// @author Alpaca Fin Corporation
 /** @notice A contract which is the manager for all of the liquidations of the protocol.
@@ -122,25 +120,21 @@ contract LiquidationEngine is
     address _strategy = strategies[_collateralPoolId];
     require(_strategy != address(0), "LiquidationEngine/not-set-strategy");
     // 1. Check if the position is underwater
-    uint256 _debtAccumulatedRate = bookKeeper
-      .collateralPoolConfig()
-      .collateralPools(_collateralPoolId)
-      .debtAccumulatedRate;
-    uint256 _priceWithSafetyMargin = bookKeeper
-      .collateralPoolConfig()
-      .collateralPools(_collateralPoolId)
-      .priceWithSafetyMargin;
+    ICollateralPoolConfig.CollateralPool memory collateralPool = bookKeeper.collateralPoolConfig().collateralPools(
+      _collateralPoolId
+    );
+
     // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]
     // (positionDebtShare [wad] * debtAccumulatedRate [ray]) [rad]
     require(
-      _priceWithSafetyMargin > 0 &&
-        _vars.positionLockedCollateral.mul(_priceWithSafetyMargin) < _vars.positionDebtShare.mul(_debtAccumulatedRate),
+      collateralPool.priceWithSafetyMargin > 0 &&
+        _vars.positionLockedCollateral.mul(collateralPool.priceWithSafetyMargin) <
+        _vars.positionDebtShare.mul(collateralPool.debtAccumulatedRate),
       "LiquidationEngine/position-is-safe"
     );
 
     _vars.systemDebtEngineStablecoinBefore = bookKeeper.stablecoin(address(systemDebtEngine));
 
-    console.log("_strategy");
     ILiquidationStrategy(_strategy).execute(
       _collateralPoolId,
       _vars.positionDebtShare,
@@ -152,7 +146,6 @@ contract LiquidationEngine is
       _collateralRecipient,
       data
     );
-    console.log("_strategy2");
     (_vars.newPositionLockedCollateral, _vars.newPositionDebtShare) = bookKeeper.positions(
       _collateralPoolId,
       _positionAddress
@@ -162,7 +155,7 @@ contract LiquidationEngine is
     // (positionDebtShare [wad] - newPositionDebtShare [wad]) * debtAccumulatedRate [ray]
 
     _vars.wantStablecoinValueFromLiquidation = _vars.positionDebtShare.sub(_vars.newPositionDebtShare).mul(
-      _debtAccumulatedRate
+      collateralPool.debtAccumulatedRate
     ); // [rad]
     require(
       bookKeeper.stablecoin(address(systemDebtEngine)).sub(_vars.systemDebtEngineStablecoinBefore) >=
