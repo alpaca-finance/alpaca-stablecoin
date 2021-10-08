@@ -47,8 +47,8 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const SimplePriceFeed = await smoddit("SimplePriceFeed")
   const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as ModifiableContract
 
-  const BEP20 = await smoddit("BEP20")
-  const bep20 = (await upgrades.deployProxy(BEP20, [])) as ModifiableContract
+  const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
+  const bep20 = await BEP20.deploy("BTOKEN", "BTOKEN")
 
   const TokenAdapter = await smoddit("TokenAdapter")
   const tokenAdapter = (await upgrades.deployProxy(TokenAdapter, [
@@ -65,6 +65,13 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
   ])) as StabilityFeeCollector
+
+  await collateralPoolConfig.grantRole(
+    await collateralPoolConfig.STABILITY_FEE_COLLECTOR_ROLE(),
+    stabilityFeeCollector.address
+  )
+  await bookKeeper.grantRole(await collateralPoolConfig.STABILITY_FEE_COLLECTOR_ROLE(), stabilityFeeCollector.address)
+  await collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
 
   await collateralPoolConfig.initCollateralPool(
     formatBytes32String("BNB"),
@@ -112,35 +119,27 @@ describe("StabilityFeeCollector", () => {
   describe("#collect", () => {
     context("when call collect", async () => {
       it("should be rate to ~ 1%", async () => {
-        // // rate ~ 1% annually
-        // // r^31536000 = 1.01
-        // // r =~ 1000000000315522921573372069...
-        // await stabilityFeeCollector.setStabilityFeeRate(
-        //   formatBytes32String("BNB"),
-        //   BigNumber.from("1000000000315522921573372069")
-        // )
-        // // time increase 1 year
-        // await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from("31536000")))
-        // // mock bookeeper
-        // // set debtAccumulatedRate = 1 ray
-        // mockedBookKeeper.smocked.collateralPools.will.return.with([
-        //   BigNumber.from(0),
-        //   UnitHelpers.WeiPerRay,
-        //   BigNumber.from(0),
-        //   BigNumber.from(0),
-        //   BigNumber.from(0),
-        // ])
-        // mockedBookKeeper.smocked.accrueStabilityFee.will.return.with()
-        // await stabilityFeeCollectorAsAlice.collect(formatBytes32String("BNB"))
-        // const { calls } = mockedBookKeeper.smocked.accrueStabilityFee
-        // expect(calls.length).to.be.equal(1)
-        // expect(calls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        // expect(calls[0].stabilityFeeRecipient).to.be.equal(AddressZero)
-        // // rate ~ 0.01 ray ~ 1%
-        // AssertHelpers.assertAlmostEqual(
-        //   calls[0].debtAccumulatedRate.toString(),
-        //   BigNumber.from("10000000000000000000000000").toString()
-        // )
+        // rate ~ 1% annually
+        // r^31536000 = 1.01
+        // r =~ 1000000000315522921573372069...
+        await collateralPoolConfig.setStabilityFeeRate(
+          formatBytes32String("BNB"),
+          BigNumber.from("1000000000315522921573372069")
+        )
+        // time increase 1 year
+        await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from("31536000")))
+        // mock bookeeper
+        // set debtAccumulatedRate = 1 ray
+
+        await stabilityFeeCollectorAsAlice.collect(formatBytes32String("BNB"))
+
+        // rate ~ 0.01 ray ~ 1%
+        const collateralPool = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
+        console.log("collateralPool.debtAccumulatedRate", collateralPool.debtAccumulatedRate.toString())
+        AssertHelpers.assertAlmostEqual(
+          collateralPool.debtAccumulatedRate.toString(),
+          BigNumber.from("10000000000000000000000000").toString()
+        )
       })
     })
   })
