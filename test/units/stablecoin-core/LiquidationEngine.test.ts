@@ -85,6 +85,8 @@ describe("LiquidationEngine", () => {
             formatBytes32String("BNB"),
             aliceAddress,
             UnitHelpers.WeiPerWad,
+            UnitHelpers.WeiPerWad,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
           )
         ).to.be.revertedWith("LiquidationEngine/not-live")
@@ -97,9 +99,11 @@ describe("LiquidationEngine", () => {
             formatBytes32String("BNB"),
             aliceAddress,
             0,
+            0,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
           )
-        ).to.be.revertedWith("LiquidationEngine/zero-debtShareToRepay")
+        ).to.be.revertedWith("LiquidationEngine/zero-debt-value-to-be-liquidated")
       })
     })
     context("when liquidation engine colllteral pool does not set strategy", () => {
@@ -121,9 +125,11 @@ describe("LiquidationEngine", () => {
             formatBytes32String("BNB"),
             aliceAddress,
             UnitHelpers.WeiPerWad,
+            UnitHelpers.WeiPerWad,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
           )
-        ).to.be.revertedWith("LiquidationEngine/not-setStrategy")
+        ).to.be.revertedWith("LiquidationEngine/not-set-strategy")
       })
     })
     context("when position is safe", () => {
@@ -147,9 +153,11 @@ describe("LiquidationEngine", () => {
             formatBytes32String("BNB"),
             aliceAddress,
             UnitHelpers.WeiPerWad,
+            UnitHelpers.WeiPerWad,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
           )
-        ).to.be.revertedWith("LiquidationEngine/not-unsafe")
+        ).to.be.revertedWith("LiquidationEngine/position-is-safe")
       })
     })
     context("when liquidating in position", () => {
@@ -175,11 +183,13 @@ describe("LiquidationEngine", () => {
           formatBytes32String("BNB"),
           aliceAddress,
           UnitHelpers.WeiPerWad,
+          UnitHelpers.WeiPerWad,
+          deployerAddress,
           ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
         )
 
         const { calls: positions } = mockedBookKeeper.smocked.positions
-        expect(positions.length).to.be.equal(1)
+        expect(positions.length).to.be.equal(2)
         expect(positions[0][0]).to.be.equal(formatBytes32String("BNB"))
         expect(positions[0][1]).to.be.equal(aliceAddress)
 
@@ -336,6 +346,8 @@ describe("LiquidationEngine", () => {
             formatBytes32String("BNB"),
             aliceAddress,
             UnitHelpers.WeiPerWad,
+            UnitHelpers.WeiPerWad,
+            deployerAddress,
             ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
           )
         ).to.be.revertedWith("Pausable: paused")
@@ -398,11 +410,13 @@ describe("LiquidationEngine", () => {
           formatBytes32String("BNB"),
           aliceAddress,
           UnitHelpers.WeiPerWad,
+          UnitHelpers.WeiPerWad,
+          deployerAddress,
           ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
         )
 
         const { calls: positions } = mockedBookKeeper.smocked.positions
-        expect(positions.length).to.be.equal(1)
+        expect(positions.length).to.be.equal(2)
         expect(positions[0][0]).to.be.equal(formatBytes32String("BNB"))
         expect(positions[0][1]).to.be.equal(aliceAddress)
 
