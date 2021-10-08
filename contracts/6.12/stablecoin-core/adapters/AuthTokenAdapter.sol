@@ -33,30 +33,16 @@ import "../../interfaces/ICagable.sol";
 // Authed TokenAdapter for a token that has a lower precision than 18 and it has decimals (like USDC)
 
 contract AuthTokenAdapter is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
   IAuthTokenAdapter,
   ICagable
 {
-  // --- Auth ---
-  mapping(address => uint256) public wards;
-
-  function rely(address usr) external auth {
-    wards[usr] = 1;
-    emit Rely(usr);
-  }
-
-  function deny(address usr) external auth {
-    wards[usr] = 0;
-    emit Deny(usr);
-  }
-
-  modifier auth() {
-    require(wards[msg.sender] == 1);
-    _;
-  }
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
+  bytes32 public constant WHITELISTED = keccak256("WHITELISTED");
 
   IBookKeeper public override bookKeeper; // cdp engine
   bytes32 public override collateralPoolId; // collateral pool id
@@ -75,28 +61,36 @@ contract AuthTokenAdapter is
     bytes32 collateralPoolId_,
     address token_
   ) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     token = IToken(token_);
-    uint256 decimals_ = decimals = IToken(token_).decimals();
-    require(decimals_ < 18, "AuthTokenAdapter/decimals-18-or-higher");
-    wards[msg.sender] = 1;
-    emit Rely(msg.sender);
+    decimals = IToken(token_).decimals();
     live = 1;
     bookKeeper = IBookKeeper(bookKeeper_);
     collateralPoolId = collateralPoolId_;
+
+    // Grant the contract deployer the owner role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
-  function cage() external override auth {
+  function cage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
     require(live == 1, "AuthTokenAdapter/not-live");
     live = 0;
     emit Cage();
   }
 
-  function uncage() external override auth {
+  function uncage() external override {
+    require(
+      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
     require(live == 0, "AuthTokenAdapter/not-caged");
     live = 1;
     emit Uncage();
@@ -116,7 +110,8 @@ contract AuthTokenAdapter is
     address urn,
     uint256 wad,
     address msgSender
-  ) external override auth nonReentrant {
+  ) external override nonReentrant {
+    require(hasRole(WHITELISTED, msg.sender), "AuthTokenAdapter/not-whitelisted");
     require(live == 1, "AuthTokenAdapter/not-live");
     uint256 wad18 = mul(wad, 10**(18 - decimals));
     require(int256(wad18) >= 0, "AuthTokenAdapter/overflow");
@@ -136,5 +131,16 @@ contract AuthTokenAdapter is
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad18));
     require(token.transfer(guy, wad), "AuthTokenAdapter/failed-transfer");
     emit Withdraw(guy, wad);
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 }
