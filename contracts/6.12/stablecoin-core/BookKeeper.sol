@@ -423,6 +423,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     require(live == 1, "BookKeeper/not-live");
     ICollateralPoolConfig.CollateralPool memory collateralPool = collateralPoolConfig.collateralPools(collateralPoolId);
     collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);
+    collateralPoolConfig.setDebtAccumulatedRate(collateralPoolId, collateralPool.debtAccumulatedRate);
     int256 value = mul(collateralPool.totalDebtShare, debtAccumulatedRate); // [rad]
     stablecoin[stabilityFeeRecipient] = add(stablecoin[stabilityFeeRecipient], value);
     totalStablecoinIssued = add(totalStablecoinIssued, value);

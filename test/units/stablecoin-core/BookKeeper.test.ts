@@ -3,26 +3,66 @@ import { Signer } from "ethers"
 import chai from "chai"
 import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import { BookKeeper__factory, BookKeeper } from "../../../typechain"
+import {
+  BookKeeper__factory,
+  BookKeeper,
+  CollateralPoolConfig__factory,
+  CollateralPoolConfig,
+  SimplePriceFeed__factory,
+  SimplePriceFeed,
+  TokenAdapter__factory,
+  TokenAdapter,
+  BEP20__factory,
+  BEP20,
+} from "../../../typechain"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 
 chai.use(solidity)
 const { expect } = chai
 const { formatBytes32String } = ethers.utils
+const { AddressZero } = ethers.constants
 
 type fixture = {
   bookKeeper: BookKeeper
+  collateralPoolConfig: CollateralPoolConfig
+  simplePriceFeed: SimplePriceFeed
+  tokenAdapter: TokenAdapter
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
 
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [])) as CollateralPoolConfig
+
   // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [collateralPoolConfig.address])) as BookKeeper
   await bookKeeper.deployed()
 
-  return { bookKeeper }
+  collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
+
+  const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
+  await simplePriceFeed.deployed()
+
+  // Deploy mocked BEP20
+  const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
+  const dummyToken = await BEP20.deploy("dummy", "DUMP")
+  await dummyToken.deployed()
+
+  const TokenAdapter = (await ethers.getContractFactory("TokenAdapter", deployer)) as TokenAdapter__factory
+  const tokenAdapter = (await upgrades.deployProxy(TokenAdapter, [
+    bookKeeper.address,
+    formatBytes32String("BNB"),
+    dummyToken.address,
+  ])) as TokenAdapter
+  await tokenAdapter.deployed()
+
+  return { bookKeeper, collateralPoolConfig, simplePriceFeed, tokenAdapter }
 }
 
 describe("BookKeeper", () => {
@@ -42,8 +82,17 @@ describe("BookKeeper", () => {
   let bookKeeperAsAlice: BookKeeper
   let bookKeeperAsBob: BookKeeper
 
+  let collateralPoolConfig: CollateralPoolConfig
+  let collateralPoolConfigAsAlice: CollateralPoolConfig
+  let collateralPoolConfigAsBob: CollateralPoolConfig
+
+  let simplePriceFeed: SimplePriceFeed
+  let tokenAdapter: TokenAdapter
+
   beforeEach(async () => {
-    ;({ bookKeeper } = await waffle.loadFixture(loadFixtureHandler))
+    ;({ bookKeeper, collateralPoolConfig, simplePriceFeed, tokenAdapter } = await waffle.loadFixture(
+      loadFixtureHandler
+    ))
     ;[deployer, alice, bob] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress] = await Promise.all([
       deployer.getAddress(),
@@ -53,12 +102,34 @@ describe("BookKeeper", () => {
 
     bookKeeperAsAlice = BookKeeper__factory.connect(bookKeeper.address, alice) as BookKeeper
     bookKeeperAsBob = BookKeeper__factory.connect(bookKeeper.address, bob) as BookKeeper
+
+    collateralPoolConfigAsAlice = CollateralPoolConfig__factory.connect(
+      collateralPoolConfig.address,
+      alice
+    ) as CollateralPoolConfig
+    collateralPoolConfigAsBob = CollateralPoolConfig__factory.connect(
+      collateralPoolConfig.address,
+      bob
+    ) as CollateralPoolConfig
   })
 
   describe("#init", () => {
     context("when the caller is not the owner", () => {
       it("should revert", async () => {
-        await expect(bookKeeperAsAlice.init(formatBytes32String("BNB"))).to.be.revertedWith("!ownerRole")
+        await expect(
+          collateralPoolConfigAsAlice.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
+          )
+        ).to.be.revertedWith("!ownerRole")
       })
     })
 
@@ -67,8 +138,19 @@ describe("BookKeeper", () => {
         it("should be success", async () => {
           // grant role access
           await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.init(formatBytes32String("BNB"))
-          const pool = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+          await collateralPoolConfig.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
+          )
+          const pool = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
           expect(pool.debtAccumulatedRate).equal(WeiPerRay)
         })
       })
@@ -77,17 +159,52 @@ describe("BookKeeper", () => {
         it("should be revert", async () => {
           await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           // first initialize BNB colleteral pool
-          await bookKeeper.init(formatBytes32String("BNB"))
-          // second initialize BNB colleteral pool
-          await expect(bookKeeper.init(formatBytes32String("BNB"))).to.be.revertedWith(
-            "BookKeeper/collateral-pool-already-init"
+          await collateralPoolConfig.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
           )
+          // second initialize BNB colleteral pool
+          await expect(
+            collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
+          ).to.be.revertedWith("CollateralPoolConfig/collateral-pool-already-init")
         })
       })
 
       context("when role can't authentication", () => {
         it("should be revert", async () => {
-          await expect(bookKeeperAsAlice.init(formatBytes32String("BNB"))).to.be.revertedWith("!ownerRole")
+          await expect(
+            collateralPoolConfigAsAlice.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
+          ).to.be.revertedWith("!ownerRole")
         })
       })
     })
@@ -109,7 +226,18 @@ describe("BookKeeper", () => {
           await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
           // init BNB collateral pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          await collateralPoolConfig.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
+          )
 
           const collateralTokenBefore = await bookKeeper.collateralToken(formatBytes32String("BNB"), deployerAddress)
           expect(collateralTokenBefore).to.be.equal(0)
@@ -129,7 +257,18 @@ describe("BookKeeper", () => {
           await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
 
           // init BNB collateral pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          await collateralPoolConfig.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
+          )
 
           // add collateral 1 BNB
           await bookKeeper.addCollateral(formatBytes32String("BNB"), deployerAddress, WeiPerWad)
@@ -330,7 +469,18 @@ describe("BookKeeper", () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
 
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
             await expect(
@@ -352,7 +502,18 @@ describe("BookKeeper", () => {
                 await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
                 // initialize BNB colleteral pool
-                await bookKeeper.init(formatBytes32String("BNB"))
+                await collateralPoolConfig.initCollateralPool(
+                  formatBytes32String("BNB"),
+                  0,
+                  0,
+                  simplePriceFeed.address,
+                  0,
+                  0,
+                  tokenAdapter.address,
+                  0,
+                  0,
+                  0
+                )
 
                 // alice allow bob to move stablecoin
                 await bookKeeperAsBob.whitelist(aliceAddress)
@@ -378,7 +539,18 @@ describe("BookKeeper", () => {
                 await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
                 // initialize BNB colleteral pool
-                await bookKeeper.init(formatBytes32String("BNB"))
+                await collateralPoolConfig.initCollateralPool(
+                  formatBytes32String("BNB"),
+                  0,
+                  0,
+                  simplePriceFeed.address,
+                  0,
+                  0,
+                  tokenAdapter.address,
+                  0,
+                  0,
+                  0
+                )
 
                 // add collateral to bob 10 BNB
                 await bookKeeper.addCollateral(formatBytes32String("BNB"), bobAddress, WeiPerWad.mul(10))
@@ -413,7 +585,18 @@ describe("BookKeeper", () => {
               await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
               // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              await collateralPoolConfig.initCollateralPool(
+                formatBytes32String("BNB"),
+                0,
+                0,
+                simplePriceFeed.address,
+                0,
+                0,
+                tokenAdapter.address,
+                0,
+                0,
+                0
+              )
 
               await expect(
                 bookKeeperAsAlice.adjustPosition(
@@ -436,7 +619,18 @@ describe("BookKeeper", () => {
               await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
               // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              await collateralPoolConfig.initCollateralPool(
+                formatBytes32String("BNB"),
+                0,
+                0,
+                simplePriceFeed.address,
+                0,
+                0,
+                tokenAdapter.address,
+                0,
+                0,
+                0
+              )
 
               // add collateral to bob 10 BNB
               await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -469,7 +663,18 @@ describe("BookKeeper", () => {
               await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
               // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              await collateralPoolConfig.initCollateralPool(
+                formatBytes32String("BNB"),
+                0,
+                0,
+                simplePriceFeed.address,
+                0,
+                0,
+                tokenAdapter.address,
+                0,
+                0,
+                0
+              )
 
               // free collateral
               await expect(
@@ -493,7 +698,18 @@ describe("BookKeeper", () => {
               await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
               // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              await collateralPoolConfig.initCollateralPool(
+                formatBytes32String("BNB"),
+                0,
+                0,
+                simplePriceFeed.address,
+                0,
+                0,
+                tokenAdapter.address,
+                0,
+                0,
+                0
+              )
 
               // add collateral to alice 10 BNB
               await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -544,7 +760,18 @@ describe("BookKeeper", () => {
               await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
               // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              await collateralPoolConfig.initCollateralPool(
+                formatBytes32String("BNB"),
+                0,
+                0,
+                simplePriceFeed.address,
+                0,
+                0,
+                tokenAdapter.address,
+                0,
+                0,
+                0
+              )
 
               // free collateral
               await expect(
@@ -567,7 +794,18 @@ describe("BookKeeper", () => {
               await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
               // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              await collateralPoolConfig.initCollateralPool(
+                formatBytes32String("BNB"),
+                0,
+                0,
+                simplePriceFeed.address,
+                0,
+                0,
+                tokenAdapter.address,
+                0,
+                0,
+                0
+              )
 
               // add collateral to alice 10 BNB
               await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -616,9 +854,20 @@ describe("BookKeeper", () => {
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
 
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 1 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad)
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad)
 
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -641,9 +890,20 @@ describe("BookKeeper", () => {
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
 
             // set total debt ceiling 1 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad)
@@ -665,14 +925,25 @@ describe("BookKeeper", () => {
         it("should be revert", async () => {
           // grant role access
           await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+          await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
           await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
           // initialize BNB colleteral pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          await collateralPoolConfig.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
+          )
           // set pool debt ceiling 10 rad
-          await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+          await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
           // set price with safety margin 1 ray
-          await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+          await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
 
           // set total debt ceiling 10 rad
           await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -694,18 +965,29 @@ describe("BookKeeper", () => {
           it("should be revert", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), bobAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
 
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -738,17 +1020,28 @@ describe("BookKeeper", () => {
             it("should be able to call adjustPosition(draw)", async () => {
               // grant role access
               await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+              await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
               await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
               await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), bobAddress)
               await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
               // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              await collateralPoolConfig.initCollateralPool(
+                formatBytes32String("BNB"),
+                0,
+                0,
+                simplePriceFeed.address,
+                0,
+                0,
+                tokenAdapter.address,
+                0,
+                0,
+                0
+              )
               // set pool debt ceiling 10 rad
-              await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+              await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
               // set price with safety margin 1 ray
-              await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+              await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
 
               // set total debt ceiling 10 rad
               await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -771,7 +1064,7 @@ describe("BookKeeper", () => {
 
               const positionBobBefore = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
               expect(positionBobBefore.debtShare).to.be.equal(0)
-              const BNBPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+              const BNBPoolBefore = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
               expect(BNBPoolBefore.totalDebtShare).to.be.equal(0)
               const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
               expect(stablecoinAliceBefore).to.be.equal(0)
@@ -788,7 +1081,7 @@ describe("BookKeeper", () => {
 
               const positionBobAfter = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
               expect(positionBobAfter.debtShare).to.be.equal(WeiPerWad.mul(10))
-              const BNBPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+              const BNBPoolAfter = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
               expect(BNBPoolAfter.totalDebtShare).to.be.equal(WeiPerWad.mul(10))
               const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
               expect(stablecoinAliceAfter).to.be.equal(WeiPerRad.mul(10))
@@ -799,16 +1092,27 @@ describe("BookKeeper", () => {
           it("should be able to call adjustPosition(draw)", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
 
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -828,7 +1132,7 @@ describe("BookKeeper", () => {
 
             const positionaliceBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionaliceBefore.debtShare).to.be.equal(0)
-            const BNBPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+            const BNBPoolBefore = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
             expect(BNBPoolBefore.totalDebtShare).to.be.equal(0)
             const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
             expect(stablecoinAliceBefore).to.be.equal(0)
@@ -845,7 +1149,7 @@ describe("BookKeeper", () => {
 
             const positionaliceAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionaliceAfter.debtShare).to.be.equal(WeiPerWad.mul(10))
-            const BNBPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+            const BNBPoolAfter = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
             expect(BNBPoolAfter.totalDebtShare).to.be.equal(WeiPerWad.mul(10))
             const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
             expect(stablecoinAliceAfter).to.be.equal(WeiPerRad.mul(10))
@@ -855,18 +1159,29 @@ describe("BookKeeper", () => {
           it("should be revert", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 20 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(20))
+            await collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(20))
 
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -903,16 +1218,27 @@ describe("BookKeeper", () => {
           it("should be able to call adjustPosition(wipe)", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
 
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -942,7 +1268,7 @@ describe("BookKeeper", () => {
 
             const positionaliceBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionaliceBefore.debtShare).to.be.equal(WeiPerWad.mul(10))
-            const BNBPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+            const BNBPoolBefore = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
             expect(BNBPoolBefore.totalDebtShare).to.be.equal(WeiPerWad.mul(10))
             const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
             expect(stablecoinAliceBefore).to.be.equal(WeiPerRad.mul(10))
@@ -959,7 +1285,7 @@ describe("BookKeeper", () => {
 
             const positionaliceAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionaliceAfter.debtShare).to.be.equal(0)
-            const BNBPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+            const BNBPoolAfter = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
             expect(BNBPoolAfter.totalDebtShare).to.be.equal(0)
             const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
             expect(stablecoinAliceAfter).to.be.equal(0)
@@ -969,18 +1295,29 @@ describe("BookKeeper", () => {
           it("should be revert", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 5 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(5))
+            await collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(5))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1030,18 +1367,29 @@ describe("BookKeeper", () => {
         it("should be revert", async () => {
           // grant role access
           await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+          await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
           await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
           await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
           // initialize BNB colleteral pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          await collateralPoolConfig.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
+          )
           // set pool debt ceiling 10 rad
-          await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+          await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
           // set price with safety margin 1 ray
-          await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+          await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
           // set position debt floor 1 rad
-          await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
+          await collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
           // set total debt ceiling 10 rad
           await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1074,18 +1422,29 @@ describe("BookKeeper", () => {
           it("should be revert", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
+            await collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1120,18 +1479,29 @@ describe("BookKeeper", () => {
           it("should be revert", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
+            await collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1166,18 +1536,29 @@ describe("BookKeeper", () => {
           it("should be revert", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(2))
+            await collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(2))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1212,18 +1593,29 @@ describe("BookKeeper", () => {
           it("should be revert", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(2))
+            await collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(2))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1258,18 +1650,29 @@ describe("BookKeeper", () => {
           it("should be able to call movePosition", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
             // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
+            await collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1339,19 +1742,30 @@ describe("BookKeeper", () => {
           it("should be able to call confiscatePosition", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
             // init BNB pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
+            await collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 1 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad)
 
@@ -1370,7 +1784,7 @@ describe("BookKeeper", () => {
             const positionBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionBefore.lockedCollateral).to.be.equal(WeiPerWad)
             expect(positionBefore.debtShare).to.be.equal(WeiPerWad)
-            const collateralPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+            const collateralPoolBefore = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
             expect(collateralPoolBefore.totalDebtShare).to.be.equal(WeiPerWad)
             const collateralTokenCreditorBefore = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
@@ -1395,7 +1809,7 @@ describe("BookKeeper", () => {
             const positionAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionAfter.lockedCollateral).to.be.equal(0)
             expect(positionAfter.debtShare).to.be.equal(0)
-            const collateralPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+            const collateralPoolAfter = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
             expect(collateralPoolAfter.totalDebtShare).to.be.equal(0)
             const collateralTokenCreditorAfter = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
@@ -1412,18 +1826,29 @@ describe("BookKeeper", () => {
           it("should be able to call confiscatePosition", async () => {
             // grant role access
             await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+            await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), deployerAddress)
             await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
             // init BNB pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            await collateralPoolConfig.initCollateralPool(
+              formatBytes32String("BNB"),
+              0,
+              0,
+              simplePriceFeed.address,
+              0,
+              0,
+              tokenAdapter.address,
+              0,
+              0,
+              0
+            )
             // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+            await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
             // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
             // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
+            await collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1442,7 +1867,7 @@ describe("BookKeeper", () => {
             const positionBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionBefore.lockedCollateral).to.be.equal(WeiPerWad.mul(2))
             expect(positionBefore.debtShare).to.be.equal(WeiPerWad.mul(2))
-            const collateralPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+            const collateralPoolBefore = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
             expect(collateralPoolBefore.totalDebtShare).to.be.equal(WeiPerWad.mul(2))
             const collateralTokenCreditorBefore = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
@@ -1467,7 +1892,7 @@ describe("BookKeeper", () => {
             const positionAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionAfter.lockedCollateral).to.be.equal(WeiPerWad)
             expect(positionAfter.debtShare).to.be.equal(WeiPerWad)
-            const collateralPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+            const collateralPoolAfter = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
             expect(collateralPoolAfter.totalDebtShare).to.be.equal(WeiPerWad)
             const collateralTokenCreditorAfter = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
@@ -1582,18 +2007,29 @@ describe("BookKeeper", () => {
         it("should be able to call accrueStabilityFee", async () => {
           // grant role access
           await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+          await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
           await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
           await bookKeeper.grantRole(await bookKeeper.STABILITY_FEE_COLLECTOR_ROLE(), deployerAddress)
           await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
           // init BNB pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          await collateralPoolConfig.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
+          )
           // set pool debt ceiling 10 rad
-          await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+          await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
           // set price with safety margin 1 ray
-          await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+          await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
           // set position debt floor 1 rad
-          await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
+          await collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
           // set total debt ceiling 1 rad
           await bookKeeper.setTotalDebtCeiling(WeiPerRad)
 
@@ -1609,7 +2045,7 @@ describe("BookKeeper", () => {
             WeiPerWad
           )
 
-          const poolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+          const poolBefore = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
           expect(poolBefore.debtAccumulatedRate).to.be.equal(WeiPerRay)
           const stablecoinDeployerBefore = await bookKeeper.stablecoin(deployerAddress)
           expect(stablecoinDeployerBefore).to.be.equal(WeiPerRad)
@@ -1618,7 +2054,7 @@ describe("BookKeeper", () => {
 
           await bookKeeper.accrueStabilityFee(formatBytes32String("BNB"), deployerAddress, WeiPerRay)
 
-          const poolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+          const poolAfter = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
           expect(poolAfter.debtAccumulatedRate).to.be.equal(WeiPerRay.mul(2))
           const stablecoinDeployerAfter = await bookKeeper.stablecoin(deployerAddress)
           expect(stablecoinDeployerAfter).to.be.equal(WeiPerRad.mul(2))
@@ -1651,7 +2087,18 @@ describe("BookKeeper", () => {
           // grant role access
           await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           // init BNB pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          await collateralPoolConfig.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
+          )
           // set total debt ceiling 1 rad
           await expect(bookKeeper.setTotalDebtCeiling(WeiPerRad))
             .to.emit(bookKeeper, "SetTotalDebtCeiling")
@@ -1664,34 +2111,34 @@ describe("BookKeeper", () => {
   describe("#setPriceWithSafetyMargin", () => {
     context("when role can't access", async () => {
       it("should revert", async () => {
-        await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+        await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
         await expect(
-          bookKeeperAsAlice.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+          collateralPoolConfigAsAlice.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
         ).to.be.revertedWith("!priceOracleRole")
       })
     })
     context("when role can access", async () => {
-      context("when bookkeeper does not live", () => {
-        it("should be revert", async () => {
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.cage()
-
-          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-          await expect(bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-            "BookKeeper/not-live"
-          )
-        })
-      })
       context("when bookkeeper is live", () => {
         it("should be able to call setPriceWithSafetyMargin", async () => {
           await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           // init BNB pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          await collateralPoolConfig.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
+          )
 
-          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
+          await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
           // set total debt ceiling 1 rad
-          await expect(bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay))
-            .to.emit(bookKeeper, "SetPriceWithSafetyMargin")
+          await expect(collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay))
+            .to.emit(collateralPoolConfig, "LogSetPriceWithSafetyMargin")
             .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
         })
       })
@@ -1701,33 +2148,32 @@ describe("BookKeeper", () => {
   describe("#setDebtCeiling", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
-        await expect(bookKeeperAsAlice.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-          "!ownerRole"
-        )
+        await expect(
+          collateralPoolConfigAsAlice.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay)
+        ).to.be.revertedWith("!ownerRole")
       })
     })
     context("when the caller is the owner", async () => {
-      context("when bookkeeper does not live", () => {
-        it("should be revert", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-
-          bookKeeper.cage()
-
-          await expect(bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-            "BookKeeper/not-live"
-          )
-        })
-      })
       context("when bookkeeper is live", () => {
         it("should be able to call setDebtCeiling", async () => {
           // grant role access
           await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           // init BNB pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          await collateralPoolConfig.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
+          )
           // set total debt ceiling 1 rad
-          await expect(bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay))
-            .to.emit(bookKeeper, "SetDebtCeiling")
+          await expect(collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay))
+            .to.emit(collateralPoolConfig, "LogSetDebtCeiling")
             .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
         })
       })
@@ -1737,33 +2183,32 @@ describe("BookKeeper", () => {
   describe("#setDebtFloor", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
-        await expect(bookKeeperAsAlice.setDebtFloor(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-          "!ownerRole"
-        )
+        await expect(
+          collateralPoolConfigAsAlice.setDebtFloor(formatBytes32String("BNB"), WeiPerRay)
+        ).to.be.revertedWith("!ownerRole")
       })
     })
     context("when the caller is the owner", async () => {
-      context("when bookkeeper does not live", () => {
-        it("should be revert", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-
-          bookKeeper.cage()
-
-          await expect(bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-            "BookKeeper/not-live"
-          )
-        })
-      })
       context("when bookkeeper is live", () => {
         it("should be able to call setDebtFloor", async () => {
           // grant role access
           await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
           // init BNB pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          await collateralPoolConfig.initCollateralPool(
+            formatBytes32String("BNB"),
+            0,
+            0,
+            simplePriceFeed.address,
+            0,
+            0,
+            tokenAdapter.address,
+            0,
+            0,
+            0
+          )
           // set total debt ceiling 1 rad
-          await expect(bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRay))
-            .to.emit(bookKeeper, "SetDebtFloor")
+          await expect(collateralPoolConfig.setDebtFloor(formatBytes32String("BNB"), WeiPerRay))
+            .to.emit(collateralPoolConfig, "LogSetDebtFloor")
             .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
         })
       })
@@ -1790,15 +2235,6 @@ describe("BookKeeper", () => {
           await bookKeeper.grantRole(await bookKeeper.GOV_ROLE(), deployerAddress)
           await bookKeeper.pause()
         })
-      })
-    })
-
-    context("when pause contract", () => {
-      it("should be success", async () => {
-        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-        await bookKeeper.pause()
-
-        await expect(bookKeeper.init(formatBytes32String("BNB"))).to.be.revertedWith("Pausable: paused")
       })
     })
   })
@@ -1838,8 +2274,19 @@ describe("BookKeeper", () => {
         // unpause contract
         await bookKeeper.unpause()
 
-        await bookKeeper.init(formatBytes32String("BNB"))
-        const pool = await bookKeeper.collateralPools(formatBytes32String("BNB"))
+        await collateralPoolConfig.initCollateralPool(
+          formatBytes32String("BNB"),
+          0,
+          0,
+          simplePriceFeed.address,
+          0,
+          0,
+          tokenAdapter.address,
+          0,
+          0,
+          0
+        )
+        const pool = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
         expect(pool.debtAccumulatedRate).equal(WeiPerRay)
       })
     })
