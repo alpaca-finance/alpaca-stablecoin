@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "scripts": {
     "hardhat": "hardhat",
-    "compile": "hardhat typechain",
+    "compile": "hardhat typechain --config hardhat.config.ts",
     "mainnet": "hardhat console --no-compile --network mainnet",
     "test:case": "mocha --require hardhat/register --extension ts -g",
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
@@ -11,7 +11,7 @@
     "test:integrations:ibTokenAdapter": "hardhat test --no-compile ./test/integrations/stablecoin-core/adapters/FarmableTokenAdapter/IbTokenAdapter.test.ts",
     "test:integrations:proxywallet": "hardhat test --no-compile ./test/integrations/proxy-wallet/ProxyWallet.test.ts",
     "test:collateral-auctioneer": "hardhat test --no-compile ./test/units/stablecoin-core/auctioneers/CollateralAuctioneer.test.ts",
-    "test:cdp-manager": "hardhat test --no-compile ./test/units/managers/CDPManager.test.ts",
+    "test:position-manager": "hardhat test --no-compile ./test/units/managers/PositionManager.test.ts",
     "testnet": "hardhat console --no-compile --network testnet",
     "test:bookkeeper": "hardhat test --no-compile ./test/units/stablecoin-core/BookKeeper.test.ts",
     "test:exponentialdecrease": "hardhat test --no-compile ./test/units/calculators/ExponentialDecrease.test.ts",
@@ -29,6 +29,7 @@
     "test:fixedSpreadliquidationstrategy": "hardhat test --no-compile ./test/units/liquidation-strategies/FixedSpreadLiquidationStrategy.test.ts",
     "test:flashmintmodule": "hardhat test --no-compile ./test/units/flash-mint/FlashMintModule.test.ts",
     "test:integrations:alpacastablecoinproxyaction": "hardhat test --no-compile ./test/integrations/AlpacaStablecoinProxyAction.test.ts",
+    "test:integrations:flashmintmodule": "hardhat test --no-compile ./test/integrations/flash-mint/FlashMintModule.test.ts",
     "coverage": "hardhat coverage",
     "solhint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
     "prettier:solidity": "./node_modules/.bin/prettier --write contracts/**/*.sol"
@@ -46,6 +47,7 @@
     "@openzeppelin/contracts-upgradeable": "^3.4.0",
     "@openzeppelin/hardhat-upgrades": "^1.9.0",
     "@openzeppelin/test-helpers": "^0.5.10",
+    "@pancakeswap-libs/pancake-swap-core": "^0.1.0",
     "@typechain/ethers-v5": "^5.0.0",
     "@types/chai": "^4.2.15",
     "@types/mocha": "^8.2.0",
