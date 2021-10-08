@@ -27,8 +27,8 @@ import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IAuctioneer.sol";
-import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/ISystemDebtEngine.sol";
+import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/ILiquidationStrategy.sol";
 import "../interfaces/ICagable.sol";
 
@@ -42,8 +42,8 @@ contract LiquidationEngine is
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
-  ILiquidationEngine,
-  ICagable
+  ICagable,
+  ILiquidationEngine
 {
   using SafeMathUpgradeable for uint256;
 
@@ -93,7 +93,7 @@ contract LiquidationEngine is
     uint256 _maxDebtShareToBeLiquidated, // [rad]
     address _collateralRecipient,
     bytes calldata data
-  ) external nonReentrant whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(live == 1, "LiquidationEngine/not-live");
     require(_debtShareToBeLiquidated != 0, "LiquidationEngine/zero-debt-value-to-be-liquidated");
     require(_maxDebtShareToBeLiquidated != 0, "LiquidationEngine/zero-max-debt-value-to-be-liquidated");
@@ -104,12 +104,12 @@ contract LiquidationEngine is
       _collateralPoolId,
       _positionAddress
     );
-    address _strategy = strategies[_collateralPoolId];
-    require(_strategy != address(0), "LiquidationEngine/not-set-strategy");
     // 1. Check if the position is underwater
     ICollateralPoolConfig.CollateralPool memory collateralPool = bookKeeper.collateralPoolConfig().collateralPools(
       _collateralPoolId
     );
+    ILiquidationStrategy _strategy = collateralPool.strategy;
+    require(address(_strategy) != address(0), "LiquidationEngine/not-set-strategy");
 
     // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]
     // (positionDebtShare [wad] * debtAccumulatedRate [ray]) [rad]
@@ -122,7 +122,7 @@ contract LiquidationEngine is
 
     _vars.systemDebtEngineStablecoinBefore = bookKeeper.stablecoin(address(systemDebtEngine));
 
-    ILiquidationStrategy(_strategy).execute(
+    _strategy.execute(
       _collateralPoolId,
       _vars.positionDebtShare,
       _vars.positionLockedCollateral,

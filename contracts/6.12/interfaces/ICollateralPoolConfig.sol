@@ -3,6 +3,7 @@ pragma experimental ABIEncoderV2;
 
 import "./IPriceFeed.sol";
 import "./IGenericTokenAdapter.sol";
+import "./ILiquidationStrategy.sol";
 
 interface ICollateralPoolConfig {
   struct CollateralPool {
