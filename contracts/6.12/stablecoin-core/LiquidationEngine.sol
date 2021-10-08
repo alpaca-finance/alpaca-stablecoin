@@ -61,14 +61,8 @@ contract LiquidationEngine is
   }
 
   IBookKeeper public bookKeeper; // CDP Engine
-
-  mapping(bytes32 => address) public override strategies; // Liquidation strategy for each collateral pool
-
   ISystemDebtEngine public systemDebtEngine; // Debt Engine
   uint256 public live; // Active Flag
-
-  // --- Events ---
-  event LogSetStrategy(address indexed caller, bytes32 _collateralPoolId, address strategy);
 
   // --- Init ---
   function initialize(address _bookKeeper, address _systemDebtEngine) external initializer {
@@ -91,13 +85,6 @@ contract LiquidationEngine is
 
   // --- Math ---
   uint256 constant WAD = 10**18;
-
-  function setStrategy(bytes32 _collateralPoolId, address _strategy) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(live == 1, "LiquidationEngine/not-live");
-    strategies[_collateralPoolId] = _strategy;
-    emit LogSetStrategy(msg.sender, _collateralPoolId, _strategy);
-  }
 
   function liquidate(
     bytes32 _collateralPoolId,

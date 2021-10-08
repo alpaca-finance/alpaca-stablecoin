@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "../../interfaces/IPriceFeed.sol";
 import "../../interfaces/IGenericTokenAdapter.sol";
 import "../../interfaces/ICollateralPoolConfig.sol";
+import "../../interfaces/ILiquidationStrategy.sol";
 
 contract CollateralPoolConfig is AccessControlUpgradeable {
   using SafeMathUpgradeable for uint256;
@@ -26,6 +27,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
   event LogSetCloseFactorBps(address indexed caller, bytes32 collateralPoolId, uint256 _closeFactorBps);
   event LogSetLiquidatorIncentiveBps(address indexed caller, bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps);
   event LogSetTreasuryFeesBps(address indexed caller, bytes32 collateralPoolId, uint256 _treasuryFeeBps);
+  event LogSetStrategy(address indexed caller, bytes32 _collateralPoolId, address strategy);
 
   struct CollateralPool {
     uint256 totalDebtShare; // Total debt share of Alpaca Stablecoin of this collateral pool              [wad]
@@ -41,6 +43,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
     uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation
     uint256 liquidatorIncentiveBps; // Percentage (BPS) of how much additional collateral will be given to the liquidator incentive
     uint256 treasuryFeesBps; // Percentage (BPS) of how much additional collateral will be transferred to the treasury
+    ILiquidationStrategy strategy; // Liquidation strategy for this collateral pool
   }
 
   mapping(bytes32 => CollateralPool) public collateralPools;
@@ -69,7 +72,8 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
     IGenericTokenAdapter _adapter,
     uint256 _closeFactorBps,
     uint256 _liquidatorIncentiveBps,
-    uint256 _treasuryFeesBps
+    uint256 _treasuryFeesBps,
+    ILiquidationStrategy _strategy
   ) external onlyOwner {
     require(
       collateralPools[_collateralPoolId].debtAccumulatedRate == 0,
@@ -185,6 +189,12 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
   function setDebtAccumulatedRate(bytes32 _collateralPoolId, uint256 _debtAccumulatedRate) external {
     require(hasRole(BOOK_KEEPER_ROLE, msg.sender), "!bookKeeperRole");
     collateralPools[_collateralPoolId].debtAccumulatedRate = _debtAccumulatedRate;
+  }
+
+  function setStrategy(bytes32 _collateralPoolId, ILiquidationStrategy _strategy) external {
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    collateralPools[_collateralPoolId].strategy = _strategy;
+    emit LogSetStrategy(msg.sender, _collateralPoolId, address(_strategy));
   }
 
   function updateLastAccumulationTime(bytes32 _collateralPoolId) external {

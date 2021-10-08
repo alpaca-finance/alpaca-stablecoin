@@ -19,6 +19,7 @@ interface ICollateralPoolConfig {
     uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation
     uint256 liquidatorIncentiveBps; // Percentage (BPS) of how much additional collateral will be given to the liquidator incentive
     uint256 treasuryFeesBps; // Percentage (BPS) of how much additional collateral will be transferred to the treasury
+    ILiquidationStrategy strategy; // Liquidation strategy for this collateral pool
   }
 
   // struct CollateralPool {
