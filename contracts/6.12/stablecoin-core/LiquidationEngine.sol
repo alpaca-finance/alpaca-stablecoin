@@ -32,6 +32,8 @@ import "../interfaces/ISystemDebtEngine.sol";
 import "../interfaces/ILiquidationStrategy.sol";
 import "../interfaces/ICagable.sol";
 
+import "hardhat/console.sol";
+
 /// @title LiquidationEngine
 /// @author Alpaca Fin Corporation
 /** @notice A contract which is the manager for all of the liquidations of the protocol.
@@ -138,6 +140,7 @@ contract LiquidationEngine is
 
     _vars.systemDebtEngineStablecoinBefore = bookKeeper.stablecoin(address(systemDebtEngine));
 
+    console.log("_strategy");
     ILiquidationStrategy(_strategy).execute(
       _collateralPoolId,
       _vars.positionDebtShare,
@@ -149,7 +152,7 @@ contract LiquidationEngine is
       _collateralRecipient,
       data
     );
-
+    console.log("_strategy2");
     (_vars.newPositionLockedCollateral, _vars.newPositionDebtShare) = bookKeeper.positions(
       _collateralPoolId,
       _positionAddress

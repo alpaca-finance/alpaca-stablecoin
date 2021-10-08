@@ -43,7 +43,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const bookKeeper = (await upgrades.deployProxy(BookKeeper, [collateralPoolConfig.address])) as BookKeeper
   await bookKeeper.deployed()
 
-  collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
+  await collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
 
   const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
   const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed

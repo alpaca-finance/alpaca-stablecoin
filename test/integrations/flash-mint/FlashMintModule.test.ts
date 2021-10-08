@@ -77,7 +77,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const bookKeeper = (await upgrades.deployProxy(BookKeeper, [collateralPoolConfig.address])) as BookKeeper
   await bookKeeper.deployed()
 
-  collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
+  await collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
 
   // Deploy mocked BEP20
   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
