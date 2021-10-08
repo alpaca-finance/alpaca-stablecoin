@@ -107,7 +107,7 @@ contract LiquidationEngine is
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "LiquidationEngine/not-live");
     strategies[_collateralPoolId] = strategy;
-    emit SetStrategy(msg.sender, _collateralPoolId, strategy);
+    emit LogSetStrategy(msg.sender, _collateralPoolId, strategy);
   }
 
   function liquidate(
