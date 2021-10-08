@@ -275,7 +275,7 @@ describe("PriceOracle", () => {
       context("when priceOracle is live", () => {
         it("should be able to call setStableCoinReferencePrice", async () => {
           await expect(priceOracle.setStableCoinReferencePrice(10 ** 10))
-            .to.emit(priceOracle, "SetStableCoinReferencePrice")
+            .to.emit(priceOracle, "LogSetStableCoinReferencePrice")
             .withArgs(deployerAddress, 10 ** 10)
         })
       })
