@@ -27,24 +27,7 @@ interface ICollateralPoolConfig {
 
   function setPriceWithSafetyMargin(bytes32 collateralPoolId, uint256 priceWithSafetyMargin) external;
 
-  function collateralPools(bytes32 _collateralPoolId)
-    external
-    view
-    returns (
-      uint256 _totalDebtShare,
-      uint256 _debtAccumulatedRate,
-      uint256 _priceWithSafetyMargin,
-      uint256 _debtCeiling,
-      uint256 _debtFloor,
-      IPriceFeed _priceFeed,
-      uint256 _liquidationRatio,
-      uint256 _stabilityFeeRate,
-      uint256 _lastAccumulationTime,
-      IGenericTokenAdapter _adapter,
-      uint256 _closeFactorBps,
-      uint256 _liquidatorIncentiveBps,
-      uint256 _treasuryFeesBps
-    );
+  function collateralPools(bytes32 _collateralPoolId) external view returns (CollateralPool memory);
 
   // function collateralPools(bytes32 _collateralPoolId) external view returns (CollateralPool memory);
 

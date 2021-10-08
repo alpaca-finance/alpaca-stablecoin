@@ -93,17 +93,16 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
 
   // --- Update value ---
   /// @dev Update the latest price with safety margin of the collateral pool to the BookKeeper
-  /// @param poolId Collateral pool id
-  function setPrice(bytes32 poolId) external whenNotPaused {
-    (, , , , , IPriceFeed priceFeed, uint256 liquidationRatio, , , , , , ) = bookKeeper
-      .collateralPoolConfig()
-      .collateralPools(poolId);
+  /// @param _collateralPoolId Collateral pool id
+  function setPrice(bytes32 _collateralPoolId) external whenNotPaused {
+    IPriceFeed priceFeed = bookKeeper.collateralPoolConfig().collateralPools(_collateralPoolId).priceFeed;
+    uint256 liquidationRatio = bookKeeper.collateralPoolConfig().collateralPools(_collateralPoolId).liquidationRatio;
     (bytes32 rawPrice, bool hasPrice) = priceFeed.peekPrice();
     uint256 priceWithSafetyMargin = hasPrice
       ? rdiv(rdiv(mul(uint256(rawPrice), 10**9), stableCoinReferencePrice), liquidationRatio)
       : 0;
-    bookKeeper.collateralPoolConfig().setPriceWithSafetyMargin(poolId, priceWithSafetyMargin);
-    emit LogSetPrice(poolId, rawPrice, priceWithSafetyMargin);
+    bookKeeper.collateralPoolConfig().setPriceWithSafetyMargin(_collateralPoolId, priceWithSafetyMargin);
+    emit LogSetPrice(_collateralPoolId, rawPrice, priceWithSafetyMargin);
   }
 
   function cage() external override {

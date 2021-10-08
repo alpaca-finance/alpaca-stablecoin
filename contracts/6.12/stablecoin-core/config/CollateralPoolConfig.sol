@@ -8,7 +8,7 @@ import "../../interfaces/IPriceFeed.sol";
 import "../../interfaces/IGenericTokenAdapter.sol";
 import "../../interfaces/ICollateralPoolConfig.sol";
 
-contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig {
+contract CollateralPoolConfig is AccessControlUpgradeable {
   using SafeMathUpgradeable for uint256;
 
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
@@ -27,7 +27,23 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
   event LogSetLiquidatorIncentiveBps(address indexed caller, bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps);
   event LogSetTreasuryFeesBps(address indexed caller, bytes32 collateralPoolId, uint256 _treasuryFeeBps);
 
-  mapping(bytes32 => CollateralPool) public override collateralPools;
+  struct CollateralPool {
+    uint256 totalDebtShare; // Total debt share of Alpaca Stablecoin of this collateral pool              [wad]
+    uint256 debtAccumulatedRate; // Accumulated rates (equivalent to ibToken Price)                       [ray]
+    uint256 priceWithSafetyMargin; // Price with safety margin (taken into account the Collateral Ratio)  [ray]
+    uint256 debtCeiling; // Debt ceiling of this collateral pool                                          [rad]
+    uint256 debtFloor; // Position debt floor of this collateral pool                                     [rad]
+    IPriceFeed priceFeed; // Price Feed
+    uint256 liquidationRatio; // Liquidation ratio or Collateral ratio                                    [ray]
+    uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee debtAccumulatedRate or mint interest debtAccumulatedRate [ray]
+    uint256 lastAccumulationTime; // Time of last call to `collect`                                       [unix epoch time]
+    IGenericTokenAdapter adapter;
+    uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation
+    uint256 liquidatorIncentiveBps; // Percentage (BPS) of how much additional collateral will be given to the liquidator incentive
+    uint256 treasuryFeesBps; // Percentage (BPS) of how much additional collateral will be transferred to the treasury
+  }
+
+  mapping(bytes32 => CollateralPool) public collateralPools;
 
   modifier onlyOwner() {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
@@ -74,7 +90,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
     collateralPools[_collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
   }
 
-  function setPriceWithSafetyMargin(bytes32 _collateralPoolId, uint256 _priceWithSafetyMargin) external override {
+  function setPriceWithSafetyMargin(bytes32 _collateralPoolId, uint256 _priceWithSafetyMargin) external {
     require(hasRole(PRICE_ORACLE_ROLE, msg.sender), "!priceOracleRole");
     collateralPools[_collateralPoolId].priceWithSafetyMargin = _priceWithSafetyMargin;
     emit LogSetPriceWithSafetyMargin(msg.sender, _collateralPoolId, _priceWithSafetyMargin);
@@ -161,17 +177,17 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
     emit LogSetTreasuryFeesBps(msg.sender, collateralPoolId, _treasuryFeesBps);
   }
 
-  function setTotalDebtShare(bytes32 _collateralPoolId, uint256 _totalDebtShare) external override {
+  function setTotalDebtShare(bytes32 _collateralPoolId, uint256 _totalDebtShare) external {
     require(hasRole(BOOK_KEEPER_ROLE, msg.sender), "!bookKeeperRole");
     collateralPools[_collateralPoolId].totalDebtShare = _totalDebtShare;
   }
 
-  function setDebtAccumulatedRate(bytes32 _collateralPoolId, uint256 _debtAccumulatedRate) external override {
+  function setDebtAccumulatedRate(bytes32 _collateralPoolId, uint256 _debtAccumulatedRate) external {
     require(hasRole(BOOK_KEEPER_ROLE, msg.sender), "!bookKeeperRole");
     collateralPools[_collateralPoolId].debtAccumulatedRate = _debtAccumulatedRate;
   }
 
-  function updateLastAccumulationTime(bytes32 _collateralPoolId) external override {
+  function updateLastAccumulationTime(bytes32 _collateralPoolId) external {
     require(hasRole(STABILITY_FEE_COLLECTOR_ROLE, msg.sender), "!stabilityFeeCollectorRole");
     collateralPools[_collateralPoolId].lastAccumulationTime = now;
   }

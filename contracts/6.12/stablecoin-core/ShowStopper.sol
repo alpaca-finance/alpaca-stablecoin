@@ -297,9 +297,8 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 0, "ShowStopper/still-live");
     require(cagePrice[collateralPoolId] == 0, "ShowStopper/cage-price-collateral-pool-id-already-defined");
-    (uint256 _totalDebtShare, , , , , IPriceFeed _priceFeed, , , , , , , ) = bookKeeper
-      .collateralPoolConfig()
-      .collateralPools(collateralPoolId);
+    uint256 _totalDebtShare = bookKeeper.collateralPoolConfig().collateralPools(collateralPoolId).totalDebtShare;
+    IPriceFeed _priceFeed = bookKeeper.collateralPoolConfig().collateralPools(collateralPoolId).priceFeed;
     totalDebtShare[collateralPoolId] = _totalDebtShare;
     // par is a ray, priceFeed returns a wad
     cagePrice[collateralPoolId] = wdiv(priceOracle.stableCoinReferencePrice(), uint256(_priceFeed.readPrice()));
@@ -314,9 +313,10 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
   /// @param positionAddress Position address
   function accumulateBadDebt(bytes32 collateralPoolId, address positionAddress) external {
     require(cagePrice[collateralPoolId] != 0, "ShowStopper/cage-price-collateral-pool-id-not-defined");
-    (, uint256 _debtAccumulatedRate, , , , , , , , , , , ) = IBookKeeper(bookKeeper)
+    uint256 _debtAccumulatedRate = IBookKeeper(bookKeeper)
       .collateralPoolConfig()
-      .collateralPools(collateralPoolId); // [ray]
+      .collateralPools(collateralPoolId)
+      .debtAccumulatedRate; // [ray]
     (uint256 lockedCollateralAmount, uint256 debtShare) = bookKeeper.positions(collateralPoolId, positionAddress);
 
     // find the amount of debt in the unit of collateralToken
@@ -400,9 +400,10 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
     require(debt != 0, "ShowStopper/debt-zero");
     require(finalCashPrice[collateralPoolId] == 0, "ShowStopper/final-cash-price-collateral-pool-id-already-defined");
 
-    (, uint256 _debtAccumulatedRate, , , , , , , , , , , ) = IBookKeeper(bookKeeper)
+    uint256 _debtAccumulatedRate = IBookKeeper(bookKeeper)
       .collateralPoolConfig()
-      .collateralPools(collateralPoolId); // [ray]
+      .collateralPools(collateralPoolId)
+      .debtAccumulatedRate; // [ray]
     uint256 wad = rmul(rmul(totalDebtShare[collateralPoolId], _debtAccumulatedRate), cagePrice[collateralPoolId]);
     finalCashPrice[collateralPoolId] = mul(sub(wad, badDebtAccumulator[collateralPoolId]), RAY) / (debt / RAY);
     emit FinalizeCashPrice(collateralPoolId);

@@ -83,9 +83,10 @@ contract AlpacaStablecoinProxyActions {
     bytes32 collateralPoolId
   ) internal view returns (int256 resultDebtShare) {
     // Gets actual rate from the bookKeeper
-    (, uint256 _debtAccumulatedRate, , , , , , , , , , , ) = IBookKeeper(bookKeeper)
+    uint256 _debtAccumulatedRate = IBookKeeper(bookKeeper)
       .collateralPoolConfig()
-      .collateralPools(collateralPoolId); // [ray]
+      .collateralPools(collateralPoolId)
+      .debtAccumulatedRate; // [ray]
     // Gets actual debtShare value of the positionAddress
     (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress); // [wad]
 
@@ -102,9 +103,10 @@ contract AlpacaStablecoinProxyActions {
     bytes32 collateralPoolId
   ) internal view returns (uint256 requiredStablecoinAmount) {
     // Gets actual rate from the bookKeeper
-    (, uint256 _debtAccumulatedRate, , , , , , , , , , , ) = IBookKeeper(bookKeeper)
+    uint256 _debtAccumulatedRate = IBookKeeper(bookKeeper)
       .collateralPoolConfig()
-      .collateralPools(collateralPoolId); // [ray]
+      .collateralPools(collateralPoolId)
+      .debtAccumulatedRate; // [ray]
     // Gets actual debtShare value of the positionAddress
     (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress); // [wad]
     // Gets actual stablecoin amount in the usr

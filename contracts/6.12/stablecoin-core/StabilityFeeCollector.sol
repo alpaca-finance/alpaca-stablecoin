@@ -175,21 +175,15 @@ contract StabilityFeeCollector is
   }
 
   function _collect(bytes32 _collateralPoolId) internal returns (uint256 _debtAccumulatedRate) {
-    (
-      ,
-      uint256 _previousDebtAccumulatedRate,
-      ,
-      ,
-      ,
-      ,
-      ,
-      uint256 _stabilityFeeRate,
-      uint256 _lastAccumulationTime,
-      ,
-      ,
-      ,
-
-    ) = bookKeeper.collateralPoolConfig().collateralPools(_collateralPoolId);
+    uint256 _previousDebtAccumulatedRate = bookKeeper
+      .collateralPoolConfig()
+      .collateralPools(_collateralPoolId)
+      .debtAccumulatedRate;
+    uint256 _stabilityFeeRate = bookKeeper.collateralPoolConfig().collateralPools(_collateralPoolId).stabilityFeeRate;
+    uint256 _lastAccumulationTime = bookKeeper
+      .collateralPoolConfig()
+      .collateralPools(_collateralPoolId)
+      .lastAccumulationTime;
     require(now >= _lastAccumulationTime, "StabilityFeeCollector/invalid-now");
 
     // debtAccumulatedRate [ray]

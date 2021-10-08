@@ -119,9 +119,14 @@ contract LiquidationEngine is
     address _strategy = strategies[_collateralPoolId];
     require(_strategy != address(0), "LiquidationEngine/not-set-strategy");
     // 1. Check if the position is underwater
-    (, uint256 _debtAccumulatedRate, uint256 _priceWithSafetyMargin, , , , , , , , , , ) = bookKeeper
+    uint256 _debtAccumulatedRate = bookKeeper
       .collateralPoolConfig()
-      .collateralPools(_collateralPoolId);
+      .collateralPools(_collateralPoolId)
+      .debtAccumulatedRate;
+    uint256 _priceWithSafetyMargin = bookKeeper
+      .collateralPoolConfig()
+      .collateralPools(_collateralPoolId)
+      .priceWithSafetyMargin;
     // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]
     // (positionDebtShare [wad] * debtAccumulatedRate [ray]) [rad]
     require(
