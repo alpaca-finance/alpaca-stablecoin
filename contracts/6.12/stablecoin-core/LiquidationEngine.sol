@@ -66,7 +66,7 @@ contract LiquidationEngine is
   uint256 public live; // Active Flag
 
   // --- Events ---
-  event SetStrategy(address indexed caller, bytes32 _collateralPoolId, address strategy);
+  event LogSetStrategy(address indexed caller, bytes32 _collateralPoolId, address strategy);
 
   // --- Init ---
   function initialize(address _bookKeeper, address _systemDebtEngine) external initializer {
