@@ -61,7 +61,14 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   await alpacaToken.deployed()
 
   const FairLaunch = (await ethers.getContractFactory("FairLaunch", deployer)) as FairLaunch__factory
-  const fairLaunch = await FairLaunch.deploy(alpacaToken.address, await dev.getAddress(), ALPACA_PER_BLOCK, 0, 0, 0)
+  const fairLaunch = await FairLaunch.deploy(
+    alpacaToken.address,
+    await deployer.getAddress(),
+    ALPACA_PER_BLOCK,
+    0,
+    0,
+    0
+  )
   await fairLaunch.deployed()
 
   const Shield = (await ethers.getContractFactory("Shield", deployer)) as Shield__factory
@@ -373,7 +380,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
 
-        // Now Alice harvest rewards. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA
+        // Now Alice harvest rewards. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA, treasury account should get 10 ALPACA.
         await ibTokenAdapterAsAlice.deposit(
           aliceAddress,
           0,
@@ -387,6 +394,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(ethers.utils.parseEther("0"))
         expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(ethers.utils.parseEther("100"))
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("10"))
 
         // Bob join the party! As 2 blocks moved. IbTokenAdapter earned 200 ALPACA
         await ibDUMMYasBob.approve(ibTokenAdapter.address, ethers.utils.parseEther("4"))
@@ -406,11 +414,12 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(ethers.utils.parseEther("100"))
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(ethers.utils.parseEther("4"))
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(ethers.utils.parseEther("1200"))
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("10"))
 
         // Bob harvest ALPACA. IbTokenAdapter earned another 100 ALPACA.
         // IbTokenAdapter has another 100 ALPACA from previous block. Hence,
         // balanceOf(address(this)) should return 300 ALPACA.
-        // Bob should get 72 (80 - 10%) ALPACA.
+        // Bob should get 72 (80 - 10%) ALPACA, treasury account should get 8 ALPACA.
         await ibTokenAdapterAsBob.deposit(bobAddress, 0, ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]))
 
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("220"))
@@ -423,6 +432,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(ethers.utils.parseEther("100"))
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(ethers.utils.parseEther("4"))
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(ethers.utils.parseEther("1280"))
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("18"))
       })
     })
   })
@@ -570,6 +580,7 @@ describe("IbTokenAdapter", () => {
         // - Bob pending rewards must be 0 ALPACA as all rewards after Bob deposited hasn't been harvested.
         // - Alice should get 180 (200 - 10%) ALPACA that is harvested before cage (when Bob deposited)
         // - Alice should get 1 ibDUMMY back.
+        // - treasury account should get 20 ALPACA.
         expect(await ibTokenAdapter.pendingRewards(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
         expect(await ibTokenAdapter.pendingRewards(bobAddress)).to.be.eq(0)
 
@@ -592,6 +603,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(ethers.utils.parseEther("4"))
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(ethers.utils.parseEther("800"))
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("20"))
 
         let bobIbDUMMYbefore = await ibDUMMY.balanceOf(bobAddress)
         await ibTokenAdapterAsBob.withdraw(
@@ -632,7 +644,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
 
-        // Now Alice withdraw her position. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA
+        // Now Alice withdraw her position. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA, treasury account should get 10 ALPACA.
         let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
         await ibTokenAdapterAsAlice.withdraw(
           aliceAddress,
@@ -649,6 +661,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
         expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("10"))
       })
     })
   })
@@ -1027,6 +1040,7 @@ describe("IbTokenAdapter", () => {
         // - Bob pending rewards must be 0 ALPACA as all rewards after Bob deposited hasn't been harvested.
         // - Alice should get 180 (200 - 10%) ALPACA that is harvested before cage (when Bob deposited)
         // - Alice should get 1 ibDUMMY back.
+        // - Treasury account should get 20 ALPACA.
         expect(await ibTokenAdapter.pendingRewards(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
         expect(await ibTokenAdapter.pendingRewards(bobAddress)).to.be.eq(0)
 
@@ -1049,6 +1063,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(ethers.utils.parseEther("4"))
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(ethers.utils.parseEther("800"))
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("20"))
 
         await ibTokenAdapter.uncage()
         expect(await ibTokenAdapter.live()).to.be.eq(1)
@@ -1071,6 +1086,7 @@ describe("IbTokenAdapter", () => {
         // - Bob pending rewards must be 0 ALPACA as all rewards are harvested.
         // - Bob should get 4 ibDUMMY back.
         // - Alice's ALPACA should remain the same.
+        // - Treasury account should get 20 ALPACA.
         let bobIbDUMMYbefore = await ibDUMMY.balanceOf(bobAddress)
         await ibTokenAdapterAsBob.withdraw(
           bobAddress,
@@ -1091,6 +1107,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("40"))
       })
     })
   })
@@ -1138,6 +1155,7 @@ describe("IbTokenAdapter", () => {
         // - ibTokenAdapter should has 0 ALPACA as all harvested by Alice
         // - ibTokenAdapter should has 0 pending ALPACA as all harvested
         // - accRewardPershare, accRewardBalance, and rewardDebts must be updated correctly
+        // - Treasury account should get 35 ALPACA.
         await ibTokenAdapterAsAlice.withdraw(
           aliceAddress,
           0,
@@ -1153,6 +1171,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(ethers.utils.parseEther("350"))
         expect(await ibTokenAdapter.pendingRewards(aliceAddress)).to.be.eq(0)
         expect(await fairLaunch.pendingAlpaca(0, ibTokenAdapter.address)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("35"))
       })
     })
 
@@ -1246,6 +1265,7 @@ describe("IbTokenAdapter", () => {
         // - Bob should get his 4 ibDUMMY back
         // - Bob earn 90 (100 - 10%) ALPACA as block diff that Bob exit and uncage = 1 block
         // - IbTokenAdapter should still has 200 ALPACA that Alice dismissed
+        // - Treasury account should get 10 ALPACA.
         let bobIbDUMMYbefore = await ibDUMMY.balanceOf(bobAddress)
         await ibTokenAdapterAsBob.withdraw(
           bobAddress,
@@ -1266,6 +1286,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("10"))
       })
     })
   })

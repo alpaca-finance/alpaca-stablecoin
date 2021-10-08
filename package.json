@@ -10,6 +10,7 @@
     "test": "hardhat test --no-compile",
     "test:integrations:ibTokenAdapter": "hardhat test --no-compile ./test/integrations/stablecoin-core/adapters/FarmableTokenAdapter/IbTokenAdapter.test.ts",
     "test:integrations:proxywallet": "hardhat test --no-compile ./test/integrations/proxy-wallet/ProxyWallet.test.ts",
+    "test:integrations:positionmanager": "hardhat test --no-compile ./test/integrations/position-manager/PositionManager.test.ts",
     "test:collateral-auctioneer": "hardhat test --no-compile ./test/units/stablecoin-core/auctioneers/CollateralAuctioneer.test.ts",
     "test:position-manager": "hardhat test --no-compile ./test/units/managers/PositionManager.test.ts",
     "testnet": "hardhat console --no-compile --network testnet",
