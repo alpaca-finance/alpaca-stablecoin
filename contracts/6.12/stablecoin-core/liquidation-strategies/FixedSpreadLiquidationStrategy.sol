@@ -70,7 +70,7 @@ contract FixedSpreadLiquidationStrategy is
   /// @param _actualDebtValueToBeLiquidated [rad]
   /// @param _collateralAmountToBeLiquidated [wad]
   /// @param _treasuryFees [wad]
-  event LogLogSetCollateralPool(
+  event LogFixedSpreadLiquidate(
     bytes32 indexed _collateralPoolId,
     uint256 _positionDebtShare,
     uint256 _positionCollateralAmount,
@@ -424,7 +424,7 @@ contract FixedSpreadLiquidationStrategy is
     info.positionCollateralAmount = _positionCollateralAmount;
     info.debtShareToBeLiquidated = _debtShareToBeLiquidated;
     info.maxDebtShareToBeLiquidated = _maxDebtShareToBeLiquidated;
-    emit LogLogSetCollateralPool(
+    emit LogFixedSpreadLiquidate(
       _collateralPoolId,
       info.positionDebtShare,
       info.positionCollateralAmount,

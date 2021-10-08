@@ -40,6 +40,8 @@ import {
   PriceOracle__factory,
   SimplePriceFeed__factory,
   SimplePriceFeed,
+  ShowStopper,
+  ShowStopper__factory,
 } from "../../../typechain"
 import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
@@ -164,9 +166,16 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
   const alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
 
+  // Deploy ShowStopper
+  const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
+  const showStopper = (await upgrades.deployProxy(ShowStopper, [])) as ShowStopper
+
   // Deploy PositionManager
   const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
-  const positionManager = (await upgrades.deployProxy(PositionManager, [bookKeeper.address])) as PositionManager
+  const positionManager = (await upgrades.deployProxy(PositionManager, [
+    bookKeeper.address,
+    showStopper.address,
+  ])) as PositionManager
   await positionManager.deployed()
   await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
 
@@ -525,7 +534,7 @@ describe("LiquidationEngine", () => {
             ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [bobAddress, []])
           )
         )
-          .to.emit(fixedSpreadLiquidationStrategy, "FixedSpreadLiquidate")
+          .to.emit(fixedSpreadLiquidationStrategy, "LogFixedSpreadLiquidate")
           .withArgs(
             COLLATERAL_POOL_ID,
             ethers.utils.parseEther("1"),
