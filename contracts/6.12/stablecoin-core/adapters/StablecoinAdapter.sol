@@ -19,7 +19,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -56,7 +55,6 @@ import "../../interfaces/ICagable.sol";
 */
 
 contract StablecoinAdapter is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
@@ -71,7 +69,6 @@ contract StablecoinAdapter is
   uint256 public live; // Active Flag
 
   function initialize(address _bookKeeper, address _stablecoin) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
