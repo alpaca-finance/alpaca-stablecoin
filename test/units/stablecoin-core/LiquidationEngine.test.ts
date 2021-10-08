@@ -160,61 +160,62 @@ describe("LiquidationEngine", () => {
         ).to.be.revertedWith("LiquidationEngine/position-is-safe")
       })
     })
-    context("when liquidating in position", () => {
-      it("should be able to call liquidate", async () => {
-        // mock contract
-        mockedBookKeeper.smocked.positions.will.return.with([
-          UnitHelpers.WeiPerWad.mul(10),
-          UnitHelpers.WeiPerWad.mul(10),
-        ])
-        mockedBookKeeper.smocked.collateralPools.will.return.with([
-          BigNumber.from(0),
-          UnitHelpers.WeiPerRay.mul(2),
-          UnitHelpers.WeiPerRay,
-          BigNumber.from(0),
-          BigNumber.from(0),
-        ])
-        mockedBookKeeper.smocked.moveStablecoin.will.return.with()
-        mockedFixedSpreadLiquidationStrategy.smocked.execute.will.return.with()
+    // @dev this test case is moved to integration test
+    // context("when liquidating in position", () => {
+    //   it("should be able to call liquidate", async () => {
+    //     // mock contract
+    //     mockedBookKeeper.smocked.positions.will.return.with([
+    //       UnitHelpers.WeiPerWad.mul(10),
+    //       UnitHelpers.WeiPerWad.mul(10),
+    //     ])
+    //     mockedBookKeeper.smocked.collateralPools.will.return.with([
+    //       BigNumber.from(0),
+    //       UnitHelpers.WeiPerRay.mul(2),
+    //       UnitHelpers.WeiPerRay,
+    //       BigNumber.from(0),
+    //       BigNumber.from(0),
+    //     ])
+    //     mockedBookKeeper.smocked.moveStablecoin.will.return.with()
+    //     mockedFixedSpreadLiquidationStrategy.smocked.execute.will.return.with()
 
-        await liquidationEngine.setStrategy(formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
+    //     await liquidationEngine.setStrategy(formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
 
-        await liquidationEngine.liquidate(
-          formatBytes32String("BNB"),
-          aliceAddress,
-          UnitHelpers.WeiPerWad,
-          UnitHelpers.WeiPerWad,
-          deployerAddress,
-          ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
-        )
+    //     await liquidationEngine.liquidate(
+    //       formatBytes32String("BNB"),
+    //       aliceAddress,
+    //       UnitHelpers.WeiPerWad,
+    //       UnitHelpers.WeiPerWad,
+    //       deployerAddress,
+    //       ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
+    //     )
 
-        const { calls: positions } = mockedBookKeeper.smocked.positions
-        expect(positions.length).to.be.equal(2)
-        expect(positions[0][0]).to.be.equal(formatBytes32String("BNB"))
-        expect(positions[0][1]).to.be.equal(aliceAddress)
+    //     const { calls: positions } = mockedBookKeeper.smocked.positions
+    //     expect(positions.length).to.be.equal(2)
+    //     expect(positions[0][0]).to.be.equal(formatBytes32String("BNB"))
+    //     expect(positions[0][1]).to.be.equal(aliceAddress)
 
-        const { calls: collateralPools } = mockedBookKeeper.smocked.collateralPools
-        expect(collateralPools.length).to.be.equal(1)
-        expect(collateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
+    //     const { calls: collateralPools } = mockedBookKeeper.smocked.collateralPools
+    //     expect(collateralPools.length).to.be.equal(1)
+    //     expect(collateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
 
-        const { calls: moveStablecoin } = mockedBookKeeper.smocked.moveStablecoin
-        expect(moveStablecoin.length).to.be.equal(1)
-        expect(moveStablecoin[0].src).to.be.equal(deployerAddress)
-        expect(moveStablecoin[0].dst).to.be.equal(mockedSystemDebtEngine.address)
-        expect(moveStablecoin[0].value).to.be.equal(UnitHelpers.WeiPerRad.mul(2))
+    //     const { calls: moveStablecoin } = mockedBookKeeper.smocked.moveStablecoin
+    //     expect(moveStablecoin.length).to.be.equal(1)
+    //     expect(moveStablecoin[0].src).to.be.equal(deployerAddress)
+    //     expect(moveStablecoin[0].dst).to.be.equal(mockedSystemDebtEngine.address)
+    //     expect(moveStablecoin[0].value).to.be.equal(UnitHelpers.WeiPerRad.mul(2))
 
-        const { calls: execute } = mockedFixedSpreadLiquidationStrategy.smocked.execute
-        expect(execute.length).to.be.equal(1)
-        expect(execute[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(execute[0].positionDebtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
-        expect(execute[0].positionCollateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
-        expect(execute[0].positionAddress).to.be.equal(aliceAddress)
-        expect(execute[0].debtShareToRepay).to.be.equal(UnitHelpers.WeiPerWad)
-        expect(execute[0].data).to.be.equal(
-          ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
-        )
-      })
-    })
+    //     const { calls: execute } = mockedFixedSpreadLiquidationStrategy.smocked.execute
+    //     expect(execute.length).to.be.equal(1)
+    //     expect(execute[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+    //     expect(execute[0].positionDebtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
+    //     expect(execute[0].positionCollateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
+    //     expect(execute[0].positionAddress).to.be.equal(aliceAddress)
+    //     expect(execute[0].debtShareToRepay).to.be.equal(UnitHelpers.WeiPerWad)
+    //     expect(execute[0].data).to.be.equal(
+    //       ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
+    //     )
+    //   })
+    // })
   })
 
   describe("#cage()", () => {
@@ -380,62 +381,63 @@ describe("LiquidationEngine", () => {
       })
     })
 
-    context("when unpause contract", () => {
-      it("should be success", async () => {
-        await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), deployerAddress)
+    // @dev this test case is moved to integration test
+    // context("when unpause contract", () => {
+    //   it("should be success", async () => {
+    //     await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), deployerAddress)
 
-        // pause contract
-        await liquidationEngine.pause()
+    //     // pause contract
+    //     await liquidationEngine.pause()
 
-        // unpause contract
-        await liquidationEngine.unpause()
+    //     // unpause contract
+    //     await liquidationEngine.unpause()
 
-        // mock contract
-        mockedBookKeeper.smocked.positions.will.return.with([
-          UnitHelpers.WeiPerWad.mul(10),
-          UnitHelpers.WeiPerWad.mul(10),
-        ])
-        mockedBookKeeper.smocked.collateralPools.will.return.with([
-          BigNumber.from(0),
-          UnitHelpers.WeiPerRay.mul(2),
-          UnitHelpers.WeiPerRay,
-          BigNumber.from(0),
-          BigNumber.from(0),
-        ])
-        mockedFixedSpreadLiquidationStrategy.smocked.execute.will.return.with()
+    //     // mock contract
+    //     mockedBookKeeper.smocked.positions.will.return.with([
+    //       UnitHelpers.WeiPerWad.mul(10),
+    //       UnitHelpers.WeiPerWad.mul(10),
+    //     ])
+    //     mockedBookKeeper.smocked.collateralPools.will.return.with([
+    //       BigNumber.from(0),
+    //       UnitHelpers.WeiPerRay.mul(2),
+    //       UnitHelpers.WeiPerRay,
+    //       BigNumber.from(0),
+    //       BigNumber.from(0),
+    //     ])
+    //     mockedFixedSpreadLiquidationStrategy.smocked.execute.will.return.with()
 
-        await liquidationEngine.setStrategy(formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
+    //     await liquidationEngine.setStrategy(formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
 
-        await liquidationEngine.liquidate(
-          formatBytes32String("BNB"),
-          aliceAddress,
-          UnitHelpers.WeiPerWad,
-          UnitHelpers.WeiPerWad,
-          deployerAddress,
-          ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
-        )
+    //     await liquidationEngine.liquidate(
+    //       formatBytes32String("BNB"),
+    //       aliceAddress,
+    //       UnitHelpers.WeiPerWad,
+    //       UnitHelpers.WeiPerWad,
+    //       deployerAddress,
+    //       ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
+    //     )
 
-        const { calls: positions } = mockedBookKeeper.smocked.positions
-        expect(positions.length).to.be.equal(2)
-        expect(positions[0][0]).to.be.equal(formatBytes32String("BNB"))
-        expect(positions[0][1]).to.be.equal(aliceAddress)
+    //     const { calls: positions } = mockedBookKeeper.smocked.positions
+    //     expect(positions.length).to.be.equal(2)
+    //     expect(positions[0][0]).to.be.equal(formatBytes32String("BNB"))
+    //     expect(positions[0][1]).to.be.equal(aliceAddress)
 
-        const { calls: collateralPools } = mockedBookKeeper.smocked.collateralPools
-        expect(collateralPools.length).to.be.equal(1)
-        expect(collateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
+    //     const { calls: collateralPools } = mockedBookKeeper.smocked.collateralPools
+    //     expect(collateralPools.length).to.be.equal(1)
+    //     expect(collateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
 
-        const { calls: execute } = mockedFixedSpreadLiquidationStrategy.smocked.execute
-        expect(execute.length).to.be.equal(1)
-        expect(execute[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(execute[0].positionDebtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
-        expect(execute[0].positionCollateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
-        expect(execute[0].positionAddress).to.be.equal(aliceAddress)
-        expect(execute[0].debtShareToRepay).to.be.equal(UnitHelpers.WeiPerWad)
-        expect(execute[0].data).to.be.equal(
-          ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
-        )
-      })
-    })
+    //     const { calls: execute } = mockedFixedSpreadLiquidationStrategy.smocked.execute
+    //     expect(execute.length).to.be.equal(1)
+    //     expect(execute[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+    //     expect(execute[0].positionDebtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
+    //     expect(execute[0].positionCollateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
+    //     expect(execute[0].positionAddress).to.be.equal(aliceAddress)
+    //     expect(execute[0].debtShareToRepay).to.be.equal(UnitHelpers.WeiPerWad)
+    //     expect(execute[0].data).to.be.equal(
+    //       ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
+    //     )
+    //   })
+    // })
   })
 
   describe("#setStrategy", () => {
@@ -455,7 +457,7 @@ describe("LiquidationEngine", () => {
         await expect(
           liquidationEngine.setStrategy(formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
         )
-          .to.emit(liquidationEngine, "SetStrategy")
+          .to.emit(liquidationEngine, "LogSetStrategy")
           .withArgs(deployerAddress, formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
       })
     })
