@@ -232,6 +232,7 @@ contract IbTokenAdapter is
   /// @param from The position address that is owned and staked the collateral tokens
   /// @param to The address to receive the yields
   function harvest(address from, address to) internal {
+    require(to != address(0), "IbTokenAdapter/harvest-to-address-zero");
     // 1. Perform actual harvest. Calculate the new accRewardPerShare.
     if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvest(), totalShare));
     // 2. Calculate the rewards that "to" should get by:
@@ -242,7 +243,7 @@ contract IbTokenAdapter is
       uint256 back = sub(rewards, rewardDebt);
       uint256 treasuryFee = div(mul(back, treasuryFeeBps), 10000);
       address(rewardToken).safeTransfer(treasuryAccount, treasuryFee);
-      if (to != address(0)) address(rewardToken).safeTransfer(to, sub(back, treasuryFee));
+      address(rewardToken).safeTransfer(to, sub(back, treasuryFee));
     }
 
     // 3. Update accRewardBalance
@@ -292,14 +293,11 @@ contract IbTokenAdapter is
     harvest(positionAddress, user);
     if (amount > 0) {
       uint256 share = wdiv(mul(amount, to18ConversionFactor), netAssetPerShare()); // [wad]
-
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
       require(int256(share) > 0, "IbTokenAdapter/share-overflow");
-
       address(collateralToken).safeTransferFrom(msg.sender, address(this), amount);
       bookKeeper.addCollateral(collateralPoolId, positionAddress, int256(share));
-
       totalShare = add(totalShare, share);
       stake[positionAddress] = add(stake[positionAddress], share);
     }
@@ -339,7 +337,6 @@ contract IbTokenAdapter is
     harvest(positionAddress, user);
     if (amount > 0) {
       uint256 share = wdivup(mul(amount, to18ConversionFactor), netAssetPerShare()); // [wad]
-
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
       require(int256(share) > 0, "IbTokenAdapter/share-overflow");
@@ -347,12 +344,10 @@ contract IbTokenAdapter is
 
       address(collateralToken).safeTransfer(user, amount);
       bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(share));
-
       totalShare = sub(totalShare, share);
       stake[positionAddress] = sub(stake[positionAddress], share);
     }
     rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
-
     emit Withdraw(amount);
   }
 
@@ -372,14 +367,11 @@ contract IbTokenAdapter is
     uint256 share = bookKeeper.collateralToken(collateralPoolId, positionAddress); //[wad]
     require(share <= 2**255, "IbTokenAdapter/share-overflow");
     uint256 amount = wmul(wmul(share, netAssetPerShare()), toTokenConversionFactor);
-
     address(collateralToken).safeTransfer(to, amount);
     bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(share));
-
     totalShare = sub(totalShare, share);
     stake[positionAddress] = sub(stake[positionAddress], share);
     rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
-
     emit EmergencyWithdaraw();
   }
 
@@ -398,18 +390,15 @@ contract IbTokenAdapter is
     uint256 stakedAmount = stake[source];
     stake[source] = sub(stakedAmount, share);
     stake[destination] = add(stake[destination], share);
-
     // 2. Update source's rewardDebt due to collateral tokens have
     // moved from source to destination. Hence, rewardDebt should be updated.
     // rewardDebtDiff is how many rewards has been paid for that share.
     uint256 rewardDebt = rewardDebts[source];
     uint256 rewardDebtDiff = mul(rewardDebt, share) / stakedAmount;
-
     // 3. Update rewardDebts for both source and destination
     // Safe since rewardDebtDiff <= rewardDebts[source]
     rewardDebts[source] = rewardDebt - rewardDebtDiff;
     rewardDebts[destination] = add(rewardDebts[destination], rewardDebtDiff);
-
     // 4. Sanity check.
     // - stake[source] must more than or equal to collateral + lockedCollateral that source has
     // to prevent a case where someone try to steal stake from source
@@ -425,7 +414,6 @@ contract IbTokenAdapter is
       stake[destination] <= add(bookKeeper.collateralToken(collateralPoolId, destination), lockedCollateral),
       "IbTokenAdapter/stake[destination] > collateralTokens + lockedCollateral"
     );
-
     emit MoveStake(source, destination, share);
   }
 

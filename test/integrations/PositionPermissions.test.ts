@@ -36,6 +36,8 @@ import {
   PriceOracle__factory,
   SimplePriceFeed__factory,
   SimplePriceFeed,
+  ShowStopper,
+  ShowStopper__factory,
 } from "../../typechain"
 import { expect } from "chai"
 import { AddressZero } from "../helper/address"
@@ -183,9 +185,16 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
   const alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
 
+  // Deploy ShowStopper
+  const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
+  const showStopper = (await upgrades.deployProxy(ShowStopper, [])) as ShowStopper
+
   // Deploy PositionManager
   const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
-  const positionManager = (await upgrades.deployProxy(PositionManager, [bookKeeper.address])) as PositionManager
+  const positionManager = (await upgrades.deployProxy(PositionManager, [
+    bookKeeper.address,
+    showStopper.address,
+  ])) as PositionManager
   await positionManager.deployed()
   await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
 
@@ -291,8 +300,6 @@ describe("PositionPermissions", () => {
   let devAddress: string
 
   // Contracts
-  let proxyWalletRegistry: ProxyWalletRegistry
-
   let deployerProxyWallet: ProxyWallet
   let aliceProxyWallet: ProxyWallet
   let bobProxyWallet: ProxyWallet
@@ -313,13 +320,9 @@ describe("PositionPermissions", () => {
 
   let stabilityFeeCollector: StabilityFeeCollector
 
-  let liquidationEngine: LiquidationEngine
-
   let alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions
 
   let alpacaStablecoin: AlpacaStablecoin
-
-  let simplePriceFeed: SimplePriceFeed
 
   let ibDUMMYasAlice: BEP20
   let ibDUMMYasBob: BEP20
@@ -335,7 +338,6 @@ describe("PositionPermissions", () => {
 
   beforeEach(async () => {
     ;({
-      proxyWalletRegistry,
       ibTokenAdapter,
       ibTokenAdapter2,
       stablecoinAdapter,
@@ -345,8 +347,6 @@ describe("PositionPermissions", () => {
       positionManager,
       stabilityFeeCollector,
       alpacaStablecoin,
-      liquidationEngine,
-      simplePriceFeed,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
