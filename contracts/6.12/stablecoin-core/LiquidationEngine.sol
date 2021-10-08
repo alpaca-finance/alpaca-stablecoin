@@ -53,8 +53,6 @@ contract LiquidationEngine is
   struct LocalVars {
     uint256 positionLockedCollateral;
     uint256 positionDebtShare;
-    uint256 debtAccumulatedRate;
-    uint256 priceWithSafetyMargin;
     uint256 systemDebtEngineStablecoinBefore;
     uint256 newPositionLockedCollateral;
     uint256 newPositionDebtShare;
@@ -121,13 +119,14 @@ contract LiquidationEngine is
     address _strategy = strategies[_collateralPoolId];
     require(_strategy != address(0), "LiquidationEngine/not-set-strategy");
     // 1. Check if the position is underwater
-    (, _vars.debtAccumulatedRate, _vars.priceWithSafetyMargin, , ) = bookKeeper.collateralPools(_collateralPoolId);
+    (, uint256 _debtAccumulatedRate, uint256 _priceWithSafetyMargin, , , , , , , , , , ) = bookKeeper
+      .collateralPoolConfig()
+      .collateralPools(_collateralPoolId);
     // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]
     // (positionDebtShare [wad] * debtAccumulatedRate [ray]) [rad]
     require(
-      _vars.priceWithSafetyMargin > 0 &&
-        _vars.positionLockedCollateral.mul(_vars.priceWithSafetyMargin) <
-        _vars.positionDebtShare.mul(_vars.debtAccumulatedRate),
+      _priceWithSafetyMargin > 0 &&
+        _vars.positionLockedCollateral.mul(_priceWithSafetyMargin) < _vars.positionDebtShare.mul(_debtAccumulatedRate),
       "LiquidationEngine/position-is-safe"
     );
 
@@ -154,7 +153,7 @@ contract LiquidationEngine is
     // (positionDebtShare [wad] - newPositionDebtShare [wad]) * debtAccumulatedRate [ray]
 
     _vars.wantStablecoinValueFromLiquidation = _vars.positionDebtShare.sub(_vars.newPositionDebtShare).mul(
-      _vars.debtAccumulatedRate
+      _debtAccumulatedRate
     ); // [rad]
     require(
       bookKeeper.stablecoin(address(systemDebtEngine)).sub(_vars.systemDebtEngineStablecoinBefore) >=

@@ -83,12 +83,14 @@ contract AlpacaStablecoinProxyActions {
     bytes32 collateralPoolId
   ) internal view returns (int256 resultDebtShare) {
     // Gets actual rate from the bookKeeper
-    (, uint256 debtAccumulatedRate, , , ) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId); // [ray]
+    (, uint256 _debtAccumulatedRate, , , , , , , , , , , ) = IBookKeeper(bookKeeper)
+      .collateralPoolConfig()
+      .collateralPools(collateralPoolId); // [ray]
     // Gets actual debtShare value of the positionAddress
     (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress); // [wad]
 
     // Uses the whole stablecoin balance in the bookKeeper to reduce the debt
-    resultDebtShare = _safeToInt(stablecoinValue / debtAccumulatedRate); // [wad]
+    resultDebtShare = _safeToInt(stablecoinValue / _debtAccumulatedRate); // [wad]
     // Checks the calculated resultDebtShare is not higher than positionAddress.art (total debt), otherwise uses its value
     resultDebtShare = uint256(resultDebtShare) <= debtShare ? -resultDebtShare : -_safeToInt(debtShare); // [wad]
   }
@@ -100,13 +102,15 @@ contract AlpacaStablecoinProxyActions {
     bytes32 collateralPoolId
   ) internal view returns (uint256 requiredStablecoinAmount) {
     // Gets actual rate from the bookKeeper
-    (, uint256 rate, , , ) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId); // [ray]
+    (, uint256 _debtAccumulatedRate, , , , , , , , , , , ) = IBookKeeper(bookKeeper)
+      .collateralPoolConfig()
+      .collateralPools(collateralPoolId); // [ray]
     // Gets actual debtShare value of the positionAddress
     (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress); // [wad]
     // Gets actual stablecoin amount in the usr
     uint256 stablecoinValue = IBookKeeper(bookKeeper).stablecoin(usr); // [rad]
 
-    uint256 requiredStablecoinValue = _safeSub(_safeMul(debtShare, rate), stablecoinValue); // [rad]
+    uint256 requiredStablecoinValue = _safeSub(_safeMul(debtShare, _debtAccumulatedRate), stablecoinValue); // [rad]
     requiredStablecoinAmount = requiredStablecoinValue / RAY; // [wad] = [rad]/[ray]
 
     // If the value precision has some dust, it will need to request for 1 extra amount wei

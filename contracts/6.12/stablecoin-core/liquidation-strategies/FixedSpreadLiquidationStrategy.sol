@@ -135,8 +135,10 @@ contract FixedSpreadLiquidationStrategy is
 
   // get the price directly from the PriceOracle
   function getFeedPrice(bytes32 collateralPoolId) internal view returns (uint256 feedPrice) {
-    (IPriceFeed priceFeed, ) = priceOracle.collateralPools(collateralPoolId);
-    (bytes32 price, bool priceOk) = priceFeed.peekPrice();
+    (, , , , , IPriceFeed _priceFeed, , , , , , , ) = bookKeeper.collateralPoolConfig().collateralPools(
+      collateralPoolId
+    );
+    (bytes32 price, bool priceOk) = _priceFeed.peekPrice();
     require(priceOk, "FixedSpreadLiquidationStrategy/invalid-price");
     // (price [wad] * BLN [10 ** 9] ) [ray] / priceOracle.stableCoinReferencePrice [ray]
     feedPrice = rdiv(mul(uint256(price), BLN), priceOracle.stableCoinReferencePrice()); // [ray]
@@ -163,9 +165,9 @@ contract FixedSpreadLiquidationStrategy is
       uint256 _closeFactorBps,
       uint256 _liquidatorIncentiveBps,
       uint256 _treasuryFeesBps
-    ) = bookKeeper.collateralPools(_collateralPoolId);
+    ) = bookKeeper.collateralPoolConfig().collateralPools(_collateralPoolId);
 
-    uint256 _positionDebtValue = _positionDebtShare.mul(info.debtAccumulatedRate);
+    uint256 _positionDebtValue = _positionDebtShare.mul(_debtAccumulatedRate);
 
     // Calculate max liquidatable debt value based on the close factor
     // (_positionDebtShare [wad] * closeFactorBps [bps]) / 10000
@@ -213,7 +215,7 @@ contract FixedSpreadLiquidationStrategy is
       // If the remaining debt after liquidation is smaller than `debtFloor`
       if (
         _positionDebtValue > info.actualDebtValueToBeLiquidated &&
-        _positionDebtValue.sub(info.actualDebtValueToBeLiquidated) < info.debtFloor
+        _positionDebtValue.sub(info.actualDebtValueToBeLiquidated) < _debtFloor
       ) {
         // Full Debt Liquidation
         info.actualDebtValueToBeLiquidated = _positionDebtValue; // [rad]
@@ -230,7 +232,7 @@ contract FixedSpreadLiquidationStrategy is
       }
     }
 
-    info.actualDebtShareToBeLiquidated = info.actualDebtValueToBeLiquidated.div(info.debtAccumulatedRate); // [wad]
+    info.actualDebtShareToBeLiquidated = info.actualDebtValueToBeLiquidated.div(_debtAccumulatedRate); // [wad]
 
     // collateralAmountToBeLiquidated - (collateralAmountToBeLiquidated * 10000 / liquidatorIncentiveBps)
     uint256 liquidatorIncentiveCollectedFromPosition = info.collateralAmountToBeLiquidated.sub(
