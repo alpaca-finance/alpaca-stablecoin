@@ -1,5 +1,5 @@
 import { ethers, upgrades, waffle } from "hardhat"
-import { BigNumber, Contract, ContractReceipt, Event, EventFilter, Signer } from "ethers"
+import { Signer } from "ethers"
 
 import {
   ProxyWallet,
@@ -9,21 +9,13 @@ import {
   PositionManager,
   AlpacaStablecoinProxyActions,
   AlpacaStablecoinProxyActions__factory,
-  IbTokenAdapter__factory,
   BEP20__factory,
-  AlpacaToken__factory,
-  FairLaunch__factory,
-  Shield__factory,
-  IbTokenAdapter,
-  BEP20,
   StabilityFeeCollector,
   StabilityFeeCollector__factory,
   AlpacaStablecoin__factory,
   AlpacaStablecoin,
   StablecoinAdapter__factory,
   StablecoinAdapter,
-  AlpacaToken,
-  FairLaunch,
   ShowStopper__factory,
   ShowStopper,
   SystemDebtEngine,
@@ -34,187 +26,134 @@ import {
   PriceOracle__factory,
   MockPriceFeed,
   MockPriceFeed__factory,
+  SimplePriceFeed,
+  SimplePriceFeed__factory,
+  TokenAdapter,
+  TokenAdapter__factory,
+  GetPositions,
+  GetPositions__factory,
 } from "../../../typechain"
 import { expect } from "chai"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
 import { formatBytes32String } from "ethers/lib/utils"
-import {
-  DebtToken__factory,
-  MockWBNB,
-  MockWBNB__factory,
-  SimpleVaultConfig__factory,
-  Vault,
-  Vault__factory,
-  WNativeRelayer,
-  WNativeRelayer__factory,
-} from "@alpaca-finance/alpaca-contract/typechain"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 
-import * as TimeHelpers from "../../helper/time"
-import * as AssertHelpers from "../../helper/assert"
-
 type Fixture = {
+  positionManager: PositionManager
+  alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions
+  stabilityFeeCollector: StabilityFeeCollector
+  busdTokenAdapter: TokenAdapter
+  usdtTokenAdapter: TokenAdapter
+  stablecoinAdapter: StablecoinAdapter
   showStopper: ShowStopper
   bookKeeper: BookKeeper
   liquidationEngine: LiquidationEngine
   systemDebtEngine: SystemDebtEngine
   priceOracle: PriceOracle
+  getPositions: GetPositions
 }
 
 const loadFixtureHandler = async (): Promise<Fixture> => {
-  const [deployer, alice, , dev] = await ethers.getSigners()
+  const [deployer, alice, bob, dev] = await ethers.getSigners()
 
-  //   // alpca vault
-  //   const ALPACA_BONUS_LOCK_UP_BPS = 7000
-  //   const ALPACA_REWARD_PER_BLOCK = ethers.utils.parseEther("5000")
-  //   const RESERVE_POOL_BPS = "1000" // 10% reserve pool
-  //   const KILL_PRIZE_BPS = "1000" // 10% Kill prize
-  //   const INTEREST_RATE = "3472222222222" // 30% per year
-  //   const MIN_DEBT_SIZE = ethers.utils.parseEther("1") // 1 BTOKEN min debt size
-  //   const KILL_TREASURY_BPS = "100"
+  // Deploy BEP20
+  const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
 
-  //   const WBNB = new MockWBNB__factory(deployer)
-  //   const wbnb = (await WBNB.deploy()) as MockWBNB
-  //   await wbnb.deployed()
-
-  //   const WNativeRelayer = new WNativeRelayer__factory(deployer)
-  //   const wNativeRelayer = (await WNativeRelayer.deploy(wbnb.address)) as WNativeRelayer
-  //   await wNativeRelayer.deployed()
-
-  //   // Deploy mocked BEP20
-  //   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
-  //   const ibDUMMY = await BEP20.deploy("ibDUMMY", "ibDUMMY")
-  //   await ibDUMMY.deployed()
-
-  //   const baseToken = await BEP20.deploy("BTOKEN", "BTOKEN")
-  //   await baseToken.deployed()
+  const BUSD = await BEP20.deploy("BUSD", "BUSD")
+  await BUSD.deployed()
   //   await baseToken.mint(await deployer.getAddress(), ethers.utils.parseEther("100"))
-  //   await baseToken.mint(await alice.getAddress(), ethers.utils.parseEther("100"))
+  await BUSD.mint(await alice.getAddress(), ethers.utils.parseEther("100"))
+  await BUSD.mint(await bob.getAddress(), ethers.utils.parseEther("100"))
 
-  //   const DebtToken = new DebtToken__factory(deployer)
-  //   const debtToken = await DebtToken.deploy()
-  //   await debtToken.deployed()
-  //   await debtToken.initialize("debtibBTOKEN_V2", "debtibBTOKEN_V2", deployer.address)
+  const USDT = await BEP20.deploy("BUSD", "BUSD")
+  await USDT.deployed()
+  await USDT.mint(await bob.getAddress(), ethers.utils.parseEther("100"))
 
-  //   // Setup FairLaunch contract
-  //   // Deploy ALPACAs
-  //   const AlpacaToken = new AlpacaToken__factory(deployer)
-  //   const alpacaToken = await AlpacaToken.deploy(132, 137)
-  //   await alpacaToken.deployed()
-
-  //   const FairLaunch = new FairLaunch__factory(deployer)
-  //   const fairLaunch = (await FairLaunch.deploy(
-  //     alpacaToken.address,
-  //     deployer.address,
-  //     ALPACA_REWARD_PER_BLOCK,
-  //     0,
-  //     ALPACA_BONUS_LOCK_UP_BPS,
-  //     0
-  //   )) as FairLaunch
-  //   await fairLaunch.deployed()
-
-  //   const Shield = (await ethers.getContractFactory("Shield", deployer)) as Shield__factory
-  //   const shield = await Shield.deploy(deployer.address, fairLaunch.address)
-  //   await shield.deployed()
-
-  //   const SimpleVaultConfig = new SimpleVaultConfig__factory(deployer)
-  //   const simpleVaultConfig = await SimpleVaultConfig.deploy()
-  //   await simpleVaultConfig.deployed()
-  //   await simpleVaultConfig.initialize(
-  //     MIN_DEBT_SIZE,
-  //     INTEREST_RATE,
-  //     RESERVE_POOL_BPS,
-  //     KILL_PRIZE_BPS,
-  //     wbnb.address,
-  //     wNativeRelayer.address,
-  //     fairLaunch.address,
-  //     KILL_TREASURY_BPS,
-  //     deployer.address
-  //   )
-
-  //   const Vault = new Vault__factory(deployer)
-  //   const busdVault = await Vault.deploy()
-  //   await busdVault.deployed()
-  //   await busdVault.initialize(
-  //     simpleVaultConfig.address,
-  //     baseToken.address,
-  //     "Interest Bearing BTOKEN",
-  //     "ibBTOKEN",
-  //     18,
-  //     debtToken.address
-  //   )
-
-  //   // Config Alpaca's FairLaunch
-  //   // Assuming Deployer is timelock for easy testing
-  //   await fairLaunch.addPool(1, busdVault.address, true)
-  //   await fairLaunch.transferOwnership(shield.address)
-  //   await shield.transferOwnership(await deployer.getAddress())
-  //   await alpacaToken.transferOwnership(fairLaunch.address)
-
-  //   // Deploy AlpacaStablecoin
-  //   const AlpacaStablecoin = new AlpacaStablecoin__factory(deployer)
-  //   const alpacaStablecoin = await AlpacaStablecoin.deploy("Alpaca USD", "AUSD", "31337")
+  // Deploy AlpacaStablecoin
+  const AlpacaStablecoin = new AlpacaStablecoin__factory(deployer)
+  const alpacaStablecoin = await AlpacaStablecoin.deploy("Alpaca USD", "AUSD", "31337")
 
   const BookKeeper = new BookKeeper__factory(deployer)
   const bookKeeper = (await upgrades.deployProxy(BookKeeper)) as BookKeeper
 
-  //   await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
+  const PriceOracle = new PriceOracle__factory(deployer)
+  const priceOracle = (await upgrades.deployProxy(PriceOracle, [bookKeeper.address])) as PriceOracle
 
-  //   await bookKeeper.init(formatBytes32String("ibBUSD"))
-  //   // set pool debt ceiling 100 rad
-  //   await bookKeeper.setDebtCeiling(formatBytes32String("ibBUSD"), WeiPerRad.mul(100))
-  //   // set price with safety margin 1 ray
-  //   await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("ibBUSD"), WeiPerRay)
-  //   // set position debt floor 1 rad
-  //   await bookKeeper.setDebtFloor(formatBytes32String("ibBUSD"), WeiPerRad.mul(1))
-  //   // set total debt ceiling 100 rad
-  //   await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100))
+  const SimplePriceFeed = new SimplePriceFeed__factory(deployer)
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed)) as SimplePriceFeed
+  await simplePriceFeed.setPrice(WeiPerWad)
 
-  //   const PositionManager = new PositionManager__factory(deployer)
-  //   const positionManager = (await upgrades.deployProxy(PositionManager, [bookKeeper.address])) as PositionManager
+  const PriceFeed = new MockPriceFeed__factory(deployer)
+  const priceFeed = await PriceFeed.deploy()
 
-  //   const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
-  //   const alpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
+  priceOracle.setPriceFeed(formatBytes32String("BUSD"), simplePriceFeed.address)
+  priceOracle.setPriceFeed(formatBytes32String("USDT"), simplePriceFeed.address)
 
-  //   const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
-  //   const ibTokenAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
-  //     bookKeeper.address,
-  //     formatBytes32String("ibBUSD"),
-  //     busdVault.address,
-  //     alpacaToken.address,
-  //     fairLaunch.address,
-  //     0,
-  //     shield.address,
-  //     await deployer.getAddress(),
-  //     BigNumber.from(1000),
-  //     await dev.getAddress(),
-  //   ])) as IbTokenAdapter
+  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
+  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), priceOracle.address)
 
-  //   const StablecoinAdapter = new StablecoinAdapter__factory(deployer)
-  //   const stablecoinAdapter = (await upgrades.deployProxy(StablecoinAdapter, [
-  //     bookKeeper.address,
-  //     alpacaStablecoin.address,
-  //   ])) as StablecoinAdapter
+  await bookKeeper.init(formatBytes32String("BUSD"))
+  // set pool debt ceiling 100 rad
+  await bookKeeper.setDebtCeiling(formatBytes32String("BUSD"), WeiPerRad.mul(100))
+  // set price with safety margin 1 ray
+  await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BUSD"), WeiPerRay)
+  // set position debt floor 1 rad
+  await bookKeeper.setDebtFloor(formatBytes32String("BUSD"), WeiPerRad.mul(1))
+  // set total debt ceiling 100 rad
+  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100))
 
-  //   // Deploy StabilityFeeCollector
-  //   const StabilityFeeCollector = new StabilityFeeCollector__factory(deployer)
-  //   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
-  //     bookKeeper.address,
-  //   ])) as StabilityFeeCollector
+  await bookKeeper.init(formatBytes32String("USDT"))
+  // set pool debt ceiling 100 rad
+  await bookKeeper.setDebtCeiling(formatBytes32String("USDT"), WeiPerRad.mul(100))
+  // set price with safety margin 1 ray
+  await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("USDT"), WeiPerRay)
+  // set position debt floor 1 rad
+  await bookKeeper.setDebtFloor(formatBytes32String("USDT"), WeiPerRad.mul(1))
+  // set total debt ceiling 100 rad
+  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100))
 
-  //   await stabilityFeeCollector.init(formatBytes32String("ibBUSD"))
+  const ShowStopper = new ShowStopper__factory(deployer)
+  const showStopper = (await upgrades.deployProxy(ShowStopper)) as ShowStopper
 
-  //   await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter.address)
-  //   await bookKeeper.grantRole(
-  //     ethers.utils.solidityKeccak256(["string"], ["POSITION_MANAGER_ROLE"]),
-  //     positionManager.address
-  //   )
-  //   await bookKeeper.grantRole(
-  //     ethers.utils.solidityKeccak256(["string"], ["STABILITY_FEE_COLLECTOR_ROLE"]),
-  //     stabilityFeeCollector.address
-  //   )
+  const PositionManager = new PositionManager__factory(deployer)
+  const positionManager = (await upgrades.deployProxy(PositionManager, [
+    bookKeeper.address,
+    showStopper.address,
+  ])) as PositionManager
 
-  //   await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), stablecoinAdapter.address)
+  const GetPositions = new GetPositions__factory(deployer)
+  const getPositions = await GetPositions.deploy()
+
+  const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
+  const alpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
+
+  const TokenAdapter = new TokenAdapter__factory(deployer)
+  const busdTokenAdapter = (await upgrades.deployProxy(TokenAdapter, [
+    bookKeeper.address,
+    formatBytes32String("BUSD"),
+    BUSD.address,
+  ])) as TokenAdapter
+
+  const usdtTokenAdapter = (await upgrades.deployProxy(TokenAdapter, [
+    bookKeeper.address,
+    formatBytes32String("USDT"),
+    USDT.address,
+  ])) as TokenAdapter
+
+  const StablecoinAdapter = new StablecoinAdapter__factory(deployer)
+  const stablecoinAdapter = (await upgrades.deployProxy(StablecoinAdapter, [
+    bookKeeper.address,
+    alpacaStablecoin.address,
+  ])) as StablecoinAdapter
+
+  // Deploy StabilityFeeCollector
+  const StabilityFeeCollector = new StabilityFeeCollector__factory(deployer)
+  const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
+    bookKeeper.address,
+  ])) as StabilityFeeCollector
+
+  await stabilityFeeCollector.init(formatBytes32String("BUSD"))
+  await stabilityFeeCollector.init(formatBytes32String("USDT"))
 
   const SystemDebtEngine = new SystemDebtEngine__factory(deployer)
   const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
@@ -225,26 +164,33 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     systemDebtEngine.address,
   ])) as LiquidationEngine
 
-  const PriceOracle = new PriceOracle__factory(deployer)
-  const priceOracle = (await upgrades.deployProxy(PriceOracle, [bookKeeper.address])) as PriceOracle
-
-  const PriceFeed = new MockPriceFeed__factory(deployer)
-  const priceFeed = await up
-
-  const ShowStopper = new ShowStopper__factory(deployer)
-  const showStopper = (await upgrades.deployProxy(ShowStopper)) as ShowStopper
-
   await showStopper.setBookKeeper(bookKeeper.address)
   await showStopper.setLiquidationEngine(liquidationEngine.address)
   await showStopper.setSystemDebtEngine(systemDebtEngine.address)
   await showStopper.setPriceOracle(priceOracle.address)
 
+  await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), liquidationEngine.address)
+  await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), showStopper.address)
+  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), priceOracle.address)
+  await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), busdTokenAdapter.address)
+  await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), usdtTokenAdapter.address)
+  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
+  await bookKeeper.grantRole(await bookKeeper.STABILITY_FEE_COLLECTOR_ROLE(), stabilityFeeCollector.address)
+  await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), stablecoinAdapter.address)
+
   return {
+    positionManager,
+    alpacaStablecoinProxyActions,
+    stabilityFeeCollector,
+    busdTokenAdapter,
+    usdtTokenAdapter,
+    stablecoinAdapter,
     showStopper,
     bookKeeper,
     liquidationEngine,
     systemDebtEngine,
     priceOracle,
+    getPositions,
   }
 }
 
@@ -261,15 +207,44 @@ describe("ShowStopper", () => {
   let bobAddress: string
   let devAddress: string
 
+  // Proxy wallet
+  let deployerProxyWallet: ProxyWallet
+  let aliceProxyWallet: ProxyWallet
+  let bobProxyWallet: ProxyWallet
+
+  // Contract
+  let positionManager: PositionManager
+  let alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions
   let showStopper: ShowStopper
   let bookKeeper: BookKeeper
   let liquidationEngine: LiquidationEngine
   let systemDebtEngine: SystemDebtEngine
   let priceOracle: PriceOracle
   let priceFeed: MockPriceFeed
+  let stabilityFeeCollector: StabilityFeeCollector
+  let busdTokenAdapter: TokenAdapter
+  let usdtTokenAdapter: TokenAdapter
+  let stablecoinAdapter: StablecoinAdapter
+  let getPositions: GetPositions
+
+  let showStopperAsAlice: ShowStopper
+  let stablecoinAdapterAsAlice: StablecoinAdapter
+  let bookKeeperAsAlice: BookKeeper
 
   beforeEach(async () => {
-    ;({ showStopper, bookKeeper, liquidationEngine, systemDebtEngine, priceOracle } = await loadFixtureHandler())
+    ;({
+      alpacaStablecoinProxyActions,
+      positionManager,
+      stabilityFeeCollector,
+      busdTokenAdapter,
+      usdtTokenAdapter,
+      stablecoinAdapter,
+      showStopper,
+      bookKeeper,
+      liquidationEngine,
+      systemDebtEngine,
+      priceOracle,
+    } = await loadFixtureHandler())
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
       deployer.getAddress(),
@@ -277,6 +252,29 @@ describe("ShowStopper", () => {
       bob.getAddress(),
       dev.getAddress(),
     ])
+    ;({
+      proxyWallets: [deployerProxyWallet, aliceProxyWallet, bobProxyWallet],
+    } = await loadProxyWalletFixtureHandler())
+
+    const busdAsAlice = BEP20__factory.connect(await busdTokenAdapter.collateralToken(), alice)
+    const busdAsBob = BEP20__factory.connect(await busdTokenAdapter.collateralToken(), bob)
+
+    busdAsAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+    busdAsBob.approve(bobProxyWallet.address, WeiPerWad.mul(10000))
+
+    const usdtAsAlice = BEP20__factory.connect(await usdtTokenAdapter.collateralToken(), alice)
+    const usdtAsBob = BEP20__factory.connect(await usdtTokenAdapter.collateralToken(), bob)
+
+    usdtAsAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+    usdtAsBob.approve(bobProxyWallet.address, WeiPerWad.mul(10000))
+
+    showStopperAsAlice = ShowStopper__factory.connect(showStopper.address, alice)
+    stablecoinAdapterAsAlice = StablecoinAdapter__factory.connect(stablecoinAdapter.address, alice)
+    bookKeeperAsAlice = BookKeeper__factory.connect(bookKeeper.address, alice)
+
+    const stablecoinAsAlice = AlpacaStablecoin__factory.connect(await stablecoinAdapter.stablecoin(), alice)
+
+    stablecoinAsAlice.approve(stablecoinAdapter.address, WeiPerWad.mul(10000))
   })
 
   describe("#cage", () => {
@@ -324,9 +322,30 @@ describe("ShowStopper", () => {
         expect(await priceOracle.live()).to.be.equal(0)
       })
     })
+  })
+  describe("#cage(collateralPoolId)", () => {
+    context("deployer cage BUSD pool", () => {
+      it("should be able to cage", async () => {
+        // 1.
+        //  a. open a new position
+        //  b. lock ibBUSD
+        //  c. mint AUSD
+        const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "openLockTokenAndDraw",
+          [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            busdTokenAdapter.address,
+            stablecoinAdapter.address,
+            formatBytes32String("BUSD"),
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(5),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
 
-    context("", () => {
-      it("", async () => {
         await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
         await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
         await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
@@ -334,7 +353,429 @@ describe("ShowStopper", () => {
 
         await showStopper["cage()"]()
 
-        await showStopper["cage(bytes32)"](formatBytes32String("busd"))
+        await showStopper["cage(bytes32)"](formatBytes32String("BUSD"))
+
+        expect(await showStopper.cagePrice(formatBytes32String("BUSD"))).to.be.equal(WeiPerRay)
+        expect(await showStopper.totalDebtShare(formatBytes32String("BUSD"))).to.be.equal(WeiPerWad.mul(5))
+      })
+    })
+  })
+  describe("#accumulateBadDebt, #redeemLockedCollateral", () => {
+    context("when the caller is not the position owner", () => {
+      it("should be able to redeemLockedCollateral", async () => {
+        // alice's position #1
+        //  a. open a new position
+        //  b. lock ibBUSD
+        //  c. mint AUSD
+        const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "openLockTokenAndDraw",
+          [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            busdTokenAdapter.address,
+            stablecoinAdapter.address,
+            formatBytes32String("BUSD"),
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(5),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
+
+        const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+        const positionAddress = await positionManager.positions(positionId)
+
+        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
+        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
+        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
+        await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), showStopper.address)
+
+        await showStopper["cage()"]()
+
+        await showStopper["cage(bytes32)"](formatBytes32String("BUSD"))
+
+        // accumulate bad debt posiion #1
+        await showStopper.accumulateBadDebt(formatBytes32String("BUSD"), positionAddress)
+
+        // redeem lock collateral position #1
+        const redeemLockedCollateralCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "redeemLockedCollateral",
+          [
+            positionManager.address,
+            positionId,
+            busdTokenAdapter.address,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        await expect(
+          bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, redeemLockedCollateralCall)
+        ).to.be.revertedWith("owner not allowed")
+      })
+    })
+    context("when the caller is the position owner", () => {
+      it("should be able to redeemLockedCollateral", async () => {
+        // alice's position #1
+        //  a. open a new position
+        //  b. lock ibBUSD
+        //  c. mint AUSD
+        const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "openLockTokenAndDraw",
+          [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            busdTokenAdapter.address,
+            stablecoinAdapter.address,
+            formatBytes32String("BUSD"),
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(5),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
+
+        const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+        const positionAddress = await positionManager.positions(positionId)
+
+        // bob's position #2
+        //  a. open a new position
+        //  b. lock ibBUSD
+        //  c. mint AUSD
+        const openLockTokenAndDraw2Call = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "openLockTokenAndDraw",
+          [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            busdTokenAdapter.address,
+            stablecoinAdapter.address,
+            formatBytes32String("BUSD"),
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(5),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDraw2Call)
+
+        const positionId2 = await positionManager.ownerLastPositionId(bobProxyWallet.address)
+        const positionAddress2 = await positionManager.positions(positionId2)
+
+        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
+        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
+        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
+        await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), showStopper.address)
+
+        await showStopper["cage()"]()
+
+        await showStopper["cage(bytes32)"](formatBytes32String("BUSD"))
+
+        // accumulate bad debt posiion #1
+        await showStopper.accumulateBadDebt(formatBytes32String("BUSD"), positionAddress)
+        const position1 = await bookKeeper.positions(formatBytes32String("BUSD"), positionAddress)
+        expect(position1.lockedCollateral).to.be.equal(WeiPerWad.mul(5))
+        expect(position1.debtShare).to.be.equal(0)
+        expect(await bookKeeper.collateralToken(formatBytes32String("BUSD"), showStopper.address)).to.be.equal(
+          WeiPerWad.mul(5)
+        )
+        expect(await bookKeeper.systemBadDebt(systemDebtEngine.address)).to.be.equal(WeiPerRad.mul(5))
+
+        // accumulate bad debt posiion #2
+        await showStopper.accumulateBadDebt(formatBytes32String("BUSD"), positionAddress2)
+        const position2 = await bookKeeper.positions(formatBytes32String("BUSD"), positionAddress2)
+        expect(position2.lockedCollateral).to.be.equal(WeiPerWad.mul(5))
+        expect(position2.debtShare).to.be.equal(0)
+        expect(await bookKeeper.collateralToken(formatBytes32String("BUSD"), showStopper.address)).to.be.equal(
+          WeiPerWad.mul(10)
+        )
+        expect(await bookKeeper.systemBadDebt(systemDebtEngine.address)).to.be.equal(WeiPerRad.mul(10))
+
+        // redeem lock collateral position #1
+        const redeemLockedCollateralCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "redeemLockedCollateral",
+          [
+            positionManager.address,
+            positionId,
+            busdTokenAdapter.address,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        await aliceProxyWallet["execute(address,bytes)"](
+          alpacaStablecoinProxyActions.address,
+          redeemLockedCollateralCall
+        )
+        expect((await bookKeeper.positions(formatBytes32String("BUSD"), positionAddress)).lockedCollateral).to.be.equal(
+          0
+        )
+        expect(await bookKeeper.collateralToken(formatBytes32String("BUSD"), aliceProxyWallet.address)).to.be.equal(
+          WeiPerWad.mul(5)
+        )
+
+        // redeem lock collateral position #2
+        const redeemLockedCollateral2Call = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "redeemLockedCollateral",
+          [
+            positionManager.address,
+            positionId2,
+            busdTokenAdapter.address,
+            ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]),
+          ]
+        )
+        await bobProxyWallet["execute(address,bytes)"](
+          alpacaStablecoinProxyActions.address,
+          redeemLockedCollateral2Call
+        )
+        expect(
+          (await bookKeeper.positions(formatBytes32String("BUSD"), positionAddress2)).lockedCollateral
+        ).to.be.equal(0)
+        expect(await bookKeeper.collateralToken(formatBytes32String("BUSD"), bobProxyWallet.address)).to.be.equal(
+          WeiPerWad.mul(5)
+        )
+      })
+    })
+  })
+  describe("#finalizeDebt, #finalizeCashPrice", () => {
+    context("when finalizeDebt and finalizeCashPrice", () => {
+      it("should be able to call", async () => {
+        // alice's position #1
+        //  a. open a new position
+        //  b. lock ibBUSD
+        //  c. mint AUSD
+        const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "openLockTokenAndDraw",
+          [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            busdTokenAdapter.address,
+            stablecoinAdapter.address,
+            formatBytes32String("BUSD"),
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(5),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
+
+        const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+        const positionAddress = await positionManager.positions(positionId)
+
+        // bob's position #2
+        //  a. open a new position
+        //  b. lock ibBUSD
+        //  c. mint AUSD
+        const openLockTokenAndDraw2Call = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "openLockTokenAndDraw",
+          [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            busdTokenAdapter.address,
+            stablecoinAdapter.address,
+            formatBytes32String("BUSD"),
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(5),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDraw2Call)
+
+        const positionId2 = await positionManager.ownerLastPositionId(bobProxyWallet.address)
+        const positionAddress2 = await positionManager.positions(positionId2)
+
+        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
+        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
+        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
+        await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), showStopper.address)
+
+        await showStopper["cage()"]()
+
+        await showStopper["cage(bytes32)"](formatBytes32String("BUSD"))
+
+        // accumulate bad debt posiion #1
+        await showStopper.accumulateBadDebt(formatBytes32String("BUSD"), positionAddress)
+        const position1 = await bookKeeper.positions(formatBytes32String("BUSD"), positionAddress)
+        expect(position1.lockedCollateral).to.be.equal(WeiPerWad.mul(5))
+        expect(position1.debtShare).to.be.equal(0)
+        expect(await bookKeeper.collateralToken(formatBytes32String("BUSD"), showStopper.address)).to.be.equal(
+          WeiPerWad.mul(5)
+        )
+        expect(await bookKeeper.systemBadDebt(systemDebtEngine.address)).to.be.equal(WeiPerRad.mul(5))
+
+        // accumulate bad debt posiion #2
+        await showStopper.accumulateBadDebt(formatBytes32String("BUSD"), positionAddress2)
+        const position2 = await bookKeeper.positions(formatBytes32String("BUSD"), positionAddress2)
+        expect(position2.lockedCollateral).to.be.equal(WeiPerWad.mul(5))
+        expect(position2.debtShare).to.be.equal(0)
+        expect(await bookKeeper.collateralToken(formatBytes32String("BUSD"), showStopper.address)).to.be.equal(
+          WeiPerWad.mul(10)
+        )
+        expect(await bookKeeper.systemBadDebt(systemDebtEngine.address)).to.be.equal(WeiPerRad.mul(10))
+
+        // finalize debt
+        await showStopper.finalizeDebt()
+        // total debt
+        expect(await showStopper.debt()).to.be.equal(WeiPerRad.mul(10))
+
+        // finalize cash price
+        await showStopper.finalizeCashPrice(formatBytes32String("BUSD"))
+        // badDebtAccumulator / totalDebt = 10000000000000000000000000000000000000000000000 / 10000000000000000000 = 1000000000000000000000000000
+        expect(await showStopper.finalCashPrice(formatBytes32String("BUSD"))).to.be.equal(WeiPerRay)
+      })
+    })
+  })
+  describe("#accumulateStablecoin, #redeemStablecoin", () => {
+    context("when redeem stablecoin", () => {
+      it("should be able to accumulateStablecoin, redeemStablecoin", async () => {
+        // alice's position #1
+        //  a. open a new position
+        //  b. lock BUSD
+        //  c. mint AUSD
+        const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "openLockTokenAndDraw",
+          [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            busdTokenAdapter.address,
+            stablecoinAdapter.address,
+            formatBytes32String("BUSD"),
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(5),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
+
+        const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+        const positionAddress = await positionManager.positions(positionId)
+
+        // bob's position #2
+        //  a. open a new position
+        //  b. lock BUSD
+        //  c. mint AUSD
+        const openLockTokenAndDraw2Call = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "openLockTokenAndDraw",
+          [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            busdTokenAdapter.address,
+            stablecoinAdapter.address,
+            formatBytes32String("BUSD"),
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(5),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ]
+        )
+        await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDraw2Call)
+
+        const positionId2 = await positionManager.ownerLastPositionId(bobProxyWallet.address)
+        const positionAddress2 = await positionManager.positions(positionId2)
+
+        // bob's position #3
+        //  a. open a new position
+        //  b. lock USDT
+        //  c. mint AUSD
+        const openLockTokenAndDraw3Call = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+          "openLockTokenAndDraw",
+          [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            usdtTokenAdapter.address,
+            stablecoinAdapter.address,
+            formatBytes32String("USDT"),
+            WeiPerWad.mul(10),
+            WeiPerWad.mul(5),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]),
+          ]
+        )
+        await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDraw3Call)
+
+        const positionId3 = await positionManager.ownerLastPositionId(bobProxyWallet.address)
+        const positionAddress3 = await positionManager.positions(positionId3)
+
+        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
+        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
+        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
+        await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), showStopper.address)
+
+        await showStopper["cage()"]()
+
+        await showStopper["cage(bytes32)"](formatBytes32String("BUSD"))
+        await showStopper["cage(bytes32)"](formatBytes32String("USDT"))
+
+        // accumulate bad debt posiion #1
+        await showStopper.accumulateBadDebt(formatBytes32String("BUSD"), positionAddress)
+        const position1 = await bookKeeper.positions(formatBytes32String("BUSD"), positionAddress)
+        expect(position1.lockedCollateral).to.be.equal(WeiPerWad.mul(5))
+        expect(position1.debtShare).to.be.equal(0)
+        expect(await bookKeeper.collateralToken(formatBytes32String("BUSD"), showStopper.address)).to.be.equal(
+          WeiPerWad.mul(5)
+        )
+        expect(await bookKeeper.systemBadDebt(systemDebtEngine.address)).to.be.equal(WeiPerRad.mul(5))
+
+        // accumulate bad debt posiion #2
+        await showStopper.accumulateBadDebt(formatBytes32String("BUSD"), positionAddress2)
+        const position2 = await bookKeeper.positions(formatBytes32String("BUSD"), positionAddress2)
+        expect(position2.lockedCollateral).to.be.equal(WeiPerWad.mul(5))
+        expect(position2.debtShare).to.be.equal(0)
+        expect(await bookKeeper.collateralToken(formatBytes32String("BUSD"), showStopper.address)).to.be.equal(
+          WeiPerWad.mul(10)
+        )
+        expect(await bookKeeper.systemBadDebt(systemDebtEngine.address)).to.be.equal(WeiPerRad.mul(10))
+
+        // accumulate bad debt posiion #3
+        await showStopper.accumulateBadDebt(formatBytes32String("USDT"), positionAddress3)
+        const position3 = await bookKeeper.positions(formatBytes32String("USDT"), positionAddress3)
+        expect(position3.lockedCollateral).to.be.equal(WeiPerWad.mul(5))
+        expect(position3.debtShare).to.be.equal(0)
+        expect(await bookKeeper.collateralToken(formatBytes32String("USDT"), showStopper.address)).to.be.equal(
+          WeiPerWad.mul(5)
+        )
+        expect(await bookKeeper.systemBadDebt(systemDebtEngine.address)).to.be.equal(WeiPerRad.mul(15))
+
+        // finalize debt
+        await showStopper.finalizeDebt()
+        expect(await showStopper.debt()).to.be.equal(WeiPerRad.mul(15))
+
+        // finalize cash price BUSD
+        await showStopper.finalizeCashPrice(formatBytes32String("BUSD"))
+        // badDebtAccumulator / totalDebt = 10000000000000000000000000000000000000000000000 / 15000000000000000000 = 666666666666666666666666666
+        expect(await showStopper.finalCashPrice(formatBytes32String("BUSD"))).to.be.equal("666666666666666666666666666")
+        // finalize cash price USDT
+        await showStopper.finalizeCashPrice(formatBytes32String("USDT"))
+        // badDebtAccumulator / totalDebt = 5000000000000000000000000000000000000000000000 / 15000000000000000000 = 333333333333333333333333333
+        expect(await showStopper.finalCashPrice(formatBytes32String("USDT"))).to.be.equal("333333333333333333333333333")
+
+        // accumulate stablecoin
+        await stablecoinAdapterAsAlice.deposit(
+          aliceAddress,
+          WeiPerWad.mul(5),
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+        )
+
+        await bookKeeperAsAlice.whitelist(showStopper.address)
+
+        await showStopperAsAlice.accumulateStablecoin(WeiPerWad.mul(5))
+
+        // redeem stablecoin
+        await showStopperAsAlice.redeemStablecoin(formatBytes32String("BUSD"), WeiPerWad.mul(5))
+        // WAD(5000000000000000000 * 666666666666666666666666666) = 3333333333333333333
+        expect(await bookKeeper.collateralToken(formatBytes32String("BUSD"), aliceAddress)).to.be.equal(
+          "3333333333333333333"
+        )
+        await showStopperAsAlice.redeemStablecoin(formatBytes32String("USDT"), WeiPerWad.mul(5))
+        // WAD(5000000000000000000 * 333333333333333333333333333) = 3333333333333333333
+        expect(await bookKeeper.collateralToken(formatBytes32String("USDT"), aliceAddress)).to.be.equal(
+          "1666666666666666666"
+        )
+
+        // over redeem stablecoin
+        await expect(
+          showStopperAsAlice.redeemStablecoin(formatBytes32String("USDT"), WeiPerWad.mul(5))
+        ).to.be.revertedWith("ShowStopper/insufficient-stablecoin-accumulator-balance")
       })
     })
   })
