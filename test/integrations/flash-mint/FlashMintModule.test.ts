@@ -24,6 +24,12 @@ import {
   FlashMintArbitrager,
   BookKeeperFlashMintArbitrager__factory,
   BookKeeperFlashMintArbitrager,
+  CollateralPoolConfig__factory,
+  CollateralPoolConfig,
+  SimplePriceFeed__factory,
+  SimplePriceFeed,
+  TokenAdapter__factory,
+  TokenAdapter,
 } from "../../../typechain"
 import {
   PancakeFactory__factory,
@@ -60,16 +66,18 @@ type fixture = {
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer, alice, bob, dev] = await ethers.getSigners()
 
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [])) as CollateralPoolConfig
+
   // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [collateralPoolConfig.address])) as BookKeeper
   await bookKeeper.deployed()
 
-  await bookKeeper.init(COLLATERAL_POOL_ID)
-  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100000000000000))
-  await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID, WeiPerRad.mul(100000000000000))
-  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
-  await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
+  collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
 
   // Deploy mocked BEP20
   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
@@ -85,6 +93,27 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await authTokenAdapter.deployed()
   await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), authTokenAdapter.address)
   await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployer.address)
+
+  const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
+  await simplePriceFeed.deployed()
+
+  await collateralPoolConfig.initCollateralPool(
+    COLLATERAL_POOL_ID,
+    0,
+    0,
+    simplePriceFeed.address,
+    0,
+    0,
+    authTokenAdapter.address,
+    0,
+    0,
+    0
+  )
+  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100000000000000))
+  await collateralPoolConfig.setDebtCeiling(COLLATERAL_POOL_ID, WeiPerRad.mul(100000000000000))
+  await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
+  await collateralPoolConfig.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
 
   // Deploy Alpaca Stablecoin
   const AlpacaStablecoin = (await ethers.getContractFactory("AlpacaStablecoin", deployer)) as AlpacaStablecoin__factory
