@@ -1,6 +1,5 @@
 import { ethers, upgrades, waffle } from "hardhat"
 import { Signer, BigNumber, Wallet } from "ethers"
-import * as TimeHelpers from "../../helper/time"
 import { MaxUint256 } from "@ethersproject/constants"
 
 import {
@@ -43,9 +42,10 @@ import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
 
-import * as AssertHelpers from "../../helper/assert"
+import { advanceBlock } from "../../helper/time"
 
 const { formatBytes32String } = ethers.utils
+const { Zero } = ethers.constants
 
 type fixture = {
   proxyWalletRegistry: ProxyWalletRegistry
@@ -67,10 +67,6 @@ type fixture = {
 
 const ALPACA_PER_BLOCK = ethers.utils.parseEther("100")
 const COLLATERAL_POOL_ID = formatBytes32String("ibDUMMY")
-const CLOSE_FACTOR_BPS = BigNumber.from(5000)
-const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(10250)
-const TREASURY_FEE_BPS = BigNumber.from(100)
-const BPS = BigNumber.from(10000)
 
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer, alice, bob, dev] = await ethers.getSigners()
@@ -233,6 +229,7 @@ describe("GetPositions", () => {
 
   let deployerProxyWallet: ProxyWallet
   let aliceProxyWallet: ProxyWallet
+  let bobProxyWallet: ProxyWallet
 
   let ibTokenAdapter: IbTokenAdapter
   let stablecoinAdapter: StablecoinAdapter
@@ -243,6 +240,7 @@ describe("GetPositions", () => {
   let fairLaunch: FairLaunch
 
   let positionManager: PositionManager
+  let positionManagerAsBob: PositionManager
 
   let stabilityFeeCollector: StabilityFeeCollector
 
@@ -269,7 +267,7 @@ describe("GetPositions", () => {
 
   before(async () => {
     ;({
-      proxyWallets: [deployerProxyWallet, aliceProxyWallet],
+      proxyWallets: [deployerProxyWallet, aliceProxyWallet, bobProxyWallet],
     } = await waffle.loadFixture(loadProxyWalletFixtureHandler))
   })
 
@@ -310,10 +308,11 @@ describe("GetPositions", () => {
     simplePriceFeedAsDeployer = SimplePriceFeed__factory.connect(simplePriceFeed.address, deployer)
 
     bookKeeperAsBob = BookKeeper__factory.connect(bookKeeper.address, bob)
+    positionManagerAsBob = PositionManager__factory.connect(positionManager.address, bob)
   })
   describe("#getPositionWithSafetyBuffer", async () => {
     context("multiple positions at risks", async () => {
-      it("should query all positions at risks", async () => {
+      it("should query all positions with safety buffer and its debt share", async () => {
         await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
 
         await ibDUMMYasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
@@ -329,6 +328,7 @@ describe("GetPositions", () => {
           ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
         ])
         await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+        await advanceBlock()
 
         const openPositionCall2 = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
           positionManager.address,
@@ -342,6 +342,7 @@ describe("GetPositions", () => {
           ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
         ])
         await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall2)
+        await advanceBlock()
 
         const openPositionCall3 = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
           positionManager.address,
@@ -355,11 +356,205 @@ describe("GetPositions", () => {
           ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
         ])
         await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall3)
+        await advanceBlock()
 
         await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, ethers.utils.parseEther("0.9").mul(1e9))
+
         const positions = await getPositions.getPositionWithSafetyBuffer(positionManager.address, 1, 40)
-        console.log(positions.debtShares)
-        console.log(positions.safetyBuffers)
+        expect(positions.debtShares[0]).to.be.equal(WeiPerWad)
+        expect(positions.debtShares[1]).to.be.equal(WeiPerWad)
+        expect(positions.debtShares[2]).to.be.equal(WeiPerWad)
+        expect(positions.safetyBuffers[0]).to.be.equal(Zero)
+        expect(positions.safetyBuffers[1]).to.be.equal(WeiPerRad.mul(8).div(10))
+        expect(positions.safetyBuffers[2]).to.be.equal(WeiPerRad.mul(35).div(100))
+      })
+    })
+  })
+
+  describe("#getAllPostionsAsc, #getPositionsAsc, #getAllPositionsDesc, #getPositionsDesc", async () => {
+    context("when Bob opened 11 positions", async () => {
+      context("when calling each getPositions function", async () => {
+        it("should return correctly", async () => {
+          const open = async () => {
+            const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("openLockTokenAndDraw", [
+              positionManagerAsBob.address,
+              stabilityFeeCollector.address,
+              ibTokenAdapter.address,
+              stablecoinAdapter.address,
+              COLLATERAL_POOL_ID,
+              ethers.utils.parseEther("2"),
+              ethers.utils.parseEther("1"),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ])
+            return bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall)
+          }
+
+          const open11 = async () => {
+            await ibDUMMYasBob.approve(bobProxyWallet.address, MaxUint256)
+            for (let i = 0; i < 11; i++) {
+              await (await open()).wait()
+              // call advanceBlock to prevent unknown random revert
+              await advanceBlock()
+            }
+          }
+
+          await open11()
+
+          /**
+           * #getAllPositionsDesc
+           */
+          {
+            const [ids, positions, collateralPools] = await getPositions.getAllPositionsAsc(
+              positionManagerAsBob.address,
+              bobProxyWallet.address
+            )
+
+            expect(ids.length).to.be.equal(11)
+            expect(positions.length).to.be.equal(11)
+            expect(collateralPools.length).to.be.equal(11)
+            expect(ids[0]).to.be.equal(1)
+            expect(ids[10]).to.be.equal(11)
+          }
+
+          /**
+           * #getAllPositionsDesc
+           */
+          {
+            const [ids, positions, collateralPools] = await getPositions.getAllPositionsDesc(
+              positionManagerAsBob.address,
+              bobProxyWallet.address
+            )
+
+            expect(ids.length).to.be.equal(11)
+            expect(positions.length).to.be.equal(11)
+            expect(collateralPools.length).to.be.equal(11)
+            expect(ids[0]).to.be.equal(11)
+            expect(ids[10]).to.be.equal(1)
+          }
+
+          /**
+           * #getPositionsAsc
+           */
+          {
+            // 1st page
+            let from = await positionManagerAsBob.ownerFirstPositionId(bobProxyWallet.address)
+            let [ids, positions, collateralPools] = await getPositions.getPositionsAsc(
+              positionManagerAsBob.address,
+              from,
+              4
+            )
+            expect(ids.length).to.be.equal(4)
+            expect(positions.length).to.be.equal(4)
+            expect(collateralPools.length).to.be.equal(4)
+            expect(ids[0]).to.be.equal(1)
+            expect(ids[3]).to.be.equal(4)
+
+            // 2nd page
+            from = ids[3]
+            ;[ids, positions, collateralPools] = await getPositions.getPositionsAsc(
+              positionManagerAsBob.address,
+              from,
+              4
+            )
+            expect(ids.length).to.be.equal(4)
+            expect(positions.length).to.be.equal(4)
+            expect(collateralPools.length).to.be.equal(4)
+            expect(ids[0]).to.be.equal(4)
+            expect(ids[3]).to.be.equal(7)
+
+            // 3rd page
+            from = ids[3]
+            ;[ids, positions, collateralPools] = await getPositions.getPositionsAsc(
+              positionManagerAsBob.address,
+              from,
+              4
+            )
+            expect(ids.length).to.be.equal(4)
+            expect(positions.length).to.be.equal(4)
+            expect(collateralPools.length).to.be.equal(4)
+            expect(ids[0]).to.be.equal(7)
+            expect(ids[3]).to.be.equal(10)
+
+            // 4th page
+            from = ids[3]
+            ;[ids, positions, collateralPools] = await getPositions.getPositionsAsc(
+              positionManagerAsBob.address,
+              from,
+              4
+            )
+
+            // even the page is not filled up, the size will be four
+            expect(ids.length).to.be.equal(4)
+            expect(positions.length).to.be.equal(4)
+            expect(collateralPools.length).to.be.equal(4)
+            expect(ids[0]).to.be.equal(10)
+            expect(ids[1]).to.be.equal(11)
+            expect(ids[2]).to.be.equal(0)
+            expect(ids[3]).to.be.equal(0)
+          }
+
+          /**
+           * #getPositionsDesc
+           */
+          {
+            // 1st page
+            let from = await positionManagerAsBob.ownerLastPositionId(bobProxyWallet.address)
+            let [ids, positions, collateralPools] = await getPositions.getPositionsDesc(
+              positionManagerAsBob.address,
+              from,
+              4
+            )
+            expect(ids.length).to.be.equal(4)
+            expect(positions.length).to.be.equal(4)
+            expect(collateralPools.length).to.be.equal(4)
+            expect(ids[0]).to.be.equal(11)
+            expect(ids[3]).to.be.equal(8)
+
+            // 2nd page
+            from = ids[3]
+            ;[ids, positions, collateralPools] = await getPositions.getPositionsDesc(
+              positionManagerAsBob.address,
+              from,
+              4
+            )
+            expect(ids.length).to.be.equal(4)
+            expect(positions.length).to.be.equal(4)
+            expect(collateralPools.length).to.be.equal(4)
+            expect(ids[0]).to.be.equal(8)
+            expect(ids[3]).to.be.equal(5)
+
+            // 3rd page
+            from = ids[3]
+            ;[ids, positions, collateralPools] = await getPositions.getPositionsDesc(
+              positionManagerAsBob.address,
+              from,
+              4
+            )
+            expect(ids.length).to.be.equal(4)
+            expect(positions.length).to.be.equal(4)
+            expect(collateralPools.length).to.be.equal(4)
+            expect(ids[0]).to.be.equal(5)
+            expect(ids[3]).to.be.equal(2)
+
+            // 4th page
+            from = ids[3]
+            ;[ids, positions, collateralPools] = await getPositions.getPositionsDesc(
+              positionManagerAsBob.address,
+              from,
+              4
+            )
+
+            // even the page is not filled up, the size will be four
+            expect(ids.length).to.be.equal(4)
+            expect(positions.length).to.be.equal(4)
+            expect(collateralPools.length).to.be.equal(4)
+            expect(ids[0]).to.be.equal(2)
+            expect(ids[1]).to.be.equal(1)
+            expect(ids[2]).to.be.equal(0)
+            expect(ids[3]).to.be.equal(0)
+          }
+        })
       })
     })
   })
