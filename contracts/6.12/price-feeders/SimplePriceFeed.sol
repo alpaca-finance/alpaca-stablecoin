@@ -18,7 +18,7 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
-    priceLife = 1 days; //[seconds] how old the price is considered stale, default 1 day
+    priceLife = 1 days; // [seconds] how old the price is considered stale, default 1 day
 
     // Grant the contract deployer OWNER role: it will be able
     // to grant and revoke any roles afterward

@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./PositionHandler.sol";
 import "../interfaces/IManager.sol";
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IGenericTokenAdapter.sol";
+import "../interfaces/IShowStopper.sol";
 
 /// @title PositionManager is a contract for manging positions
-contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IManager {
+contract PositionManager is PausableUpgradeable, AccessControlUpgradeable, IManager {
   /// @dev Address of a BookKeeper
   address public override bookKeeper;
+
+  address public showStopper;
 
   /// @dev The lastest id that has been used
   uint256 public lastPositionId;
@@ -90,12 +92,16 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
 
   /// @dev Initializer for intializing PositionManager
   /// @param _bookKeeper The address of the Book Keeper
-  function initialize(address _bookKeeper) external initializer {
-    OwnableUpgradeable.__Ownable_init();
+  function initialize(address _bookKeeper, address _showStopper) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
     bookKeeper = _bookKeeper;
+    showStopper = _showStopper;
+
+    // Grant the contract deployer the owner role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   function _safeAdd(uint256 x, uint256 y) internal pure returns (uint256 z) {
@@ -136,7 +142,9 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   /// @param collateralPoolId The collateral pool id that will be used for this position
   /// @param user The user address that is owned this position
   function open(bytes32 collateralPoolId, address user) public override returns (uint256) {
-    require(user != address(0), "user address(0)");
+    require(user != address(0), "PositionManager/user-address(0)");
+    (, uint256 debtAccumulatedRate, , , ) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId);
+    require(debtAccumulatedRate != 0, "PositionManager/collateralPool-not-init");
 
     lastPositionId = _safeAdd(lastPositionId, 1);
     positions[lastPositionId] = address(new PositionHandler(bookKeeper));
@@ -354,5 +362,34 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
       _safeToInt(debtShare)
     );
     emit MovePosition(sourceId, destinationId, lockedCollateral, debtShare);
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
+  }
+
+  /// @dev Redeem locked collateral from a position when emergency shutdown is activated
+  /// @param posId The position id to be adjusted
+  /// @param adapter The adapter to be called once the position is adjusted
+  /// @param data The extra data for adapter
+  function redeemLockedCollateral(
+    uint256 posId,
+    address adapter,
+    bytes calldata data
+  ) public onlyOwnerAllowed(posId) {
+    address positionAddress = positions[posId];
+    IShowStopper(showStopper).redeemLockedCollateral(
+      collateralPools[posId],
+      IGenericTokenAdapter(adapter),
+      positionAddress,
+      data
+    );
   }
 }
