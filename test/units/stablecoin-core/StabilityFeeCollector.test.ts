@@ -138,7 +138,7 @@ describe("StabilityFeeCollector", () => {
         console.log("collateralPool.debtAccumulatedRate", collateralPool.debtAccumulatedRate.toString())
         AssertHelpers.assertAlmostEqual(
           collateralPool.debtAccumulatedRate.toString(),
-          BigNumber.from("10000000000000000000000000").toString()
+          ethers.utils.parseEther("1.01").mul(1e9).toString()
         )
       })
     })
