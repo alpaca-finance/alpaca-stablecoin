@@ -61,7 +61,7 @@ contract BookKeeperFlashMintArbitrager is OwnableUpgradeable, IBookKeeperFlashBo
 
     // 2. Swap BUSD to AUSD at StableSwapModule
     vars.stableSwapToken.safeApprove(address(vars.stableSwapModule.authTokenAdapter()), uint256(-1));
-    vars.stableSwapModule.swapTokenForStablecoin(address(this), balanceAfter.sub(balanceBefore));
+    vars.stableSwapModule.swapTokenToStablecoin(address(this), balanceAfter.sub(balanceBefore));
     vars.stableSwapToken.safeApprove(address(vars.stableSwapModule.authTokenAdapter()), 0);
 
     // 3. Approve AUSD for FlashMintModule
