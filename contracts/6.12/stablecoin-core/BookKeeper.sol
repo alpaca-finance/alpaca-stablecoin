@@ -74,7 +74,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
   uint256 public totalUnbackedStablecoin; // Total unbacked stable coin  [rad]
   uint256 public totalDebtCeiling; // Total debt ceiling  [rad]
   uint256 public live; // Active Flag
-  ICollateralPoolConfig public collateralPoolConfig;
+  ICollateralPoolConfig public override collateralPoolConfig;
 
   // --- Init ---
   function initialize(address _collateralPoolConfig) external initializer {

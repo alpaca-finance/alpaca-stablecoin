@@ -17,6 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import "../interfaces/ICollateralPoolConfig.sol";
+
 pragma solidity 0.6.12;
 
 interface IBookKeeper {
@@ -100,4 +102,6 @@ interface IBookKeeper {
   function whitelist(address toBeWhitelistedAddress) external;
 
   function blacklist(address toBeBlacklistedAddress) external;
+
+  function collateralPoolConfig() external view returns (ICollateralPoolConfig);
 }
