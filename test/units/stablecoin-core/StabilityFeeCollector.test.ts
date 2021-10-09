@@ -16,8 +16,10 @@ import {
   TokenAdapter,
   BEP20,
   BEP20__factory,
+  AccessControlConfig__factory,
+  AccessControlConfig,
 } from "../../../typechain"
-import { smoddit, ModifiableContract } from "@eth-optimism/smock"
+import { smoddit, ModifiableContract, ModifiableContractFactory } from "@eth-optimism/smock"
 
 import * as TimeHelpers from "../../helper/time"
 import * as AssertHelpers from "../../helper/assert"
@@ -31,18 +33,33 @@ const { formatBytes32String } = ethers.utils
 type fixture = {
   stabilityFeeCollector: StabilityFeeCollector
   bookKeeper: ModifiableContract
-  collateralPoolConfig: ModifiableContract
+  collateralPoolConfig: CollateralPoolConfig
+  accessControlConfig: AccessControlConfig
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
 
-  const CollateralPoolConfig = await smoddit("CollateralPoolConfig")
-  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [])) as ModifiableContract
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const accessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [
+    accessControlConfig.address,
+  ])) as CollateralPoolConfig
 
   // Deploy mocked BookKeeper
   const BookKeeper = await smoddit("BookKeeper")
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [collateralPoolConfig.address])) as ModifiableContract
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [
+    collateralPoolConfig.address,
+    accessControlConfig.address,
+  ])) as ModifiableContract
 
   const SimplePriceFeed = await smoddit("SimplePriceFeed")
   const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as ModifiableContract
@@ -66,12 +83,11 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     bookKeeper.address,
   ])) as StabilityFeeCollector
 
-  await collateralPoolConfig.grantRole(
-    await collateralPoolConfig.STABILITY_FEE_COLLECTOR_ROLE(),
+  await accessControlConfig.grantRole(
+    await accessControlConfig.STABILITY_FEE_COLLECTOR_ROLE(),
     stabilityFeeCollector.address
   )
-  await bookKeeper.grantRole(await collateralPoolConfig.STABILITY_FEE_COLLECTOR_ROLE(), stabilityFeeCollector.address)
-  await collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
+  await accessControlConfig.grantRole(await accessControlConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
 
   await collateralPoolConfig.initCollateralPool(
     formatBytes32String("BNB"),
@@ -87,7 +103,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     AddressZero
   )
 
-  return { stabilityFeeCollector, bookKeeper, collateralPoolConfig }
+  return { stabilityFeeCollector, bookKeeper, collateralPoolConfig, accessControlConfig }
 }
 
 describe("StabilityFeeCollector", () => {
@@ -101,13 +117,19 @@ describe("StabilityFeeCollector", () => {
 
   // Contracts
   let bookKeeper: ModifiableContract
-  let collateralPoolConfig: ModifiableContract
+  let collateralPoolConfig: CollateralPoolConfig
+  let collateralPoolConfigAsAlice: CollateralPoolConfig
+
+  let accessControlConfig: AccessControlConfig
+  let accessControlConfigAsAlice: AccessControlConfig
 
   let stabilityFeeCollector: StabilityFeeCollector
   let stabilityFeeCollectorAsAlice: StabilityFeeCollector
 
   beforeEach(async () => {
-    ;({ stabilityFeeCollector, bookKeeper, collateralPoolConfig } = await waffle.loadFixture(loadFixtureHandler))
+    ;({ stabilityFeeCollector, bookKeeper, collateralPoolConfig, accessControlConfig } = await waffle.loadFixture(
+      loadFixtureHandler
+    ))
     ;[deployer, alice] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
 
@@ -115,6 +137,16 @@ describe("StabilityFeeCollector", () => {
       stabilityFeeCollector.address,
       alice
     ) as StabilityFeeCollector
+
+    accessControlConfigAsAlice = AccessControlConfig__factory.connect(
+      accessControlConfig.address,
+      alice
+    ) as AccessControlConfig
+
+    collateralPoolConfigAsAlice = CollateralPoolConfig__factory.connect(
+      collateralPoolConfig.address,
+      alice
+    ) as CollateralPoolConfig
   })
 
   describe("#collect", () => {
@@ -145,162 +177,139 @@ describe("StabilityFeeCollector", () => {
     })
   })
 
-  // describe("#setGlobalStabilityFeeRate", () => {
-  //   context("when the caller is not the owner", async () => {
-  //     it("should revert", async () => {
-  //       await expect(stabilityFeeCollectorAsAlice.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad)).to.be.revertedWith(
-  //         "!ownerRole"
-  //       )
-  //     })
-  //   })
-  //   context("when the caller is the owner", async () => {
-  //     it("should be able to call setGlobalStabilityFeeRate", async () => {
-  //       await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
+  describe("#setGlobalStabilityFeeRate", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(stabilityFeeCollectorAsAlice.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad)).to.be.revertedWith(
+          "!ownerRole"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setGlobalStabilityFeeRate", async () => {
+        await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
 
-  //       // init BNB pool
-  //       await stabilityFeeCollector.init(formatBytes32String("BNB"))
+        await expect(stabilityFeeCollector.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad))
+          .to.emit(stabilityFeeCollector, "LogSetGlobalStabilityFeeRate")
+          .withArgs(deployerAddress, UnitHelpers.WeiPerWad)
+      })
+    })
+  })
 
-  //       await expect(stabilityFeeCollector.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad))
-  //         .to.emit(stabilityFeeCollector, "SetGlobalStabilityFeeRate")
-  //         .withArgs(deployerAddress, UnitHelpers.WeiPerWad)
-  //     })
-  //   })
-  // })
+  describe("#setSystemDebtEngine", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(stabilityFeeCollectorAsAlice.setSystemDebtEngine(bookKeeper.address)).to.be.revertedWith(
+          "!ownerRole"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setSystemDebtEngine", async () => {
+        await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
 
-  // describe("#setSystemDebtEngine", () => {
-  //   context("when the caller is not the owner", async () => {
-  //     it("should revert", async () => {
-  //       await expect(stabilityFeeCollectorAsAlice.setSystemDebtEngine(mockedBookKeeper.address)).to.be.revertedWith(
-  //         "!ownerRole"
-  //       )
-  //     })
-  //   })
-  //   context("when the caller is the owner", async () => {
-  //     it("should be able to call setSystemDebtEngine", async () => {
-  //       await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
+        await expect(stabilityFeeCollector.setSystemDebtEngine(bookKeeper.address))
+          .to.emit(stabilityFeeCollector, "LogSetSystemDebtEngine")
+          .withArgs(deployerAddress, bookKeeper.address)
+      })
+    })
+  })
 
-  //       // init BNB pool
-  //       await stabilityFeeCollector.init(formatBytes32String("BNB"))
+  describe("#setStabilityFeeRate", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        await expect(
+          collateralPoolConfigAsAlice.setStabilityFeeRate(
+            formatBytes32String("BNB"),
+            BigNumber.from("1000000000315522921573372069")
+          )
+        ).to.be.revertedWith("!ownerRole")
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setStabilityFeeRate", async () => {
+        await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
 
-  //       await expect(stabilityFeeCollector.setSystemDebtEngine(mockedBookKeeper.address))
-  //         .to.emit(stabilityFeeCollector, "SetSystemDebtEngine")
-  //         .withArgs(deployerAddress, mockedBookKeeper.address)
-  //     })
-  //   })
-  // })
+        await expect(
+          collateralPoolConfig.setStabilityFeeRate(
+            formatBytes32String("BNB"),
+            BigNumber.from("1000000000315522921573372069")
+          )
+        )
+          .to.emit(collateralPoolConfig, "LogSetStabilityFeeRate")
+          .withArgs(deployerAddress, formatBytes32String("BNB"), BigNumber.from("1000000000315522921573372069"))
+      })
+    })
+  })
 
-  // describe("#setStabilityFeeRate", () => {
-  //   context("when the caller is not the owner", async () => {
-  //     it("should revert", async () => {
-  //       await expect(
-  //         stabilityFeeCollectorAsAlice.setStabilityFeeRate(
-  //           formatBytes32String("BNB"),
-  //           BigNumber.from("1000000000315522921573372069")
-  //         )
-  //       ).to.be.revertedWith("!ownerRole")
-  //     })
-  //   })
-  //   context("when the caller is the owner", async () => {
-  //     it("should be able to call setStabilityFeeRate", async () => {
-  //       await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
+  describe("#pause", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(stabilityFeeCollectorAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
+      })
+    })
 
-  //       // init BNB pool
-  //       await stabilityFeeCollector.init(formatBytes32String("BNB"))
+    context("when role can access", () => {
+      context("and role is owner role", () => {
+        it("should be success", async () => {
+          await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
+          await stabilityFeeCollector.pause()
+        })
+      })
+    })
 
-  //       await expect(
-  //         stabilityFeeCollector.setStabilityFeeRate(
-  //           formatBytes32String("BNB"),
-  //           BigNumber.from("1000000000315522921573372069")
-  //         )
-  //       )
-  //         .to.emit(stabilityFeeCollector, "SetStabilityFeeRate")
-  //         .withArgs(deployerAddress, formatBytes32String("BNB"), BigNumber.from("1000000000315522921573372069"))
-  //     })
-  //   })
-  // })
+    context("and role is gov role", () => {
+      it("should be success", async () => {
+        await accessControlConfig.grantRole(await accessControlConfig.GOV_ROLE(), deployerAddress)
+        await stabilityFeeCollector.pause()
+      })
+    })
+  })
 
-  // describe("#pause", () => {
-  //   context("when role can't access", () => {
-  //     it("should revert", async () => {
-  //       await expect(stabilityFeeCollectorAsAlice.pause()).to.be.revertedWith("!ownerRole or !govRole")
-  //     })
-  //   })
+  describe("#unpause", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        await expect(stabilityFeeCollectorAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
+      })
+    })
 
-  //   context("when role can access", () => {
-  //     context("and role is owner role", () => {
-  //       it("should be success", async () => {
-  //         await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
-  //         await stabilityFeeCollector.pause()
-  //       })
-  //     })
-  //   })
+    context("when role can access", () => {
+      context("and role is owner role", () => {
+        it("should be success", async () => {
+          await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
+          await stabilityFeeCollector.pause()
+          await stabilityFeeCollector.unpause()
+        })
+      })
 
-  //   context("and role is gov role", () => {
-  //     it("should be success", async () => {
-  //       await stabilityFeeCollector.grantRole(await stabilityFeeCollector.GOV_ROLE(), deployerAddress)
-  //       await stabilityFeeCollector.pause()
-  //     })
-  //   })
+      context("and role is gov role", () => {
+        it("should be success", async () => {
+          await accessControlConfig.grantRole(await accessControlConfig.GOV_ROLE(), deployerAddress)
+          await stabilityFeeCollector.pause()
+          await stabilityFeeCollector.unpause()
+        })
+      })
+    })
 
-  //   context("when pause contract", () => {
-  //     it("should be success", async () => {
-  //       await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
-  //       await stabilityFeeCollector.pause()
+    context("when unpause contract", () => {
+      it("should be success", async () => {
+        await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
 
-  //       await expect(
-  //         stabilityFeeCollector.setStabilityFeeRate(
-  //           formatBytes32String("BNB"),
-  //           BigNumber.from("1000000000315522921573372069")
-  //         )
-  //       ).to.be.revertedWith("Pausable: paused")
-  //     })
-  //   })
-  // })
+        // pause contract
+        await stabilityFeeCollector.pause()
 
-  // describe("#unpause", () => {
-  //   context("when role can't access", () => {
-  //     it("should revert", async () => {
-  //       await expect(stabilityFeeCollectorAsAlice.unpause()).to.be.revertedWith("!ownerRole or !govRole")
-  //     })
-  //   })
+        // unpause contract
+        await stabilityFeeCollector.unpause()
 
-  //   context("when role can access", () => {
-  //     context("and role is owner role", () => {
-  //       it("should be success", async () => {
-  //         await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
-  //         await stabilityFeeCollector.pause()
-  //         await stabilityFeeCollector.unpause()
-  //       })
-  //     })
-
-  //     context("and role is gov role", () => {
-  //       it("should be success", async () => {
-  //         await stabilityFeeCollector.grantRole(await stabilityFeeCollector.GOV_ROLE(), deployerAddress)
-  //         await stabilityFeeCollector.pause()
-  //         await stabilityFeeCollector.unpause()
-  //       })
-  //     })
-  //   })
-
-  //   context("when unpause contract", () => {
-  //     it("should be success", async () => {
-  //       await stabilityFeeCollector.grantRole(await stabilityFeeCollector.OWNER_ROLE(), deployerAddress)
-
-  //       // pause contract
-  //       await stabilityFeeCollector.pause()
-
-  //       // unpause contract
-  //       await stabilityFeeCollector.unpause()
-
-  //       await expect(
-  //         stabilityFeeCollector.setStabilityFeeRate(
-  //           formatBytes32String("BNB"),
-  //           BigNumber.from("1000000000315522921573372069")
-  //         )
-  //       )
-  //         .to.emit(stabilityFeeCollector, "SetStabilityFeeRate")
-  //         .withArgs(deployerAddress, formatBytes32String("BNB"), BigNumber.from("1000000000315522921573372069"))
-  //     })
-  //   })
-  // })
+        await expect(
+          collateralPoolConfig.setStabilityFeeRate(
+            formatBytes32String("BNB"),
+            BigNumber.from("1000000000315522921573372069")
+          )
+        )
+          .to.emit(collateralPoolConfig, "LogSetStabilityFeeRate")
+          .withArgs(deployerAddress, formatBytes32String("BNB"), BigNumber.from("1000000000315522921573372069"))
+      })
+    })
+  })
 })
