@@ -99,7 +99,8 @@ contract TokenAdapter is
 
   function cage() external override {
     require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "TokenAdapter/not-live");
@@ -109,7 +110,8 @@ contract TokenAdapter is
 
   function uncage() external override {
     require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "TokenAdapter/not-caged");

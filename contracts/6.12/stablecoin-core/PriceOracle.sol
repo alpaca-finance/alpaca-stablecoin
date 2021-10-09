@@ -108,7 +108,8 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
 
   function cage() external override {
     require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "PriceOracle/not-live");
@@ -118,7 +119,8 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
 
   function uncage() external override {
     require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "PriceOracle/not-caged");
@@ -128,12 +130,20 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _unpause();
   }
 }

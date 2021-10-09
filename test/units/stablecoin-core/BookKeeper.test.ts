@@ -2150,7 +2150,7 @@ describe("BookKeeper", () => {
           )
           // set total debt ceiling 1 rad
           await expect(bookKeeper.setTotalDebtCeiling(WeiPerRad))
-            .to.emit(bookKeeper, "SetTotalDebtCeiling")
+            .to.emit(bookKeeper, "LogSetTotalDebtCeiling")
             .withArgs(deployerAddress, WeiPerRad)
         })
       })

@@ -31,7 +31,10 @@ contract FlashMintModule is PausableUpgradeable, AccessControlUpgradeable, IERC3
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
   modifier onlyOwner() {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     _;
   }
 

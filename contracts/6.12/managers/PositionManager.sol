@@ -374,12 +374,32 @@ contract PositionManager is PausableUpgradeable, AccessControlUpgradeable, IMana
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    require(
+      IBookKeeper(bookKeeper).accessControlConfig().hasRole(
+        IBookKeeper(bookKeeper).accessControlConfig().OWNER_ROLE(),
+        msg.sender
+      ) ||
+        IBookKeeper(bookKeeper).accessControlConfig().hasRole(
+          IBookKeeper(bookKeeper).accessControlConfig().GOV_ROLE(),
+          msg.sender
+        ),
+      "!(ownerRole or govRole)"
+    );
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    require(
+      IBookKeeper(bookKeeper).accessControlConfig().hasRole(
+        IBookKeeper(bookKeeper).accessControlConfig().OWNER_ROLE(),
+        msg.sender
+      ) ||
+        IBookKeeper(bookKeeper).accessControlConfig().hasRole(
+          IBookKeeper(bookKeeper).accessControlConfig().GOV_ROLE(),
+          msg.sender
+        ),
+      "!(ownerRole or govRole)"
+    );
     _unpause();
   }
 

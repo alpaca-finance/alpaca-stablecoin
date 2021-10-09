@@ -18,6 +18,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import "../interfaces/ICollateralPoolConfig.sol";
+import "../interfaces/IAccessControlConfig.sol";
 
 pragma solidity 0.6.12;
 
@@ -104,4 +105,6 @@ interface IBookKeeper {
   function blacklist(address toBeBlacklistedAddress) external;
 
   function collateralPoolConfig() external view returns (ICollateralPoolConfig);
+
+  function accessControlConfig() external view returns (IAccessControlConfig);
 }

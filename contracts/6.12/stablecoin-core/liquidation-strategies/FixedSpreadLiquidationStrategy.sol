@@ -129,7 +129,11 @@ contract FixedSpreadLiquidationStrategy is
   }
 
   function setFlashLendingEnabled(uint256 _flashLendingEnabled) external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     flashLendingEnabled = _flashLendingEnabled;
     emit LogSetFlashLendingEnabled(msg.sender, _flashLendingEnabled);
   }
@@ -356,12 +360,20 @@ contract FixedSpreadLiquidationStrategy is
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _unpause();
   }
 }
