@@ -24,6 +24,8 @@ import {
   CollateralPoolConfig,
   SimplePriceFeed__factory,
   SimplePriceFeed,
+  AccessControlConfig__factory,
+  AccessControlConfig,
 } from "../../../typechain"
 import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
@@ -50,18 +52,29 @@ type fixture = {
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer, alice, bob, dev] = await ethers.getSigners()
 
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const accessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+
   const CollateralPoolConfig = (await ethers.getContractFactory(
     "CollateralPoolConfig",
     deployer
   )) as CollateralPoolConfig__factory
-  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [])) as CollateralPoolConfig
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [
+    accessControlConfig.address,
+  ])) as CollateralPoolConfig
 
   // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [collateralPoolConfig.address])) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [
+    collateralPoolConfig.address,
+    accessControlConfig.address,
+  ])) as BookKeeper
   await bookKeeper.deployed()
 
-  await collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
+  await accessControlConfig.grantRole(await accessControlConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
 
   const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
   const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
@@ -79,8 +92,11 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     BUSD.address,
   ])) as AuthTokenAdapter
   await authTokenAdapter.deployed()
-  await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), authTokenAdapter.address)
-  await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployer.address)
+  await accessControlConfig.grantRole(
+    ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]),
+    authTokenAdapter.address
+  )
+  await accessControlConfig.grantRole(await accessControlConfig.MINTABLE_ROLE(), deployer.address)
 
   await collateralPoolConfig.initCollateralPool(
     COLLATERAL_POOL_ID,
@@ -96,7 +112,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     AddressZero
   )
   await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100000000000000))
-  await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
+  await accessControlConfig.grantRole(await accessControlConfig.PRICE_ORACLE_ROLE(), deployer.address)
   await collateralPoolConfig.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
 
   // Deploy Alpaca Stablecoin
@@ -129,7 +145,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await stableSwapModule.setFeeIn(ethers.utils.parseEther("0.001"))
   await stableSwapModule.setFeeOut(ethers.utils.parseEther("0.001"))
   await authTokenAdapter.grantRole(await authTokenAdapter.WHITELISTED(), stableSwapModule.address)
-  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), stableSwapModule.address)
+  await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), stableSwapModule.address)
 
   const FlashMintModule = (await ethers.getContractFactory("FlashMintModule", deployer)) as FlashMintModule__factory
   const flashMintModule = (await upgrades.deployProxy(FlashMintModule, [
@@ -139,7 +155,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await flashMintModule.deployed()
   await flashMintModule.setMax(ethers.utils.parseEther("100000000"))
   await flashMintModule.setFeeRate(ethers.utils.parseEther("25").div(10000))
-  await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), flashMintModule.address)
+  await accessControlConfig.grantRole(await accessControlConfig.MINTABLE_ROLE(), flashMintModule.address)
 
   return {
     stablecoinAdapter,
