@@ -26,10 +26,7 @@ import "../interfaces/IStablecoin.sol";
 import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IBookKeeper.sol";
 
-contract FlashMintModule is PausableUpgradeable, AccessControlUpgradeable, IERC3156FlashLender, IBookKeeperFlashLender {
-  // --- Auth ---
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-
+contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeeperFlashLender {
   modifier onlyOwner() {
     require(
       bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
@@ -69,9 +66,6 @@ contract FlashMintModule is PausableUpgradeable, AccessControlUpgradeable, IERC3
   function initialize(address stablecoinAdapter_, address systemDebtEngine_) external initializer {
     // 1. Initialized all dependencies
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
-
-    _setupRole(OWNER_ROLE, msg.sender);
 
     IBookKeeper bookKeeper_ = bookKeeper = IBookKeeper(IStablecoinAdapter(stablecoinAdapter_).bookKeeper());
     stablecoinAdapter = IStablecoinAdapter(stablecoinAdapter_);

@@ -40,8 +40,6 @@ contract AuthTokenAdapter is
   ICagable
 {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
   bytes32 public constant WHITELISTED = keccak256("WHITELISTED");
 
   IBookKeeper public override bookKeeper; // cdp engine

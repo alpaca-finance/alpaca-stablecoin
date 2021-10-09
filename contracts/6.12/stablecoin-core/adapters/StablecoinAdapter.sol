@@ -54,32 +54,18 @@ import "../../interfaces/ICagable.sol";
 
 */
 
-contract StablecoinAdapter is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  IStablecoinAdapter,
-  ICagable
-{
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
-
+contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IStablecoinAdapter, ICagable {
   IBookKeeper public override bookKeeper; // CDP Engine
   IStablecoin public override stablecoin; // Stablecoin Token
   uint256 public live; // Active Flag
 
   function initialize(address _bookKeeper, address _stablecoin) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     stablecoin = IStablecoin(_stablecoin);
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   function cage() external override {

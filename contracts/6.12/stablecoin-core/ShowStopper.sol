@@ -149,9 +149,7 @@ import "../interfaces/ICagable.sol";
         - the number of gems is limited by how big your stablecoinAccumulator is
 */
 
-contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-
+contract ShowStopper is PausableUpgradeable {
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
   ILiquidationEngine public liquidationEngine;
@@ -193,12 +191,8 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
   // --- Init ---
   function initialize() external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
-    live = 1;
 
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
+    live = 1;
   }
 
   // --- Math ---

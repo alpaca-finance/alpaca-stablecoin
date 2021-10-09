@@ -33,11 +33,7 @@ import "../interfaces/ICollateralPoolConfig.sol";
     The price oracle is important in reflecting the current state of the market price.
 */
 
-contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOracle, ICagable {
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
-
+contract PriceOracle is PausableUpgradeable, IPriceOracle, ICagable {
   // --- Data ---
   struct CollateralPool {
     IPriceFeed priceFeed; // Price Feed
@@ -59,16 +55,11 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
 
     IBookKeeper(_bookKeeper).collateralPoolConfig(); // Sanity check call
     bookKeeper = IBookKeeper(_bookKeeper);
     stableCoinReferencePrice = ONE;
     live = 1;
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---

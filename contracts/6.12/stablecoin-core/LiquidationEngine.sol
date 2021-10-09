@@ -38,18 +38,8 @@ import "../interfaces/ICagable.sol";
     LiquidationEngine will be the interface for the liquidator to trigger any positions into the liquidation process.
 */
 
-contract LiquidationEngine is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  ICagable,
-  ILiquidationEngine
-{
+contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, ICagable, ILiquidationEngine {
   using SafeMathUpgradeable for uint256;
-
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
   struct LocalVars {
     uint256 positionLockedCollateral;
@@ -67,7 +57,6 @@ contract LiquidationEngine is
   // --- Init ---
   function initialize(address _bookKeeper, address _systemDebtEngine) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
@@ -77,10 +66,6 @@ contract LiquidationEngine is
     bookKeeper.totalStablecoinIssued();
 
     live = 1;
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---

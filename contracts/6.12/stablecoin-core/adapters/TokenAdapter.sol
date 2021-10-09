@@ -51,18 +51,8 @@ import "../../utils/SafeToken.sol";
 
 */
 
-contract TokenAdapter is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  IGenericTokenAdapter,
-  ICagable
-{
+contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGenericTokenAdapter, ICagable {
   using SafeToken for address;
-
-  // --- Auth ---
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
   modifier onlyOwner() {
     require(
@@ -84,20 +74,13 @@ contract TokenAdapter is
     address collateralToken_
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
-
-    _setupRole(OWNER_ROLE, msg.sender);
 
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
     collateralToken = collateralToken_;
     decimals = IToken(collateralToken).decimals();
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   function cage() external override {

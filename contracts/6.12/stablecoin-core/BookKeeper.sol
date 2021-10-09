@@ -15,7 +15,7 @@ import "../interfaces/IAccessControlConfig.sol";
     It has the ability to move collateral token and stablecoin with in the accounting state variable. 
 */
 
-contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeable, ICagable {
+contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
   function pause() external {
     require(
       accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
@@ -80,7 +80,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
   // --- Init ---
   function initialize(address _collateralPoolConfig, address _accessControlConfig) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
 
     collateralPoolConfig = ICollateralPoolConfig(_collateralPoolConfig);
 
@@ -88,10 +87,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     accessControlConfig = IAccessControlConfig(_accessControlConfig);
 
     live = 1;
-
-    // Grant the contract deployer the default admin role: it will be able
-    // to grant and revoke any roles
-    _setupRole(accessControlConfig.OWNER_ROLE(), msg.sender);
   }
 
   // --- Math ---

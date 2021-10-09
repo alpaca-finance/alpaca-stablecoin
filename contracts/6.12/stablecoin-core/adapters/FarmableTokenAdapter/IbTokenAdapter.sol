@@ -28,13 +28,7 @@ import "../../../utils/SafeToken.sol";
 /// @title IbTokenAdapter is the adapter that inherited BaseFarmableTokenAdapter.
 /// It receives Alpaca's ibTOKEN from users and deposit in Alpaca's FairLaunch.
 /// Hence, users will still earn ALPACA rewards while holding positions.
-contract IbTokenAdapter is
-  IFarmableTokenAdapter,
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  ICagable
-{
+contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, ReentrancyGuardUpgradeable, ICagable {
   using SafeToken for address;
 
   uint256 internal constant WAD = 10**18;
@@ -86,9 +80,6 @@ contract IbTokenAdapter is
   event EmergencyWithdaraw();
   event MoveStake(address indexed src, address indexed dst, uint256 wad);
 
-  // --- Auth ---
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-
   modifier onlyOwner() {
     require(
       bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
@@ -111,10 +102,7 @@ contract IbTokenAdapter is
   ) external initializer {
     // 1. Initialized all dependencies
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
-
-    _setupRole(OWNER_ROLE, msg.sender);
 
     // 2. Sanity checks
     (address stakeToken, , , , ) = IAlpacaFairLaunch(_fairlaunch).poolInfo(_pid);
@@ -145,10 +133,6 @@ contract IbTokenAdapter is
     treasuryAccount = _treasuryAccount;
 
     address(collateralToken).safeApprove(address(fairlaunch), uint256(-1));
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   function add(uint256 x, uint256 y) public pure returns (uint256 z) {

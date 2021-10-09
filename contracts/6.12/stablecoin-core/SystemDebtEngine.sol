@@ -35,17 +35,7 @@ import "../interfaces/ICagable.sol";
     The stability fee will be accrued and kept within SystemDebtEngine. As it is the debtor, therefore SystemDebtEngine should be the holder of the surplus and use it to settle the bad debt.
 */
 
-contract SystemDebtEngine is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  ISystemDebtEngine,
-  ICagable
-{
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
-
+contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, ISystemDebtEngine, ICagable {
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
   uint256 public surplusBuffer; // Surplus buffer         [rad]
@@ -54,15 +44,10 @@ contract SystemDebtEngine is
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
     live = 1;
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---

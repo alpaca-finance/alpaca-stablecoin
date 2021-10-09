@@ -34,15 +34,7 @@ import "../interfaces/IStabilityFeeCollector.sol";
     The stability fee will be accumulated in the system as a surplus to settle any bad debt.
 */
 
-contract StabilityFeeCollector is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  IStabilityFeeCollector
-{
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-
+contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeable, IStabilityFeeCollector {
   // --- Data ---
   struct CollateralPool {
     uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee debtAccumulatedRate or mint interest debtAccumulatedRate [ray]
@@ -56,14 +48,9 @@ contract StabilityFeeCollector is
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
-
-    // Grant the contract deployer the default admin role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
