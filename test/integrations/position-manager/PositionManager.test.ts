@@ -28,6 +28,12 @@ import {
   TokenAdapter,
   AlpacaToken,
   FairLaunch,
+  CollateralPoolConfig__factory,
+  CollateralPoolConfig,
+  AccessControlConfig__factory,
+  AccessControlConfig,
+  SimplePriceFeed__factory,
+  SimplePriceFeed,
 } from "../../../typechain"
 import { expect } from "chai"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
@@ -47,6 +53,7 @@ import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 
 import * as TimeHelpers from "../../helper/time"
 import * as AssertHelpers from "../../helper/assert"
+import { AddressZero } from "../../helper/address"
 
 type Fixture = {
   positionManager: PositionManager
@@ -62,6 +69,7 @@ type Fixture = {
   baseToken: BEP20
   alpacaToken: AlpacaToken
   alpacaStablecoin: AlpacaStablecoin
+  collateralPoolConfig: CollateralPoolConfig
 }
 
 const loadFixtureHandler = async (): Promise<Fixture> => {
@@ -160,39 +168,27 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   const AlpacaStablecoin = new AlpacaStablecoin__factory(deployer)
   const alpacaStablecoin = await AlpacaStablecoin.deploy("Alpaca USD", "AUSD", "31337")
 
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const accessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [
+    accessControlConfig.address,
+  ])) as CollateralPoolConfig
+
   const BookKeeper = new BookKeeper__factory(deployer)
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper)) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [
+    collateralPoolConfig.address,
+    accessControlConfig.address,
+  ])) as BookKeeper
 
-  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
-
-  // init ibBUSD pool
-  await bookKeeper.init(formatBytes32String("ibBUSD"))
-  // set pool debt ceiling 100 rad
-  await bookKeeper.setDebtCeiling(formatBytes32String("ibBUSD"), WeiPerRad.mul(100))
-  // set price with safety margin 1 ray (1 ibBUSD = 1 USD)
-  await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("ibBUSD"), WeiPerRay)
-  // set position debt floor 1 rad
-  await bookKeeper.setDebtFloor(formatBytes32String("ibBUSD"), WeiPerRad.mul(1))
-  // set total debt ceiling 10000 rad
-  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10000))
-
-  // init WBNB pool
-  await bookKeeper.init(formatBytes32String("WBNB"))
-  // set pool debt ceiling 1000 rad
-  await bookKeeper.setDebtCeiling(formatBytes32String("WBNB"), WeiPerRad.mul(1000))
-  // set price with safety margin 400 ray (1 BNB = 400 USD)
-  await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("WBNB"), WeiPerRay.mul(400))
-  // set position debt floor 1 rad
-  await bookKeeper.setDebtFloor(formatBytes32String("WBNB"), WeiPerRad.mul(1))
-
-  // init ALPACA pool
-  await bookKeeper.init(formatBytes32String("ALPACA"))
-  // set pool debt ceiling 1000 rad
-  await bookKeeper.setDebtCeiling(formatBytes32String("ALPACA"), WeiPerRad.mul(1000))
-  // set price with safety margin 10 ray (1 ALPACA = 10 USD)
-  await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("ALPACA"), WeiPerRay.mul(10))
-  // set position debt floor 1 rad
-  await bookKeeper.setDebtFloor(formatBytes32String("ALPACA"), WeiPerRad.mul(1))
+  await accessControlConfig.grantRole(await accessControlConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
+  await accessControlConfig.grantRole(await accessControlConfig.PRICE_ORACLE_ROLE(), deployer.address)
 
   // Deploy ShowStopper
   const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
@@ -247,23 +243,86 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     bookKeeper.address,
   ])) as StabilityFeeCollector
 
-  await stabilityFeeCollector.init(formatBytes32String("ibBUSD"))
-  await stabilityFeeCollector.init(formatBytes32String("WBNB"))
-  await stabilityFeeCollector.init(formatBytes32String("ALPACA"))
-
-  await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter.address)
-  await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), wbnbTokenAdapter.address)
-  await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), alpacaTokenAdapter.address)
-  await bookKeeper.grantRole(
+  await accessControlConfig.grantRole(
+    ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]),
+    ibTokenAdapter.address
+  )
+  await accessControlConfig.grantRole(await accessControlConfig.ADAPTER_ROLE(), wbnbTokenAdapter.address)
+  await accessControlConfig.grantRole(await accessControlConfig.ADAPTER_ROLE(), alpacaTokenAdapter.address)
+  await accessControlConfig.grantRole(
     ethers.utils.solidityKeccak256(["string"], ["POSITION_MANAGER_ROLE"]),
     positionManager.address
   )
-  await bookKeeper.grantRole(
+  await accessControlConfig.grantRole(
     ethers.utils.solidityKeccak256(["string"], ["STABILITY_FEE_COLLECTOR_ROLE"]),
     stabilityFeeCollector.address
   )
 
   await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), stablecoinAdapter.address)
+
+  const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
+  await simplePriceFeed.deployed()
+
+  // set total debt ceiling 10000 rad
+  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10000))
+
+  // init ibBUSD pool
+  await collateralPoolConfig.initCollateralPool(
+    formatBytes32String("ibBUSD"),
+    // set pool debt ceiling 100 rad
+    WeiPerRad.mul(100),
+    // set position debt floor 1 rad
+    WeiPerRad.mul(1),
+    simplePriceFeed.address,
+    WeiPerRay,
+    WeiPerRay,
+    ibTokenAdapter.address,
+    0,
+    0,
+    0,
+    AddressZero
+  )
+  // set price with safety margin 1 ray (1 ibBUSD = 1 USD)
+  await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("ibBUSD"), WeiPerRay)
+
+  // init WBNB pool
+  await collateralPoolConfig.initCollateralPool(
+    formatBytes32String("WBNB"),
+    // set pool debt ceiling 1000 rad
+    WeiPerRad.mul(1000),
+    // set position debt floor 1 rad
+    WeiPerRad.mul(1),
+    simplePriceFeed.address,
+    WeiPerRay,
+    WeiPerRay,
+    ibTokenAdapter.address,
+    0,
+    0,
+    0,
+    AddressZero
+  )
+  // set price with safety margin 400 ray (1 BNB = 400 USD)
+  await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("WBNB"), WeiPerRay.mul(400))
+
+  // init ALPACA pool
+  await collateralPoolConfig.initCollateralPool(
+    formatBytes32String("ALPACA"),
+    // set pool debt ceiling 1000 rad
+    WeiPerRad.mul(1000),
+    // set position debt floor 1 rad
+    WeiPerRad.mul(1),
+    simplePriceFeed.address,
+    WeiPerRay,
+    WeiPerRay,
+    ibTokenAdapter.address,
+    0,
+    0,
+    0,
+    AddressZero
+  )
+  // set price with safety margin 10 ray (1 ALPACA = 10 USD)
+  await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("ALPACA"), WeiPerRay.mul(10))
 
   return {
     alpacaStablecoinProxyActions,
@@ -279,6 +338,7 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     baseToken,
     alpacaToken,
     alpacaStablecoin,
+    collateralPoolConfig,
   }
 }
 
@@ -313,6 +373,7 @@ describe("position manager", () => {
   let alpacaToken: AlpacaToken
   let stabilityFeeCollector: StabilityFeeCollector
   let alpacaStablecoin: AlpacaStablecoin
+  let collateralPoolConfig: CollateralPoolConfig
 
   beforeEach(async () => {
     ;[deployer, alice, bob] = await ethers.getSigners()
@@ -339,6 +400,7 @@ describe("position manager", () => {
       stabilityFeeCollector,
       alpacaToken,
       alpacaStablecoin,
+      collateralPoolConfig,
     } = await loadFixtureHandler())
 
     const baseTokenAsAlice = BEP20__factory.connect(baseToken.address, alice)
@@ -1519,7 +1581,7 @@ describe("position manager", () => {
       context("alice mint AUSD and repay AUSD", () => {
         it("should be able to mint and repay", async () => {
           // set stability fee rate 20% per year
-          await stabilityFeeCollector.setStabilityFeeRate(
+          await collateralPoolConfig.setStabilityFeeRate(
             formatBytes32String("ibBUSD"),
             BigNumber.from("1000000005781378656804591713")
           )
@@ -1552,7 +1614,7 @@ describe("position manager", () => {
           const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
           const positionAddress = await positionManager.positions(positionId)
 
-          const [, debtAccumulatedRateBefore] = await bookKeeper["collateralPools(bytes32)"](
+          const [, debtAccumulatedRateBefore] = await collateralPoolConfig.collateralPools(
             formatBytes32String("ibBUSD")
           )
 
@@ -1573,9 +1635,7 @@ describe("position manager", () => {
             positionAddress
           )
 
-          const [, debtAccumulatedRateAfter] = await bookKeeper["collateralPools(bytes32)"](
-            formatBytes32String("ibBUSD")
-          )
+          const [, debtAccumulatedRateAfter] = await collateralPoolConfig.collateralPools(formatBytes32String("ibBUSD"))
 
           // 2.
           //  a. repay some AUSD
@@ -1650,7 +1710,7 @@ describe("position manager", () => {
           const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
           const positionAddress = await positionManager.positions(positionId)
 
-          const [, debtAccumulatedRateBefore] = await bookKeeper["collateralPools(bytes32)"](
+          const [, debtAccumulatedRateBefore] = await collateralPoolConfig.collateralPools(
             formatBytes32String("ibBUSD")
           )
 

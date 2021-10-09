@@ -24,6 +24,12 @@ import {
   StablecoinAdapter,
   TokenAdapter__factory,
   TokenAdapter,
+  AccessControlConfig__factory,
+  AccessControlConfig,
+  CollateralPoolConfig,
+  CollateralPoolConfig__factory,
+  SimplePriceFeed,
+  SimplePriceFeed__factory,
 } from "../../../typechain"
 import { expect } from "chai"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
@@ -42,6 +48,7 @@ import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 
 import * as TimeHelpers from "../../helper/time"
 import * as AssertHelpers from "../../helper/assert"
+import { AddressZero } from "../../helper/address"
 
 type Fixture = {
   positionManager: PositionManager
@@ -52,10 +59,24 @@ type Fixture = {
   stablecoinAdapter: StablecoinAdapter
   busd: BEP20
   alpacaStablecoin: AlpacaStablecoin
+  collateralPoolConfig: CollateralPoolConfig
 }
 
 const loadFixtureHandler = async (): Promise<Fixture> => {
   const [deployer, alice, , dev] = await ethers.getSigners()
+
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const accessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [
+    accessControlConfig.address,
+  ])) as CollateralPoolConfig
 
   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
   const busd = await BEP20.deploy("BUSD", "BUSD")
@@ -68,22 +89,20 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   const alpacaStablecoin = await AlpacaStablecoin.deploy("Alpaca USD", "AUSD", "31337")
 
   const BookKeeper = new BookKeeper__factory(deployer)
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper)) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [
+    collateralPoolConfig.address,
+    accessControlConfig.address,
+  ])) as BookKeeper
 
-  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
+  await accessControlConfig.grantRole(await accessControlConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
 
-  await bookKeeper.init(formatBytes32String("BUSD"))
-  // set pool debt ceiling 100 rad
-  await bookKeeper.setDebtCeiling(formatBytes32String("BUSD"), WeiPerRad.mul(100))
-  // set price with safety margin 1 ray
-  await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BUSD"), WeiPerRay)
-  // set position debt floor 1 rad
-  await bookKeeper.setDebtFloor(formatBytes32String("BUSD"), WeiPerRad.mul(1))
-  // set total debt ceiling 100 rad
-  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100))
+  await accessControlConfig.grantRole(await accessControlConfig.PRICE_ORACLE_ROLE(), deployer.address)
 
   const PositionManager = new PositionManager__factory(deployer)
-  const positionManager = (await upgrades.deployProxy(PositionManager, [bookKeeper.address])) as PositionManager
+  const positionManager = (await upgrades.deployProxy(PositionManager, [
+    bookKeeper.address,
+    AddressZero,
+  ])) as PositionManager
 
   const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
   const alpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
@@ -108,19 +127,55 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   ])) as StabilityFeeCollector
 
   await stabilityFeeCollector.setSystemDebtEngine(await dev.getAddress())
-  await stabilityFeeCollector.init(formatBytes32String("BUSD"))
 
-  await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), busdTokenAdapter.address)
-  await bookKeeper.grantRole(
+  await accessControlConfig.grantRole(
+    ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]),
+    busdTokenAdapter.address
+  )
+  await accessControlConfig.grantRole(
     ethers.utils.solidityKeccak256(["string"], ["POSITION_MANAGER_ROLE"]),
     positionManager.address
   )
-  await bookKeeper.grantRole(
+  await accessControlConfig.grantRole(
     ethers.utils.solidityKeccak256(["string"], ["STABILITY_FEE_COLLECTOR_ROLE"]),
     stabilityFeeCollector.address
   )
 
   await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), stablecoinAdapter.address)
+
+  const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
+  await simplePriceFeed.deployed()
+
+  // Deploy TokenAdapter
+  const TokenAdapter = (await ethers.getContractFactory("TokenAdapter", deployer)) as TokenAdapter__factory
+  const tokenAdapter = (await upgrades.deployProxy(TokenAdapter, [
+    bookKeeper.address,
+    formatBytes32String("BTCB"),
+    busd.address,
+  ])) as TokenAdapter
+  await tokenAdapter.deployed()
+
+  await collateralPoolConfig.initCollateralPool(
+    formatBytes32String("BUSD"),
+    // set pool debt ceiling 100 rad
+    WeiPerRad.mul(100),
+    // set position debt floor 1 rad
+    WeiPerRad.mul(1),
+    simplePriceFeed.address,
+    WeiPerRay,
+    WeiPerRay,
+    tokenAdapter.address,
+    0,
+    0,
+    0,
+    AddressZero
+  )
+
+  await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BUSD"), WeiPerRay)
+
+  // set total debt ceiling 100 rad
+  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100))
 
   return {
     alpacaStablecoinProxyActions,
@@ -131,6 +186,7 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     stablecoinAdapter,
     busd,
     alpacaStablecoin,
+    collateralPoolConfig,
   }
 }
 
@@ -160,6 +216,7 @@ describe("Stability Fee", () => {
   let busd: BEP20
   let stabilityFeeCollector: StabilityFeeCollector
   let alpacaStablecoin: AlpacaStablecoin
+  let collateralPoolConfig: CollateralPoolConfig
 
   beforeEach(async () => {
     ;[deployer, alice, , dev] = await ethers.getSigners()
@@ -180,6 +237,7 @@ describe("Stability Fee", () => {
       busd,
       stabilityFeeCollector,
       alpacaStablecoin,
+      collateralPoolConfig,
     } = await loadFixtureHandler())
 
     const busdTokenAsAlice = BEP20__factory.connect(busd.address, alice)
@@ -197,7 +255,7 @@ describe("Stability Fee", () => {
     context("when call collect directly and call deposit", () => {
       it("should be success", async () => {
         // set stability fee rate 20% per year
-        await stabilityFeeCollector.setStabilityFeeRate(
+        await collateralPoolConfig.setStabilityFeeRate(
           formatBytes32String("BUSD"),
           BigNumber.from("1000000005781378656804591713")
         )
@@ -208,7 +266,7 @@ describe("Stability Fee", () => {
 
         // debtAccumulatedRate = RAY(1000000005781378656804591713^15768000) = 1095445115010332226911367294
         AssertHelpers.assertAlmostEqual(
-          (await bookKeeper["collateralPools(bytes32)"](formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
+          (await collateralPoolConfig.collateralPools(formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
           "1095445115010332226911367294"
         )
         AssertHelpers.assertAlmostEqual((await bookKeeper.stablecoin(devAddress)).toString(), "0")
@@ -244,11 +302,11 @@ describe("Stability Fee", () => {
           "4564354645876384278"
         )
         AssertHelpers.assertAlmostEqual(
-          (await bookKeeper.collateralPools(formatBytes32String("BUSD"))).totalDebtShare.toString(),
+          (await collateralPoolConfig.collateralPools(formatBytes32String("BUSD"))).totalDebtShare.toString(),
           "4564354645876384278"
         )
         AssertHelpers.assertAlmostEqual(
-          (await bookKeeper.collateralPools(formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
+          (await collateralPoolConfig.collateralPools(formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
           "1095445115010332226911367294"
         )
 
@@ -282,7 +340,7 @@ describe("Stability Fee", () => {
 
         // debtAccumulatedRate = RAY((1000000005781378656804591713^31536000) * 1095445115010332226911367294) = 1314534138012398672287467301
         AssertHelpers.assertAlmostEqual(
-          (await bookKeeper["collateralPools(bytes32)"](formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
+          (await collateralPoolConfig.collateralPools(formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
           "1314534138012398672287467301"
         )
         // debtShare * diffDebtAccumulatedRate =  4564354645876384278 * (1314534138012398672287467301 - 1095445115010332226911367294) = 999999999999999999792432233173942358090489946
@@ -298,7 +356,7 @@ describe("Stability Fee", () => {
         )
         // 4564354645876384278 + 3803628871563653565 = 8367983517440037843
         AssertHelpers.assertAlmostEqual(
-          (await bookKeeper.collateralPools(formatBytes32String("BUSD"))).totalDebtShare.toString(),
+          (await collateralPoolConfig.collateralPools(formatBytes32String("BUSD"))).totalDebtShare.toString(),
           "8367983517440037843"
         )
 
@@ -310,7 +368,7 @@ describe("Stability Fee", () => {
 
         // debtAccumulatedRate = RAY((1000000005781378656804591713^31536000) * 1314534138012398672287467301) = 1577440965614878406737552619
         AssertHelpers.assertAlmostEqual(
-          (await bookKeeper["collateralPools(bytes32)"](formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
+          (await collateralPoolConfig.collateralPools(formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
           "1577440965614878406737552619"
         )
         // debtShare * diffDebtAccumulatedRate =  8367983517440037843 * (1577440965614878406737552619 - 1314534138012398672287467301) = 2199999999999999999533019044066331740498689074
@@ -338,7 +396,7 @@ describe("Stability Fee", () => {
         )
 
         AssertHelpers.assertAlmostEqual(
-          (await bookKeeper["collateralPools(bytes32)"](formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
+          (await collateralPoolConfig.collateralPools(formatBytes32String("BUSD"))).debtAccumulatedRate.toString(),
           "1577440965614878406737552619"
         )
         AssertHelpers.assertAlmostEqual(
