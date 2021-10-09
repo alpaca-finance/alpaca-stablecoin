@@ -8,6 +8,7 @@ import "../../interfaces/IPriceFeed.sol";
 import "../../interfaces/IGenericTokenAdapter.sol";
 import "../../interfaces/ICollateralPoolConfig.sol";
 import "../../interfaces/ILiquidationStrategy.sol";
+import "../../interfaces/IAccessControlConfig.sol";
 
 contract CollateralPoolConfig is AccessControlUpgradeable {
   using SafeMathUpgradeable for uint256;
@@ -49,15 +50,19 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
   }
 
   mapping(bytes32 => CollateralPool) public collateralPools;
+  IAccessControlConfig public accessControlConfig;
 
   modifier onlyOwner() {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     _;
   }
 
   // --- Init ---
-  function initialize() external initializer {
+  function initialize(address _accessControlConfig) external initializer {
     AccessControlUpgradeable.__AccessControl_init();
+
+    IAccessControlConfig(_accessControlConfig).hasRole(OWNER_ROLE, msg.sender); // Sanity Check Call
+    accessControlConfig = IAccessControlConfig(_accessControlConfig);
 
     // Grant the contract deployer the owner role: it will be able
     // to grant and revoke any roles
@@ -99,7 +104,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
   }
 
   function setPriceWithSafetyMargin(bytes32 _collateralPoolId, uint256 _priceWithSafetyMargin) external {
-    require(hasRole(PRICE_ORACLE_ROLE, msg.sender), "!priceOracleRole");
+    require(accessControlConfig.hasRole(PRICE_ORACLE_ROLE, msg.sender), "!priceOracleRole");
     collateralPools[_collateralPoolId].priceWithSafetyMargin = _priceWithSafetyMargin;
     emit LogSetPriceWithSafetyMargin(msg.sender, _collateralPoolId, _priceWithSafetyMargin);
   }
@@ -115,13 +120,13 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
   }
 
   function setPriceFeed(bytes32 _poolId, address _priceFeed) external onlyOwner {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     collateralPools[_poolId].priceFeed = IPriceFeed(_priceFeed);
     emit LogSetPriceFeed(msg.sender, _poolId, _priceFeed);
   }
 
   function setLiquidationRatio(bytes32 _poolId, uint256 _data) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     collateralPools[_poolId].liquidationRatio = _data;
     emit LogSetLiquidationRatio(msg.sender, _poolId, _data);
   }
@@ -153,57 +158,57 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
   /// @param _collateralPool Collateral pool id
   /// @param _stabilityFeeRate the new stability fee rate [ray]
   function setStabilityFeeRate(bytes32 _collateralPool, uint256 _stabilityFeeRate) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(_stabilityFeeRate > RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
     collateralPools[_collateralPool].stabilityFeeRate = _stabilityFeeRate;
     emit LogSetStabilityFeeRate(msg.sender, _collateralPool, _stabilityFeeRate);
   }
 
   function setAdapter(bytes32 collateralPoolId, address _adapter) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     collateralPools[collateralPoolId].adapter = IGenericTokenAdapter(_adapter);
     emit LogSetAdapter(msg.sender, collateralPoolId, _adapter);
   }
 
   function setCloseFactorBps(bytes32 collateralPoolId, uint256 _closeFactorBps) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(_closeFactorBps <= 10000, "CollateralPoolConfig/close-factor-bps-more-10000");
     collateralPools[collateralPoolId].closeFactorBps = _closeFactorBps;
     emit LogSetCloseFactorBps(msg.sender, collateralPoolId, _closeFactorBps);
   }
 
   function setLiquidatorIncentiveBps(bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(_liquidatorIncentiveBps <= 2500, "CollateralPoolConfig/liquidator-incentive-bps-more-2500");
     collateralPools[collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
     emit LogSetLiquidatorIncentiveBps(msg.sender, collateralPoolId, _liquidatorIncentiveBps);
   }
 
   function setTreasuryFeesBps(bytes32 collateralPoolId, uint256 _treasuryFeesBps) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(_treasuryFeesBps <= 2500, "CollateralPoolConfig/treasury-fees-bps-more-2500");
     collateralPools[collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
     emit LogSetTreasuryFeesBps(msg.sender, collateralPoolId, _treasuryFeesBps);
   }
 
   function setTotalDebtShare(bytes32 _collateralPoolId, uint256 _totalDebtShare) external {
-    require(hasRole(BOOK_KEEPER_ROLE, msg.sender), "!bookKeeperRole");
+    require(accessControlConfig.hasRole(BOOK_KEEPER_ROLE, msg.sender), "!bookKeeperRole");
     collateralPools[_collateralPoolId].totalDebtShare = _totalDebtShare;
   }
 
   function setDebtAccumulatedRate(bytes32 _collateralPoolId, uint256 _debtAccumulatedRate) external {
-    require(hasRole(BOOK_KEEPER_ROLE, msg.sender), "!bookKeeperRole");
+    require(accessControlConfig.hasRole(BOOK_KEEPER_ROLE, msg.sender), "!bookKeeperRole");
     collateralPools[_collateralPoolId].debtAccumulatedRate = _debtAccumulatedRate;
   }
 
   function setStrategy(bytes32 _collateralPoolId, ILiquidationStrategy _strategy) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     collateralPools[_collateralPoolId].strategy = _strategy;
     emit LogSetStrategy(msg.sender, _collateralPoolId, address(_strategy));
   }
 
   function updateLastAccumulationTime(bytes32 _collateralPoolId) external {
-    require(hasRole(STABILITY_FEE_COLLECTOR_ROLE, msg.sender), "!stabilityFeeCollectorRole");
+    require(accessControlConfig.hasRole(STABILITY_FEE_COLLECTOR_ROLE, msg.sender), "!stabilityFeeCollectorRole");
     collateralPools[_collateralPoolId].lastAccumulationTime = now;
   }
 }
