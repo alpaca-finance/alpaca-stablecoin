@@ -86,7 +86,10 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
   event LogSetStableCoinReferencePrice(address indexed caller, uint256 data);
 
   function setStableCoinReferencePrice(uint256 _data) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     require(live == 1, "Spotter/not-live");
     stableCoinReferencePrice = _data;
     emit LogSetStableCoinReferencePrice(msg.sender, _data);

@@ -93,14 +93,20 @@ contract StableSwapModule is PausableUpgradeable, AccessControlUpgradeable, ISta
   }
 
   function setFeeIn(uint256 _feeIn) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     require(_feeIn <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeIn is 0.5 Ethers or 50%
     feeIn = _feeIn;
     emit SetFeeIn(msg.sender, _feeIn);
   }
 
   function setFeeOut(uint256 _feeOut) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     require(_feeOut <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeOut is 0.5 Ethers or 50%
     feeOut = _feeOut;
     emit SetFeeOut(msg.sender, _feeOut);
@@ -109,12 +115,18 @@ contract StableSwapModule is PausableUpgradeable, AccessControlUpgradeable, ISta
   // hope can be used to transfer control of the PSM vault to another contract
   // This can be used to upgrade the contract
   function whitelist(address _usr) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     bookKeeper.whitelist(_usr);
   }
 
   function blacklist(address _usr) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     bookKeeper.blacklist(_usr);
   }
 

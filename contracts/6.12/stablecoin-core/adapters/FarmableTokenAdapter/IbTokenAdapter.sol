@@ -90,7 +90,10 @@ contract IbTokenAdapter is
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
   modifier onlyOwner() {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     _;
   }
 
@@ -444,7 +447,11 @@ contract IbTokenAdapter is
     // Allow caging if
     // - msg.sender is whitelisted to do so
     // - Shield's owner has been changed
-    require(hasRole(OWNER_ROLE, msg.sender) || shield.owner() != address(timelock), "IbTokenAdapter/not-authorized");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        shield.owner() != address(timelock),
+      "IbTokenAdapter/not-authorized"
+    );
     require(live == 1, "IbTokenAdapter/not-live");
     fairlaunch.emergencyWithdraw(pid);
     live = 0;
@@ -452,7 +459,10 @@ contract IbTokenAdapter is
   }
 
   function uncage() external override {
-    require(hasRole(OWNER_ROLE, msg.sender), "IbTokenAdapter/not-authorized");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "IbTokenAdapter/not-authorized"
+    );
     require(live == 0, "IbTokenAdapter/not-caged");
     fairlaunch.deposit(address(this), pid, totalShare);
     live = 1;

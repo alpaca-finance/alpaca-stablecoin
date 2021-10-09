@@ -29,7 +29,6 @@ contract FixedSpreadLiquidationStrategy is
 
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-  bytes32 public constant LIQUIDATION_ENGINE_ROLE = keccak256("LIQUIDATION_ENGINE_ROLE");
 
   struct CollateralPool {
     IGenericTokenAdapter adapter;
@@ -123,7 +122,10 @@ contract FixedSpreadLiquidationStrategy is
 
   // --- Setter ---
   function setPositionManager(address _positionManager) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     positionManager = IManager(_positionManager);
     emit LogSetPositionManager(msg.sender, _positionManager);
   }
@@ -244,7 +246,10 @@ contract FixedSpreadLiquidationStrategy is
     address _collateralRecipient,
     bytes calldata _data // Data to pass in external call; if length 0, no call is done
   ) external override nonReentrant whenNotPaused {
-    require(hasRole(LIQUIDATION_ENGINE_ROLE, msg.sender), "!liquidationEngingRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().LIQUIDATION_ENGINE_ROLE(), msg.sender),
+      "!liquidationEngingRole"
+    );
 
     // Input validation
     require(_positionDebtShare > 0, "FixedSpreadLiquidationStrategy/zero-debt");

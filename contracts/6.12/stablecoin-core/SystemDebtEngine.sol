@@ -86,14 +86,20 @@ contract SystemDebtEngine is
     address to,
     uint256 amount // [wad]
   ) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     bookKeeper.moveCollateral(collateralPoolId, address(this), to, amount);
     adapter.onMoveCollateral(address(this), to, amount, abi.encode(to));
   }
 
   /// @param value The value of collateral. [rad]
   function withdrawStablecoinSurplus(address to, uint256 value) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     require(sub(bookKeeper.stablecoin(address(this)), value) >= surplusBuffer, "SystemDebtEngine/insufficient-surplus");
     bookKeeper.moveStablecoin(address(this), to, value);
   }
@@ -102,7 +108,10 @@ contract SystemDebtEngine is
   event SetSurplusBuffer(address indexed caller, uint256 data);
 
   function setSurplusBuffer(uint256 _data) external whenNotPaused {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     surplusBuffer = _data;
     emit SetSurplusBuffer(msg.sender, _data);
   }

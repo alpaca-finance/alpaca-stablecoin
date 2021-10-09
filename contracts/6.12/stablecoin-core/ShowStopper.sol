@@ -238,35 +238,50 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
   event SetCageCoolDown(address indexed caller, uint256 _cageCoolDown);
 
   function setBookKeeper(address _bookKeeper) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     require(live == 1, "ShowStopper/not-live");
     bookKeeper = IBookKeeper(_bookKeeper);
     emit SetBookKeeper(msg.sender, _bookKeeper);
   }
 
   function setLiquidationEngine(address _liquidationEngine) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     require(live == 1, "ShowStopper/not-live");
     liquidationEngine = ILiquidationEngine(_liquidationEngine);
     emit SetLiquidationEngine(msg.sender, _liquidationEngine);
   }
 
   function setSystemDebtEngine(address _systemDebtEngine) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     require(live == 1, "ShowStopper/not-live");
     systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
     emit SetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
 
   function setPriceOracle(address _priceOracle) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     require(live == 1, "ShowStopper/not-live");
     priceOracle = IPriceOracle(_priceOracle);
     emit SetPriceOracle(msg.sender, _priceOracle);
   }
 
   function setCageCoolDown(uint256 _cageCoolDown) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     require(live == 1, "ShowStopper/not-live");
     cageCoolDown = _cageCoolDown;
     emit SetCageCoolDown(msg.sender, _cageCoolDown);
@@ -281,7 +296,10 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
       - PriceOracle will be paused: no new price update, no liquidation trigger
    */
   function cage() external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     require(live == 1, "ShowStopper/not-live");
     live = 0;
     cagedTimestamp = block.timestamp;
@@ -295,7 +313,10 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
   /// @dev Set the cage price of the collateral pool with the latest price from the price oracle
   /// @param collateralPoolId Collateral pool id
   function cage(bytes32 collateralPoolId) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(
+      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
+      "!ownerRole"
+    );
     require(live == 0, "ShowStopper/still-live");
     require(cagePrice[collateralPoolId] == 0, "ShowStopper/cage-price-collateral-pool-id-already-defined");
     uint256 _totalDebtShare = bookKeeper.collateralPoolConfig().collateralPools(collateralPoolId).totalDebtShare;
