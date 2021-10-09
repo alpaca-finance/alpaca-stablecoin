@@ -83,7 +83,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
 
     collateralPoolConfig = ICollateralPoolConfig(_collateralPoolConfig);
 
-    IAccessControlConfig(_accessControlConfig).hasRole(accessControlConfig.OWNER_ROLE(), msg.sender); // Sanity Check Call
     accessControlConfig = IAccessControlConfig(_accessControlConfig);
 
     live = 1;

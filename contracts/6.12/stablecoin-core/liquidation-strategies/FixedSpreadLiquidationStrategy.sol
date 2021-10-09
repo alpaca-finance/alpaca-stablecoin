@@ -19,16 +19,8 @@ import "../../interfaces/IFlashLendingCallee.sol";
 import "../../interfaces/IGenericTokenAdapter.sol";
 import "../../interfaces/IManager.sol";
 
-contract FixedSpreadLiquidationStrategy is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  ILiquidationStrategy
-{
+contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardUpgradeable, ILiquidationStrategy {
   using SafeMathUpgradeable for uint256;
-
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
   struct CollateralPool {
     IGenericTokenAdapter adapter;
@@ -92,7 +84,6 @@ contract FixedSpreadLiquidationStrategy is
     address _positionManager
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
@@ -100,10 +91,6 @@ contract FixedSpreadLiquidationStrategy is
     liquidationEngine = ILiquidationEngine(_liquidationEngine);
     systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
     positionManager = IManager(_positionManager);
-
-    // Grant the contract deployer the default admin role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---

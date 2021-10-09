@@ -56,7 +56,6 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
   function initialize(address _accessControlConfig) external initializer {
     AccessControlUpgradeable.__AccessControl_init();
 
-    IAccessControlConfig(_accessControlConfig).hasRole(accessControlConfig.OWNER_ROLE(), msg.sender); // Sanity Check Call
     accessControlConfig = IAccessControlConfig(_accessControlConfig);
 
     // Grant the contract deployer the owner role: it will be able
