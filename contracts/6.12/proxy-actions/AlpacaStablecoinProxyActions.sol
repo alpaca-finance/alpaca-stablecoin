@@ -13,7 +13,6 @@ import "../interfaces/IStabilityFeeCollector.sol";
 import "../interfaces/IProxyRegistry.sol";
 import "../interfaces/IProxy.sol";
 import "../utils/SafeToken.sol";
-import "hardhat/console.sol";
 
 /// ==============================
 /// @notice WARNING: These functions meant to be used as a a library for a Proxy.
