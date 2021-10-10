@@ -73,14 +73,14 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     address to,
     uint256 amount // [wad]
   ) external {
-    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     bookKeeper.moveCollateral(collateralPoolId, address(this), to, amount);
     adapter.onMoveCollateral(address(this), to, amount, abi.encode(to));
   }
 
   /// @param value The value of collateral. [rad]
   function withdrawStablecoinSurplus(address to, uint256 value) external {
-    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(sub(bookKeeper.stablecoin(address(this)), value) >= surplusBuffer, "SystemDebtEngine/insufficient-surplus");
     bookKeeper.moveStablecoin(address(this), to, value);
   }
@@ -89,7 +89,7 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
   event SetSurplusBuffer(address indexed caller, uint256 data);
 
   function setSurplusBuffer(uint256 _data) external whenNotPaused {
-    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     surplusBuffer = _data;
     emit SetSurplusBuffer(msg.sender, _data);
   }
@@ -108,8 +108,8 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
 
   function cage() external override {
     require(
-      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "SystemDebtEngine/not-live");
@@ -120,8 +120,8 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
 
   function uncage() external override {
     require(
-      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "SystemDebtEngine/not-caged");
@@ -132,8 +132,8 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
   // --- pause ---
   function pause() external {
     require(
-      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -141,8 +141,8 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
 
   function unpause() external {
     require(
-      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

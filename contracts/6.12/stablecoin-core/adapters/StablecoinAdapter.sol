@@ -72,8 +72,8 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   function cage() external override {
     require(
-      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "StablecoinAdapter/not-live");
@@ -83,8 +83,8 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   function uncage() external override {
     require(
-      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "StablecoinAdapter/not-caged");

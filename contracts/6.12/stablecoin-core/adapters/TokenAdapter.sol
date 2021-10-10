@@ -57,7 +57,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
   bytes32 public constant OWNER_ROLE = 0x00;
 
   modifier onlyOwner() {
-    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     _;
   }
 
@@ -84,8 +84,8 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
 
   function cage() external override {
     require(
-      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "TokenAdapter/not-live");
@@ -95,8 +95,8 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
 
   function uncage() external override {
     require(
-      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "TokenAdapter/not-caged");

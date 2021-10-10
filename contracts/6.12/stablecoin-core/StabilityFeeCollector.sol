@@ -136,13 +136,13 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   /// @dev Set the global stability fee debtAccumulatedRate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
   /// @param _globalStabilityFeeRate Global stability fee debtAccumulatedRate [ray]
   function setGlobalStabilityFeeRate(uint256 _globalStabilityFeeRate) external {
-    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     globalStabilityFeeRate = _globalStabilityFeeRate;
     emit LogSetGlobalStabilityFeeRate(msg.sender, _globalStabilityFeeRate);
   }
 
   function setSystemDebtEngine(address _systemDebtEngine) external {
-    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     systemDebtEngine = _systemDebtEngine;
     emit LogSetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
@@ -165,15 +165,12 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   }
 
   function _collect(bytes32 _collateralPoolId) internal returns (uint256 _debtAccumulatedRate) {
-    uint256 _previousDebtAccumulatedRate = bookKeeper
-      .collateralPoolConfig()
-      .collateralPools(_collateralPoolId)
-      .debtAccumulatedRate;
-    uint256 _stabilityFeeRate = bookKeeper.collateralPools(_collateralPoolId).stabilityFeeRate;
-    uint256 _lastAccumulationTime = bookKeeper
-      .collateralPoolConfig()
-      .collateralPools(_collateralPoolId)
-      .lastAccumulationTime;
+    ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(
+      bookKeeper.collateralPoolConfig()
+    ).collateralPools(_collateralPoolId);
+    uint256 _previousDebtAccumulatedRate = collateralPool.debtAccumulatedRate;
+    uint256 _stabilityFeeRate = collateralPool.stabilityFeeRate;
+    uint256 _lastAccumulationTime = collateralPool.lastAccumulationTime;
     require(now >= _lastAccumulationTime, "StabilityFeeCollector/invalid-now");
 
     // debtAccumulatedRate [ray]
@@ -186,14 +183,14 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
       systemDebtEngine,
       diff(_debtAccumulatedRate, _previousDebtAccumulatedRate)
     );
-    bookKeeper.collateralPoolConfig().updateLastAccumulationTime(_collateralPoolId);
+    ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).updateLastAccumulationTime(_collateralPoolId);
   }
 
   // --- pause ---
   function pause() external {
     require(
-      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -201,8 +198,8 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
 
   function unpause() external {
     require(
-      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

@@ -30,7 +30,7 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
   bytes32 public constant OWNER_ROLE = 0x00;
 
   modifier onlyOwner() {
-    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     _;
   }
 

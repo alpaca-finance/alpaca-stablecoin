@@ -83,7 +83,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   event MoveStake(address indexed src, address indexed dst, uint256 wad);
 
   modifier onlyOwner() {
-    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     _;
   }
 
@@ -431,7 +431,8 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     // - msg.sender is whitelisted to do so
     // - Shield's owner has been changed
     require(
-      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) || shield.owner() != address(timelock),
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
+        shield.owner() != address(timelock),
       "IbTokenAdapter/not-authorized"
     );
     require(live == 1, "IbTokenAdapter/not-live");
@@ -441,7 +442,10 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   }
 
   function uncage() external override {
-    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "IbTokenAdapter/not-authorized");
+    require(
+      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender),
+      "IbTokenAdapter/not-authorized"
+    );
     require(live == 0, "IbTokenAdapter/not-caged");
     fairlaunch.deposit(address(this), pid, totalShare);
     live = 1;

@@ -16,10 +16,12 @@ import "../interfaces/IAccessControlConfig.sol";
 */
 
 contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
+  bytes32 public constant OWNER_ROLE = 0x00;
+
   function pause() external {
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(accessControlConfig.GOV_ROLE(), msg.sender),
+      IAccessControlConfig(accessControlConfig).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(accessControlConfig).hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -27,8 +29,8 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
 
   function unpause() external {
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(accessControlConfig.GOV_ROLE(), msg.sender),
+      IAccessControlConfig(accessControlConfig).hasRole(OWNER_ROLE, msg.sender) ||
+        IAccessControlConfig(accessControlConfig).hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();
@@ -74,31 +76,18 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
   uint256 public totalUnbackedStablecoin; // Total unbacked stable coin  [rad]
   uint256 public totalDebtCeiling; // Total debt ceiling  [rad]
   uint256 public live; // Active Flag
-  ICollateralPoolConfig public override collateralPoolConfig;
-  IAccessControlConfig public override accessControlConfig;
+  address public override collateralPoolConfig;
+  address public override accessControlConfig;
 
   // --- Init ---
   function initialize(address _collateralPoolConfig, address _accessControlConfig) external initializer {
     PausableUpgradeable.__Pausable_init();
 
-    collateralPoolConfig = ICollateralPoolConfig(_collateralPoolConfig);
+    collateralPoolConfig = _collateralPoolConfig;
 
-    accessControlConfig = IAccessControlConfig(_accessControlConfig);
+    accessControlConfig = _accessControlConfig;
 
     live = 1;
-  }
-
-  function collateralPools(bytes32 _collateralPoolId)
-    external
-    view
-    override
-    returns (ICollateralPoolConfig.CollateralPool memory)
-  {
-    return collateralPoolConfig.collateralPools(_collateralPoolId);
-  }
-
-  function accessControlConfigHasRole(bytes32 _role, address _account) external view override returns (bool) {
-    return accessControlConfig.hasRole(_role, _account);
   }
 
   // --- Math ---
@@ -137,25 +126,46 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
   event LogSetAccessControlConfig(address indexed _caller, address _accessControlConfig);
 
   function setTotalDebtCeiling(uint256 _totalDebtCeiling) external {
-    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    require(
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).OWNER_ROLE(),
+        msg.sender
+      ),
+      "!ownerRole"
+    );
     require(live == 1, "BookKeeper/not-live");
     totalDebtCeiling = _totalDebtCeiling;
     emit LogSetTotalDebtCeiling(msg.sender, _totalDebtCeiling);
   }
 
   function setAccessControlConfig(address _accessControlConfig) external {
-    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    require(
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).OWNER_ROLE(),
+        msg.sender
+      ),
+      "!ownerRole"
+    );
 
-    IAccessControlConfig(_accessControlConfig).hasRole(accessControlConfig.OWNER_ROLE(), msg.sender); // Sanity Check Call
-    accessControlConfig = IAccessControlConfig(_accessControlConfig);
+    IAccessControlConfig(_accessControlConfig).hasRole(
+      IAccessControlConfig(accessControlConfig).OWNER_ROLE(),
+      msg.sender
+    ); // Sanity Check Call
+    accessControlConfig = _accessControlConfig;
 
     emit LogSetAccessControlConfig(msg.sender, _accessControlConfig);
   }
 
   function cage() external override {
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).OWNER_ROLE(),
+        msg.sender
+      ) ||
+        IAccessControlConfig(accessControlConfig).hasRole(
+          IAccessControlConfig(accessControlConfig).SHOW_STOPPER_ROLE(),
+          msg.sender
+        ),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "BookKeeper/not-live");
@@ -166,8 +176,14 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
 
   function uncage() external override {
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).OWNER_ROLE(),
+        msg.sender
+      ) ||
+        IAccessControlConfig(accessControlConfig).hasRole(
+          IAccessControlConfig(accessControlConfig).SHOW_STOPPER_ROLE(),
+          msg.sender
+        ),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "BookKeeper/not-caged");
@@ -186,7 +202,13 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
     address usr,
     int256 amount
   ) external override whenNotPaused {
-    require(accessControlConfig.hasRole(accessControlConfig.ADAPTER_ROLE(), msg.sender), "!adapterRole");
+    require(
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).ADAPTER_ROLE(),
+        msg.sender
+      ),
+      "!adapterRole"
+    );
     collateralToken[collateralPoolId][usr] = add(collateralToken[collateralPoolId][usr], amount);
   }
 
@@ -249,7 +271,10 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
     int256 debtShare
   ) external override whenNotPaused {
     require(
-      accessControlConfig.hasRole(accessControlConfig.POSITION_MANAGER_ROLE(), msg.sender),
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).POSITION_MANAGER_ROLE(),
+        msg.sender
+      ),
       "!positionManagerRole"
     );
 
@@ -257,13 +282,14 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
     require(live == 1, "BookKeeper/not-live");
 
     Position memory position = positions[collateralPoolId][positionAddress];
-    ICollateralPoolConfig.CollateralPool memory collateralPool = collateralPoolConfig.collateralPools(collateralPoolId);
+    ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(collateralPoolConfig)
+      .collateralPools(collateralPoolId);
     // collateralPool has been initialised
     require(collateralPool.debtAccumulatedRate != 0, "BookKeeper/collateralPool-not-init");
     position.lockedCollateral = add(position.lockedCollateral, collateralValue);
     position.debtShare = add(position.debtShare, debtShare);
     collateralPool.totalDebtShare = add(collateralPool.totalDebtShare, debtShare);
-    collateralPoolConfig.setTotalDebtShare(collateralPoolId, collateralPool.totalDebtShare);
+    ICollateralPoolConfig(collateralPoolConfig).setTotalDebtShare(collateralPoolId, collateralPool.totalDebtShare);
 
     int256 debtValue = mul(collateralPool.debtAccumulatedRate, debtShare);
     uint256 positionDebtValue = mul(collateralPool.debtAccumulatedRate, position.debtShare);
@@ -325,13 +351,17 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
     int256 debtShare
   ) external override whenNotPaused {
     require(
-      accessControlConfig.hasRole(accessControlConfig.POSITION_MANAGER_ROLE(), msg.sender),
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).POSITION_MANAGER_ROLE(),
+        msg.sender
+      ),
       "!positionManagerRole"
     );
 
     Position storage _positionSrc = positions[collateralPoolId][src];
     Position storage _positionDst = positions[collateralPoolId][dst];
-    ICollateralPoolConfig.CollateralPool memory collateralPool = collateralPoolConfig.collateralPools(collateralPoolId);
+    ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(collateralPoolConfig)
+      .collateralPools(collateralPoolId);
 
     _positionSrc.lockedCollateral = sub(_positionSrc.lockedCollateral, collateralAmount);
     _positionSrc.debtShare = sub(_positionSrc.debtShare, debtShare);
@@ -381,17 +411,21 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
     int256 debtShare
   ) external override whenNotPaused {
     require(
-      accessControlConfig.hasRole(accessControlConfig.LIQUIDATION_ENGINE_ROLE(), msg.sender),
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).LIQUIDATION_ENGINE_ROLE(),
+        msg.sender
+      ),
       "!liquidationEngineRole"
     );
 
     Position storage position = positions[collateralPoolId][positionAddress];
-    ICollateralPoolConfig.CollateralPool memory collateralPool = collateralPoolConfig.collateralPools(collateralPoolId);
+    ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(collateralPoolConfig)
+      .collateralPools(collateralPoolId);
 
     position.lockedCollateral = add(position.lockedCollateral, collateralAmount);
     position.debtShare = add(position.debtShare, debtShare);
     collateralPool.totalDebtShare = add(collateralPool.totalDebtShare, debtShare);
-    collateralPoolConfig.setTotalDebtShare(collateralPoolId, collateralPool.totalDebtShare);
+    ICollateralPoolConfig(collateralPoolConfig).setTotalDebtShare(collateralPoolId, collateralPool.totalDebtShare);
 
     int256 debtValue = mul(collateralPool.debtAccumulatedRate, debtShare);
 
@@ -426,7 +460,13 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
     address to,
     uint256 value
   ) external override whenNotPaused {
-    require(accessControlConfig.hasRole(accessControlConfig.MINTABLE_ROLE(), msg.sender), "!mintableRole");
+    require(
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).MINTABLE_ROLE(),
+        msg.sender
+      ),
+      "!mintableRole"
+    );
     systemBadDebt[from] = add(systemBadDebt[from], value);
     stablecoin[to] = add(stablecoin[to], value);
     totalUnbackedStablecoin = add(totalUnbackedStablecoin, value);
@@ -449,13 +489,20 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
     int256 debtAccumulatedRate
   ) external override whenNotPaused {
     require(
-      accessControlConfig.hasRole(accessControlConfig.STABILITY_FEE_COLLECTOR_ROLE(), msg.sender),
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).STABILITY_FEE_COLLECTOR_ROLE(),
+        msg.sender
+      ),
       "!stabilityFeeCollectorRole"
     );
     require(live == 1, "BookKeeper/not-live");
-    ICollateralPoolConfig.CollateralPool memory collateralPool = collateralPoolConfig.collateralPools(collateralPoolId);
+    ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(collateralPoolConfig)
+      .collateralPools(collateralPoolId);
     collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);
-    collateralPoolConfig.setDebtAccumulatedRate(collateralPoolId, collateralPool.debtAccumulatedRate);
+    ICollateralPoolConfig(collateralPoolConfig).setDebtAccumulatedRate(
+      collateralPoolId,
+      collateralPool.debtAccumulatedRate
+    );
     int256 value = mul(collateralPool.totalDebtShare, debtAccumulatedRate); // [rad]
     stablecoin[stabilityFeeRecipient] = add(stablecoin[stabilityFeeRecipient], value);
     totalStablecoinIssued = add(totalStablecoinIssued, value);

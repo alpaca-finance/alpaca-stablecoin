@@ -105,14 +105,7 @@ interface IBookKeeper {
 
   function blacklist(address toBeBlacklistedAddress) external;
 
-  function collateralPoolConfig() external view returns (ICollateralPoolConfig);
+  function collateralPoolConfig() external view returns (address);
 
-  function collateralPools(bytes32 _collateralPoolId)
-    external
-    view
-    returns (ICollateralPoolConfig.CollateralPool memory);
-
-  function accessControlConfig() external view returns (IAccessControlConfig);
-
-  function accessControlConfigHasRole(bytes32 _role, address _account) external view returns (bool);
+  function accessControlConfig() external view returns (address);
 }
