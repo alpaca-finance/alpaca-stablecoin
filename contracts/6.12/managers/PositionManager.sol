@@ -13,6 +13,8 @@ import "../interfaces/IShowStopper.sol";
 
 /// @title PositionManager is a contract for manging positions
 contract PositionManager is PausableUpgradeable, IManager {
+  bytes32 public constant OWNER_ROLE = 0x00;
+
   /// @dev Address of a BookKeeper
   address public override bookKeeper;
 
@@ -366,14 +368,8 @@ contract PositionManager is PausableUpgradeable, IManager {
   // --- pause ---
   function pause() external {
     require(
-      IBookKeeper(bookKeeper).accessControlConfig().hasRole(
-        IBookKeeper(bookKeeper).accessControlConfig().OWNER_ROLE(),
-        msg.sender
-      ) ||
-        IBookKeeper(bookKeeper).accessControlConfig().hasRole(
-          IBookKeeper(bookKeeper).accessControlConfig().GOV_ROLE(),
-          msg.sender
-        ),
+      IBookKeeper(bookKeeper).accessControlConfig().hasRole(OWNER_ROLE, msg.sender) ||
+        IBookKeeper(bookKeeper).accessControlConfig().hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -381,14 +377,8 @@ contract PositionManager is PausableUpgradeable, IManager {
 
   function unpause() external {
     require(
-      IBookKeeper(bookKeeper).accessControlConfig().hasRole(
-        IBookKeeper(bookKeeper).accessControlConfig().OWNER_ROLE(),
-        msg.sender
-      ) ||
-        IBookKeeper(bookKeeper).accessControlConfig().hasRole(
-          IBookKeeper(bookKeeper).accessControlConfig().GOV_ROLE(),
-          msg.sender
-        ),
+      IBookKeeper(bookKeeper).accessControlConfig().hasRole(OWNER_ROLE, msg.sender) ||
+        IBookKeeper(bookKeeper).accessControlConfig().hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

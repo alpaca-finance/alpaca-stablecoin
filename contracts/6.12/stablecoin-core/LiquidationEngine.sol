@@ -153,8 +153,8 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   function cage() external override {
     require(
-      bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "LiquidationEngine/not-live");
@@ -164,8 +164,8 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   function uncage() external override {
     require(
-      bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "LiquidationEngine/not-caged");
@@ -176,8 +176,8 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
   // --- pause ---
   function pause() external {
     require(
-      bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -185,8 +185,8 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   function unpause() external {
     require(
-      bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

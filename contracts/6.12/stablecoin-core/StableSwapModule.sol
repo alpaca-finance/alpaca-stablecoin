@@ -166,7 +166,7 @@ contract StableSwapModule is PausableUpgradeable, IStableSwapModule {
   function pause() external {
     require(
       bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -175,7 +175,7 @@ contract StableSwapModule is PausableUpgradeable, IStableSwapModule {
   function unpause() external {
     require(
       bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

@@ -102,7 +102,7 @@ contract PriceOracle is PausableUpgradeable, IPriceOracle, ICagable {
   function cage() external override {
     require(
       bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
+        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "PriceOracle/not-live");
@@ -113,7 +113,7 @@ contract PriceOracle is PausableUpgradeable, IPriceOracle, ICagable {
   function uncage() external override {
     require(
       bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
+        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "PriceOracle/not-caged");
@@ -125,7 +125,7 @@ contract PriceOracle is PausableUpgradeable, IPriceOracle, ICagable {
   function pause() external {
     require(
       bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -134,7 +134,7 @@ contract PriceOracle is PausableUpgradeable, IPriceOracle, ICagable {
   function unpause() external {
     require(
       bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

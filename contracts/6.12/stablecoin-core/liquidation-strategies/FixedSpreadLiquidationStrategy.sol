@@ -119,7 +119,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
   function setFlashLendingEnabled(uint256 _flashLendingEnabled) external {
     require(
       bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     flashLendingEnabled = _flashLendingEnabled;
@@ -231,7 +231,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     bytes calldata _data // Data to pass in external call; if length 0, no call is done
   ) external override nonReentrant whenNotPaused {
     require(
-      bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().LIQUIDATION_ENGINE_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(keccak256("LIQUIDATION_ENGINE_ROLE"), msg.sender),
       "!liquidationEngingRole"
     );
 
@@ -351,7 +351,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
   function pause() external {
     require(
       bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -360,7 +360,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
   function unpause() external {
     require(
       bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+        bookKeeper.accessControlConfigHasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

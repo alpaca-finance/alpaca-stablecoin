@@ -85,7 +85,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
   function cage() external override {
     require(
       bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
+        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "TokenAdapter/not-live");
@@ -96,7 +96,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
   function uncage() external override {
     require(
       bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
-        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
+        bookKeeper.accessControlConfigHasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "TokenAdapter/not-caged");
