@@ -80,7 +80,7 @@ contract PriceOracle is PausableUpgradeable, IPriceOracle, ICagable {
 
   function setStableCoinReferencePrice(uint256 _data) external {
     require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(live == 1, "Spotter/not-live");
+    require(live == 1, "PriceOracle/not-live");
     stableCoinReferencePrice = _data;
     emit LogSetStableCoinReferencePrice(msg.sender, _data);
   }
@@ -95,7 +95,8 @@ contract PriceOracle is PausableUpgradeable, IPriceOracle, ICagable {
     uint256 priceWithSafetyMargin = hasPrice
       ? rdiv(rdiv(mul(uint256(rawPrice), 10**9), stableCoinReferencePrice), liquidationRatio)
       : 0;
-    bookKeeper.collateralPoolConfig().setPriceWithSafetyMargin(_collateralPoolId, priceWithSafetyMargin);
+    address collateralPoolConfig = address(bookKeeper.collateralPoolConfig());
+    ICollateralPoolConfig(collateralPoolConfig).setPriceWithSafetyMargin(_collateralPoolId, priceWithSafetyMargin);
     emit LogSetPrice(_collateralPoolId, rawPrice, priceWithSafetyMargin);
   }
 
