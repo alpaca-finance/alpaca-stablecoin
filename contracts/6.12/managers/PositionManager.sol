@@ -141,10 +141,7 @@ contract PositionManager is PausableUpgradeable, IManager {
   /// @param user The user address that is owned this position
   function open(bytes32 collateralPoolId, address user) public override returns (uint256) {
     require(user != address(0), "PositionManager/user-address(0)");
-    uint256 debtAccumulatedRate = IBookKeeper(bookKeeper)
-      .collateralPoolConfig()
-      .collateralPools(collateralPoolId)
-      .debtAccumulatedRate;
+    uint256 debtAccumulatedRate = IBookKeeper(bookKeeper).collateralPools(collateralPoolId).debtAccumulatedRate;
     require(debtAccumulatedRate != 0, "PositionManager/collateralPool-not-init");
 
     lastPositionId = _safeAdd(lastPositionId, 1);
