@@ -10,7 +10,7 @@ import "../../interfaces/ICollateralPoolConfig.sol";
 import "../../interfaces/ILiquidationStrategy.sol";
 import "../../interfaces/IAccessControlConfig.sol";
 
-contract CollateralPoolConfig is AccessControlUpgradeable {
+contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig {
   using SafeMathUpgradeable for uint256;
 
   uint256 constant RAY = 10**27;
@@ -27,24 +27,34 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
   event LogSetTreasuryFeesBps(address indexed caller, bytes32 collateralPoolId, uint256 _treasuryFeeBps);
   event LogSetStrategy(address indexed caller, bytes32 _collateralPoolId, address strategy);
 
-  struct CollateralPool {
-    uint256 totalDebtShare; // Total debt share of Alpaca Stablecoin of this collateral pool              [wad]
-    uint256 debtAccumulatedRate; // Accumulated rates (equivalent to ibToken Price)                       [ray]
-    uint256 priceWithSafetyMargin; // Price with safety margin (taken into account the Collateral Ratio)  [ray]
-    uint256 debtCeiling; // Debt ceiling of this collateral pool                                          [rad]
-    uint256 debtFloor; // Position debt floor of this collateral pool                                     [rad]
-    IPriceFeed priceFeed; // Price Feed
-    uint256 liquidationRatio; // Liquidation ratio or Collateral ratio                                    [ray]
-    uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee debtAccumulatedRate or mint interest debtAccumulatedRate [ray]
-    uint256 lastAccumulationTime; // Time of last call to `collect`                                       [unix epoch time]
-    IGenericTokenAdapter adapter;
-    uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation
-    uint256 liquidatorIncentiveBps; // Percentage (BPS) of how much additional collateral will be given to the liquidator incentive
-    uint256 treasuryFeesBps; // Percentage (BPS) of how much additional collateral will be transferred to the treasury
-    ILiquidationStrategy strategy; // Liquidation strategy for this collateral pool
+  // struct CollateralPool {
+  //   uint256 totalDebtShare; // Total debt share of Alpaca Stablecoin of this collateral pool              [wad]
+  //   uint256 debtAccumulatedRate; // Accumulated rates (equivalent to ibToken Price)                       [ray]
+  //   uint256 priceWithSafetyMargin; // Price with safety margin (taken into account the Collateral Ratio)  [ray]
+  //   uint256 debtCeiling; // Debt ceiling of this collateral pool                                          [rad]
+  //   uint256 debtFloor; // Position debt floor of this collateral pool                                     [rad]
+  //   address priceFeed; // Price Feed
+  //   uint256 liquidationRatio; // Liquidation ratio or Collateral ratio                                    [ray]
+  //   uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee debtAccumulatedRate or mint interest debtAccumulatedRate [ray]
+  //   uint256 lastAccumulationTime; // Time of last call to `collect`                                       [unix epoch time]
+  //   address adapter;
+  //   uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation
+  //   uint256 liquidatorIncentiveBps; // Percentage (BPS) of how much additional collateral will be given to the liquidator incentive
+  //   uint256 treasuryFeesBps; // Percentage (BPS) of how much additional collateral will be transferred to the treasury
+  //   address strategy; // Liquidation strategy for this collateral pool
+  // }
+
+  mapping(bytes32 => ICollateralPoolConfig.CollateralPool) public _collateralPools;
+
+  function collateralPools(bytes32 _collateralPoolId)
+    external
+    view
+    override
+    returns (ICollateralPoolConfig.CollateralPool memory)
+  {
+    return _collateralPools[_collateralPoolId];
   }
 
-  mapping(bytes32 => CollateralPool) public collateralPools;
   IAccessControlConfig public accessControlConfig;
 
   modifier onlyOwner() {
@@ -67,61 +77,61 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
     bytes32 _collateralPoolId,
     uint256 _debtCeiling,
     uint256 _debtFloor,
-    IPriceFeed _priceFeed,
+    address _priceFeed,
     uint256 _liquidationRatio,
     uint256 _stabilityFeeRate,
-    IGenericTokenAdapter _adapter,
+    address _adapter,
     uint256 _closeFactorBps,
     uint256 _liquidatorIncentiveBps,
     uint256 _treasuryFeesBps,
-    ILiquidationStrategy _strategy
+    address _strategy
   ) external onlyOwner {
     require(
-      collateralPools[_collateralPoolId].debtAccumulatedRate == 0,
+      _collateralPools[_collateralPoolId].debtAccumulatedRate == 0,
       "CollateralPoolConfig/collateral-pool-already-init"
     );
-    collateralPools[_collateralPoolId].debtAccumulatedRate = 10**27;
-    collateralPools[_collateralPoolId].debtCeiling = _debtCeiling;
-    collateralPools[_collateralPoolId].debtFloor = _debtFloor;
-    _priceFeed.peekPrice(); // Sanity Check Call
-    collateralPools[_collateralPoolId].priceFeed = _priceFeed;
-    collateralPools[_collateralPoolId].liquidationRatio = _liquidationRatio;
+    _collateralPools[_collateralPoolId].debtAccumulatedRate = 10**27;
+    _collateralPools[_collateralPoolId].debtCeiling = _debtCeiling;
+    _collateralPools[_collateralPoolId].debtFloor = _debtFloor;
+    IPriceFeed(_priceFeed).peekPrice(); // Sanity Check Call
+    _collateralPools[_collateralPoolId].priceFeed = _priceFeed;
+    _collateralPools[_collateralPoolId].liquidationRatio = _liquidationRatio;
     require(_stabilityFeeRate >= RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
-    collateralPools[_collateralPoolId].stabilityFeeRate = _stabilityFeeRate;
-    collateralPools[_collateralPoolId].lastAccumulationTime = now;
-    _adapter.decimals(); // Sanity Check Call
-    collateralPools[_collateralPoolId].adapter = _adapter;
-    collateralPools[_collateralPoolId].closeFactorBps = _closeFactorBps;
-    collateralPools[_collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
-    collateralPools[_collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
-    collateralPools[_collateralPoolId].strategy = _strategy;
+    _collateralPools[_collateralPoolId].stabilityFeeRate = _stabilityFeeRate;
+    _collateralPools[_collateralPoolId].lastAccumulationTime = now;
+    IGenericTokenAdapter(_adapter).decimals(); // Sanity Check Call
+    _collateralPools[_collateralPoolId].adapter = _adapter;
+    _collateralPools[_collateralPoolId].closeFactorBps = _closeFactorBps;
+    _collateralPools[_collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
+    _collateralPools[_collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
+    _collateralPools[_collateralPoolId].strategy = _strategy;
   }
 
-  function setPriceWithSafetyMargin(bytes32 _collateralPoolId, uint256 _priceWithSafetyMargin) external {
+  function setPriceWithSafetyMargin(bytes32 _collateralPoolId, uint256 _priceWithSafetyMargin) external override {
     require(accessControlConfig.hasRole(accessControlConfig.PRICE_ORACLE_ROLE(), msg.sender), "!priceOracleRole");
-    collateralPools[_collateralPoolId].priceWithSafetyMargin = _priceWithSafetyMargin;
+    _collateralPools[_collateralPoolId].priceWithSafetyMargin = _priceWithSafetyMargin;
     emit LogSetPriceWithSafetyMargin(msg.sender, _collateralPoolId, _priceWithSafetyMargin);
   }
 
   function setDebtCeiling(bytes32 _collateralPoolId, uint256 _debtCeiling) external onlyOwner {
-    collateralPools[_collateralPoolId].debtCeiling = _debtCeiling;
+    _collateralPools[_collateralPoolId].debtCeiling = _debtCeiling;
     emit LogSetDebtCeiling(msg.sender, _collateralPoolId, _debtCeiling);
   }
 
   function setDebtFloor(bytes32 _collateralPoolId, uint256 _debtFloor) external onlyOwner {
-    collateralPools[_collateralPoolId].debtFloor = _debtFloor;
+    _collateralPools[_collateralPoolId].debtFloor = _debtFloor;
     emit LogSetDebtFloor(msg.sender, _collateralPoolId, _debtFloor);
   }
 
   function setPriceFeed(bytes32 _poolId, address _priceFeed) external onlyOwner {
     require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
-    collateralPools[_poolId].priceFeed = IPriceFeed(_priceFeed);
+    _collateralPools[_poolId].priceFeed = _priceFeed;
     emit LogSetPriceFeed(msg.sender, _poolId, _priceFeed);
   }
 
   function setLiquidationRatio(bytes32 _poolId, uint256 _data) external {
     require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
-    collateralPools[_poolId].liquidationRatio = _data;
+    _collateralPools[_poolId].liquidationRatio = _data;
     emit LogSetLiquidationRatio(msg.sender, _poolId, _data);
   }
 
@@ -154,58 +164,58 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
   function setStabilityFeeRate(bytes32 _collateralPool, uint256 _stabilityFeeRate) external {
     require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(_stabilityFeeRate > RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
-    collateralPools[_collateralPool].stabilityFeeRate = _stabilityFeeRate;
+    _collateralPools[_collateralPool].stabilityFeeRate = _stabilityFeeRate;
     emit LogSetStabilityFeeRate(msg.sender, _collateralPool, _stabilityFeeRate);
   }
 
   function setAdapter(bytes32 collateralPoolId, address _adapter) external {
     require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
-    collateralPools[collateralPoolId].adapter = IGenericTokenAdapter(_adapter);
+    _collateralPools[collateralPoolId].adapter = _adapter;
     emit LogSetAdapter(msg.sender, collateralPoolId, _adapter);
   }
 
   function setCloseFactorBps(bytes32 collateralPoolId, uint256 _closeFactorBps) external {
     require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(_closeFactorBps <= 10000, "CollateralPoolConfig/close-factor-bps-more-10000");
-    collateralPools[collateralPoolId].closeFactorBps = _closeFactorBps;
+    _collateralPools[collateralPoolId].closeFactorBps = _closeFactorBps;
     emit LogSetCloseFactorBps(msg.sender, collateralPoolId, _closeFactorBps);
   }
 
   function setLiquidatorIncentiveBps(bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps) external {
     require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(_liquidatorIncentiveBps <= 2500, "CollateralPoolConfig/liquidator-incentive-bps-more-2500");
-    collateralPools[collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
+    _collateralPools[collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
     emit LogSetLiquidatorIncentiveBps(msg.sender, collateralPoolId, _liquidatorIncentiveBps);
   }
 
   function setTreasuryFeesBps(bytes32 collateralPoolId, uint256 _treasuryFeesBps) external {
     require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(_treasuryFeesBps <= 2500, "CollateralPoolConfig/treasury-fees-bps-more-2500");
-    collateralPools[collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
+    _collateralPools[collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
     emit LogSetTreasuryFeesBps(msg.sender, collateralPoolId, _treasuryFeesBps);
   }
 
-  function setTotalDebtShare(bytes32 _collateralPoolId, uint256 _totalDebtShare) external {
+  function setTotalDebtShare(bytes32 _collateralPoolId, uint256 _totalDebtShare) external override {
     require(accessControlConfig.hasRole(accessControlConfig.BOOK_KEEPER_ROLE(), msg.sender), "!bookKeeperRole");
-    collateralPools[_collateralPoolId].totalDebtShare = _totalDebtShare;
+    _collateralPools[_collateralPoolId].totalDebtShare = _totalDebtShare;
   }
 
-  function setDebtAccumulatedRate(bytes32 _collateralPoolId, uint256 _debtAccumulatedRate) external {
+  function setDebtAccumulatedRate(bytes32 _collateralPoolId, uint256 _debtAccumulatedRate) external override {
     require(accessControlConfig.hasRole(accessControlConfig.BOOK_KEEPER_ROLE(), msg.sender), "!bookKeeperRole");
-    collateralPools[_collateralPoolId].debtAccumulatedRate = _debtAccumulatedRate;
+    _collateralPools[_collateralPoolId].debtAccumulatedRate = _debtAccumulatedRate;
   }
 
-  function setStrategy(bytes32 _collateralPoolId, ILiquidationStrategy _strategy) external {
+  function setStrategy(bytes32 _collateralPoolId, address _strategy) external {
     require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
-    collateralPools[_collateralPoolId].strategy = _strategy;
+    _collateralPools[_collateralPoolId].strategy = _strategy;
     emit LogSetStrategy(msg.sender, _collateralPoolId, address(_strategy));
   }
 
-  function updateLastAccumulationTime(bytes32 _collateralPoolId) external {
+  function updateLastAccumulationTime(bytes32 _collateralPoolId) external override {
     require(
       accessControlConfig.hasRole(accessControlConfig.STABILITY_FEE_COLLECTOR_ROLE(), msg.sender),
       "!stabilityFeeCollectorRole"
     );
-    collateralPools[_collateralPoolId].lastAccumulationTime = now;
+    _collateralPools[_collateralPoolId].lastAccumulationTime = now;
   }
 }

@@ -12,15 +12,15 @@ interface ICollateralPoolConfig {
     uint256 priceWithSafetyMargin; // Price with safety margin (taken into account the Collateral Ratio)  [ray]
     uint256 debtCeiling; // Debt ceiling of this collateral pool                                          [rad]
     uint256 debtFloor; // Position debt floor of this collateral pool                                     [rad]
-    IPriceFeed priceFeed; // Price Feed
+    address priceFeed; // Price Feed
     uint256 liquidationRatio; // Liquidation ratio or Collateral ratio                                    [ray]
     uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee debtAccumulatedRate or mint interest debtAccumulatedRate [ray]
     uint256 lastAccumulationTime; // Time of last call to `collect`                                       [unix epoch time]
-    IGenericTokenAdapter adapter;
+    address adapter;
     uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation
     uint256 liquidatorIncentiveBps; // Percentage (BPS) of how much additional collateral will be given to the liquidator incentive
     uint256 treasuryFeesBps; // Percentage (BPS) of how much additional collateral will be transferred to the treasury
-    ILiquidationStrategy strategy; // Liquidation strategy for this collateral pool
+    address strategy; // Liquidation strategy for this collateral pool
   }
 
   // struct CollateralPool {

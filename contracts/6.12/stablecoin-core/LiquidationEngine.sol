@@ -95,7 +95,7 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(
       bookKeeper.collateralPoolConfig()
     ).collateralPools(_collateralPoolId);
-    ILiquidationStrategy _strategy = collateralPool.strategy;
+    ILiquidationStrategy _strategy = ILiquidationStrategy(collateralPool.strategy);
     require(address(_strategy) != address(0), "LiquidationEngine/not-set-strategy");
 
     // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]

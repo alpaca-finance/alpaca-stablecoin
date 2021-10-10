@@ -89,9 +89,9 @@ contract PriceOracle is PausableUpgradeable, IPriceOracle, ICagable {
   /// @dev Update the latest price with safety margin of the collateral pool to the BookKeeper
   /// @param _collateralPoolId Collateral pool id
   function setPrice(bytes32 _collateralPoolId) external whenNotPaused {
-    IPriceFeed priceFeed = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
-      .collateralPools(_collateralPoolId)
-      .priceFeed;
+    IPriceFeed priceFeed = IPriceFeed(
+      ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).collateralPools(_collateralPoolId).priceFeed
+    );
     uint256 liquidationRatio = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
       .collateralPools(_collateralPoolId)
       .liquidationRatio;

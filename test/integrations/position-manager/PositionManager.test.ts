@@ -192,7 +192,7 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
 
   // Deploy ShowStopper
   const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
-  const showStopper = (await upgrades.deployProxy(ShowStopper, [])) as ShowStopper
+  const showStopper = (await upgrades.deployProxy(ShowStopper, [bookKeeper.address])) as ShowStopper
 
   const PositionManager = new PositionManager__factory(deployer)
   const positionManager = (await upgrades.deployProxy(PositionManager, [

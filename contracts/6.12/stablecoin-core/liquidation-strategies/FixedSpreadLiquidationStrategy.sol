@@ -128,9 +128,10 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
   // get the price directly from the PriceOracle
   function getFeedPrice(bytes32 collateralPoolId) internal view returns (uint256 feedPrice) {
-    IPriceFeed _priceFeed = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
+    address _priceFeedAddress = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
       .collateralPools(collateralPoolId)
       .priceFeed;
+    IPriceFeed _priceFeed = IPriceFeed(_priceFeedAddress);
     (bytes32 price, bool priceOk) = _priceFeed.peekPrice();
     require(priceOk, "FixedSpreadLiquidationStrategy/invalid-price");
     // (price [wad] * BLN [10 ** 9] ) [ray] / priceOracle.stableCoinReferencePrice [ray]
@@ -278,9 +279,9 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     );
     address _positionOwnerAddress = positionManager.mapPositionHandlerToOwner(_positionAddress);
     if (_positionOwnerAddress == address(0)) _positionOwnerAddress = _positionAddress;
-    IGenericTokenAdapter _adapter = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
-      .collateralPools(_collateralPoolId)
-      .adapter;
+    IGenericTokenAdapter _adapter = IGenericTokenAdapter(
+      ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).collateralPools(_collateralPoolId).adapter
+    );
     _adapter.onMoveCollateral(
       _positionAddress,
       address(this),

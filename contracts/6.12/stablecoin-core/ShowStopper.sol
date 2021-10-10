@@ -291,9 +291,10 @@ contract ShowStopper is PausableUpgradeable {
     uint256 _totalDebtShare = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
       .collateralPools(collateralPoolId)
       .totalDebtShare;
-    IPriceFeed _priceFeed = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
+    address _priceFeedAddress = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
       .collateralPools(collateralPoolId)
       .priceFeed;
+    IPriceFeed _priceFeed = IPriceFeed(_priceFeedAddress);
     totalDebtShare[collateralPoolId] = _totalDebtShare;
     // par is a ray, priceFeed returns a wad
     cagePrice[collateralPoolId] = wdiv(priceOracle.stableCoinReferencePrice(), uint256(_priceFeed.readPrice()));

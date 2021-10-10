@@ -76,7 +76,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
 
   // Deploy mocked ShowStopper
   const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
-  const showStopper = await upgrades.deployProxy(ShowStopper, [])
+  const showStopper = await upgrades.deployProxy(ShowStopper, [mockedBookKeeper.address])
   await showStopper.deployed()
   const mockedShowStopper = await smockit(showStopper)
 
