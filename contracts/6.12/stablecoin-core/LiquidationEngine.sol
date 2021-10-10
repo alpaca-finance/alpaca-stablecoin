@@ -41,6 +41,8 @@ import "../interfaces/ICagable.sol";
 contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, ICagable, ILiquidationEngine {
   using SafeMathUpgradeable for uint256;
 
+  bytes32 public constant OWNER_ROLE = 0x00;
+
   struct LocalVars {
     uint256 positionLockedCollateral;
     uint256 positionDebtShare;
@@ -90,9 +92,7 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
       _positionAddress
     );
     // 1. Check if the position is underwater
-    ICollateralPoolConfig.CollateralPool memory collateralPool = bookKeeper.collateralPoolConfig().collateralPools(
-      _collateralPoolId
-    );
+    ICollateralPoolConfig.CollateralPool memory collateralPool = bookKeeper.collateralPools(_collateralPoolId);
     ILiquidationStrategy _strategy = collateralPool.strategy;
     require(address(_strategy) != address(0), "LiquidationEngine/not-set-strategy");
 
@@ -153,8 +153,8 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   function cage() external override {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "LiquidationEngine/not-live");
@@ -164,8 +164,8 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   function uncage() external override {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "LiquidationEngine/not-caged");
@@ -176,8 +176,8 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
   // --- pause ---
   function pause() external {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -185,8 +185,8 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   function unpause() external {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

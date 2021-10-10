@@ -31,6 +31,8 @@ import "../interfaces/IStableSwapModule.sol";
 // An optional fee is charged for incoming and outgoing transfers
 
 contract StableSwapModule is PausableUpgradeable, IStableSwapModule {
+  bytes32 public constant OWNER_ROLE = 0x00;
+
   IBookKeeper public bookKeeper;
   IAuthTokenAdapter public override authTokenAdapter;
   IStablecoin public stablecoin;
@@ -85,20 +87,14 @@ contract StableSwapModule is PausableUpgradeable, IStableSwapModule {
   }
 
   function setFeeIn(uint256 _feeIn) external {
-    require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
-      "!ownerRole"
-    );
+    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(_feeIn <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeIn is 0.5 Ethers or 50%
     feeIn = _feeIn;
     emit SetFeeIn(msg.sender, _feeIn);
   }
 
   function setFeeOut(uint256 _feeOut) external {
-    require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
-      "!ownerRole"
-    );
+    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(_feeOut <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeOut is 0.5 Ethers or 50%
     feeOut = _feeOut;
     emit SetFeeOut(msg.sender, _feeOut);
@@ -107,18 +103,12 @@ contract StableSwapModule is PausableUpgradeable, IStableSwapModule {
   // hope can be used to transfer control of the PSM vault to another contract
   // This can be used to upgrade the contract
   function whitelist(address _usr) external {
-    require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
-      "!ownerRole"
-    );
+    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     bookKeeper.whitelist(_usr);
   }
 
   function blacklist(address _usr) external {
-    require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
-      "!ownerRole"
-    );
+    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     bookKeeper.blacklist(_usr);
   }
 
@@ -175,8 +165,8 @@ contract StableSwapModule is PausableUpgradeable, IStableSwapModule {
   // --- pause ---
   function pause() external {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -184,8 +174,8 @@ contract StableSwapModule is PausableUpgradeable, IStableSwapModule {
 
   function unpause() external {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

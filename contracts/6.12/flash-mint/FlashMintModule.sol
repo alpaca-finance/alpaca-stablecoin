@@ -27,11 +27,10 @@ import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IBookKeeper.sol";
 
 contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeeperFlashLender {
+  bytes32 public constant OWNER_ROLE = 0x00;
+
   modifier onlyOwner() {
-    require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
-      "!ownerRole"
-    );
+    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     _;
   }
 

@@ -35,6 +35,8 @@ import "../interfaces/IStabilityFeeCollector.sol";
 */
 
 contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeable, IStabilityFeeCollector {
+  bytes32 public constant OWNER_ROLE = 0x00;
+
   // --- Data ---
   struct CollateralPool {
     uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee debtAccumulatedRate or mint interest debtAccumulatedRate [ray]
@@ -134,19 +136,13 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   /// @dev Set the global stability fee debtAccumulatedRate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
   /// @param _globalStabilityFeeRate Global stability fee debtAccumulatedRate [ray]
   function setGlobalStabilityFeeRate(uint256 _globalStabilityFeeRate) external {
-    require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
-      "!ownerRole"
-    );
+    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     globalStabilityFeeRate = _globalStabilityFeeRate;
     emit LogSetGlobalStabilityFeeRate(msg.sender, _globalStabilityFeeRate);
   }
 
   function setSystemDebtEngine(address _systemDebtEngine) external {
-    require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
-      "!ownerRole"
-    );
+    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     systemDebtEngine = _systemDebtEngine;
     emit LogSetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
@@ -173,7 +169,7 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
       .collateralPoolConfig()
       .collateralPools(_collateralPoolId)
       .debtAccumulatedRate;
-    uint256 _stabilityFeeRate = bookKeeper.collateralPoolConfig().collateralPools(_collateralPoolId).stabilityFeeRate;
+    uint256 _stabilityFeeRate = bookKeeper.collateralPools(_collateralPoolId).stabilityFeeRate;
     uint256 _lastAccumulationTime = bookKeeper
       .collateralPoolConfig()
       .collateralPools(_collateralPoolId)
@@ -196,8 +192,8 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   // --- pause ---
   function pause() external {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -205,8 +201,8 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
 
   function unpause() external {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

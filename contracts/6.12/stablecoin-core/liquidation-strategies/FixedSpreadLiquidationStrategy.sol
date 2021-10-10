@@ -22,6 +22,8 @@ import "../../interfaces/IManager.sol";
 contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardUpgradeable, ILiquidationStrategy {
   using SafeMathUpgradeable for uint256;
 
+  bytes32 public constant OWNER_ROLE = 0x00;
+
   struct CollateralPool {
     IGenericTokenAdapter adapter;
     uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation
@@ -109,18 +111,15 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
   // --- Setter ---
   function setPositionManager(address _positionManager) external {
-    require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender),
-      "!ownerRole"
-    );
+    require(bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     positionManager = IManager(_positionManager);
     emit LogSetPositionManager(msg.sender, _positionManager);
   }
 
   function setFlashLendingEnabled(uint256 _flashLendingEnabled) external {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     flashLendingEnabled = _flashLendingEnabled;
@@ -129,7 +128,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
   // get the price directly from the PriceOracle
   function getFeedPrice(bytes32 collateralPoolId) internal view returns (uint256 feedPrice) {
-    IPriceFeed _priceFeed = bookKeeper.collateralPoolConfig().collateralPools(collateralPoolId).priceFeed;
+    IPriceFeed _priceFeed = bookKeeper.collateralPools(collateralPoolId).priceFeed;
     (bytes32 price, bool priceOk) = _priceFeed.peekPrice();
     require(priceOk, "FixedSpreadLiquidationStrategy/invalid-price");
     // (price [wad] * BLN [10 ** 9] ) [ray] / priceOracle.stableCoinReferencePrice [ray]
@@ -143,9 +142,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     uint256 _positionCollateralAmount,
     uint256 _positionDebtShare
   ) internal view returns (LiquidationInfo memory info) {
-    ICollateralPoolConfig.CollateralPool memory _collateralPool = bookKeeper.collateralPoolConfig().collateralPools(
-      _collateralPoolId
-    );
+    ICollateralPoolConfig.CollateralPool memory _collateralPool = bookKeeper.collateralPools(_collateralPoolId);
     uint256 _positionDebtValue = _positionDebtShare.mul(_collateralPool.debtAccumulatedRate);
 
     // Calculate max liquidatable debt value based on the close factor
@@ -234,7 +231,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     bytes calldata _data // Data to pass in external call; if length 0, no call is done
   ) external override nonReentrant whenNotPaused {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().LIQUIDATION_ENGINE_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().LIQUIDATION_ENGINE_ROLE(), msg.sender),
       "!liquidationEngingRole"
     );
 
@@ -277,7 +274,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     );
     address _positionOwnerAddress = positionManager.mapPositionHandlerToOwner(_positionAddress);
     if (_positionOwnerAddress == address(0)) _positionOwnerAddress = _positionAddress;
-    IGenericTokenAdapter _adapter = bookKeeper.collateralPoolConfig().collateralPools(_collateralPoolId).adapter;
+    IGenericTokenAdapter _adapter = bookKeeper.collateralPools(_collateralPoolId).adapter;
     _adapter.onMoveCollateral(
       _positionAddress,
       address(this),
@@ -353,8 +350,8 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
   // --- pause ---
   function pause() external {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -362,8 +359,8 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
   function unpause() external {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

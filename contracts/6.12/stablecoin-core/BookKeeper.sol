@@ -88,6 +88,19 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ICagable {
     live = 1;
   }
 
+  function collateralPools(bytes32 _collateralPoolId)
+    external
+    view
+    override
+    returns (ICollateralPoolConfig.CollateralPool memory)
+  {
+    return collateralPoolConfig.collateralPools(_collateralPoolId);
+  }
+
+  function accessControlConfigHasRole(bytes32 _role, address _account) external view override returns (bool) {
+    return accessControlConfig.hasRole(_role, _account);
+  }
+
   // --- Math ---
   function add(uint256 x, int256 y) internal pure returns (uint256 z) {
     z = x + uint256(y);

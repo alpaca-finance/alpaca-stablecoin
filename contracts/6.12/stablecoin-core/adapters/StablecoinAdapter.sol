@@ -55,6 +55,8 @@ import "../../interfaces/ICagable.sol";
 */
 
 contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IStablecoinAdapter, ICagable {
+  bytes32 public constant OWNER_ROLE = 0x00;
+
   IBookKeeper public override bookKeeper; // CDP Engine
   IStablecoin public override stablecoin; // Stablecoin Token
   uint256 public live; // Active Flag
@@ -70,8 +72,8 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   function cage() external override {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "StablecoinAdapter/not-live");
@@ -81,8 +83,8 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   function uncage() external override {
     require(
-      bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().OWNER_ROLE(), msg.sender) ||
-        bookKeeper.accessControlConfig().hasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
+      bookKeeper.accessControlConfigHasRole(OWNER_ROLE, msg.sender) ||
+        bookKeeper.accessControlConfigHasRole(bookKeeper.accessControlConfig().SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "StablecoinAdapter/not-caged");

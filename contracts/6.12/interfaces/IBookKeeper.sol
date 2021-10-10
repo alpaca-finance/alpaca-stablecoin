@@ -21,6 +21,7 @@ import "../interfaces/ICollateralPoolConfig.sol";
 import "../interfaces/IAccessControlConfig.sol";
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 interface IBookKeeper {
   function collateralToken(bytes32 collateralPoolId, address ownerAddress) external view returns (uint256);
@@ -106,5 +107,12 @@ interface IBookKeeper {
 
   function collateralPoolConfig() external view returns (ICollateralPoolConfig);
 
+  function collateralPools(bytes32 _collateralPoolId)
+    external
+    view
+    returns (ICollateralPoolConfig.CollateralPool memory);
+
   function accessControlConfig() external view returns (IAccessControlConfig);
+
+  function accessControlConfigHasRole(bytes32 _role, address _account) external view returns (bool);
 }
