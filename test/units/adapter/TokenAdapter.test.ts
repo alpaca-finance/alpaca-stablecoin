@@ -3,7 +3,16 @@ import { Signer, BigNumber, Wallet } from "ethers"
 import chai from "chai"
 import { MockProvider, solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import { BookKeeper__factory, BookKeeper, TokenAdapter, TokenAdapter__factory } from "../../../typechain"
+import {
+  BookKeeper__factory,
+  BookKeeper,
+  TokenAdapter,
+  TokenAdapter__factory,
+  AccessControlConfig__factory,
+  AccessControlConfig,
+  CollateralPoolConfig,
+  CollateralPoolConfig__factory,
+} from "../../../typechain"
 import { MockContract, smockit } from "@eth-optimism/smock"
 import { ERC20__factory } from "../../../typechain/factories/ERC20__factory"
 import { WeiPerWad } from "../../helper/unit"
@@ -12,6 +21,7 @@ type fixture = {
   tokenAdapter: TokenAdapter
   mockedBookKeeper: MockContract
   mockedToken: MockContract
+  mockedAccessControlConfig: MockContract
 }
 chai.use(solidity)
 const { expect } = chai
@@ -20,9 +30,27 @@ const { formatBytes32String } = ethers.utils
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
 
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const accessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+  const mockedAccessControlConfig = await smockit(accessControlConfig)
+
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [
+    accessControlConfig.address,
+  ])) as CollateralPoolConfig
+
   // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [
+    collateralPoolConfig.address,
+    accessControlConfig.address,
+  ])) as BookKeeper
   await bookKeeper.deployed()
   const mockedBookKeeper = await smockit(bookKeeper)
 
@@ -41,7 +69,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   ])) as TokenAdapter
   await tokenAdapter.deployed()
 
-  return { tokenAdapter, mockedBookKeeper, mockedToken }
+  return { tokenAdapter, mockedBookKeeper, mockedToken, mockedAccessControlConfig }
 }
 
 describe("TokenAdapter", () => {
@@ -61,10 +89,13 @@ describe("TokenAdapter", () => {
   let tokenAdapter: TokenAdapter
   let mockedBookKeeper: MockContract
   let mockedToken: MockContract
+  let mockedAccessControlConfig: MockContract
   let tokenAdapterAsAlice: TokenAdapter
 
   beforeEach(async () => {
-    ;({ tokenAdapter, mockedBookKeeper, mockedToken } = await waffle.loadFixture(loadFixtureHandler))
+    ;({ tokenAdapter, mockedBookKeeper, mockedToken, mockedAccessControlConfig } = await waffle.loadFixture(
+      loadFixtureHandler
+    ))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
       deployer.getAddress(),
@@ -79,6 +110,7 @@ describe("TokenAdapter", () => {
   describe("#deposit()", () => {
     context("when the token adapter is inactive", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
         await tokenAdapter.cage()
         await expect(tokenAdapter.deposit(aliceAddress, WeiPerWad.mul(1), "0x")).to.be.revertedWith(
           "TokenAdapter/not-live"
@@ -159,6 +191,7 @@ describe("TokenAdapter", () => {
   describe("#cage()", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(false)
         await expect(tokenAdapterAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
@@ -167,7 +200,7 @@ describe("TokenAdapter", () => {
       context("caller is owner role ", () => {
         it("should be set live to 0", async () => {
           // grant role access
-          await tokenAdapter.grantRole(await tokenAdapter.OWNER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
           expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
 
@@ -180,7 +213,7 @@ describe("TokenAdapter", () => {
       context("caller is showStopper role", () => {
         it("should be set live to 0", async () => {
           // grant role access
-          await tokenAdapter.grantRole(await tokenAdapter.SHOW_STOPPER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
           expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
 
@@ -195,6 +228,7 @@ describe("TokenAdapter", () => {
   describe("#uncage()", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(false)
         await expect(tokenAdapterAsAlice.uncage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
@@ -203,7 +237,7 @@ describe("TokenAdapter", () => {
       context("caller is owner role ", () => {
         it("should be set live to 1", async () => {
           // grant role access
-          await tokenAdapter.grantRole(await tokenAdapter.OWNER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
           expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
 
@@ -220,7 +254,7 @@ describe("TokenAdapter", () => {
       context("caller is showStopper role", () => {
         it("should be set live to 1", async () => {
           // grant role access
-          await tokenAdapter.grantRole(await tokenAdapter.SHOW_STOPPER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
           expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
 
