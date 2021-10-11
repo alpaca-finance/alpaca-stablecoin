@@ -3,17 +3,16 @@ import { Signer, BigNumber } from "ethers"
 import chai from "chai"
 import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
+import { StableSwapModule, StableSwapModule__factory } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 import { WeiPerRay, WeiPerWad } from "../../helper/unit"
-import { PegStabilityModule } from "../../../typechain/PegStabilityModule"
-import { PegStabilityModule__factory } from "../../../typechain/factories/PegStabilityModule__factory"
 
 chai.use(solidity)
 const { expect } = chai
 const { formatBytes32String } = ethers.utils
 
 type fixture = {
-  pegStabilityModule: PegStabilityModule
+  stableSwapModule: StableSwapModule
   mockAuthTokenAdapter: MockContract
   mockBookKeeper: MockContract
   mockStablecoinAdapter: MockContract
@@ -39,19 +38,16 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   // Deploy mocked SystemDebtEngine
   const mockSystemDebtEngine = await smockit(await ethers.getContractFactory("SystemDebtEngine", deployer))
 
-  // Deploy PegStabilityModule
-  const PegStabilityModule = (await ethers.getContractFactory(
-    "PegStabilityModule",
-    deployer
-  )) as PegStabilityModule__factory
-  const pegStabilityModule = (await upgrades.deployProxy(PegStabilityModule, [
+  // Deploy StableSwapModule
+  const StableSwapModule = (await ethers.getContractFactory("StableSwapModule", deployer)) as StableSwapModule__factory
+  const stableSwapModule = (await upgrades.deployProxy(StableSwapModule, [
     mockAuthTokenAdapter.address,
     mockStablecoinAdapter.address,
     mockSystemDebtEngine.address,
-  ])) as PegStabilityModule
+  ])) as StableSwapModule
 
   return {
-    pegStabilityModule,
+    stableSwapModule,
     mockAuthTokenAdapter,
     mockBookKeeper,
     mockStablecoinAdapter,
@@ -60,7 +56,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   }
 }
 
-describe("PegStabilityModule", () => {
+describe("StableSwapModule", () => {
   // Accounts
   let deployer: Signer
   let alice: Signer
@@ -76,12 +72,12 @@ describe("PegStabilityModule", () => {
   let mockAlpacaStablecoin: MockContract
   let mockSystemDebtEngine: MockContract
 
-  let pegStabilityModule: PegStabilityModule
-  let pegStabilityModuleAsAlice: PegStabilityModule
+  let stableSwapModule: StableSwapModule
+  let stableSwapModuleAsAlice: StableSwapModule
 
   beforeEach(async () => {
     ;({
-      pegStabilityModule,
+      stableSwapModule,
       mockAuthTokenAdapter,
       mockBookKeeper,
       mockStablecoinAdapter,
@@ -91,38 +87,35 @@ describe("PegStabilityModule", () => {
     ;[deployer, alice] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
 
-    pegStabilityModuleAsAlice = PegStabilityModule__factory.connect(
-      pegStabilityModule.address,
-      alice
-    ) as PegStabilityModule
+    stableSwapModuleAsAlice = StableSwapModule__factory.connect(stableSwapModule.address, alice) as StableSwapModule
   })
 
-  describe("#sellToken", () => {
+  describe("#swapTokenToStablecoin", () => {
     context("when parameters are valid", () => {
-      it("should be able to call sellToken", async () => {
-        await pegStabilityModule.file(formatBytes32String("feeIn"), WeiPerWad.div(10))
-        await expect(pegStabilityModuleAsAlice.sellToken(aliceAddress, WeiPerWad.mul(10)))
-          .to.be.emit(pegStabilityModule, "SellToken")
+      it("should be able to call swapTokenToStablecoin", async () => {
+        await stableSwapModule.setFeeIn(WeiPerWad.div(10))
+        await expect(stableSwapModuleAsAlice.swapTokenToStablecoin(aliceAddress, WeiPerWad.mul(10)))
+          .to.be.emit(stableSwapModule, "SwapTokenToStablecoin")
           .withArgs(aliceAddress, WeiPerWad.mul(10), WeiPerWad)
 
         const { calls: authTokenAdapterDepositCalls } = mockAuthTokenAdapter.smocked.deposit
         expect(authTokenAdapterDepositCalls.length).to.be.equal(1)
-        expect(authTokenAdapterDepositCalls[0].urn).to.be.equal(pegStabilityModule.address)
+        expect(authTokenAdapterDepositCalls[0].urn).to.be.equal(stableSwapModule.address)
         expect(authTokenAdapterDepositCalls[0].wad).to.be.equal(WeiPerWad.mul(10))
         expect(authTokenAdapterDepositCalls[0].msgSender).to.be.equal(aliceAddress)
 
         const { calls: bookKeeperAdjustPositionCalls } = mockBookKeeper.smocked.adjustPosition
         expect(bookKeeperAdjustPositionCalls.length).to.be.equal(1)
         expect(bookKeeperAdjustPositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BUSD"))
-        expect(bookKeeperAdjustPositionCalls[0].positionAddress).to.be.equal(pegStabilityModule.address)
-        expect(bookKeeperAdjustPositionCalls[0].collateralOwner).to.be.equal(pegStabilityModule.address)
-        expect(bookKeeperAdjustPositionCalls[0].stablecoinOwner).to.be.equal(pegStabilityModule.address)
+        expect(bookKeeperAdjustPositionCalls[0].positionAddress).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperAdjustPositionCalls[0].collateralOwner).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperAdjustPositionCalls[0].stablecoinOwner).to.be.equal(stableSwapModule.address)
         expect(bookKeeperAdjustPositionCalls[0].collateralValue).to.be.equal(WeiPerWad.mul(10))
         expect(bookKeeperAdjustPositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(10))
 
         const { calls: bookKeeperMoveStablecoinCalls } = mockBookKeeper.smocked.moveStablecoin
         expect(bookKeeperMoveStablecoinCalls.length).to.be.equal(1)
-        expect(bookKeeperMoveStablecoinCalls[0].src).to.be.equal(pegStabilityModule.address)
+        expect(bookKeeperMoveStablecoinCalls[0].src).to.be.equal(stableSwapModule.address)
         expect(bookKeeperMoveStablecoinCalls[0].dst).to.be.equal(mockSystemDebtEngine.address)
         expect(bookKeeperMoveStablecoinCalls[0].value).to.be.equal(WeiPerWad.mul(WeiPerRay))
 
@@ -133,35 +126,35 @@ describe("PegStabilityModule", () => {
       })
     })
   })
-  describe("#buyToken", () => {
+  describe("#swapStablecoinToToken", () => {
     context("when failed transfer", () => {
       it("should be revert", async () => {
-        await expect(pegStabilityModuleAsAlice.buyToken(aliceAddress, WeiPerWad.mul(10))).to.be.revertedWith(
-          "PegStabilityModule/failed-transfer"
+        await expect(stableSwapModuleAsAlice.swapStablecoinToToken(aliceAddress, WeiPerWad.mul(10))).to.be.revertedWith(
+          "StableSwapModule/failed-transfer"
         )
       })
     })
     context("when parameters are valid", () => {
-      it("should be able to call buyToken", async () => {
-        await pegStabilityModule.file(formatBytes32String("feeOut"), WeiPerWad.div(10))
+      it("should be able to call swapStablecoinToToken", async () => {
+        await stableSwapModule.setFeeOut(WeiPerWad.div(10))
 
         mockAlpacaStablecoin.smocked.transferFrom.will.return.with(true)
 
-        await expect(pegStabilityModuleAsAlice.buyToken(aliceAddress, WeiPerWad.mul(10)))
-          .to.be.emit(pegStabilityModule, "BuyToken")
+        await expect(stableSwapModuleAsAlice.swapStablecoinToToken(aliceAddress, WeiPerWad.mul(10)))
+          .to.be.emit(stableSwapModule, "SwapStablecoinToToken")
           .withArgs(aliceAddress, WeiPerWad.mul(10), WeiPerWad)
 
         const { calls: stablecoinAdapterDepositCalls } = mockStablecoinAdapter.smocked.deposit
         expect(stablecoinAdapterDepositCalls.length).to.be.equal(1)
-        expect(stablecoinAdapterDepositCalls[0].usr).to.be.equal(pegStabilityModule.address)
+        expect(stablecoinAdapterDepositCalls[0].usr).to.be.equal(stableSwapModule.address)
         expect(stablecoinAdapterDepositCalls[0].wad).to.be.equal(WeiPerWad.mul(11))
 
         const { calls: bookKeeperAdjustPositionCalls } = mockBookKeeper.smocked.adjustPosition
         expect(bookKeeperAdjustPositionCalls.length).to.be.equal(1)
         expect(bookKeeperAdjustPositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BUSD"))
-        expect(bookKeeperAdjustPositionCalls[0].positionAddress).to.be.equal(pegStabilityModule.address)
-        expect(bookKeeperAdjustPositionCalls[0].collateralOwner).to.be.equal(pegStabilityModule.address)
-        expect(bookKeeperAdjustPositionCalls[0].stablecoinOwner).to.be.equal(pegStabilityModule.address)
+        expect(bookKeeperAdjustPositionCalls[0].positionAddress).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperAdjustPositionCalls[0].collateralOwner).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperAdjustPositionCalls[0].stablecoinOwner).to.be.equal(stableSwapModule.address)
         expect(bookKeeperAdjustPositionCalls[0].collateralValue).to.be.equal(WeiPerWad.mul(-10))
         expect(bookKeeperAdjustPositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(-10))
 
@@ -172,7 +165,7 @@ describe("PegStabilityModule", () => {
 
         const { calls: bookKeeperMoveStablecoinCalls } = mockBookKeeper.smocked.moveStablecoin
         expect(bookKeeperMoveStablecoinCalls.length).to.be.equal(1)
-        expect(bookKeeperMoveStablecoinCalls[0].src).to.be.equal(pegStabilityModule.address)
+        expect(bookKeeperMoveStablecoinCalls[0].src).to.be.equal(stableSwapModule.address)
         expect(bookKeeperMoveStablecoinCalls[0].dst).to.be.equal(mockSystemDebtEngine.address)
         expect(bookKeeperMoveStablecoinCalls[0].value).to.be.equal(WeiPerWad.mul(WeiPerRay))
       })

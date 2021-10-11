@@ -55,6 +55,7 @@ type Fixture = {
   stabilityFeeCollector: StabilityFeeCollector
   ibTokenAdapter: IbTokenAdapter
   wbnbTokenAdapter: TokenAdapter
+  alpacaTokenAdapter: TokenAdapter
   stablecoinAdapter: StablecoinAdapter
   vault: Vault
   fairLaunch: FairLaunch
@@ -66,7 +67,7 @@ type Fixture = {
 const loadFixtureHandler = async (): Promise<Fixture> => {
   const [deployer, alice, , dev] = await ethers.getSigners()
 
-  // alpca vault
+  // alpaca vault
   const ALPACA_BONUS_LOCK_UP_BPS = 7000
   const ALPACA_REWARD_PER_BLOCK = ethers.utils.parseEther("5000")
   const RESERVE_POOL_BPS = "1000" // 10% reserve pool
@@ -103,6 +104,8 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   const AlpacaToken = new AlpacaToken__factory(deployer)
   const alpacaToken = await AlpacaToken.deploy(132, 137)
   await alpacaToken.deployed()
+
+  await alpacaToken.mint(await alice.getAddress(), WeiPerWad.mul(100))
 
   const FairLaunch = new FairLaunch__factory(deployer)
   const fairLaunch = (await FairLaunch.deploy(
@@ -182,6 +185,15 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   // set position debt floor 1 rad
   await bookKeeper.setDebtFloor(formatBytes32String("WBNB"), WeiPerRad.mul(1))
 
+  // init ALPACA pool
+  await bookKeeper.init(formatBytes32String("ALPACA"))
+  // set pool debt ceiling 1000 rad
+  await bookKeeper.setDebtCeiling(formatBytes32String("ALPACA"), WeiPerRad.mul(1000))
+  // set price with safety margin 10 ray (1 ALPACA = 10 USD)
+  await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("ALPACA"), WeiPerRay.mul(10))
+  // set position debt floor 1 rad
+  await bookKeeper.setDebtFloor(formatBytes32String("ALPACA"), WeiPerRad.mul(1))
+
   // Deploy ShowStopper
   const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
   const showStopper = (await upgrades.deployProxy(ShowStopper, [])) as ShowStopper
@@ -216,6 +228,13 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     wbnb.address,
   ])) as TokenAdapter
 
+  const AlpacaTokenAdapter = new TokenAdapter__factory(deployer)
+  const alpacaTokenAdapter = (await upgrades.deployProxy(AlpacaTokenAdapter, [
+    bookKeeper.address,
+    formatBytes32String("ALPACA"),
+    alpacaToken.address,
+  ])) as TokenAdapter
+
   const StablecoinAdapter = new StablecoinAdapter__factory(deployer)
   const stablecoinAdapter = (await upgrades.deployProxy(StablecoinAdapter, [
     bookKeeper.address,
@@ -230,9 +249,11 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
 
   await stabilityFeeCollector.init(formatBytes32String("ibBUSD"))
   await stabilityFeeCollector.init(formatBytes32String("WBNB"))
+  await stabilityFeeCollector.init(formatBytes32String("ALPACA"))
 
   await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter.address)
   await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), wbnbTokenAdapter.address)
+  await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), alpacaTokenAdapter.address)
   await bookKeeper.grantRole(
     ethers.utils.solidityKeccak256(["string"], ["POSITION_MANAGER_ROLE"]),
     positionManager.address
@@ -251,6 +272,7 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     stabilityFeeCollector,
     ibTokenAdapter,
     wbnbTokenAdapter,
+    alpacaTokenAdapter,
     stablecoinAdapter,
     vault: busdVault,
     fairLaunch,
@@ -283,6 +305,7 @@ describe("position manager", () => {
   let bookKeeper: BookKeeper
   let ibTokenAdapter: IbTokenAdapter
   let wbnbTokenAdapter: TokenAdapter
+  let alpacaTokenAdapter: TokenAdapter
   let stablecoinAdapter: StablecoinAdapter
   let vault: Vault
   let fairLaunch: FairLaunch
@@ -307,10 +330,12 @@ describe("position manager", () => {
       bookKeeper,
       ibTokenAdapter,
       wbnbTokenAdapter,
+      alpacaTokenAdapter,
       stablecoinAdapter,
       vault,
       fairLaunch,
       baseToken,
+      alpacaToken,
       stabilityFeeCollector,
       alpacaToken,
       alpacaStablecoin,
@@ -319,6 +344,7 @@ describe("position manager", () => {
     const baseTokenAsAlice = BEP20__factory.connect(baseToken.address, alice)
     const vaultAsAlice = Vault__factory.connect(vault.address, alice)
     const alpacaStablecoinAsAlice = Vault__factory.connect(alpacaStablecoin.address, alice)
+    const alpacaTokenAsAlice = AlpacaToken__factory.connect(alpacaToken.address, alice)
 
     alpacaStablecoinProxyActionsAsAlice = AlpacaStablecoinProxyActions__factory.connect(
       alpacaStablecoinProxyActions.address,
@@ -328,6 +354,7 @@ describe("position manager", () => {
     await baseTokenAsAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
     await vaultAsAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
     await alpacaStablecoinAsAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+    await alpacaTokenAsAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
   })
 
   describe("ibToken collateral pool", () => {
@@ -2497,6 +2524,943 @@ describe("position manager", () => {
           expect(alpacaStablecoinBefore.sub(alpacaStablecoinAfter)).to.be.equal(parseEther("200"))
           expect(debtShareBefore.sub(debtShareAfter)).to.be.equal(parseEther("200"))
           expect(lockedCollateralBefore.sub(lockedCollateralAfter)).to.be.equal(parseEther("0.5"))
+        })
+      })
+    })
+  })
+  describe("alpaca collateral pool", () => {
+    describe("user opens a new position", () => {
+      context("alice opens a new position", () => {
+        it("alice should be able to open a position", async () => {
+          // 1. alice open a new position
+          const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("open", [
+            positionManager.address,
+            formatBytes32String("ALPACA"),
+            aliceProxyWallet.address,
+          ])
+          const tx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openPositionCall
+          )
+          const txReceipt = await tx.wait()
+
+          const event = await getEvent(positionManager, txReceipt.blockNumber, "NewPosition")
+          expectEmit(event, aliceProxyWallet.address, aliceProxyWallet.address, 1)
+
+          expect(await positionManager.ownerLastPositionId(aliceProxyWallet.address)).to.be.equal(1)
+        })
+      })
+    })
+    describe("user opens a new position and lock ALPACA and mint AUSD in separated transactions", () => {
+      context("alice mint AUSD over a lock collateral value", () => {
+        it("should be revert", async () => {
+          // 1. alice open a new position
+          const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("open", [
+            positionManager.address,
+            formatBytes32String("ALPACA"),
+            aliceProxyWallet.address,
+          ])
+          const openTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openPositionCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          // 2. alice lock ALPACA
+          const lockCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("lockToken", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            positionId,
+            WeiPerWad.mul(10),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          const lockTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            lockCall
+          )
+
+          // 4. alice mint AUSD
+          const drawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("draw", [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            alpacaTokenAdapter.address,
+            stablecoinAdapter.address,
+            positionId,
+            WeiPerWad.mul(150),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          await expect(
+            aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, drawCall)
+          ).to.be.revertedWith("BookKeeper/not-safe")
+        })
+      })
+      context("alice opens a new position and lock ALPACA and mint AUSD in separated transactions", () => {
+        it("alice should be able to opens a new position and lock ALPACA and mint AUSD in separated transactions", async () => {
+          // 1. alice open a new position
+          const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("open", [
+            positionManager.address,
+            formatBytes32String("ALPACA"),
+            aliceProxyWallet.address,
+          ])
+          const openTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openPositionCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const tokenBefore = await alpacaToken.balanceOf(aliceAddress)
+          const [lockedCollateralBefore] = await bookKeeper.positions(formatBytes32String("ALPACA"), positionAddress)
+
+          // 2. alice lock ALPACA
+          const lockCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("lockToken", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            positionId,
+            WeiPerWad.mul(10),
+            true,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          const lockTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            lockCall
+          )
+
+          const tokenAfterLock = await alpacaToken.balanceOf(aliceAddress)
+          const [lockedCollateralAfterlock, debtShareAfterlock] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          expect(tokenBefore.sub(tokenAfterLock)).to.be.equal(WeiPerWad.mul(10))
+          expect(lockedCollateralAfterlock.sub(lockedCollateralBefore)).to.be.equal(WeiPerWad.mul(10))
+
+          const alpacaStablecoinBefore = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          // 3. alice mint AUSD
+          const drawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("draw", [
+            positionManager.address,
+            stabilityFeeCollector.address,
+            alpacaTokenAdapter.address,
+            stablecoinAdapter.address,
+            positionId,
+            WeiPerWad.mul(50),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          const drawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            drawCall
+          )
+
+          const [lockedCollateralAfterDraw, debtShareAfterDraw] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+          const alpacaStablecoinAfterDraw = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          expect(debtShareAfterDraw.sub(debtShareAfterlock)).to.be.equal(WeiPerWad.mul(50))
+          expect(alpacaStablecoinAfterDraw.sub(alpacaStablecoinBefore)).to.be.equal(WeiPerWad.mul(50))
+        })
+      })
+    })
+    describe("user opens a new position and lock ALPACA and mint AUSD in single transactions", () => {
+      context("alice mint AUSD over a lock collateral value", () => {
+        it("should be revert", async () => {
+          // 1.
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(150),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          await expect(
+            aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
+          ).to.be.revertedWith("BookKeeper/not-safe")
+        })
+      })
+      context("alice opens a new position and lock ALPACA and mint AUSD in single transactions", () => {
+        it("alice should be able to opens a new position and lock ALPACA and mint AUSD in single transactions", async () => {
+          // 1.
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const [lockedCollateralAfter, debtShareAfter] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          const alpacaStablecoinAfter = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          expect(lockedCollateralAfter).to.be.equal(WeiPerWad.mul(10))
+          expect(debtShareAfter).to.be.equal(WeiPerWad.mul(50))
+          expect(alpacaStablecoinAfter).to.be.equal(WeiPerWad.mul(50))
+        })
+      })
+    })
+    describe("user repay some AUSD and unlock ALPACA in separated transactions", () => {
+      context("alice repay some AUSD and unlock ALPACA in separated transactions", () => {
+        it("alice should be able to repay some AUSD and unlock ALPACA in separated transactions", async () => {
+          // 1.
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const [lockedCollateralBefore, debtShareBefore] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          const alpacaStablecoinBefore = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          // 2. alice repay some AUSD
+          const wipeCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("wipe", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            stablecoinAdapter.address,
+            positionId,
+            WeiPerWad.mul(30),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          const wipeTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            wipeCall
+          )
+
+          const [lockedCollateralAfterWipe, debtShareAfterWipe] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          const alpacaStablecoinAfterWipe = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          expect(alpacaStablecoinBefore.sub(alpacaStablecoinAfterWipe)).to.be.equal(WeiPerWad.mul(30))
+          expect(debtShareBefore.sub(debtShareAfterWipe)).to.be.equal(WeiPerWad.mul(30))
+
+          // 3. alice unlock some ALPACA
+          const unlockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("unlockToken", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            positionId,
+            WeiPerWad.mul(5),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          const unlockTokenTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            unlockTokenCall
+          )
+
+          const [lockedCollateralAfterUnlock, debtShareAfterUnlock] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          expect(lockedCollateralAfterWipe.sub(lockedCollateralAfterUnlock)).to.be.equal(WeiPerWad.mul(5))
+        })
+      })
+      context("alice repay AUSD over debt", () => {
+        it("alice should be able to repay some AUSD and unlock ALPACA in separated transactions", async () => {
+          // 1. open 2 position to mint 50 + 50 = 100 AUSD
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+          const openLockTokenAndDraw2Call = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDraw2Tx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const [lockedCollateralBefore, debtShareBefore] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+          const bookKeeperStablecoinBefore = await bookKeeper.stablecoin(positionAddress)
+          const alpacaStablecoinBefore = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          // 2. alice repay AUSD over debt
+          const wipeCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("wipe", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            stablecoinAdapter.address,
+            positionId,
+            WeiPerWad.mul(100),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          const wipeTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            wipeCall
+          )
+
+          const [lockedCollateralAfterWipe, debtShareAfterWipe] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+          const bookKeeperStablecoinAfter = await bookKeeper.stablecoin(positionAddress)
+          const alpacaStablecoinAfterWipe = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          expect(bookKeeperStablecoinAfter.sub(bookKeeperStablecoinBefore)).to.be.equal(WeiPerRad.mul(50))
+          expect(alpacaStablecoinBefore.sub(alpacaStablecoinAfterWipe)).to.be.equal(WeiPerWad.mul(100))
+          expect(debtShareBefore.sub(debtShareAfterWipe)).to.be.equal(WeiPerWad.mul(50))
+
+          // 3. alice unlock some ALPACA
+          const unlockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("unlockToken", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            positionId,
+            WeiPerWad.mul(5),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          const unlockTokenTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            unlockTokenCall
+          )
+
+          const [lockedCollateralAfterUnlock, debtShareAfterUnlock] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          expect(lockedCollateralAfterWipe.sub(lockedCollateralAfterUnlock)).to.be.equal(WeiPerWad.mul(5))
+        })
+      })
+      context("alice unlock ALPACA over lock collateral", () => {
+        it("should be revert", async () => {
+          // 1.
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const [lockedCollateralBefore, debtShareBefore] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          const alpacaStablecoinBefore = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          // 2. alice repay some AUSD
+          const wipeCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("wipe", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            stablecoinAdapter.address,
+            positionId,
+            WeiPerWad.mul(20),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          const wipeTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            wipeCall
+          )
+
+          const [lockedCollateralAfterWipe, debtShareAfterWipe] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          const alpacaStablecoinAfterWipe = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          expect(alpacaStablecoinBefore.sub(alpacaStablecoinAfterWipe)).to.be.equal(WeiPerWad.mul(20))
+          expect(debtShareBefore.sub(debtShareAfterWipe)).to.be.equal(WeiPerWad.mul(20))
+
+          // 3. alice unlock ibBUSD over lock collateral
+          const unlockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("unlockToken", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            positionId,
+            WeiPerWad.mul(15),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          await expect(
+            aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, unlockTokenCall)
+          ).to.be.reverted
+        })
+      })
+      context("alice unlock ALPACA over position safe", () => {
+        it("should be revert", async () => {
+          // 1.
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const [lockedCollateralBefore, debtShareBefore] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          const alpacaStablecoinBefore = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          // 2. alice repay some AUSD
+          const wipeCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("wipe", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            stablecoinAdapter.address,
+            positionId,
+            WeiPerWad.mul(20),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          const wipeTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            wipeCall
+          )
+
+          const [lockedCollateralAfterWipe, debtShareAfterWipe] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          const alpacaStablecoinAfterWipe = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          expect(alpacaStablecoinBefore.sub(alpacaStablecoinAfterWipe)).to.be.equal(WeiPerWad.mul(20))
+          expect(debtShareBefore.sub(debtShareAfterWipe)).to.be.equal(WeiPerWad.mul(20))
+
+          // 3. alice unlock ALPACA over position safe
+          const unlockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("unlockToken", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            positionId,
+            WeiPerWad.mul(10),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+
+          await expect(
+            aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, unlockTokenCall)
+          ).to.be.revertedWith("BookKeeper/not-safe")
+        })
+      })
+    })
+    describe("user repay some AUSD and unlock ALPACA in single transactions", () => {
+      context("alice repay AUSD over debt", () => {
+        it("alice should be able to repay some AUSD and unlock ALPACA in single transactions", async () => {
+          // 1. open 2 position to mint 50 + 50 = 100 AUSD
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+          const openLockTokenAndDraw2Call = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDraw2Tx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const alpacaStablecoinBefore = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          const bookeeperStablecoinBefore = await bookKeeper.stablecoin(positionAddress)
+
+          const [lockedCollateralBefore, debtShareBefore] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          // 2.
+          //  a. repay some AUSD
+          //  b. alice unlock some ALPACA
+          const wipeAndUnlockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "wipeAndUnlockToken",
+            [
+              positionManager.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              positionId,
+              WeiPerWad.mul(4),
+              WeiPerWad.mul(100),
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const wipeAndUnlockTokenTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            wipeAndUnlockTokenCall
+          )
+
+          const alpacaStablecoinAfter = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          const bookeeperStablecoinAfter = await bookKeeper.stablecoin(positionAddress)
+
+          const [lockedCollateralAfter, debtShareAfter] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          expect(alpacaStablecoinBefore.sub(alpacaStablecoinAfter)).to.be.equal(WeiPerWad.mul(100))
+          expect(bookeeperStablecoinAfter.sub(bookeeperStablecoinBefore)).to.be.equal(WeiPerRad.mul(50))
+          expect(debtShareBefore.sub(debtShareAfter)).to.be.equal(WeiPerWad.mul(50))
+          expect(lockedCollateralBefore.sub(lockedCollateralAfter)).to.be.equal(WeiPerWad.mul(4))
+        })
+      })
+      context("alice unlock ALPACA over lock collateral", () => {
+        it("should be revert", async () => {
+          // 1.
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          // 2.
+          //  a. repay some AUSD
+          //  b. alice unlock some ALPACA
+          const wipeAndUnlockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "wipeAndUnlockToken",
+            [
+              positionManager.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              positionId,
+              WeiPerWad.mul(15),
+              WeiPerWad.mul(20),
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          await expect(
+            aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, wipeAndUnlockTokenCall)
+          ).to.be.reverted
+        })
+      })
+      context("alice unlock ALPACA over position safe", () => {
+        it("should be revert", async () => {
+          // 1.
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          // 2.
+          //  a. repay some AUSD
+          //  b. alice unlock some ALPACA
+          const wipeAndUnlockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "wipeAndUnlockToken",
+            [
+              positionManager.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              positionId,
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(20),
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          await expect(
+            aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, wipeAndUnlockTokenCall)
+          ).to.be.revertedWith("BookKeeper/not-safe")
+        })
+      })
+      context("alice repay some AUSD and unlock ALPACA in single transactions", () => {
+        it("alice should be able to repay some AUSD and unlock ALPACA in single transactions", async () => {
+          // 1.
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const alpacaStablecoinBefore = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          const [lockedCollateralBefore, debtShareBefore] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          // 2.
+          //  a. repay some AUSD
+          //  b. alice unlock some ALPACA
+          const wipeAndUnlockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "wipeAndUnlockToken",
+            [
+              positionManager.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              positionId,
+              WeiPerWad.mul(4),
+              WeiPerWad.mul(20),
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const wipeAndUnlockTokenTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            wipeAndUnlockTokenCall
+          )
+
+          const alpacaStablecoinAfter = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          const [lockedCollateralAfter, debtShareAfter] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          expect(alpacaStablecoinBefore.sub(alpacaStablecoinAfter)).to.be.equal(WeiPerWad.mul(20))
+          expect(debtShareBefore.sub(debtShareAfter)).to.be.equal(WeiPerWad.mul(20))
+          expect(lockedCollateralBefore.sub(lockedCollateralAfter)).to.be.equal(WeiPerWad.mul(4))
+        })
+      })
+    })
+    describe("user repay all AUSD and unlock ALPACA in separated transactions", () => {
+      context("alice repay all AUSD and unlock ALPACA in separated transactions", () => {
+        it("alice should be able to repay all AUSD and unlock ALPACA in separated transactions", async () => {
+          // 1.
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const [lockedCollateralBefore, debtShareBefore] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          const alpacaStablecoinBefore = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          // 2. alice repay all AUSD
+          const wipeAllCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("wipeAll", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            stablecoinAdapter.address,
+            positionId,
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          const wipeTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            wipeAllCall
+          )
+
+          const [lockedCollateralAfterWipe, debtShareAfterWipe] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          const alpacaStablecoinAfterWipe = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          expect(alpacaStablecoinBefore.sub(alpacaStablecoinAfterWipe)).to.be.equal(WeiPerWad.mul(50))
+          expect(debtShareBefore.sub(debtShareAfterWipe)).to.be.equal(WeiPerWad.mul(50))
+
+          // 3. alice unlock some ALPACA
+          const unlockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("unlockToken", [
+            positionManager.address,
+            alpacaTokenAdapter.address,
+            positionId,
+            WeiPerWad.mul(4),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+          ])
+          const unlockTokenTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            unlockTokenCall
+          )
+
+          const [lockedCollateralAfterUnlock, debtShareAfterUnlock] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          expect(lockedCollateralAfterWipe.sub(lockedCollateralAfterUnlock)).to.be.equal(WeiPerWad.mul(4))
+        })
+      })
+    })
+    describe("user repay all AUSD and unlock ALPACA in single transactions", () => {
+      context("alice repay all AUSD and unlock ALPACA in single transactions", () => {
+        it("alice should be able to repay all AUSD and unlock ALPACA in single transactions", async () => {
+          // 1.
+          //  a. open a new position
+          //  b. lock ALPACA
+          //  c. mint AUSD
+          const openLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "openLockTokenAndDraw",
+            [
+              positionManager.address,
+              stabilityFeeCollector.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ALPACA"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(50),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const openLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            openLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const alpacaStablecoinBefore = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          const [lockedCollateralBefore, debtShareBefore] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          // 2.
+          //  a. repay all AUSD
+          //  b. alice unlock some ALPACA
+          const wipeAllAndUnlockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "wipeAllAndUnlockToken",
+            [
+              positionManager.address,
+              alpacaTokenAdapter.address,
+              stablecoinAdapter.address,
+              positionId,
+              WeiPerWad.mul(4),
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const wipeAllAndUnlockTokentTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            wipeAllAndUnlockTokenCall
+          )
+
+          const alpacaStablecoinAfter = await alpacaStablecoin.balanceOf(aliceAddress)
+
+          const [lockedCollateralAfter, debtShareAfter] = await bookKeeper.positions(
+            formatBytes32String("ALPACA"),
+            positionAddress
+          )
+
+          expect(alpacaStablecoinBefore.sub(alpacaStablecoinAfter)).to.be.equal(WeiPerWad.mul(50))
+          expect(debtShareBefore.sub(debtShareAfter)).to.be.equal(WeiPerWad.mul(50))
+          expect(lockedCollateralBefore.sub(lockedCollateralAfter)).to.be.equal(WeiPerWad.mul(4))
         })
       })
     })
