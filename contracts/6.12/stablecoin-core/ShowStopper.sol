@@ -347,6 +347,7 @@ contract ShowStopper is PausableUpgradeable {
     bytes32 collateralPoolId,
     IGenericTokenAdapter adapter,
     address positionAddress,
+    address collateralReceiver,
     bytes calldata data
   ) external {
     require(live == 0, "ShowStopper/still-live");
@@ -359,14 +360,14 @@ contract ShowStopper is PausableUpgradeable {
     require(lockedCollateralAmount <= 2**255, "ShowStopper/overflow");
     bookKeeper.confiscatePosition(
       collateralPoolId,
-      msg.sender,
       positionAddress,
+      collateralReceiver,
       address(systemDebtEngine),
       -int256(lockedCollateralAmount),
       0
     );
-    adapter.onMoveCollateral(positionAddress, msg.sender, lockedCollateralAmount, data);
-    emit RedeemLockedCollateral(collateralPoolId, msg.sender, lockedCollateralAmount);
+    adapter.onMoveCollateral(positionAddress, collateralReceiver, lockedCollateralAmount, data);
+    emit RedeemLockedCollateral(collateralPoolId, collateralReceiver, lockedCollateralAmount);
   }
 
   /** @dev Finalize the total debt of the system after the emergency shutdown.

@@ -402,7 +402,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     address destination,
     uint256 share,
     bytes calldata /* data */
-  ) internal {
+  ) private {
     // 1. Update collateral tokens for source and destination
     uint256 stakedAmount = stake[source];
     stake[source] = sub(stakedAmount, share);

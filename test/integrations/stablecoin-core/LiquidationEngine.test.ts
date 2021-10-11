@@ -44,6 +44,8 @@ import {
   SimplePriceFeed,
   AccessControlConfig__factory,
   AccessControlConfig,
+  ShowStopper,
+  ShowStopper__factory,
 } from "../../../typechain"
 import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
@@ -146,7 +148,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
   const positionManager = (await upgrades.deployProxy(PositionManager, [
     bookKeeper.address,
-    bookKeeper.address,
+    AddressZero,
   ])) as PositionManager
   await positionManager.deployed()
   await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)

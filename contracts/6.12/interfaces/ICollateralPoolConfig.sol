@@ -23,15 +23,9 @@ interface ICollateralPoolConfig {
     address strategy; // Liquidation strategy for this collateral pool
   }
 
-  // struct CollateralPool {
-  //   uint256 totalDebtShare;
-  // }
-
   function setPriceWithSafetyMargin(bytes32 collateralPoolId, uint256 priceWithSafetyMargin) external;
 
   function collateralPools(bytes32 _collateralPoolId) external view returns (CollateralPool memory);
-
-  // function collateralPools(bytes32 _collateralPoolId) external view returns (CollateralPool memory);
 
   function setTotalDebtShare(bytes32 _collateralPoolId, uint256 _totalDebtShare) external;
 

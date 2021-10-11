@@ -90,7 +90,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
       _collateralPools[_collateralPoolId].debtAccumulatedRate == 0,
       "CollateralPoolConfig/collateral-pool-already-init"
     );
-    _collateralPools[_collateralPoolId].debtAccumulatedRate = 10**27;
+    _collateralPools[_collateralPoolId].debtAccumulatedRate = RAY;
     _collateralPools[_collateralPoolId].debtCeiling = _debtCeiling;
     _collateralPools[_collateralPoolId].debtFloor = _debtFloor;
     IPriceFeed(_priceFeed).peekPrice(); // Sanity Check Call
