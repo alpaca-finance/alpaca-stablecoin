@@ -27,8 +27,6 @@ interface ICollateralPoolConfig {
 
   function collateralPools(bytes32 _collateralPoolId) external view returns (CollateralPool memory);
 
-  // function collateralPools(bytes32 _collateralPoolId) external view returns (CollateralPool memory);
-
   function setTotalDebtShare(bytes32 _collateralPoolId, uint256 _totalDebtShare) external;
 
   function setDebtAccumulatedRate(bytes32 _collateralPoolId, uint256 _debtAccumulatedRate) external;
