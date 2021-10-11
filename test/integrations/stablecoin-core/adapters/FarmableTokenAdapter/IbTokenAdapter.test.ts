@@ -5,6 +5,7 @@ import { MockProvider, solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
 import {
   BookKeeper__factory,
+  PositionManager__factory,
   PositionManager,
   BookKeeper,
   BEP20__factory,
@@ -103,6 +104,15 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   await shield.transferOwnership(await deployer.getAddress())
   await alpacaToken.transferOwnership(fairLaunch.address)
 
+  // Deploy PositionManager
+  const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
+  const positionManager = (await upgrades.deployProxy(PositionManager, [
+    bookKeeper.address,
+    bookKeeper.address,
+  ])) as PositionManager
+  await positionManager.deployed()
+  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
+
   const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
   const ibTokenAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
     bookKeeper.address,
@@ -115,6 +125,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     await deployer.getAddress(),
     BigNumber.from(1000),
     await dev.getAddress(),
+    positionManager.address,
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
@@ -196,6 +207,7 @@ describe("IbTokenAdapter", () => {
             deployerAddress,
             BigNumber.from(1000),
             deployerAddress,
+            deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/collateralToken-not-match")
       })
@@ -215,6 +227,7 @@ describe("IbTokenAdapter", () => {
             shield.address,
             deployerAddress,
             BigNumber.from(1000),
+            deployerAddress,
             deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/reward-token-not-match")
@@ -236,6 +249,7 @@ describe("IbTokenAdapter", () => {
             deployerAddress,
             BigNumber.from(1000),
             deployerAddress,
+            deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/shield-not-match")
       })
@@ -255,6 +269,7 @@ describe("IbTokenAdapter", () => {
             shield.address,
             shield.address,
             BigNumber.from(1000),
+            deployerAddress,
             deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/timelock-not-match")

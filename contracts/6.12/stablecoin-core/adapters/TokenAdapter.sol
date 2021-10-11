@@ -111,7 +111,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     address usr,
     uint256 wad,
     bytes calldata /* data */
-  ) external payable override nonReentrant {
+  ) external payable override nonReentrant whenNotPaused {
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, usr, int256(wad));
@@ -127,7 +127,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     address usr,
     uint256 wad,
     bytes calldata /* data */
-  ) external override nonReentrant {
+  ) external override nonReentrant whenNotPaused {
     require(wad <= 2**255, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
 
@@ -149,4 +149,15 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     uint256 wad,
     bytes calldata data
   ) external override nonReentrant {}
+
+  // --- pause ---
+  function pause() external {
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) || IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) || IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender), "!(ownerRole or govRole)");
+    _unpause();
+  }
 }

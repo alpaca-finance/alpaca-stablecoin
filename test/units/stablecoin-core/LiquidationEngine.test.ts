@@ -403,6 +403,7 @@ describe("LiquidationEngine", () => {
       })
     })
 
+    // @dev this test case is moved to integration test
     // context("when unpause contract", () => {
     //   it("should be success", async () => {
     //     await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), deployerAddress)

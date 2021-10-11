@@ -110,7 +110,7 @@ contract AuthTokenAdapter is
     address urn,
     uint256 wad,
     address msgSender
-  ) external override nonReentrant {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(WHITELISTED, msg.sender), "AuthTokenAdapter/not-whitelisted");
     require(live == 1, "AuthTokenAdapter/not-live");
     uint256 wad18 = mul(wad, 10**(18 - decimals));
@@ -125,7 +125,7 @@ contract AuthTokenAdapter is
    * @param guy The destination address to receive collateral token
    * @param wad The amount of collateral to be withdraw [wad]
    */
-  function withdraw(address guy, uint256 wad) external override nonReentrant {
+  function withdraw(address guy, uint256 wad) external override nonReentrant whenNotPaused {
     uint256 wad18 = mul(wad, 10**(18 - decimals));
     require(int256(wad18) >= 0, "AuthTokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad18));

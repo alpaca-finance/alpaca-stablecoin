@@ -215,6 +215,7 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     await deployer.getAddress(),
     BigNumber.from(1000),
     await dev.getAddress(),
+    positionManager.address,
   ])) as IbTokenAdapter
 
   const WBNBTokenAdapter = new TokenAdapter__factory(deployer)
@@ -721,6 +722,18 @@ describe("position manager", () => {
             expect(lockedCollateralAfter).to.be.equal(WeiPerWad.mul(10))
             expect(debtShareAfter).to.be.equal(WeiPerWad.mul(5))
             expect(alpacaStablecoinAfter).to.be.equal(WeiPerWad.mul(5))
+
+            // Harvest ALPACA from the position
+            const harvestCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("harvest", [
+              positionManager.address,
+              ibTokenAdapter.address,
+              1,
+              aliceAddress,
+              alpacaToken.address,
+            ])
+            await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestCall)
+            const harvestedALPACABalance = await alpacaToken.balanceOf(aliceAddress)
+            expect(harvestedALPACABalance).to.be.equal(ethers.utils.parseEther("4500"))
           })
         }
       )
@@ -1736,6 +1749,17 @@ describe("position manager", () => {
           const wipeUnlockTokenAndConvertTx = await aliceProxyWallet["execute(address,bytes)"](
             alpacaStablecoinProxyActions.address,
             wipeUnlockTokenAndConvertCall
+          )
+
+          const claimFromProxyWalletCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("transfer", [
+            alpacaToken.address,
+            aliceAddress,
+            await alpacaToken.balanceOf(aliceProxyWallet.address),
+          ])
+
+          await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            claimFromProxyWalletCall
           )
 
           const alpacaTokenAfter = await alpacaToken.balanceOf(aliceAddress)

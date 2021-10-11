@@ -105,7 +105,7 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     address usr,
     uint256 wad,
     bytes calldata /* data */
-  ) external payable override nonReentrant {
+  ) external payable override nonReentrant whenNotPaused {
     bookKeeper.moveStablecoin(address(this), usr, mul(ONE, wad));
     stablecoin.burn(msg.sender, wad);
   }
@@ -117,9 +117,20 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     address usr,
     uint256 wad,
     bytes calldata /* data */
-  ) external override nonReentrant {
+  ) external override nonReentrant whenNotPaused {
     require(live == 1, "StablecoinAdapter/not-live");
     bookKeeper.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
     stablecoin.mint(usr, wad);
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) || IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) || IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 }
