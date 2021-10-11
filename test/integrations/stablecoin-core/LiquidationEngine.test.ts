@@ -48,6 +48,7 @@ import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
 
 import * as AssertHelpers from "../../helper/assert"
+import { AddressZero } from "../../helper/address"
 
 const { formatBytes32String } = ethers.utils
 
@@ -128,6 +129,15 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await shield.transferOwnership(await deployer.getAddress())
   await alpacaToken.transferOwnership(fairLaunch.address)
 
+  // Deploy PositionManager
+  const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
+  const positionManager = (await upgrades.deployProxy(PositionManager, [
+    bookKeeper.address,
+    AddressZero,
+  ])) as PositionManager
+  await positionManager.deployed()
+  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
+
   const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
   const ibTokenAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
     bookKeeper.address,
@@ -140,6 +150,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     await deployer.getAddress(),
     BigNumber.from(1000),
     await dev.getAddress(),
+    positionManager.address,
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
@@ -165,19 +176,6 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
   const alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
-
-  // Deploy ShowStopper
-  const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
-  const showStopper = (await upgrades.deployProxy(ShowStopper, [])) as ShowStopper
-
-  // Deploy PositionManager
-  const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
-  const positionManager = (await upgrades.deployProxy(PositionManager, [
-    bookKeeper.address,
-    showStopper.address,
-  ])) as PositionManager
-  await positionManager.deployed()
-  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
 
   const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
   const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine

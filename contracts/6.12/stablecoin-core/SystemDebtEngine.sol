@@ -101,7 +101,7 @@ contract SystemDebtEngine is
   // --- Administration ---
   event SetSurplusBuffer(address indexed caller, uint256 data);
 
-  function setSurplusBuffer(uint256 _data) external whenNotPaused {
+  function setSurplusBuffer(uint256 _data) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     surplusBuffer = _data;
     emit SetSurplusBuffer(msg.sender, _data);

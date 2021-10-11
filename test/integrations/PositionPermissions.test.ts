@@ -72,7 +72,7 @@ const ALPACA_PER_BLOCK = ethers.utils.parseEther("100")
 const COLLATERAL_POOL_ID = formatBytes32String("ibDUMMY")
 const COLLATERAL_POOL_ID2 = formatBytes32String("ibDUMMY2")
 const CLOSE_FACTOR_BPS = BigNumber.from(5000)
-const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(250)
+const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(10250)
 const TREASURY_FEE_BPS = BigNumber.from(100)
 const BPS = BigNumber.from(10000)
 
@@ -103,6 +103,19 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
 
   await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID2, WeiPerRay)
+
+  // Deploy ShowStopper
+  const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
+  const showStopper = (await upgrades.deployProxy(ShowStopper, [])) as ShowStopper
+
+  // Deploy PositionManager
+  const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
+  const positionManager = (await upgrades.deployProxy(PositionManager, [
+    bookKeeper.address,
+    showStopper.address,
+  ])) as PositionManager
+  await positionManager.deployed()
+  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
 
   // Deploy mocked BEP20
   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
@@ -144,6 +157,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     await deployer.getAddress(),
     BigNumber.from(1000),
     await dev.getAddress(),
+    positionManager.address,
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
@@ -158,6 +172,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     await deployer.getAddress(),
     BigNumber.from(1000),
     await dev.getAddress(),
+    positionManager.address,
   ])) as IbTokenAdapter
   await ibTokenAdapter2.deployed()
 
@@ -184,19 +199,6 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
   const alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
-
-  // Deploy ShowStopper
-  const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
-  const showStopper = (await upgrades.deployProxy(ShowStopper, [])) as ShowStopper
-
-  // Deploy PositionManager
-  const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
-  const positionManager = (await upgrades.deployProxy(PositionManager, [
-    bookKeeper.address,
-    showStopper.address,
-  ])) as PositionManager
-  await positionManager.deployed()
-  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
 
   // Deploy StabilityFeeCollector
   const StabilityFeeCollector = (await ethers.getContractFactory(

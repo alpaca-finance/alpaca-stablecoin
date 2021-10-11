@@ -213,7 +213,7 @@ describe("SystemDebtEngine", () => {
         await systemDebtEngine.grantRole(await systemDebtEngine.OWNER_ROLE(), deployerAddress)
         await systemDebtEngine.pause()
 
-        await expect(systemDebtEngine.setSurplusBuffer(UnitHelpers.WeiPerRad)).to.be.revertedWith("Pausable: paused")
+        await expect(systemDebtEngine.settleSystemBadDebt(UnitHelpers.WeiPerRad)).to.be.revertedWith("Pausable: paused")
       })
     })
   })

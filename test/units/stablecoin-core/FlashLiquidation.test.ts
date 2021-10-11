@@ -78,7 +78,7 @@ const ALPACA_PER_BLOCK = ethers.utils.parseEther("100")
 const COLLATERAL_POOL_ID = formatBytes32String("ibDUMMY")
 const CLOSE_FACTOR_BPS = BigNumber.from(5000)
 const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(10250)
-const TREASURY_FEE_BPS = BigNumber.from(100)
+const TREASURY_FEE_BPS = BigNumber.from(5000)
 const BPS = BigNumber.from(10000)
 
 const loadFixtureHandler = async (): Promise<fixture> => {
@@ -132,6 +132,15 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await shield.transferOwnership(await deployer.getAddress())
   await alpacaToken.transferOwnership(fairLaunch.address)
 
+  // Deploy PositionManager
+  const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
+  const positionManager = (await upgrades.deployProxy(PositionManager, [
+    bookKeeper.address,
+    bookKeeper.address,
+  ])) as PositionManager
+  await positionManager.deployed()
+  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
+
   const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
   const ibTokenAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
     bookKeeper.address,
@@ -144,6 +153,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     await deployer.getAddress(),
     BigNumber.from(1000),
     await dev.getAddress(),
+    positionManager.address,
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
@@ -169,12 +179,6 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
   const alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
-
-  // Deploy PositionManager
-  const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
-  const positionManager = (await upgrades.deployProxy(PositionManager, [bookKeeper.address])) as PositionManager
-  await positionManager.deployed()
-  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
 
   const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
   const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
@@ -272,7 +276,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   }
 }
 
-describe("LiquidationEngine", () => {
+describe("FlashLiquidation", () => {
   // Accounts
   let deployer: Signer
   let alice: Signer
@@ -495,7 +499,10 @@ describe("LiquidationEngine", () => {
         await bookKeeper.mintUnbackedStablecoin(deployerAddress, bobAddress, WeiPerRad.mul(100))
         const bobStablecoinBeforeLiquidation = await bookKeeper.stablecoin(bobAddress)
         const expectedSeizedCollateral = debtShareToRepay.mul(LIQUIDATOR_INCENTIVE_BPS).div(BPS)
-        const expectedTreasuryFee = expectedSeizedCollateral.mul(TREASURY_FEE_BPS).div(BPS)
+        const expectedLiquidatorIncentive = expectedSeizedCollateral.sub(
+          expectedSeizedCollateral.mul(BPS).div(LIQUIDATOR_INCENTIVE_BPS)
+        )
+        const expectedTreasuryFee = expectedLiquidatorIncentive.mul(TREASURY_FEE_BPS).div(BPS)
         const expectedCollateralBobShouldReceive = expectedSeizedCollateral.sub(expectedTreasuryFee)
         await liquidationEngineAsBob.liquidate(
           COLLATERAL_POOL_ID,
@@ -528,19 +535,19 @@ describe("LiquidationEngine", () => {
           "System bad debt should be 0 AUSD"
         ).to.be.equal(0)
         console.log("bobAddress", bobAddress)
-        expect(await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress), "Bob should receive 0.507375 ibDUMMY")
+        expect(await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress), "Bob should receive 0.50625 ibDUMMY")
           .to.be.equal(expectedCollateralBobShouldReceive)
-          .to.be.equal(ethers.utils.parseEther("0.507375"))
+          .to.be.equal(ethers.utils.parseEther("0.50625"))
         expect(
           bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation),
           "Bob should pay 0.5 AUSD for this liquidation"
         ).to.be.equal(ethers.utils.parseEther("0.5").mul(WeiPerRay))
         expect(
           await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address),
-          "SystemDebtEngine should receive 0.005125 ibDUMMY as treasury fee"
+          "SystemDebtEngine should receive 0.00625 ibDUMMY as treasury fee"
         )
           .to.be.equal(expectedTreasuryFee)
-          .to.be.equal(ethers.utils.parseEther("0.005125"))
+          .to.be.equal(ethers.utils.parseEther("0.00625"))
         expect(
           await alpacaToken.balanceOf(aliceProxyWallet.address),
           "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"

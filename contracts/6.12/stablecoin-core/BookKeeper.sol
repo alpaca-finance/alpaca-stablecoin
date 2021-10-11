@@ -3,6 +3,8 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/ICagable.sol";
 
@@ -12,7 +14,13 @@ import "../interfaces/ICagable.sol";
     It has the ability to move collateral token and stablecoin with in the accounting state variable. 
 */
 
-contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeable, ICagable {
+contract BookKeeper is
+  IBookKeeper,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable,
+  ICagable
+{
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant PRICE_ORACLE_ROLE = keccak256("PRICE_ORACLE_ROLE");
@@ -86,6 +94,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
   function initialize() external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     live = 1;
 
@@ -196,7 +205,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     bytes32 collateralPoolId,
     address usr,
     int256 amount
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(ADAPTER_ROLE, msg.sender), "!adapterRole");
     collateralToken[collateralPoolId][usr] = add(collateralToken[collateralPoolId][usr], amount);
   }
@@ -211,7 +220,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address src,
     address dst,
     uint256 amount
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(wish(src, msg.sender), "BookKeeper/not-allowed");
     collateralToken[collateralPoolId][src] = sub(collateralToken[collateralPoolId][src], amount);
     collateralToken[collateralPoolId][dst] = add(collateralToken[collateralPoolId][dst], amount);
@@ -225,7 +234,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address src,
     address dst,
     uint256 value
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(wish(src, msg.sender), "BookKeeper/not-allowed");
     stablecoin[src] = sub(stablecoin[src], value);
     stablecoin[dst] = add(stablecoin[dst], value);
@@ -258,7 +267,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address stablecoinOwner,
     int256 collateralValue,
     int256 debtShare
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(POSITION_MANAGER_ROLE, msg.sender), "!positionManagerRole");
 
     // system is live
@@ -331,7 +340,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address dst,
     int256 collateralAmount,
     int256 debtShare
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(POSITION_MANAGER_ROLE, msg.sender), "!positionManagerRole");
 
     Position storage u = positions[collateralPoolId][src];
@@ -378,7 +387,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address stablecoinDebtor,
     int256 collateralAmount,
     int256 debtShare
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(LIQUIDATION_ENGINE_ROLE, msg.sender), "!liquidationEngineRole");
 
     Position storage position = positions[collateralPoolId][positionAddress];
@@ -405,7 +414,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
       A successful `settleSystemBadDebt` would remove the bad debt from the system.
   */
   /// @param value the value of stablecoin to be used to settle bad debt [rad]
-  function settleSystemBadDebt(uint256 value) external override whenNotPaused {
+  function settleSystemBadDebt(uint256 value) external override nonReentrant whenNotPaused {
     systemBadDebt[msg.sender] = sub(systemBadDebt[msg.sender], value);
     stablecoin[msg.sender] = sub(stablecoin[msg.sender], value);
     totalUnbackedStablecoin = sub(totalUnbackedStablecoin, value);
@@ -420,7 +429,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address from,
     address to,
     uint256 value
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(MINTABLE_ROLE, msg.sender), "!mintableRole");
     systemBadDebt[from] = add(systemBadDebt[from], value);
     stablecoin[to] = add(stablecoin[to], value);
@@ -442,7 +451,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     bytes32 collateralPoolId,
     address stabilityFeeRecipient,
     int256 debtAccumulatedRate
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(STABILITY_FEE_COLLECTOR_ROLE, msg.sender), "!stabilityFeeCollectorRole");
     require(live == 1, "BookKeeper/not-live");
     CollateralPool storage collateralPool = collateralPools[collateralPoolId];

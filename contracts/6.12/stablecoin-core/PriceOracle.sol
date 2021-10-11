@@ -19,6 +19,7 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IPriceFeed.sol";
@@ -31,7 +32,13 @@ import "../interfaces/ICagable.sol";
     The price oracle is important in reflecting the current state of the market price.
 */
 
-contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOracle, ICagable {
+contract PriceOracle is
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable,
+  IPriceOracle,
+  ICagable
+{
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
@@ -60,6 +67,7 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
   function initialize(address _bookKeeper) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
     stableCoinReferencePrice = ONE;
@@ -110,7 +118,7 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
   // --- Update value ---
   /// @dev Update the latest price with safety margin of the collateral pool to the BookKeeper
   /// @param poolId Collateral pool id
-  function setPrice(bytes32 poolId) external whenNotPaused {
+  function setPrice(bytes32 poolId) external nonReentrant whenNotPaused {
     (bytes32 rawPrice, bool hasPrice) = collateralPools[poolId].priceFeed.peekPrice();
     uint256 priceWithSafetyMargin = hasPrice
       ? rdiv(rdiv(mul(uint256(rawPrice), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)

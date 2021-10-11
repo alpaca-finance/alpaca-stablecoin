@@ -41,7 +41,6 @@ contract AuthTokenAdapter is
 {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
   bytes32 public constant WHITELISTED = keccak256("WHITELISTED");
 
   IBookKeeper public override bookKeeper; // cdp engine
@@ -77,20 +76,14 @@ contract AuthTokenAdapter is
   }
 
   function cage() external override {
-    require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "AuthTokenAdapter/not-live");
     live = 0;
     emit Cage();
   }
 
   function uncage() external override {
-    require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 0, "AuthTokenAdapter/not-caged");
     live = 1;
     emit Uncage();
@@ -110,7 +103,7 @@ contract AuthTokenAdapter is
     address urn,
     uint256 wad,
     address msgSender
-  ) external override nonReentrant {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(WHITELISTED, msg.sender), "AuthTokenAdapter/not-whitelisted");
     require(live == 1, "AuthTokenAdapter/not-live");
     uint256 wad18 = mul(wad, 10**(18 - decimals));
@@ -125,7 +118,7 @@ contract AuthTokenAdapter is
    * @param guy The destination address to receive collateral token
    * @param wad The amount of collateral to be withdraw [wad]
    */
-  function withdraw(address guy, uint256 wad) external override nonReentrant {
+  function withdraw(address guy, uint256 wad) external override nonReentrant whenNotPaused {
     uint256 wad18 = mul(wad, 10**(18 - decimals));
     require(int256(wad18) >= 0, "AuthTokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad18));
