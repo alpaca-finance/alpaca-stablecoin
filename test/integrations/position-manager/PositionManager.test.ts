@@ -158,7 +158,11 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
 
   // Deploy AlpacaStablecoin
   const AlpacaStablecoin = new AlpacaStablecoin__factory(deployer)
-  const alpacaStablecoin = await AlpacaStablecoin.deploy("Alpaca USD", "AUSD", "31337")
+  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [
+    "Alpaca USD",
+    "AUSD",
+    "31337",
+  ])) as AlpacaStablecoin
 
   const BookKeeper = new BookKeeper__factory(deployer)
   const bookKeeper = (await upgrades.deployProxy(BookKeeper)) as BookKeeper
