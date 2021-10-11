@@ -81,7 +81,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable {
       collateralPools[_collateralPoolId].debtAccumulatedRate == 0,
       "CollateralPoolConfig/collateral-pool-already-init"
     );
-    collateralPools[_collateralPoolId].debtAccumulatedRate = 10**27;
+    collateralPools[_collateralPoolId].debtAccumulatedRate = RAY;
     collateralPools[_collateralPoolId].debtCeiling = _debtCeiling;
     collateralPools[_collateralPoolId].debtFloor = _debtFloor;
     _priceFeed.peekPrice(); // Sanity Check Call
