@@ -179,7 +179,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
         ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-liquidator-incentive-bps")
       })
     })
-    context("when treasury fees is more than 25%", () => {
+    context("when treasury fees is more than 90%", () => {
       it("should be revert", async () => {
         // grant role access
         await fixedSpreadLiquidationStrategy.grantRole(
@@ -194,7 +194,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
             mockedIbTokenAdapter.address,
             10,
             10010,
-            2501
+            9001
           )
         ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps")
       })
@@ -333,7 +333,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
         ).to.be.revertedWith("!ownerRole")
       })
     })
-    context("when treasury fees is more than 25%", () => {
+    context("when treasury fees is more than 90%", () => {
       it("should be revert", async () => {
         // grant role access
         await fixedSpreadLiquidationStrategy.grantRole(
@@ -343,7 +343,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
 
         // set treasury fees
         await expect(
-          fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 2501)
+          fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 12501)
         ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps")
       })
     })
@@ -581,7 +581,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
                 UnitHelpers.WeiPerWad,
                 UnitHelpers.WeiPerRad.mul(2),
                 ethers.utils.parseEther("2.05"),
-                ethers.utils.parseEther("0.5125")
+                ethers.utils.parseEther("0.0125")
               )
 
             const { calls: BookkeeperCollateralPools } = mockedBookKeeper.smocked.collateralPools
@@ -603,12 +603,12 @@ describe("FixedSpreadLiquidationStrategy", () => {
             expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[0].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-            expect(moveCollateral[0].amount).to.be.equal(ethers.utils.parseEther("1.5375"))
+            expect(moveCollateral[0].amount).to.be.equal(ethers.utils.parseEther("2.0375"))
             //Give the treasury fees to System Debt Engine to be stored as system surplus
             expect(moveCollateral[1].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[1].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
-            expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("0.5125"))
+            expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("0.0125"))
 
             const { calls: PriceOracleCollateralPools } = mockedPriceOracle.smocked.collateralPools
             expect(PriceOracleCollateralPools.length).to.be.equal(1)
@@ -684,12 +684,12 @@ describe("FixedSpreadLiquidationStrategy", () => {
             expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[0].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-            expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(14781594375).div(10000000))
+            expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(15861781875).div(10000000))
             //Give the treasury fees to System Debt Engine to be stored as system surplus
             expect(moveCollateral[1].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[1].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
-            expect(moveCollateral[1].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(1112593125).div(10000000))
+            expect(moveCollateral[1].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(32405625).div(10000000))
 
             const { calls: PriceOracleCollateralPools } = mockedPriceOracle.smocked.collateralPools
             expect(PriceOracleCollateralPools.length).to.be.equal(1)
@@ -765,7 +765,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
             UnitHelpers.WeiPerWad.mul(37).div(100),
             ethers.utils.parseEther("1.11").mul(UnitHelpers.WeiPerRay),
             ethers.utils.parseEther("1.110111"),
-            ethers.utils.parseEther("0.0018871887")
+            ethers.utils.parseEther("0.000000188700000000")
           )
 
         const { calls: BookkeeperCollateralPools } = mockedBookKeeper.smocked.collateralPools
@@ -787,12 +787,12 @@ describe("FixedSpreadLiquidationStrategy", () => {
         expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
         expect(moveCollateral[0].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
         expect(moveCollateral[0].dst).to.be.equal(mockedFlashLendingCallee.address)
-        expect(moveCollateral[0].amount).to.be.equal(ethers.utils.parseEther("1.1082238113"))
+        expect(moveCollateral[0].amount).to.be.equal(ethers.utils.parseEther("1.1101108113"))
         //Give the treasury fees to System Debt Engine to be stored as system surplus
         expect(moveCollateral[1].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
         expect(moveCollateral[1].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
         expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
-        expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("0.0018871887"))
+        expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("0.0000001887"))
 
         const { calls: PriceOracleCollateralPools } = mockedPriceOracle.smocked.collateralPools
         expect(PriceOracleCollateralPools.length).to.be.equal(1)

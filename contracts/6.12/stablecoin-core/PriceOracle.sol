@@ -20,6 +20,7 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IPriceFeed.sol";
@@ -33,7 +34,13 @@ import "../interfaces/ICollateralPoolConfig.sol";
     The price oracle is important in reflecting the current state of the market price.
 */
 
-contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOracle, ICagable {
+contract PriceOracle is
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable,
+  IPriceOracle,
+  ICagable
+{
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
@@ -60,6 +67,7 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
   function initialize(address _bookKeeper) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     IBookKeeper(_bookKeeper).collateralPoolConfig(); // Sanity check call
     bookKeeper = IBookKeeper(_bookKeeper);

@@ -185,11 +185,11 @@ contract AlpacaStablecoinProxyActions {
     IGenericTokenAdapter(adapter).deposit(positionAddress, amount, data);
   }
 
-  function whitelist(address bookKeeper, address usr) public {
+  function whitelist(address bookKeeper, address usr) external {
     IBookKeeper(bookKeeper).whitelist(usr);
   }
 
-  function blacklist(address bookKeeper, address usr) public {
+  function blacklist(address bookKeeper, address usr) external {
     IBookKeeper(bookKeeper).blacklist(usr);
   }
 
@@ -214,7 +214,7 @@ contract AlpacaStablecoinProxyActions {
     address manager,
     uint256 positionId,
     address dst
-  ) public {
+  ) external {
     // Gets actual proxy address
     address proxy = IProxyRegistry(proxyRegistry).proxies(dst);
     // Checks if the proxy address already existed and dst address is still the owner
@@ -241,7 +241,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 positionId,
     address user,
     uint256 ok
-  ) public {
+  ) external {
     IManager(manager).allowManagePosition(positionId, user, ok);
   }
 
@@ -253,7 +253,7 @@ contract AlpacaStablecoinProxyActions {
     address manager,
     address user,
     uint256 ok
-  ) public {
+  ) external {
     IManager(manager).allowMigratePosition(user, ok);
   }
 
@@ -292,7 +292,7 @@ contract AlpacaStablecoinProxyActions {
     address manager,
     uint256 positionId,
     address destination
-  ) public {
+  ) external {
     IManager(manager).exportPosition(positionId, destination);
   }
 
@@ -300,7 +300,7 @@ contract AlpacaStablecoinProxyActions {
     address manager,
     address source,
     uint256 positionId
-  ) public {
+  ) external {
     IManager(manager).importPosition(source, positionId);
   }
 
@@ -308,7 +308,7 @@ contract AlpacaStablecoinProxyActions {
     address manager,
     uint256 source,
     uint256 destination
-  ) public {
+  ) external {
     IManager(manager).movePosition(source, destination);
   }
 
@@ -385,7 +385,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 positionId,
     address owner,
     bytes calldata data
-  ) public payable {
+  ) external payable {
     require(IManager(manager).owners(positionId) == owner, "!owner");
     lockBNB(manager, bnbAdapter, positionId, data);
   }
@@ -414,7 +414,7 @@ contract AlpacaStablecoinProxyActions {
     bool transferFrom,
     address owner,
     bytes calldata data
-  ) public {
+  ) external {
     require(IManager(manager).owners(positionId) == owner, "!owner");
     lockToken(manager, tokenAdapter, positionId, amount, transferFrom, data);
   }
@@ -460,7 +460,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 positionId,
     uint256 amount, // [wad]
     bytes calldata data
-  ) public {
+  ) external {
     // Moves the amount from the position to proxy's address
     moveCollateral(manager, positionId, address(this), amount, bnbAdapter, data);
 
@@ -478,7 +478,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 positionId,
     uint256 amount, // [in token decimal]
     bytes calldata data
-  ) public {
+  ) external {
     // Moves the amount from the position to proxy's address
     moveCollateral(manager, positionId, address(this), convertTo18(tokenAdapter, amount), tokenAdapter, data);
 
@@ -494,7 +494,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 positionId,
     uint256 amount, // [wad]
     bytes calldata data
-  ) public {
+  ) external {
     address positionAddress = IManager(manager).positions(positionId);
     address bookKeeper = IManager(manager).bookKeeper();
     bytes32 collateralPoolId = IManager(manager).collateralPools(positionId);
@@ -571,7 +571,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 amount, // [wad]
     address owner,
     bytes calldata data
-  ) public {
+  ) external {
     require(IManager(manager).owners(positionId) == owner, "!owner");
     wipe(manager, tokenAdapter, stablecoinAdapter, positionId, amount, data);
   }
@@ -626,7 +626,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 positionId,
     address owner,
     bytes calldata data
-  ) public {
+  ) external {
     require(IManager(manager).owners(positionId) == owner, "!owner");
     wipeAll(manager, tokenAdapter, stablecoinAdapter, positionId, data);
   }
@@ -673,7 +673,7 @@ contract AlpacaStablecoinProxyActions {
     bytes32 collateralPoolId,
     uint256 stablecoinAmount, // [wad]
     bytes calldata data
-  ) public payable returns (uint256 positionId) {
+  ) external payable returns (uint256 positionId) {
     positionId = open(manager, collateralPoolId, address(this));
     lockBNBAndDraw(manager, stabilityFeeCollector, bnbAdapter, stablecoinAdapter, positionId, stablecoinAmount, data);
   }
@@ -747,7 +747,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 stablecoinAmount, // [wad]
     bool transferFrom,
     bytes calldata data
-  ) public payable returns (uint256 positionId) {
+  ) external payable returns (uint256 positionId) {
     uint256 collateralAmount = bnbToIbBNB(vault, msg.value);
     return
       openLockTokenAndDraw(
@@ -774,7 +774,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 stablecoinAmount, // [wad]
     bool transferFrom,
     bytes calldata data
-  ) public returns (uint256 positionId) {
+  ) external returns (uint256 positionId) {
     uint256 collateralAmount = tokenToIbToken(vault, convertTo18(tokenAdapter, tokenAmount));
     return
       openLockTokenAndDraw(
@@ -798,7 +798,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 collateralAmount, // [wad]
     uint256 stablecoinAmount, // [wad]
     bytes calldata data
-  ) public {
+  ) external {
     address positionAddress = IManager(manager).positions(positionId);
     // Deposits Alpaca Stablecoin amount into the bookKeeper
     stablecoinAdapterDeposit(stablecoinAdapter, positionAddress, stablecoinAmount, data);
@@ -827,7 +827,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 positionId,
     uint256 collateralAmount, // [wad]
     bytes calldata data
-  ) public {
+  ) external {
     address bookKeeper = IManager(manager).bookKeeper();
     address positionAddress = IManager(manager).positions(positionId);
     bytes32 collateralPoolId = IManager(manager).collateralPools(positionId);
@@ -888,7 +888,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 collateralAmount, // [wad]
     uint256 stablecoinAmount, // [wad]
     bytes calldata data
-  ) public {
+  ) external {
     wipeAndUnlockToken(manager, tokenAdapter, stablecoinAdapter, positionId, collateralAmount, stablecoinAmount, data);
     ibBNBToBNB(vault, collateralAmount);
   }
@@ -902,7 +902,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 collateralAmount, // [token decimal]
     uint256 stablecoinAmount, // [wad]
     bytes calldata data
-  ) public {
+  ) external {
     wipeAndUnlockToken(manager, tokenAdapter, stablecoinAdapter, positionId, collateralAmount, stablecoinAmount, data);
     ibTokenToToken(vault, convertTo18(tokenAdapter, collateralAmount));
   }
@@ -944,7 +944,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 positionId,
     uint256 collateralAmount, // [wad]
     bytes calldata data
-  ) public {
+  ) external {
     wipeAllAndUnlockToken(manager, tokenAdapter, stablecoinAdapter, positionId, collateralAmount, data);
     ibBNBToBNB(vault, collateralAmount);
   }
@@ -957,8 +957,20 @@ contract AlpacaStablecoinProxyActions {
     uint256 positionId,
     uint256 collateralAmount, // [in token decimal]
     bytes calldata data
-  ) public {
+  ) external {
     wipeAllAndUnlockToken(manager, tokenAdapter, stablecoinAdapter, positionId, collateralAmount, data);
     ibTokenToToken(vault, convertTo18(tokenAdapter, collateralAmount));
+  }
+
+  function harvest(
+    address manager,
+    address tokenAdapter,
+    uint256 positionId,
+    address harvestTo,
+    address harvestToken
+  ) external {
+    address positionAddress = IManager(manager).positions(positionId);
+    IGenericTokenAdapter(tokenAdapter).deposit(positionAddress, 0, abi.encode(harvestTo));
+    transfer(harvestToken, msg.sender, harvestToken.myBalance());
   }
 }

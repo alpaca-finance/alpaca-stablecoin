@@ -19,6 +19,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IStablecoin.sol";
@@ -30,7 +31,12 @@ import "../interfaces/IStableSwapModule.sol";
 // Allows anyone to go between AUSD and the Token by pooling the liquidity
 // An optional fee is charged for incoming and outgoing transfers
 
-contract StableSwapModule is PausableUpgradeable, AccessControlUpgradeable, IStableSwapModule {
+contract StableSwapModule is
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable,
+  IStableSwapModule
+{
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
@@ -60,6 +66,7 @@ contract StableSwapModule is PausableUpgradeable, AccessControlUpgradeable, ISta
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     IAuthTokenAdapter __authTokenAdapter = authTokenAdapter = IAuthTokenAdapter(_authTokenAdapter);
     IStablecoinAdapter __stablecoinAdapter = stablecoinAdapter = IStablecoinAdapter(_stablecoinAdapter);
@@ -124,7 +131,7 @@ contract StableSwapModule is PausableUpgradeable, AccessControlUpgradeable, ISta
    * @param _usr The address of the account to sell
    * @param _tokenAmount The Amount of token to sell
    */
-  function swapTokenToStablecoin(address _usr, uint256 _tokenAmount) external override {
+  function swapTokenToStablecoin(address _usr, uint256 _tokenAmount) external override nonReentrant whenNotPaused {
     uint256 _tokenAmount18 = mul(_tokenAmount, to18ConversionFactor);
     uint256 _fee = mul(_tokenAmount18, feeIn) / WAD;
     uint256 _stablecoinAmount = sub(_tokenAmount18, _fee);
@@ -148,7 +155,7 @@ contract StableSwapModule is PausableUpgradeable, AccessControlUpgradeable, ISta
    * @param _usr The address of the account to buy
    * @param _tokenAmount The Amount of token to buy
    */
-  function swapStablecoinToToken(address _usr, uint256 _tokenAmount) external override {
+  function swapStablecoinToToken(address _usr, uint256 _tokenAmount) external override nonReentrant whenNotPaused {
     uint256 _tokenAmount18 = mul(_tokenAmount, to18ConversionFactor);
     uint256 _fee = mul(_tokenAmount18, feeOut) / WAD;
     uint256 _stablecoinAmount = add(_tokenAmount18, _fee);
