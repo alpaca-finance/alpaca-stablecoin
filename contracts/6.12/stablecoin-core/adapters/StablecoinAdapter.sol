@@ -19,7 +19,6 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -56,7 +55,6 @@ import "../../interfaces/ICagable.sol";
 */
 
 contract StablecoinAdapter is
-  OwnableUpgradeable,
   PausableUpgradeable,
   AccessControlUpgradeable,
   ReentrancyGuardUpgradeable,
@@ -64,14 +62,13 @@ contract StablecoinAdapter is
   ICagable
 {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
   IBookKeeper public override bookKeeper; // CDP Engine
   IStablecoin public override stablecoin; // Stablecoin Token
   uint256 public live; // Active Flag
 
   function initialize(address _bookKeeper, address _stablecoin) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
@@ -86,20 +83,14 @@ contract StablecoinAdapter is
   }
 
   function cage() external override {
-    require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "StablecoinAdapter/not-live");
     live = 0;
     emit Cage();
   }
 
   function uncage() external override {
-    require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 0, "StablecoinAdapter/not-caged");
     live = 1;
     emit Uncage();
@@ -118,7 +109,7 @@ contract StablecoinAdapter is
     address usr,
     uint256 wad,
     bytes calldata /* data */
-  ) external payable override nonReentrant {
+  ) external payable override nonReentrant whenNotPaused {
     bookKeeper.moveStablecoin(address(this), usr, mul(ONE, wad));
     stablecoin.burn(msg.sender, wad);
   }
@@ -130,9 +121,20 @@ contract StablecoinAdapter is
     address usr,
     uint256 wad,
     bytes calldata /* data */
-  ) external override nonReentrant {
+  ) external override nonReentrant whenNotPaused {
     require(live == 1, "StablecoinAdapter/not-live");
     bookKeeper.moveStablecoin(msg.sender, address(this), mul(ONE, wad));
     stablecoin.mint(usr, wad);
+  }
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
   }
 }

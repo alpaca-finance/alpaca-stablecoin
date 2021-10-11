@@ -18,6 +18,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -48,7 +49,6 @@ contract StabilityFeeCollector is
     uint256 lastAccumulationTime; // Time of last call to `collect` [unix epoch time]
   }
 
-  mapping(bytes32 => CollateralPool) public collateralPools;
   IBookKeeper public bookKeeper;
   address public systemDebtEngine;
   uint256 public globalStabilityFeeRate; // Global, per-second stability fee debtAccumulatedRate [ray]
@@ -141,63 +141,21 @@ contract StabilityFeeCollector is
   }
 
   // --- Administration ---
-  function init(bytes32 collateralPool) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-
-    CollateralPool storage collateralPool = collateralPools[collateralPool];
-    require(collateralPool.stabilityFeeRate == 0, "StabilityFeeCollector/collateralPool-already-init");
-    collateralPool.stabilityFeeRate = RAY;
-    collateralPool.lastAccumulationTime = now;
-  }
-
-  event SetGlobalStabilityFeeRate(address indexed caller, uint256 data);
-  event SetSystemDebtEngine(address indexed caller, address data);
-  event SetStabilityFeeRate(address indexed caller, bytes32 poolId, uint256 data);
+  event LogSetGlobalStabilityFeeRate(address indexed caller, uint256 data);
+  event LogSetSystemDebtEngine(address indexed caller, address data);
 
   /// @dev Set the global stability fee debtAccumulatedRate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
   /// @param _globalStabilityFeeRate Global stability fee debtAccumulatedRate [ray]
   function setGlobalStabilityFeeRate(uint256 _globalStabilityFeeRate) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     globalStabilityFeeRate = _globalStabilityFeeRate;
-    emit SetGlobalStabilityFeeRate(msg.sender, _globalStabilityFeeRate);
+    emit LogSetGlobalStabilityFeeRate(msg.sender, _globalStabilityFeeRate);
   }
 
   function setSystemDebtEngine(address _systemDebtEngine) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     systemDebtEngine = _systemDebtEngine;
-    emit SetSystemDebtEngine(msg.sender, _systemDebtEngine);
-  }
-
-  /** @dev Set the stability fee rate of the collateral pool.
-      The rate to be set here is the `r` in:
-
-          r^N = APR
-
-      Where:
-        r = stability fee rate
-        N = Accumulation frequency which is per-second in this case; the value will be 60*60*24*365 = 31536000 to signify the number of seconds within a year.
-        APR = the annual percentage rate
-
-    For example, to achieve 0.5% APR for stability fee rate:
-
-          r^31536000 = 1.005
-
-    Find the 31536000th root of 1.005 and we will get:
-
-          r = 1.000000000158153903837946258002097...
-
-    The rate is in [ray] format, so the actual value of `stabilityFeeRate` will be:
-
-          stabilityFeeRate = 1000000000158153903837946258
-
-    The above `stabilityFeeRate` will be the value we will use in this contract.
-  */
-  /// @param _collateralPool Collateral pool id
-  /// @param _stabilityFeeRate the new stability fee rate [ray]
-  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _stabilityFeeRate) external whenNotPaused {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    collateralPools[_collateralPool].stabilityFeeRate = _stabilityFeeRate;
-    emit SetStabilityFeeRate(msg.sender, _collateralPool, _stabilityFeeRate);
+    emit LogSetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
 
   // --- Stability Fee Collection ---
@@ -217,25 +175,29 @@ contract StabilityFeeCollector is
     debtAccumulatedRate = _collect(collateralPool);
   }
 
-  function _collect(bytes32 collateralPool) internal returns (uint256 debtAccumulatedRate) {
-    require(now >= collateralPools[collateralPool].lastAccumulationTime, "StabilityFeeCollector/invalid-now");
-    (, uint256 previousDebtAccumulatedRate, , , ) = bookKeeper.collateralPools(collateralPool);
+  function _collect(bytes32 _collateralPoolId) internal returns (uint256 _debtAccumulatedRate) {
+    uint256 _previousDebtAccumulatedRate = bookKeeper
+      .collateralPoolConfig()
+      .collateralPools(_collateralPoolId)
+      .debtAccumulatedRate;
+    uint256 _stabilityFeeRate = bookKeeper.collateralPoolConfig().collateralPools(_collateralPoolId).stabilityFeeRate;
+    uint256 _lastAccumulationTime = bookKeeper
+      .collateralPoolConfig()
+      .collateralPools(_collateralPoolId)
+      .lastAccumulationTime;
+    require(now >= _lastAccumulationTime, "StabilityFeeCollector/invalid-now");
 
     // debtAccumulatedRate [ray]
-    debtAccumulatedRate = rmul(
-      rpow(
-        add(globalStabilityFeeRate, collateralPools[collateralPool].stabilityFeeRate),
-        now - collateralPools[collateralPool].lastAccumulationTime,
-        RAY
-      ),
-      previousDebtAccumulatedRate
+    _debtAccumulatedRate = rmul(
+      rpow(add(globalStabilityFeeRate, _stabilityFeeRate), now - _lastAccumulationTime, RAY),
+      _previousDebtAccumulatedRate
     );
     bookKeeper.accrueStabilityFee(
-      collateralPool,
+      _collateralPoolId,
       systemDebtEngine,
-      diff(debtAccumulatedRate, previousDebtAccumulatedRate)
+      diff(_debtAccumulatedRate, _previousDebtAccumulatedRate)
     );
-    collateralPools[collateralPool].lastAccumulationTime = now;
+    bookKeeper.collateralPoolConfig().updateLastAccumulationTime(_collateralPoolId);
   }
 
   // --- pause ---

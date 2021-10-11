@@ -16,14 +16,17 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IPriceOracle.sol";
 import "../interfaces/ICagable.sol";
+import "../interfaces/ICollateralPoolConfig.sol";
 
 /// @title PriceOracle
 /// @author Alpaca Fin Corporation
@@ -31,7 +34,13 @@ import "../interfaces/ICagable.sol";
     The price oracle is important in reflecting the current state of the market price.
 */
 
-contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOracle, ICagable {
+contract PriceOracle is
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable,
+  IPriceOracle,
+  ICagable
+{
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
@@ -42,15 +51,13 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
     uint256 liquidationRatio; // Liquidation ratio or Collateral ratio [ray]
   }
 
-  mapping(bytes32 => CollateralPool) public override collateralPools;
-
   IBookKeeper public bookKeeper; // CDP Engine
   uint256 public override stableCoinReferencePrice; // ref per dai [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
 
   uint256 public live;
 
   // --- Events ---
-  event SetPrice(
+  event LogSetPrice(
     bytes32 poolId,
     bytes32 rawPrice, // Raw price from price feed [wad]
     uint256 priceWithSafetyMargin // Price with safety margin [ray]
@@ -60,7 +67,9 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
   function initialize(address _bookKeeper) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
+    IBookKeeper(_bookKeeper).collateralPoolConfig(); // Sanity check call
     bookKeeper = IBookKeeper(_bookKeeper);
     stableCoinReferencePrice = ONE;
     live = 1;
@@ -82,41 +91,27 @@ contract PriceOracle is PausableUpgradeable, AccessControlUpgradeable, IPriceOra
   }
 
   // --- Administration ---
-  event SetStableCoinReferencePrice(address indexed caller, uint256 data);
-  event SetPriceFeed(address indexed caller, bytes32 poolId, address priceFeed);
-  event SetLiquidationRatio(address indexed caller, bytes32 poolId, uint256 data);
+  event LogSetStableCoinReferencePrice(address indexed caller, uint256 data);
 
   function setStableCoinReferencePrice(uint256 _data) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "Spotter/not-live");
     stableCoinReferencePrice = _data;
-    emit SetStableCoinReferencePrice(msg.sender, _data);
-  }
-
-  function setPriceFeed(bytes32 _poolId, address _priceFeed) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(live == 1, "Spotter/not-live");
-    collateralPools[_poolId].priceFeed = IPriceFeed(_priceFeed);
-    emit SetPriceFeed(msg.sender, _poolId, _priceFeed);
-  }
-
-  function setLiquidationRatio(bytes32 _poolId, uint256 _data) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(live == 1, "Spotter/not-live");
-    collateralPools[_poolId].liquidationRatio = _data;
-    emit SetLiquidationRatio(msg.sender, _poolId, _data);
+    emit LogSetStableCoinReferencePrice(msg.sender, _data);
   }
 
   // --- Update value ---
   /// @dev Update the latest price with safety margin of the collateral pool to the BookKeeper
-  /// @param poolId Collateral pool id
-  function setPrice(bytes32 poolId) external whenNotPaused {
-    (bytes32 rawPrice, bool hasPrice) = collateralPools[poolId].priceFeed.peekPrice();
+  /// @param _collateralPoolId Collateral pool id
+  function setPrice(bytes32 _collateralPoolId) external whenNotPaused {
+    IPriceFeed priceFeed = bookKeeper.collateralPoolConfig().collateralPools(_collateralPoolId).priceFeed;
+    uint256 liquidationRatio = bookKeeper.collateralPoolConfig().collateralPools(_collateralPoolId).liquidationRatio;
+    (bytes32 rawPrice, bool hasPrice) = priceFeed.peekPrice();
     uint256 priceWithSafetyMargin = hasPrice
-      ? rdiv(rdiv(mul(uint256(rawPrice), 10**9), stableCoinReferencePrice), collateralPools[poolId].liquidationRatio)
+      ? rdiv(rdiv(mul(uint256(rawPrice), 10**9), stableCoinReferencePrice), liquidationRatio)
       : 0;
-    bookKeeper.setPriceWithSafetyMargin(poolId, priceWithSafetyMargin);
-    emit SetPrice(poolId, rawPrice, priceWithSafetyMargin);
+    bookKeeper.collateralPoolConfig().setPriceWithSafetyMargin(_collateralPoolId, priceWithSafetyMargin);
+    emit LogSetPrice(_collateralPoolId, rawPrice, priceWithSafetyMargin);
   }
 
   function cage() external override {

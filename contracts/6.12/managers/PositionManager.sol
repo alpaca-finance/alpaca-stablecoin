@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./PositionHandler.sol";
 import "../interfaces/IManager.sol";
@@ -12,7 +12,11 @@ import "../interfaces/IGenericTokenAdapter.sol";
 import "../interfaces/IShowStopper.sol";
 
 /// @title PositionManager is a contract for manging positions
-contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable, IManager {
+contract PositionManager is PausableUpgradeable, AccessControlUpgradeable, IManager {
+  // --- Auth ---
+  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+
   /// @dev Address of a BookKeeper
   address public override bookKeeper;
 
@@ -94,12 +98,15 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   /// @dev Initializer for intializing PositionManager
   /// @param _bookKeeper The address of the Book Keeper
   function initialize(address _bookKeeper, address _showStopper) external initializer {
-    OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
     bookKeeper = _bookKeeper;
     showStopper = _showStopper;
+
+    // Grant the contract deployer the owner role: it will be able
+    // to grant and revoke any roles
+    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   function _safeAdd(uint256 x, uint256 y) internal pure returns (uint256 z) {
@@ -123,7 +130,7 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
     uint256 positionId,
     address user,
     uint256 ok
-  ) public override onlyOwnerAllowed(positionId) {
+  ) public override whenNotPaused onlyOwnerAllowed(positionId) {
     ownerWhitelist[owners[positionId]][positionId][user] = ok;
     emit AllowManagePosition(msg.sender, positionId, owners[positionId], user, ok);
   }
@@ -131,7 +138,7 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   /// @dev Allow/disallow a user to importPosition/exportPosition from/to msg.sender
   /// @param user The address of user that will be allowed to do such an action to msg.sender
   /// @param ok Ok flag to allow/disallow
-  function allowMigratePosition(address user, uint256 ok) public override {
+  function allowMigratePosition(address user, uint256 ok) public override whenNotPaused {
     migrationWhitelist[msg.sender][user] = ok;
     emit AllowMigratePosition(msg.sender, user, ok);
   }
@@ -139,9 +146,12 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   /// @dev Open a new position for a given user address.
   /// @param collateralPoolId The collateral pool id that will be used for this position
   /// @param user The user address that is owned this position
-  function open(bytes32 collateralPoolId, address user) public override returns (uint256) {
+  function open(bytes32 collateralPoolId, address user) public override whenNotPaused returns (uint256) {
     require(user != address(0), "PositionManager/user-address(0)");
-    (, uint256 debtAccumulatedRate, , , ) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId);
+    uint256 debtAccumulatedRate = IBookKeeper(bookKeeper)
+      .collateralPoolConfig()
+      .collateralPools(collateralPoolId)
+      .debtAccumulatedRate;
     require(debtAccumulatedRate != 0, "PositionManager/collateralPool-not-init");
 
     lastPositionId = _safeAdd(lastPositionId, 1);
@@ -169,7 +179,7 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   /// @dev Give the position ownership to a destination address
   /// @param positionId The position id to be given away ownership
   /// @param destination The destination to be a new owner of the position
-  function give(uint256 positionId, address destination) public override onlyOwnerAllowed(positionId) {
+  function give(uint256 positionId, address destination) public override whenNotPaused onlyOwnerAllowed(positionId) {
     require(destination != address(0), "destination address(0)");
     require(destination != owners[positionId], "destination already owner");
 
@@ -226,7 +236,7 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
     int256 debtShare,
     address adapter,
     bytes calldata data
-  ) public override onlyOwnerAllowed(positionId) {
+  ) public override whenNotPaused onlyOwnerAllowed(positionId) {
     address positionAddress = positions[positionId];
     IBookKeeper(bookKeeper).adjustPosition(
       collateralPools[positionId],
@@ -251,7 +261,7 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
     uint256 wad,
     address adapter,
     bytes calldata data
-  ) public override onlyOwnerAllowed(positionId) {
+  ) public override whenNotPaused onlyOwnerAllowed(positionId) {
     IBookKeeper(bookKeeper).moveCollateral(collateralPools[positionId], positions[positionId], destination, wad);
     IGenericTokenAdapter(adapter).onMoveCollateral(positions[positionId], destination, wad, data);
   }
@@ -271,7 +281,7 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
     uint256 wad,
     address adapter,
     bytes calldata data
-  ) public onlyOwnerAllowed(positionId) {
+  ) public whenNotPaused onlyOwnerAllowed(positionId) {
     IBookKeeper(bookKeeper).moveCollateral(collateralPoolId, positions[positionId], destination, wad);
     IGenericTokenAdapter(adapter).onMoveCollateral(positions[positionId], destination, wad, data);
   }
@@ -284,7 +294,7 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
     uint256 positionId,
     address destination,
     uint256 rad
-  ) public override onlyOwnerAllowed(positionId) {
+  ) public override whenNotPaused onlyOwnerAllowed(positionId) {
     IBookKeeper(bookKeeper).moveStablecoin(positions[positionId], destination, rad);
   }
 
@@ -295,6 +305,7 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   function exportPosition(uint256 positionId, address destination)
     public
     override
+    whenNotPaused
     onlyOwnerAllowed(positionId)
     onlyMigrationAllowed(destination)
   {
@@ -320,6 +331,7 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   function importPosition(address source, uint256 positionId)
     public
     override
+    whenNotPaused
     onlyMigrationAllowed(source)
     onlyOwnerAllowed(positionId)
   {
@@ -344,6 +356,7 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   function movePosition(uint256 sourceId, uint256 destinationId)
     public
     override
+    whenNotPaused
     onlyOwnerAllowed(sourceId)
     onlyOwnerAllowed(destinationId)
   {
@@ -362,6 +375,17 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
     emit MovePosition(sourceId, destinationId, lockedCollateral, debtShare);
   }
 
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
+  }
+
   /// @dev Redeem locked collateral from a position when emergency shutdown is activated
   /// @param posId The position id to be adjusted
   /// @param adapter The adapter to be called once the position is adjusted
@@ -369,13 +393,15 @@ contract PositionManager is OwnableUpgradeable, PausableUpgradeable, AccessContr
   function redeemLockedCollateral(
     uint256 posId,
     address adapter,
+    address collateralReceiver,
     bytes calldata data
-  ) public onlyOwnerAllowed(posId) {
+  ) public whenNotPaused onlyOwnerAllowed(posId) {
     address positionAddress = positions[posId];
     IShowStopper(showStopper).redeemLockedCollateral(
       collateralPools[posId],
       IGenericTokenAdapter(adapter),
       positionAddress,
+      collateralReceiver,
       data
     );
   }

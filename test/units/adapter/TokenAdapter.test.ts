@@ -159,7 +159,7 @@ describe("TokenAdapter", () => {
   describe("#cage()", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(tokenAdapterAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
+        await expect(tokenAdapterAsAlice.cage()).to.be.revertedWith("!ownerRole")
       })
     })
 
@@ -180,7 +180,7 @@ describe("TokenAdapter", () => {
       context("caller is showStopper role", () => {
         it("should be set live to 0", async () => {
           // grant role access
-          await tokenAdapter.grantRole(await tokenAdapter.SHOW_STOPPER_ROLE(), aliceAddress)
+          await tokenAdapter.grantRole(await tokenAdapter.OWNER_ROLE(), aliceAddress)
 
           expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
 
@@ -195,7 +195,7 @@ describe("TokenAdapter", () => {
   describe("#uncage()", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
-        await expect(tokenAdapterAsAlice.uncage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
+        await expect(tokenAdapterAsAlice.uncage()).to.be.revertedWith("!ownerRole")
       })
     })
 
@@ -220,7 +220,7 @@ describe("TokenAdapter", () => {
       context("caller is showStopper role", () => {
         it("should be set live to 1", async () => {
           // grant role access
-          await tokenAdapter.grantRole(await tokenAdapter.SHOW_STOPPER_ROLE(), aliceAddress)
+          await tokenAdapter.grantRole(await tokenAdapter.OWNER_ROLE(), aliceAddress)
 
           expect(await tokenAdapterAsAlice.live()).to.be.equal(1)
 

@@ -62,7 +62,7 @@ contract TokenAdapter is
 
   // --- Auth ---
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
+  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
   modifier onlyOwner() {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
@@ -98,20 +98,14 @@ contract TokenAdapter is
   }
 
   function cage() external override {
-    require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "TokenAdapter/not-live");
     live = 0;
     emit Cage();
   }
 
   function uncage() external override {
-    require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 0, "TokenAdapter/not-caged");
     live = 1;
     emit Uncage();
@@ -124,7 +118,7 @@ contract TokenAdapter is
     address usr,
     uint256 wad,
     bytes calldata /* data */
-  ) external payable override nonReentrant {
+  ) external payable override nonReentrant whenNotPaused {
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, usr, int256(wad));
@@ -140,7 +134,7 @@ contract TokenAdapter is
     address usr,
     uint256 wad,
     bytes calldata /* data */
-  ) external override nonReentrant {
+  ) external override nonReentrant whenNotPaused {
     require(wad <= 2**255, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
 
@@ -162,4 +156,15 @@ contract TokenAdapter is
     uint256 wad,
     bytes calldata data
   ) external override nonReentrant {}
+
+  // --- pause ---
+  function pause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _pause();
+  }
+
+  function unpause() external {
+    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    _unpause();
+  }
 }

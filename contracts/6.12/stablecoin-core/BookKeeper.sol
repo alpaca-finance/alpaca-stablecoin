@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/ICagable.sol";
+import "../interfaces/ICollateralPoolConfig.sol";
 
 /// @title BookKeeper
 /// @author Alpaca Fin Corporation
@@ -12,7 +16,13 @@ import "../interfaces/ICagable.sol";
     It has the ability to move collateral token and stablecoin with in the accounting state variable. 
 */
 
-contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeable, ICagable {
+contract BookKeeper is
+  IBookKeeper,
+  PausableUpgradeable,
+  AccessControlUpgradeable,
+  ReentrancyGuardUpgradeable,
+  ICagable
+{
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant PRICE_ORACLE_ROLE = keccak256("PRICE_ORACLE_ROLE");
@@ -59,19 +69,11 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
   }
 
   // --- Data ---
-  struct CollateralPool {
-    uint256 totalDebtShare; // Total debt share of Alpaca Stablecoin of this collateral pool              [wad]
-    uint256 debtAccumulatedRate; // Accumulated rates (equivalent to ibToken Price)                       [ray]
-    uint256 priceWithSafetyMargin; // Price with safety margin (taken into account the Collateral Ratio)  [ray]
-    uint256 debtCeiling; // Debt ceiling of this collateral pool                                          [rad]
-    uint256 debtFloor; // Position debt floor of this collateral pool                                     [rad]
-  }
   struct Position {
     uint256 lockedCollateral; // Locked collateral inside this position (used for minting)                  [wad]
     uint256 debtShare; // The debt share of this position or the share amount of minted Alpaca Stablecoin   [wad]
   }
 
-  mapping(bytes32 => CollateralPool) public override collateralPools; // mapping of all collateral pool by its unique name in string
   mapping(bytes32 => mapping(address => Position)) public override positions; // mapping of all positions by collateral pool id and position address
   mapping(bytes32 => mapping(address => uint256)) public override collateralToken; // the accounting of collateral token which is deposited into the protocol [wad]
   mapping(address => uint256) public override stablecoin; // the accounting of the stablecoin that is deposited or has not been withdrawn from the protocol [rad]
@@ -81,11 +83,15 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
   uint256 public totalUnbackedStablecoin; // Total unbacked stable coin  [rad]
   uint256 public totalDebtCeiling; // Total debt ceiling  [rad]
   uint256 public live; // Active Flag
+  ICollateralPoolConfig public override collateralPoolConfig;
 
   // --- Init ---
-  function initialize() external initializer {
+  function initialize(address _collateralPoolConfig) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
+
+    collateralPoolConfig = ICollateralPoolConfig(_collateralPoolConfig);
 
     live = 1;
 
@@ -126,43 +132,13 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
   }
 
   // --- Administration ---
-  function init(bytes32 collateralPoolId) external whenNotPaused {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(collateralPools[collateralPoolId].debtAccumulatedRate == 0, "BookKeeper/collateral-pool-already-init");
-    collateralPools[collateralPoolId].debtAccumulatedRate = 10**27;
-  }
-
   event SetTotalDebtCeiling(address indexed caller, uint256 totalDebtCeiling);
-  event SetPriceWithSafetyMargin(address indexed caller, bytes32 collateralPoolId, uint256 priceWithSafetyMargin);
-  event SetDebtCeiling(address indexed caller, bytes32 collateralPoolId, uint256 debtCeiling);
-  event SetDebtFloor(address indexed caller, bytes32 collateralPoolId, uint256 debtFloor);
 
   function setTotalDebtCeiling(uint256 _totalDebtCeiling) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
     require(live == 1, "BookKeeper/not-live");
     totalDebtCeiling = _totalDebtCeiling;
     emit SetTotalDebtCeiling(msg.sender, _totalDebtCeiling);
-  }
-
-  function setPriceWithSafetyMargin(bytes32 _collateralPoolId, uint256 _priceWithSafetyMargin) external override {
-    require(hasRole(PRICE_ORACLE_ROLE, msg.sender), "!priceOracleRole");
-    require(live == 1, "BookKeeper/not-live");
-    collateralPools[_collateralPoolId].priceWithSafetyMargin = _priceWithSafetyMargin;
-    emit SetPriceWithSafetyMargin(msg.sender, _collateralPoolId, _priceWithSafetyMargin);
-  }
-
-  function setDebtCeiling(bytes32 _collateralPoolId, uint256 _debtCeiling) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(live == 1, "BookKeeper/not-live");
-    collateralPools[_collateralPoolId].debtCeiling = _debtCeiling;
-    emit SetDebtCeiling(msg.sender, _collateralPoolId, _debtCeiling);
-  }
-
-  function setDebtFloor(bytes32 _collateralPoolId, uint256 _debtFloor) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(live == 1, "BookKeeper/not-live");
-    collateralPools[_collateralPoolId].debtFloor = _debtFloor;
-    emit SetDebtFloor(msg.sender, _collateralPoolId, _debtFloor);
   }
 
   function cage() external override {
@@ -196,7 +172,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     bytes32 collateralPoolId,
     address usr,
     int256 amount
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(ADAPTER_ROLE, msg.sender), "!adapterRole");
     collateralToken[collateralPoolId][usr] = add(collateralToken[collateralPoolId][usr], amount);
   }
@@ -211,7 +187,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address src,
     address dst,
     uint256 amount
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(wish(src, msg.sender), "BookKeeper/not-allowed");
     collateralToken[collateralPoolId][src] = sub(collateralToken[collateralPoolId][src], amount);
     collateralToken[collateralPoolId][dst] = add(collateralToken[collateralPoolId][dst], amount);
@@ -225,7 +201,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address src,
     address dst,
     uint256 value
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(wish(src, msg.sender), "BookKeeper/not-allowed");
     stablecoin[src] = sub(stablecoin[src], value);
     stablecoin[dst] = add(stablecoin[dst], value);
@@ -258,20 +234,20 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address stablecoinOwner,
     int256 collateralValue,
     int256 debtShare
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(POSITION_MANAGER_ROLE, msg.sender), "!positionManagerRole");
 
     // system is live
     require(live == 1, "BookKeeper/not-live");
 
     Position memory position = positions[collateralPoolId][positionAddress];
-    CollateralPool memory collateralPool = collateralPools[collateralPoolId];
+    ICollateralPoolConfig.CollateralPool memory collateralPool = collateralPoolConfig.collateralPools(collateralPoolId);
     // collateralPool has been initialised
     require(collateralPool.debtAccumulatedRate != 0, "BookKeeper/collateralPool-not-init");
-
     position.lockedCollateral = add(position.lockedCollateral, collateralValue);
     position.debtShare = add(position.debtShare, debtShare);
     collateralPool.totalDebtShare = add(collateralPool.totalDebtShare, debtShare);
+    collateralPoolConfig.setTotalDebtShare(collateralPoolId, collateralPool.totalDebtShare);
 
     int256 debtValue = mul(collateralPool.debtAccumulatedRate, debtShare);
     uint256 positionDebtValue = mul(collateralPool.debtAccumulatedRate, position.debtShare);
@@ -309,7 +285,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
 
     // position has no debt, or a non-debtFloory amount
     require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "BookKeeper/debt-floor");
-
     collateralToken[collateralPoolId][collateralOwner] = sub(
       collateralToken[collateralPoolId][collateralOwner],
       collateralValue
@@ -317,7 +292,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     stablecoin[stablecoinOwner] = add(stablecoin[stablecoinOwner], debtValue);
 
     positions[collateralPoolId][positionAddress] = position;
-    collateralPools[collateralPoolId] = collateralPool;
   }
 
   // --- CDP Fungibility ---
@@ -333,31 +307,37 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address dst,
     int256 collateralAmount,
     int256 debtShare
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(POSITION_MANAGER_ROLE, msg.sender), "!positionManagerRole");
 
-    Position storage u = positions[collateralPoolId][src];
-    Position storage v = positions[collateralPoolId][dst];
-    CollateralPool storage i = collateralPools[collateralPoolId];
+    Position storage _positionSrc = positions[collateralPoolId][src];
+    Position storage _positionDst = positions[collateralPoolId][dst];
+    ICollateralPoolConfig.CollateralPool memory collateralPool = collateralPoolConfig.collateralPools(collateralPoolId);
 
-    u.lockedCollateral = sub(u.lockedCollateral, collateralAmount);
-    u.debtShare = sub(u.debtShare, debtShare);
-    v.lockedCollateral = add(v.lockedCollateral, collateralAmount);
-    v.debtShare = add(v.debtShare, debtShare);
+    _positionSrc.lockedCollateral = sub(_positionSrc.lockedCollateral, collateralAmount);
+    _positionSrc.debtShare = sub(_positionSrc.debtShare, debtShare);
+    _positionDst.lockedCollateral = add(_positionDst.lockedCollateral, collateralAmount);
+    _positionDst.debtShare = add(_positionDst.debtShare, debtShare);
 
-    uint256 utab = mul(u.debtShare, i.debtAccumulatedRate);
-    uint256 vtab = mul(v.debtShare, i.debtAccumulatedRate);
+    uint256 utab = mul(_positionSrc.debtShare, collateralPool.debtAccumulatedRate);
+    uint256 vtab = mul(_positionDst.debtShare, collateralPool.debtAccumulatedRate);
 
     // both sides consent
     require(both(wish(src, msg.sender), wish(dst, msg.sender)), "BookKeeper/not-allowed");
 
     // both sides safe
-    require(utab <= mul(u.lockedCollateral, i.priceWithSafetyMargin), "BookKeeper/not-safe-src");
-    require(vtab <= mul(v.lockedCollateral, i.priceWithSafetyMargin), "BookKeeper/not-safe-dst");
+    require(
+      utab <= mul(_positionSrc.lockedCollateral, collateralPool.priceWithSafetyMargin),
+      "BookKeeper/not-safe-src"
+    );
+    require(
+      vtab <= mul(_positionDst.lockedCollateral, collateralPool.priceWithSafetyMargin),
+      "BookKeeper/not-safe-dst"
+    );
 
     // both sides non-debtFloory
-    require(either(utab >= i.debtFloor, u.debtShare == 0), "BookKeeper/debt-floor-src");
-    require(either(vtab >= i.debtFloor, v.debtShare == 0), "BookKeeper/debt-floor-dst");
+    require(either(utab >= collateralPool.debtFloor, _positionSrc.debtShare == 0), "BookKeeper/debt-floor-src");
+    require(either(vtab >= collateralPool.debtFloor, _positionDst.debtShare == 0), "BookKeeper/debt-floor-dst");
   }
 
   // --- CDP Confiscation ---
@@ -380,15 +360,16 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address stablecoinDebtor,
     int256 collateralAmount,
     int256 debtShare
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(LIQUIDATION_ENGINE_ROLE, msg.sender), "!liquidationEngineRole");
 
     Position storage position = positions[collateralPoolId][positionAddress];
-    CollateralPool storage collateralPool = collateralPools[collateralPoolId];
+    ICollateralPoolConfig.CollateralPool memory collateralPool = collateralPoolConfig.collateralPools(collateralPoolId);
 
     position.lockedCollateral = add(position.lockedCollateral, collateralAmount);
     position.debtShare = add(position.debtShare, debtShare);
     collateralPool.totalDebtShare = add(collateralPool.totalDebtShare, debtShare);
+    collateralPoolConfig.setTotalDebtShare(collateralPoolId, collateralPool.totalDebtShare);
 
     int256 debtValue = mul(collateralPool.debtAccumulatedRate, debtShare);
 
@@ -407,7 +388,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
       A successful `settleSystemBadDebt` would remove the bad debt from the system.
   */
   /// @param value the value of stablecoin to be used to settle bad debt [rad]
-  function settleSystemBadDebt(uint256 value) external override whenNotPaused {
+  function settleSystemBadDebt(uint256 value) external override nonReentrant whenNotPaused {
     systemBadDebt[msg.sender] = sub(systemBadDebt[msg.sender], value);
     stablecoin[msg.sender] = sub(stablecoin[msg.sender], value);
     totalUnbackedStablecoin = sub(totalUnbackedStablecoin, value);
@@ -422,7 +403,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     address from,
     address to,
     uint256 value
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(MINTABLE_ROLE, msg.sender), "!mintableRole");
     systemBadDebt[from] = add(systemBadDebt[from], value);
     stablecoin[to] = add(stablecoin[to], value);
@@ -444,11 +425,12 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, AccessControlUpgradeabl
     bytes32 collateralPoolId,
     address stabilityFeeRecipient,
     int256 debtAccumulatedRate
-  ) external override whenNotPaused {
+  ) external override nonReentrant whenNotPaused {
     require(hasRole(STABILITY_FEE_COLLECTOR_ROLE, msg.sender), "!stabilityFeeCollectorRole");
     require(live == 1, "BookKeeper/not-live");
-    CollateralPool storage collateralPool = collateralPools[collateralPoolId];
+    ICollateralPoolConfig.CollateralPool memory collateralPool = collateralPoolConfig.collateralPools(collateralPoolId);
     collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);
+    collateralPoolConfig.setDebtAccumulatedRate(collateralPoolId, collateralPool.debtAccumulatedRate);
     int256 value = mul(collateralPool.totalDebtShare, debtAccumulatedRate); // [rad]
     stablecoin[stabilityFeeRecipient] = add(stablecoin[stabilityFeeRecipient], value);
     totalStablecoinIssued = add(totalStablecoinIssued, value);
