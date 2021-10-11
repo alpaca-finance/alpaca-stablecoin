@@ -7,6 +7,7 @@ interface IShowStopper {
     bytes32 collateralPoolId,
     IGenericTokenAdapter adapter,
     address positionAddress,
+    address collateralReceiver,
     bytes calldata data
   ) external;
 }
