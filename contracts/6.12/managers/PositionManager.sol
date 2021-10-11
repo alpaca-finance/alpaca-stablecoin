@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -147,7 +148,10 @@ contract PositionManager is PausableUpgradeable, AccessControlUpgradeable, IMana
   /// @param user The user address that is owned this position
   function open(bytes32 collateralPoolId, address user) public override whenNotPaused returns (uint256) {
     require(user != address(0), "PositionManager/user-address(0)");
-    (, uint256 debtAccumulatedRate, , , ) = IBookKeeper(bookKeeper).collateralPools(collateralPoolId);
+    uint256 debtAccumulatedRate = IBookKeeper(bookKeeper)
+      .collateralPoolConfig()
+      .collateralPools(collateralPoolId)
+      .debtAccumulatedRate;
     require(debtAccumulatedRate != 0, "PositionManager/collateralPool-not-init");
 
     lastPositionId = _safeAdd(lastPositionId, 1);

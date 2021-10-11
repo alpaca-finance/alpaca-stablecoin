@@ -38,6 +38,8 @@ import {
   SimplePriceFeed,
   ShowStopper,
   ShowStopper__factory,
+  CollateralPoolConfig__factory,
+  CollateralPoolConfig,
 } from "../../typechain"
 import { expect } from "chai"
 import { AddressZero } from "../helper/address"
@@ -87,22 +89,22 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     proxyWalletFactory.address,
   ])) as ProxyWalletRegistry
 
+  const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
+  await simplePriceFeed.deployed()
+
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [])) as CollateralPoolConfig
+
   // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [collateralPoolConfig.address])) as BookKeeper
   await bookKeeper.deployed()
 
-  await bookKeeper.init(COLLATERAL_POOL_ID)
-  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(1000))
-  await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID, WeiPerRad.mul(1000))
-
-  await bookKeeper.init(COLLATERAL_POOL_ID2)
-  await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID2, WeiPerRad.mul(1000))
-
-  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
-  await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
-
-  await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID2, WeiPerRay)
+  await collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
 
   // Deploy ShowStopper
   const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
@@ -176,6 +178,40 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   ])) as IbTokenAdapter
   await ibTokenAdapter2.deployed()
 
+  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(1000))
+  await collateralPoolConfig.initCollateralPool(
+    COLLATERAL_POOL_ID,
+    WeiPerRad.mul(1000),
+    0,
+    simplePriceFeed.address,
+    0,
+    WeiPerRay,
+    ibTokenAdapter.address,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
+    AddressZero
+  )
+
+  await collateralPoolConfig.initCollateralPool(
+    COLLATERAL_POOL_ID2,
+    WeiPerRad.mul(1000),
+    0,
+    simplePriceFeed.address,
+    0,
+    WeiPerRay,
+    ibTokenAdapter2.address,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
+    AddressZero
+  )
+
+  await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
+  await collateralPoolConfig.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
+
+  await collateralPoolConfig.setPriceWithSafetyMargin(COLLATERAL_POOL_ID2, WeiPerRay)
+
   await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter.address)
   await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter2.address)
   await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployer.address)
@@ -208,9 +244,11 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
   ])) as StabilityFeeCollector
-  await stabilityFeeCollector.init(COLLATERAL_POOL_ID)
-  await stabilityFeeCollector.init(COLLATERAL_POOL_ID2)
   await bookKeeper.grantRole(await bookKeeper.STABILITY_FEE_COLLECTOR_ROLE(), stabilityFeeCollector.address)
+  await collateralPoolConfig.grantRole(
+    await collateralPoolConfig.STABILITY_FEE_COLLECTOR_ROLE(),
+    stabilityFeeCollector.address
+  )
 
   const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
   const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
@@ -238,34 +276,15 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     systemDebtEngine.address,
     positionManager.address,
   ])) as FixedSpreadLiquidationStrategy
-  await liquidationEngine.setStrategy(COLLATERAL_POOL_ID, fixedSpreadLiquidationStrategy.address)
-  await liquidationEngine.setStrategy(COLLATERAL_POOL_ID2, fixedSpreadLiquidationStrategy.address)
-  await fixedSpreadLiquidationStrategy.setCollateralPool(
-    COLLATERAL_POOL_ID,
-    ibTokenAdapter.address,
-    CLOSE_FACTOR_BPS,
-    LIQUIDATOR_INCENTIVE_BPS,
-    TREASURY_FEE_BPS
-  )
-  await fixedSpreadLiquidationStrategy.setCollateralPool(
-    COLLATERAL_POOL_ID2,
-    ibTokenAdapter.address,
-    CLOSE_FACTOR_BPS,
-    LIQUIDATOR_INCENTIVE_BPS,
-    TREASURY_FEE_BPS
-  )
+  await collateralPoolConfig.setStrategy(COLLATERAL_POOL_ID, fixedSpreadLiquidationStrategy.address)
+  await collateralPoolConfig.setStrategy(COLLATERAL_POOL_ID2, fixedSpreadLiquidationStrategy.address)
+
   await fixedSpreadLiquidationStrategy.grantRole(
     await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
     liquidationEngine.address
   )
   await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), liquidationEngine.address)
   await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), fixedSpreadLiquidationStrategy.address)
-
-  const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
-  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
-  await simplePriceFeed.deployed()
-  await priceOracle.setPriceFeed(COLLATERAL_POOL_ID, simplePriceFeed.address)
-  await priceOracle.setPriceFeed(COLLATERAL_POOL_ID2, simplePriceFeed.address)
 
   return {
     proxyWalletRegistry,
@@ -404,7 +423,6 @@ describe("PositionPermissions", () => {
             "collateralToken inside Alice's position address should be 0 ibDUMMY, because Alice locked all ibDUMMY into the position"
           ).to.be.equal(0)
           expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
-
           // 2. Alice try to adjust position, add 2 ibDummy to position
           const lockToken = alpacaStablecoinProxyActions.interface.encodeFunctionData("lockToken", [
             positionManager.address,

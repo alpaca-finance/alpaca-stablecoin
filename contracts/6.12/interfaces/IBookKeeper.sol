@@ -17,6 +17,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import "../interfaces/ICollateralPoolConfig.sol";
+
 pragma solidity 0.6.12;
 
 interface IBookKeeper {
@@ -46,8 +48,6 @@ interface IBookKeeper {
     int256 collateralValue,
     int256 debtShare
   ) external;
-
-  function setPriceWithSafetyMargin(bytes32 collateralPoolId, uint256 priceWithSafetyMargin) external;
 
   function stablecoin(address ownerAddress) external view returns (uint256);
 
@@ -89,17 +89,6 @@ interface IBookKeeper {
     uint256 value // [rad]
   ) external;
 
-  function collateralPools(bytes32 collateralPoolId)
-    external
-    view
-    returns (
-      uint256 totalDebtShare, // [wad]
-      uint256 debtAccumulatedRate, // [ray]
-      uint256 priceWithSafetyMargin, // [ray]
-      uint256 debtCeiling, // [rad]
-      uint256 debtFloor // [rad]
-    );
-
   function accrueStabilityFee(
     bytes32 collateralPoolId,
     address stabilityFeeRecipient,
@@ -113,4 +102,6 @@ interface IBookKeeper {
   function whitelist(address toBeWhitelistedAddress) external;
 
   function blacklist(address toBeBlacklistedAddress) external;
+
+  function collateralPoolConfig() external view returns (ICollateralPoolConfig);
 }

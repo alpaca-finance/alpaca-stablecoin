@@ -44,12 +44,15 @@ import {
   MockFlashLendingCalleeMintable__factory,
   MockFlashLendingCallee,
   MockFlashLendingCallee__factory,
+  CollateralPoolConfig,
+  CollateralPoolConfig__factory,
 } from "../../../typechain"
 import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
 
 import * as AssertHelpers from "../../helper/assert"
+import { AddressZero } from "../../helper/address"
 
 const { formatBytes32String } = ethers.utils
 
@@ -72,6 +75,7 @@ type fixture = {
   systemDebtEngine: SystemDebtEngine
   mockFlashLendingCalleeMintable: MockFlashLendingCalleeMintable
   mockFlashLendingCallee: MockFlashLendingCallee
+  collateralPoolConfig: CollateralPoolConfig
 }
 
 const ALPACA_PER_BLOCK = ethers.utils.parseEther("100")
@@ -92,17 +96,22 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     proxyWalletFactory.address,
   ])) as ProxyWalletRegistry
 
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [])) as CollateralPoolConfig
+
   // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [collateralPoolConfig.address])) as BookKeeper
   await bookKeeper.deployed()
 
-  await bookKeeper.init(COLLATERAL_POOL_ID)
-  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10000000))
-  await bookKeeper.setDebtCeiling(COLLATERAL_POOL_ID, WeiPerRad.mul(10000000))
+  await collateralPoolConfig.grantRole(await collateralPoolConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
 
-  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
-  await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
+  const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
+  await simplePriceFeed.deployed()
 
   // Deploy mocked BEP20
   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
@@ -157,6 +166,24 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
+  await collateralPoolConfig.initCollateralPool(
+    COLLATERAL_POOL_ID,
+    WeiPerRad.mul(10000000),
+    0,
+    simplePriceFeed.address,
+    0,
+    WeiPerRay,
+    ibTokenAdapter.address,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
+    AddressZero
+  )
+  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10000000))
+
+  await collateralPoolConfig.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
+  await collateralPoolConfig.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay)
+
   await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter.address)
   await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployer.address)
 
@@ -191,9 +218,12 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
   ])) as StabilityFeeCollector
-  await stabilityFeeCollector.init(COLLATERAL_POOL_ID)
   await stabilityFeeCollector.setSystemDebtEngine(systemDebtEngine.address)
   await bookKeeper.grantRole(await bookKeeper.STABILITY_FEE_COLLECTOR_ROLE(), stabilityFeeCollector.address)
+  await collateralPoolConfig.grantRole(
+    await collateralPoolConfig.STABILITY_FEE_COLLECTOR_ROLE(),
+    stabilityFeeCollector.address
+  )
 
   const LiquidationEngine = (await ethers.getContractFactory(
     "LiquidationEngine",
@@ -218,26 +248,14 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     systemDebtEngine.address,
     positionManager.address,
   ])) as FixedSpreadLiquidationStrategy
-  await liquidationEngine.setStrategy(COLLATERAL_POOL_ID, fixedSpreadLiquidationStrategy.address)
+  await collateralPoolConfig.setStrategy(COLLATERAL_POOL_ID, fixedSpreadLiquidationStrategy.address)
   await fixedSpreadLiquidationStrategy.setFlashLendingEnabled(1)
-  await fixedSpreadLiquidationStrategy.setCollateralPool(
-    COLLATERAL_POOL_ID,
-    ibTokenAdapter.address,
-    CLOSE_FACTOR_BPS,
-    LIQUIDATOR_INCENTIVE_BPS,
-    TREASURY_FEE_BPS
-  )
   await fixedSpreadLiquidationStrategy.grantRole(
     await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
     liquidationEngine.address
   )
   await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), liquidationEngine.address)
   await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), fixedSpreadLiquidationStrategy.address)
-
-  const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
-  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
-  await simplePriceFeed.deployed()
-  await priceOracle.setPriceFeed(COLLATERAL_POOL_ID, simplePriceFeed.address)
 
   const MockFlashLendingCalleeMintable = (await ethers.getContractFactory(
     "MockFlashLendingCalleeMintable",
@@ -273,6 +291,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     systemDebtEngine,
     mockFlashLendingCalleeMintable,
     mockFlashLendingCallee,
+    collateralPoolConfig,
   }
 }
 
@@ -324,6 +343,8 @@ describe("FlashLiquidation", () => {
   let mockFlashLendingCalleeMintable: MockFlashLendingCalleeMintable
   let mockFlashLendingCallee: MockFlashLendingCallee
 
+  let collateralPoolConfig: CollateralPoolConfig
+
   // Signer
   let ibTokenAdapterAsAlice: IbTokenAdapter
   let ibTokenAdapterAsBob: IbTokenAdapter
@@ -363,6 +384,7 @@ describe("FlashLiquidation", () => {
       systemDebtEngine,
       mockFlashLendingCalleeMintable,
       mockFlashLendingCallee,
+      collateralPoolConfig,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
@@ -390,7 +412,7 @@ describe("FlashLiquidation", () => {
     context("safety buffer -0.1%, but liquidator does not have enough AUSD to liquidate", async () => {
       it("should success", async () => {
         // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
-        await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+        await collateralPoolConfig.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
 
         // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
         const lockedCollateralAmount = WeiPerWad
@@ -428,7 +450,7 @@ describe("FlashLiquidation", () => {
         ).to.be.equal(0)
 
         // 3. ibDUMMY price drop to 0.99 USD
-        await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.sub(1))
+        await collateralPoolConfig.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.sub(1))
         await simplePriceFeedAsDeployer.setPrice(WeiPerRay.sub(1).div(1e9))
 
         // 4. Bob liquidate Alice's position up to full close factor successfully
@@ -451,7 +473,7 @@ describe("FlashLiquidation", () => {
     context("safety buffer -0.1%, position is liquidated up to full close factor with flash liquidation", async () => {
       it("should success", async () => {
         // 1. Set priceWithSafetyMargin for ibDUMMY to 2 USD
-        await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+        await collateralPoolConfig.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.mul(2))
 
         // 2. Alice open a new position with 1 ibDUMMY and draw 1 AUSD
         const lockedCollateralAmount = WeiPerWad
@@ -489,7 +511,7 @@ describe("FlashLiquidation", () => {
         ).to.be.equal(0)
 
         // 3. ibDUMMY price drop to 0.99 USD
-        await bookKeeper.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.sub(1))
+        await collateralPoolConfig.setPriceWithSafetyMargin(COLLATERAL_POOL_ID, WeiPerRay.sub(1))
         await simplePriceFeedAsDeployer.setPrice(WeiPerRay.sub(1).div(1e9))
 
         // 4. Bob liquidate Alice's position up to full close factor successfully
@@ -534,7 +556,6 @@ describe("FlashLiquidation", () => {
           await bookKeeper.systemBadDebt(systemDebtEngine.address),
           "System bad debt should be 0 AUSD"
         ).to.be.equal(0)
-        console.log("bobAddress", bobAddress)
         expect(await bookKeeper.collateralToken(COLLATERAL_POOL_ID, bobAddress), "Bob should receive 0.50625 ibDUMMY")
           .to.be.equal(expectedCollateralBobShouldReceive)
           .to.be.equal(ethers.utils.parseEther("0.50625"))
