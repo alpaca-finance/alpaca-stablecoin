@@ -973,4 +973,13 @@ contract AlpacaStablecoinProxyActions {
     IGenericTokenAdapter(tokenAdapter).deposit(positionAddress, 0, abi.encode(harvestTo));
     transfer(harvestToken, msg.sender, harvestToken.myBalance());
   }
+
+  function redeemLockedCollateral(
+    address manager,
+    uint256 positionId,
+    address tokenAdapter,
+    bytes calldata data
+  ) external {
+    IManager(manager).redeemLockedCollateral(positionId, tokenAdapter, address(this), data);
+  }
 }

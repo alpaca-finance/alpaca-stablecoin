@@ -18,7 +18,7 @@ contract GetPositions is Initializable {
   // --- Init ---
   function initialize() external initializer {}
 
-  function getPostionsAsc(address manager, address user)
+  function getAllPositionsAsc(address _manager, address _user)
     external
     view
     returns (
@@ -27,24 +27,91 @@ contract GetPositions is Initializable {
       bytes32[] memory collateralPools
     )
   {
-    uint256 count = PositionManager(manager).ownerPositionCount(user);
-    ids = new uint256[](count);
-    positions = new address[](count);
-    collateralPools = new bytes32[](count);
-    uint256 i = 0;
-    uint256 id = PositionManager(manager).ownerFirstPositionId(user);
+    uint256 count = PositionManager(_manager).ownerPositionCount(_user);
+    uint256 id = PositionManager(_manager).ownerFirstPositionId(_user);
+    return _getPositionsAsc(_manager, id, count);
+  }
 
-    while (id > 0) {
+  function getPositionsAsc(
+    address _manager,
+    uint256 _fromId,
+    uint256 _size
+  )
+    external
+    view
+    returns (
+      uint256[] memory ids,
+      address[] memory positions,
+      bytes32[] memory collateralPools
+    )
+  {
+    return _getPositionsAsc(_manager, _fromId, _size);
+  }
+
+  function _getPositionsAsc(
+    address _manager,
+    uint256 _fromId,
+    uint256 _size
+  )
+    internal
+    view
+    returns (
+      uint256[] memory ids,
+      address[] memory positions,
+      bytes32[] memory collateralPools
+    )
+  {
+    ids = new uint256[](_size);
+    positions = new address[](_size);
+    collateralPools = new bytes32[](_size);
+    uint256 i = 0;
+    uint256 id = _fromId;
+
+    while (id > 0 && i < _size) {
       ids[i] = id;
-      positions[i] = PositionManager(manager).positions(id);
-      collateralPools[i] = PositionManager(manager).collateralPools(id);
-      (, id) = PositionManager(manager).list(id);
+      positions[i] = PositionManager(_manager).positions(id);
+      collateralPools[i] = PositionManager(_manager).collateralPools(id);
+      (, id) = PositionManager(_manager).list(id);
       i++;
     }
   }
 
-  function getPositionsDesc(address manager, address user)
+  function getAllPositionsDesc(address _manager, address _user)
     external
+    view
+    returns (
+      uint256[] memory,
+      address[] memory,
+      bytes32[] memory
+    )
+  {
+    uint256 count = PositionManager(_manager).ownerPositionCount(_user);
+    uint256 id = PositionManager(_manager).ownerLastPositionId(_user);
+    return _getPositionsDesc(_manager, id, count);
+  }
+
+  function getPositionsDesc(
+    address _manager,
+    uint256 _fromId,
+    uint256 _size
+  )
+    external
+    view
+    returns (
+      uint256[] memory,
+      address[] memory,
+      bytes32[] memory
+    )
+  {
+    return _getPositionsDesc(_manager, _fromId, _size);
+  }
+
+  function _getPositionsDesc(
+    address _manager,
+    uint256 _fromId,
+    uint256 _size
+  )
+    internal
     view
     returns (
       uint256[] memory ids,
@@ -52,18 +119,17 @@ contract GetPositions is Initializable {
       bytes32[] memory collateralPools
     )
   {
-    uint256 count = PositionManager(manager).ownerPositionCount(user);
-    ids = new uint256[](count);
-    positions = new address[](count);
-    collateralPools = new bytes32[](count);
+    ids = new uint256[](_size);
+    positions = new address[](_size);
+    collateralPools = new bytes32[](_size);
     uint256 i = 0;
-    uint256 id = PositionManager(manager).ownerLastPositionId(user);
+    uint256 id = _fromId;
 
-    while (id > 0) {
+    while (id > 0 && i < _size) {
       ids[i] = id;
-      positions[i] = PositionManager(manager).positions(id);
-      collateralPools[i] = PositionManager(manager).collateralPools(id);
-      (id, ) = PositionManager(manager).list(id);
+      positions[i] = PositionManager(_manager).positions(id);
+      collateralPools[i] = PositionManager(_manager).collateralPools(id);
+      (id, ) = PositionManager(_manager).list(id);
       i++;
     }
   }
