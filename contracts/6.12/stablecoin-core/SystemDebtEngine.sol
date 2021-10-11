@@ -94,6 +94,7 @@ contract SystemDebtEngine is
   /// @param value The value of collateral. [rad]
   function withdrawStablecoinSurplus(address to, uint256 value) external {
     require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(bookKeeper.systemBadDebt(address(this)) == 0, "SystemDebtEngine/system-bad-debt-remaining");
     require(sub(bookKeeper.stablecoin(address(this)), value) >= surplusBuffer, "SystemDebtEngine/insufficient-surplus");
     bookKeeper.moveStablecoin(address(this), to, value);
   }
