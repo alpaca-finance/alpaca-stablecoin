@@ -40,12 +40,15 @@ import {
   PriceOracle__factory,
   SimplePriceFeed__factory,
   SimplePriceFeed,
+  ShowStopper,
+  ShowStopper__factory,
 } from "../../../typechain"
 import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
 
 import * as AssertHelpers from "../../helper/assert"
+import { AddressZero } from "../../helper/address"
 
 const { formatBytes32String } = ethers.utils
 
@@ -130,7 +133,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
   const positionManager = (await upgrades.deployProxy(PositionManager, [
     bookKeeper.address,
-    bookKeeper.address,
+    AddressZero,
   ])) as PositionManager
   await positionManager.deployed()
   await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
@@ -529,7 +532,7 @@ describe("LiquidationEngine", () => {
             ethers.utils.defaultAbiCoder.encode(["address", "bytes"], [bobAddress, []])
           )
         )
-          .to.emit(fixedSpreadLiquidationStrategy, "FixedSpreadLiquidate")
+          .to.emit(fixedSpreadLiquidationStrategy, "LogFixedSpreadLiquidate")
           .withArgs(
             COLLATERAL_POOL_ID,
             ethers.utils.parseEther("1"),

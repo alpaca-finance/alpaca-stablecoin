@@ -457,7 +457,7 @@ describe("LiquidationEngine", () => {
         await expect(
           liquidationEngine.setStrategy(formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
         )
-          .to.emit(liquidationEngine, "SetStrategy")
+          .to.emit(liquidationEngine, "LogSetStrategy")
           .withArgs(deployerAddress, formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
       })
     })
