@@ -972,7 +972,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 positionId,
     address tokenAdapter,
     bytes calldata data
-  ) public {
+  ) external {
     IManager(manager).redeemLockedCollateral(positionId, tokenAdapter, address(this), data);
   }
 }
