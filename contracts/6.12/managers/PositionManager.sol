@@ -395,7 +395,7 @@ contract PositionManager is PausableUpgradeable, AccessControlUpgradeable, IMana
     address adapter,
     address collateralReceiver,
     bytes calldata data
-  ) public whenNotPaused onlyOwnerAllowed(posId) {
+  ) public override whenNotPaused onlyOwnerAllowed(posId) {
     address positionAddress = positions[posId];
     IShowStopper(showStopper).redeemLockedCollateral(
       collateralPools[posId],
