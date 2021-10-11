@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
@@ -97,10 +98,11 @@ contract GetPositions is Initializable {
         PositionManager(_manager).collateralPools(_positionIndex),
         positions[_resultIndex]
       );
-
-      (, uint256 _debtAccumulatedRate, uint256 _priceWithSafetyMargin, , ) = bookKeeper.collateralPools(
-        PositionManager(_manager).collateralPools(_positionIndex)
-      );
+      ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(
+        IBookKeeper(bookKeeper).collateralPoolConfig()
+      ).collateralPools(PositionManager(_manager).collateralPools(_positionIndex));
+      uint256 _debtAccumulatedRate = collateralPool.debtAccumulatedRate;
+      uint256 _priceWithSafetyMargin = collateralPool.priceWithSafetyMargin;
 
       uint256 safetyBuffer = calculateSafetyBuffer(
         _debtShare,
