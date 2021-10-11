@@ -386,13 +386,15 @@ contract PositionManager is PausableUpgradeable, AccessControlUpgradeable, IMana
   function redeemLockedCollateral(
     uint256 posId,
     address adapter,
+    address collateralReceiver,
     bytes calldata data
-  ) public onlyOwnerAllowed(posId) {
+  ) public override onlyOwnerAllowed(posId) {
     address positionAddress = positions[posId];
     IShowStopper(showStopper).redeemLockedCollateral(
       collateralPools[posId],
       IGenericTokenAdapter(adapter),
       positionAddress,
+      collateralReceiver,
       data
     );
   }

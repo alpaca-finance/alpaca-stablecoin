@@ -11,6 +11,7 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
 
   uint256 public price;
   uint256 public lastUpdate;
+
   uint256 public priceLife;
 
   // --- Init ---
