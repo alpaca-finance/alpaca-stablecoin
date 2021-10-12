@@ -47,8 +47,8 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
   // --- Events ---
   event SetFeeIn(address indexed _caller, uint256 _feeIn);
   event SetFeeOut(address indexed _caller, uint256 _feeOut);
-  event SwapTokenToStablecoin(address indexed owner, uint256 value, uint256 fee);
-  event SwapStablecoinToToken(address indexed owner, uint256 value, uint256 fee);
+  event SwapTokenToStablecoin(address indexed _owner, uint256 _value, uint256 _fee);
+  event SwapStablecoinToToken(address indexed _owner, uint256 _value, uint256 _fee);
 
   // --- Init ---
   function initialize(
@@ -74,16 +74,16 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
   uint256 constant WAD = 10**18;
   uint256 constant RAY = 10**27;
 
-  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x + y) >= x);
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x);
   }
 
-  function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x - y) <= x);
+  function sub(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x - _y) <= _x);
   }
 
-  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y == 0 || (z = x * y) / y == x);
+  function mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x);
   }
 
   function setFeeIn(uint256 _feeIn) external {

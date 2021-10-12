@@ -51,43 +51,46 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
   }
 
   // --- Math ---
-  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x + y) >= x);
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x);
   }
 
-  function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x - y) <= x);
+  function sub(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x - _y) <= _x);
   }
 
-  function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    return x <= y ? x : y;
+  function min(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    return _x <= _y ? _x : _y;
   }
 
   // --- withdraw surplus ---
-  /// @param amount The amount of collateral. [wad]
+  /// @param _amount The amount of collateral. [wad]
   function withdrawCollateralSurplus(
-    bytes32 collateralPoolId,
-    IGenericTokenAdapter adapter,
-    address to,
-    uint256 amount // [wad]
+    bytes32 _collateralPoolId,
+    IGenericTokenAdapter _adapter,
+    address _to,
+    uint256 _amount // [wad]
   ) external {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
-    bookKeeper.moveCollateral(collateralPoolId, address(this), to, amount);
-    adapter.onMoveCollateral(address(this), to, amount, abi.encode(to));
+    bookKeeper.moveCollateral(_collateralPoolId, address(this), _to, _amount);
+    _adapter.onMoveCollateral(address(this), _to, _amount, abi.encode(_to));
   }
 
-  /// @param value The value of collateral. [rad]
-  function withdrawStablecoinSurplus(address to, uint256 value) external {
+  /// @param _value The value of collateral. [rad]
+  function withdrawStablecoinSurplus(address _to, uint256 _value) external {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(bookKeeper.systemBadDebt(address(this)) == 0, "SystemDebtEngine/system-bad-debt-remaining");
-    require(sub(bookKeeper.stablecoin(address(this)), value) >= surplusBuffer, "SystemDebtEngine/insufficient-surplus");
-    bookKeeper.moveStablecoin(address(this), to, value);
+    require(
+      sub(bookKeeper.stablecoin(address(this)), _value) >= surplusBuffer,
+      "SystemDebtEngine/insufficient-surplus"
+    );
+    bookKeeper.moveStablecoin(address(this), _to, _value);
   }
 
   // --- Administration ---
-  event SetSurplusBuffer(address indexed caller, uint256 data);
+  event SetSurplusBuffer(address indexed _caller, uint256 _data);
 
   function setSurplusBuffer(uint256 _data) external whenNotPaused {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
@@ -101,18 +104,18 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
       This function could be called by anyone to settle the system bad debt when there is available surplus.
       The stablecoin held by SystemDebtEngine (which is the surplus) will be deducted to compensate the incurred bad debt.
   */
-  /// @param value The value of bad debt to be settled. [rad]
-  function settleSystemBadDebt(uint256 value) external override whenNotPaused nonReentrant {
-    require(value <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
-    require(value <= bookKeeper.systemBadDebt(address(this)), "SystemDebtEngine/insufficient-debt");
-    bookKeeper.settleSystemBadDebt(value);
+  /// @param _value The value of bad debt to be settled. [rad]
+  function settleSystemBadDebt(uint256 _value) external override whenNotPaused nonReentrant {
+    require(_value <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
+    require(_value <= bookKeeper.systemBadDebt(address(this)), "SystemDebtEngine/insufficient-debt");
+    bookKeeper.settleSystemBadDebt(_value);
   }
 
   function cage() external override {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "SystemDebtEngine/not-live");
@@ -125,7 +128,7 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "SystemDebtEngine/not-caged");

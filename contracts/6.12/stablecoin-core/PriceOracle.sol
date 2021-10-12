@@ -48,9 +48,9 @@ contract PriceOracle is PausableUpgradeable, ReentrancyGuardUpgradeable, IPriceO
 
   // --- Events ---
   event LogSetPrice(
-    bytes32 poolId,
-    bytes32 rawPrice, // Raw price from price feed [wad]
-    uint256 priceWithSafetyMargin // Price with safety margin [ray]
+    bytes32 _poolId,
+    bytes32 _rawPrice, // Raw price from price feed [wad]
+    uint256 _priceWithSafetyMargin // Price with safety margin [ray]
   );
 
   // --- Init ---
@@ -67,20 +67,20 @@ contract PriceOracle is PausableUpgradeable, ReentrancyGuardUpgradeable, IPriceO
   // --- Math ---
   uint256 constant ONE = 10**27;
 
-  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y == 0 || (z = x * y) / y == x);
+  function mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x);
   }
 
-  function rdiv(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = mul(x, ONE) / y;
+  function rdiv(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = mul(_x, ONE) / _y;
   }
 
   // --- Administration ---
-  event LogSetStableCoinReferencePrice(address indexed caller, uint256 data);
+  event LogSetStableCoinReferencePrice(address indexed _caller, uint256 _data);
 
   function setStableCoinReferencePrice(uint256 _data) external {
-    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
-    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 1, "PriceOracle/not-live");
     stableCoinReferencePrice = _data;
     emit LogSetStableCoinReferencePrice(msg.sender, _data);
@@ -90,26 +90,26 @@ contract PriceOracle is PausableUpgradeable, ReentrancyGuardUpgradeable, IPriceO
   /// @dev Update the latest price with safety margin of the collateral pool to the BookKeeper
   /// @param _collateralPoolId Collateral pool id
   function setPrice(bytes32 _collateralPoolId) external whenNotPaused {
-    IPriceFeed priceFeed = IPriceFeed(
+    IPriceFeed _priceFeed = IPriceFeed(
       ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).collateralPools(_collateralPoolId).priceFeed
     );
-    uint256 liquidationRatio = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getLiquidationRatio(
+    uint256 _liquidationRatio = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getLiquidationRatio(
       _collateralPoolId
     );
-    (bytes32 rawPrice, bool hasPrice) = priceFeed.peekPrice();
-    uint256 priceWithSafetyMargin = hasPrice
-      ? rdiv(rdiv(mul(uint256(rawPrice), 10**9), stableCoinReferencePrice), liquidationRatio)
+    (bytes32 _rawPrice, bool _hasPrice) = _priceFeed.peekPrice();
+    uint256 _priceWithSafetyMargin = _hasPrice
+      ? rdiv(rdiv(mul(uint256(_rawPrice), 10**9), stableCoinReferencePrice), _liquidationRatio)
       : 0;
-    address collateralPoolConfig = address(bookKeeper.collateralPoolConfig());
-    ICollateralPoolConfig(collateralPoolConfig).setPriceWithSafetyMargin(_collateralPoolId, priceWithSafetyMargin);
-    emit LogSetPrice(_collateralPoolId, rawPrice, priceWithSafetyMargin);
+    address _collateralPoolConfig = address(bookKeeper.collateralPoolConfig());
+    ICollateralPoolConfig(_collateralPoolConfig).setPriceWithSafetyMargin(_collateralPoolId, _priceWithSafetyMargin);
+    emit LogSetPrice(_collateralPoolId, _rawPrice, _priceWithSafetyMargin);
   }
 
   function cage() external override {
-    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "PriceOracle/not-live");
@@ -118,10 +118,10 @@ contract PriceOracle is PausableUpgradeable, ReentrancyGuardUpgradeable, IPriceO
   }
 
   function uncage() external override {
-    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "PriceOracle/not-caged");
