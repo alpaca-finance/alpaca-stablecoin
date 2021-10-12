@@ -86,7 +86,7 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     uint256 _debtShareToBeLiquidated, // [rad]
     uint256 _maxDebtShareToBeLiquidated, // [rad]
     address _collateralRecipient,
-    bytes calldata data
+    bytes calldata _data
   ) external override nonReentrant whenNotPaused {
     require(live == 1, "LiquidationEngine/not-live");
     require(_debtShareToBeLiquidated != 0, "LiquidationEngine/zero-debt-value-to-be-liquidated");
@@ -131,7 +131,7 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
       _maxDebtShareToBeLiquidated,
       msg.sender,
       _collateralRecipient,
-      data
+      _data
     );
     (_vars.newPositionLockedCollateral, _vars.newPositionDebtShare) = bookKeeper.positions(
       _collateralPoolId,
@@ -167,45 +167,45 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
   }
 
   function cage() external override {
-    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "LiquidationEngine/not-live");
     live = 0;
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
-    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "LiquidationEngine/not-caged");
     live = 1;
-    emit Uncage();
+    emit LogUncage();
   }
 
   // --- pause ---
   function pause() external {
-    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
   }
 
   function unpause() external {
-    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

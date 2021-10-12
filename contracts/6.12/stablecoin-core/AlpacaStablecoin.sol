@@ -44,12 +44,12 @@ contract AlpacaStablecoin is IStablecoin, AccessControlUpgradeable {
   event Transfer(address indexed src, address indexed dst, uint256 wad);
 
   // --- Math ---
-  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x + y) >= x);
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x);
   }
 
-  function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x - y) <= x);
+  function sub(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x - _y) <= _x);
   }
 
   // --- EIP712 niceties ---
@@ -84,93 +84,93 @@ contract AlpacaStablecoin is IStablecoin, AccessControlUpgradeable {
   }
 
   // --- Token ---
-  function transfer(address dst, uint256 wad) external override returns (bool) {
-    return transferFrom(msg.sender, dst, wad);
+  function transfer(address _dst, uint256 _wad) external override returns (bool) {
+    return transferFrom(msg.sender, _dst, _wad);
   }
 
   function transferFrom(
-    address src,
-    address dst,
-    uint256 wad
+    address _src,
+    address _dst,
+    uint256 _wad
   ) public override returns (bool) {
-    require(balanceOf[src] >= wad, "AlpacaStablecoin/insufficient-balance");
-    if (src != msg.sender && allowance[src][msg.sender] != uint256(-1)) {
-      require(allowance[src][msg.sender] >= wad, "AlpacaStablecoin/insufficient-allowance");
-      allowance[src][msg.sender] = sub(allowance[src][msg.sender], wad);
+    require(balanceOf[_src] >= _wad, "AlpacaStablecoin/insufficient-balance");
+    if (_src != msg.sender && allowance[_src][msg.sender] != uint256(-1)) {
+      require(allowance[_src][msg.sender] >= _wad, "AlpacaStablecoin/insufficient-allowance");
+      allowance[_src][msg.sender] = sub(allowance[_src][msg.sender], _wad);
     }
-    balanceOf[src] = sub(balanceOf[src], wad);
-    balanceOf[dst] = add(balanceOf[dst], wad);
-    emit Transfer(src, dst, wad);
+    balanceOf[_src] = sub(balanceOf[_src], _wad);
+    balanceOf[_dst] = add(balanceOf[_dst], _wad);
+    emit Transfer(_src, _dst, _wad);
     return true;
   }
 
-  function mint(address usr, uint256 wad) external override {
+  function mint(address _usr, uint256 _wad) external override {
     require(hasRole(MINTER_ROLE, msg.sender), "!minterRole");
 
-    balanceOf[usr] = add(balanceOf[usr], wad);
-    totalSupply = add(totalSupply, wad);
-    emit Transfer(address(0), usr, wad);
+    balanceOf[_usr] = add(balanceOf[_usr], _wad);
+    totalSupply = add(totalSupply, _wad);
+    emit Transfer(address(0), _usr, _wad);
   }
 
-  function burn(address usr, uint256 wad) external override {
-    require(balanceOf[usr] >= wad, "AlpacaStablecoin/insufficient-balance");
-    if (usr != msg.sender && allowance[usr][msg.sender] != uint256(-1)) {
-      require(allowance[usr][msg.sender] >= wad, "AlpacaStablecoin/insufficient-allowance");
-      allowance[usr][msg.sender] = sub(allowance[usr][msg.sender], wad);
+  function burn(address _usr, uint256 _wad) external override {
+    require(balanceOf[_usr] >= _wad, "AlpacaStablecoin/insufficient-balance");
+    if (_usr != msg.sender && allowance[_usr][msg.sender] != uint256(-1)) {
+      require(allowance[_usr][msg.sender] >= _wad, "AlpacaStablecoin/insufficient-allowance");
+      allowance[_usr][msg.sender] = sub(allowance[_usr][msg.sender], _wad);
     }
-    balanceOf[usr] = sub(balanceOf[usr], wad);
-    totalSupply = sub(totalSupply, wad);
-    emit Transfer(usr, address(0), wad);
+    balanceOf[_usr] = sub(balanceOf[_usr], _wad);
+    totalSupply = sub(totalSupply, _wad);
+    emit Transfer(_usr, address(0), _wad);
   }
 
-  function approve(address usr, uint256 wad) external override returns (bool) {
-    allowance[msg.sender][usr] = wad;
-    emit Approval(msg.sender, usr, wad);
+  function approve(address _usr, uint256 _wad) external override returns (bool) {
+    allowance[msg.sender][_usr] = _wad;
+    emit Approval(msg.sender, _usr, _wad);
     return true;
   }
 
   // --- Alias ---
-  function push(address usr, uint256 wad) external {
-    transferFrom(msg.sender, usr, wad);
+  function push(address _usr, uint256 _wad) external {
+    transferFrom(msg.sender, _usr, _wad);
   }
 
-  function pull(address usr, uint256 wad) external {
-    transferFrom(usr, msg.sender, wad);
+  function pull(address _usr, uint256 _wad) external {
+    transferFrom(_usr, msg.sender, _wad);
   }
 
   function move(
-    address src,
-    address dst,
-    uint256 wad
+    address _src,
+    address _dst,
+    uint256 _wad
   ) external {
-    transferFrom(src, dst, wad);
+    transferFrom(_src, _dst, _wad);
   }
 
   // --- Approve by signature ---
   function permit(
-    address holder,
-    address spender,
-    uint256 nonce,
-    uint256 expiry,
-    bool allowed,
-    uint8 v,
-    bytes32 r,
-    bytes32 s
+    address _holder,
+    address _spender,
+    uint256 _nonce,
+    uint256 _expiry,
+    bool _allowed,
+    uint8 _v,
+    bytes32 _r,
+    bytes32 _s
   ) external {
-    bytes32 digest = keccak256(
+    bytes32 _digest = keccak256(
       abi.encodePacked(
         "\x19\x01",
         DOMAIN_SEPARATOR,
-        keccak256(abi.encode(PERMIT_TYPEHASH, holder, spender, nonce, expiry, allowed))
+        keccak256(abi.encode(PERMIT_TYPEHASH, _holder, _spender, _nonce, _expiry, _allowed))
       )
     );
 
-    require(holder != address(0), "AlpacaStablecoin/invalid-address-0");
-    require(holder == ecrecover(digest, v, r, s), "AlpacaStablecoin/invalid-permit");
-    require(expiry == 0 || now <= expiry, "AlpacaStablecoin/permit-expired");
-    require(nonce == nonces[holder]++, "AlpacaStablecoin/invalid-nonce");
-    uint256 wad = allowed ? uint256(-1) : 0;
-    allowance[holder][spender] = wad;
-    emit Approval(holder, spender, wad);
+    require(_holder != address(0), "AlpacaStablecoin/invalid-address-0");
+    require(_holder == ecrecover(_digest, _v, _r, _s), "AlpacaStablecoin/invalid-permit");
+    require(_expiry == 0 || now <= _expiry, "AlpacaStablecoin/permit-expired");
+    require(_nonce == nonces[_holder]++, "AlpacaStablecoin/invalid-nonce");
+    uint256 _wad = _allowed ? uint256(-1) : 0;
+    allowance[_holder][_spender] = _wad;
+    emit Approval(_holder, _spender, _wad);
   }
 }

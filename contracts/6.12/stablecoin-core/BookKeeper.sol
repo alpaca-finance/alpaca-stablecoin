@@ -30,7 +30,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -40,7 +40,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();
@@ -180,7 +180,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     require(live == 1, "BookKeeper/not-live");
     live = 0;
 
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
@@ -193,81 +193,81 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     require(live == 0, "BookKeeper/not-caged");
     live = 1;
 
-    emit Uncage();
+    emit LogUncage();
   }
 
   // --- Fungibility ---
   /// @dev Add or remove collateral token balance to an address within the accounting of the protocol
-  /// @param collateralPoolId The collateral pool id
-  /// @param usr The target address
-  /// @param amount The collateral amount in [wad]
+  /// @param _collateralPoolId The collateral pool id
+  /// @param _usr The target address
+  /// @param _amount The collateral amount in [wad]
   function addCollateral(
-    bytes32 collateralPoolId,
-    address usr,
-    int256 amount
+    bytes32 _collateralPoolId,
+    address _usr,
+    int256 _amount
   ) external override nonReentrant whenNotPaused {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(_accessControlConfig.hasRole(_accessControlConfig.ADAPTER_ROLE(), msg.sender), "!adapterRole");
-    collateralToken[collateralPoolId][usr] = add(collateralToken[collateralPoolId][usr], amount);
+    collateralToken[_collateralPoolId][_usr] = add(collateralToken[_collateralPoolId][_usr], _amount);
   }
 
   /// @dev Move a balance of collateral token from a source address to a destination address within the accounting of the protocol
-  /// @param collateralPoolId the collateral pool id
-  /// @param src The source address
-  /// @param dst The destination address
-  /// @param amount The collateral amount in [wad]
+  /// @param _collateralPoolId the collateral pool id
+  /// @param _src The source address
+  /// @param _dst The destination address
+  /// @param _amount The collateral amount in [wad]
   function moveCollateral(
-    bytes32 collateralPoolId,
-    address src,
-    address dst,
-    uint256 amount
+    bytes32 _collateralPoolId,
+    address _src,
+    address _dst,
+    uint256 _amount
   ) external override nonReentrant whenNotPaused {
-    require(wish(src, msg.sender), "BookKeeper/not-allowed");
-    collateralToken[collateralPoolId][src] = sub(collateralToken[collateralPoolId][src], amount);
-    collateralToken[collateralPoolId][dst] = add(collateralToken[collateralPoolId][dst], amount);
+    require(wish(_src, msg.sender), "BookKeeper/not-allowed");
+    collateralToken[_collateralPoolId][_src] = sub(collateralToken[_collateralPoolId][_src], _amount);
+    collateralToken[_collateralPoolId][_dst] = add(collateralToken[_collateralPoolId][_dst], _amount);
   }
 
   /// @dev Move a balance of stablecoin from a source address to a destination address within the accounting of the protocol
-  /// @param src The source address
-  /// @param dst The destination address
-  /// @param value The stablecoin value in [rad]
+  /// @param _src The source address
+  /// @param _dst The destination address
+  /// @param _value The stablecoin value in [rad]
   function moveStablecoin(
-    address src,
-    address dst,
-    uint256 value
+    address _src,
+    address _dst,
+    uint256 _value
   ) external override nonReentrant whenNotPaused {
-    require(wish(src, msg.sender), "BookKeeper/not-allowed");
-    stablecoin[src] = sub(stablecoin[src], value);
-    stablecoin[dst] = add(stablecoin[dst], value);
+    require(wish(_src, msg.sender), "BookKeeper/not-allowed");
+    stablecoin[_src] = sub(stablecoin[_src], _value);
+    stablecoin[_dst] = add(stablecoin[_dst], _value);
   }
 
-  function either(bool x, bool y) internal pure returns (bool z) {
+  function either(bool _x, bool _y) internal pure returns (bool _z) {
     assembly {
-      z := or(x, y)
+      _z := or(_x, _y)
     }
   }
 
-  function both(bool x, bool y) internal pure returns (bool z) {
+  function both(bool _x, bool _y) internal pure returns (bool _z) {
     assembly {
-      z := and(x, y)
+      _z := and(_x, _y)
     }
   }
 
   // --- CDP Manipulation ---
   /// @dev Adjust a position on the target position address to perform locking/unlocking of collateral and minting/repaying of stablecoin
-  /// @param collateralPoolId Collateral pool id
-  /// @param positionAddress Address of the position
-  /// @param collateralOwner The payer/receiver of the collateral token, the collateral token must already be deposited into the protocol in case of locking the collateral
-  /// @param stablecoinOwner The payer/receiver of the stablecoin, the stablecoin must already be deposited into the protocol in case of repaying debt
-  /// @param collateralValue The value of the collateral to lock/unlock
-  /// @param debtShare The debt share of stalbecoin to mint/repay. Please pay attention that this is a debt share not debt value.
+  /// @param _collateralPoolId Collateral pool id
+  /// @param _positionAddress Address of the position
+  /// @param _collateralOwner The payer/receiver of the collateral token, the collateral token must already be deposited into the protocol in case of locking the collateral
+  /// @param _stablecoinOwner The payer/receiver of the stablecoin, the stablecoin must already be deposited into the protocol in case of repaying debt
+  /// @param _collateralValue The value of the collateral to lock/unlock
+  /// @param _debtShare The debt share of stalbecoin to mint/repay. Please pay attention that this is a debt share not debt value.
   function adjustPosition(
-    bytes32 collateralPoolId,
-    address positionAddress,
-    address collateralOwner,
-    address stablecoinOwner,
-    int256 collateralValue,
-    int256 debtShare
+    bytes32 _collateralPoolId,
+    address _positionAddress,
+    address _collateralOwner,
+    address _stablecoinOwner,
+    int256 _collateralValue,
+    int256 _debtShare
   ) external override nonReentrant whenNotPaused {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(
@@ -278,32 +278,32 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     // system is live
     require(live == 1, "BookKeeper/not-live");
 
-    Position memory position = positions[collateralPoolId][positionAddress];
+    Position memory position = positions[_collateralPoolId][_positionAddress];
 
     LocalVar memory _vars;
-    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(collateralPoolId); // [ray]
-    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(collateralPoolId); // [wad]
-    _vars.debtCeiling = ICollateralPoolConfig(collateralPoolConfig).getDebtCeiling(collateralPoolId); // [rad]
+    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(_collateralPoolId); // [ray]
+    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(_collateralPoolId); // [wad]
+    _vars.debtCeiling = ICollateralPoolConfig(collateralPoolConfig).getDebtCeiling(_collateralPoolId); // [rad]
     _vars.priceWithSafetyMargin = ICollateralPoolConfig(collateralPoolConfig).getPriceWithSafetyMargin(
-      collateralPoolId
+      _collateralPoolId
     ); // [ray]
-    _vars.debtFloor = ICollateralPoolConfig(collateralPoolConfig).getDebtFloor(collateralPoolId); // [rad]
+    _vars.debtFloor = ICollateralPoolConfig(collateralPoolConfig).getDebtFloor(_collateralPoolId); // [rad]
 
     // collateralPool has been initialised
     require(_vars.debtAccumulatedRate != 0, "BookKeeper/collateralPool-not-init");
-    position.lockedCollateral = add(position.lockedCollateral, collateralValue);
-    position.debtShare = add(position.debtShare, debtShare);
-    _vars.totalDebtShare = add(_vars.totalDebtShare, debtShare);
-    ICollateralPoolConfig(collateralPoolConfig).setTotalDebtShare(collateralPoolId, _vars.totalDebtShare);
+    position.lockedCollateral = add(position.lockedCollateral, _collateralValue);
+    position.debtShare = add(position.debtShare, _debtShare);
+    _vars.totalDebtShare = add(_vars.totalDebtShare, _debtShare);
+    ICollateralPoolConfig(collateralPoolConfig).setTotalDebtShare(_collateralPoolId, _vars.totalDebtShare);
 
-    int256 debtValue = mul(_vars.debtAccumulatedRate, debtShare);
-    uint256 positionDebtValue = mul(_vars.debtAccumulatedRate, position.debtShare);
-    totalStablecoinIssued = add(totalStablecoinIssued, debtValue);
+    int256 _debtValue = mul(_vars.debtAccumulatedRate, _debtShare);
+    uint256 _positionDebtValue = mul(_vars.debtAccumulatedRate, position.debtShare);
+    totalStablecoinIssued = add(totalStablecoinIssued, _debtValue);
 
     // either debt has decreased, or debt ceilings are not exceeded
     require(
       either(
-        debtShare <= 0,
+        _debtShare <= 0,
         both(
           mul(_vars.totalDebtShare, _vars.debtAccumulatedRate) <= _vars.debtCeiling,
           totalStablecoinIssued <= totalDebtCeiling
@@ -314,46 +314,49 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     // position is either less risky than before, or it is safe :: check work factor
     require(
       either(
-        both(debtShare <= 0, collateralValue >= 0),
-        positionDebtValue <= mul(position.lockedCollateral, _vars.priceWithSafetyMargin)
+        both(_debtShare <= 0, _collateralValue >= 0),
+        _positionDebtValue <= mul(position.lockedCollateral, _vars.priceWithSafetyMargin)
       ),
       "BookKeeper/not-safe"
     );
 
     // position is either more safe, or the owner consents
     require(
-      either(both(debtShare <= 0, collateralValue >= 0), wish(positionAddress, msg.sender)),
+      either(both(_debtShare <= 0, _collateralValue >= 0), wish(_positionAddress, msg.sender)),
       "BookKeeper/not-allowed-position-address"
     );
     // collateral src consents
-    require(either(collateralValue <= 0, wish(collateralOwner, msg.sender)), "BookKeeper/not-allowed-collateral-owner");
+    require(
+      either(_collateralValue <= 0, wish(_collateralOwner, msg.sender)),
+      "BookKeeper/not-allowed-collateral-owner"
+    );
     // debt dst consents
-    require(either(debtShare >= 0, wish(stablecoinOwner, msg.sender)), "BookKeeper/not-allowed-stablecoin-owner");
+    require(either(_debtShare >= 0, wish(_stablecoinOwner, msg.sender)), "BookKeeper/not-allowed-stablecoin-owner");
 
     // position has no debt, or a non-debtFloory amount
-    require(either(position.debtShare == 0, positionDebtValue >= _vars.debtFloor), "BookKeeper/debt-floor");
-    collateralToken[collateralPoolId][collateralOwner] = sub(
-      collateralToken[collateralPoolId][collateralOwner],
-      collateralValue
+    require(either(position.debtShare == 0, _positionDebtValue >= _vars.debtFloor), "BookKeeper/debt-floor");
+    collateralToken[_collateralPoolId][_collateralOwner] = sub(
+      collateralToken[_collateralPoolId][_collateralOwner],
+      _collateralValue
     );
-    stablecoin[stablecoinOwner] = add(stablecoin[stablecoinOwner], debtValue);
+    stablecoin[_stablecoinOwner] = add(stablecoin[_stablecoinOwner], _debtValue);
 
-    positions[collateralPoolId][positionAddress] = position;
+    positions[_collateralPoolId][_positionAddress] = position;
   }
 
   // --- CDP Fungibility ---
   /// @dev Move the collateral or stablecoin debt inside a position to another position
-  /// @param collateralPoolId Collateral pool id
-  /// @param src Source address of the position
-  /// @param dst Destination address of the position
-  /// @param collateralAmount The amount of the locked collateral to be moved
-  /// @param debtShare The debt share of stalbecoin to be moved
+  /// @param _collateralPoolId Collateral pool id
+  /// @param _src Source address of the position
+  /// @param _dst Destination address of the position
+  /// @param _collateralAmount The amount of the locked collateral to be moved
+  /// @param _debtShare The debt share of stalbecoin to be moved
   function movePosition(
-    bytes32 collateralPoolId,
-    address src,
-    address dst,
-    int256 collateralAmount,
-    int256 debtShare
+    bytes32 _collateralPoolId,
+    address _src,
+    address _dst,
+    int256 _collateralAmount,
+    int256 _debtShare
   ) external override nonReentrant whenNotPaused {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(
@@ -361,34 +364,34 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
       "!positionManagerRole"
     );
 
-    Position storage _positionSrc = positions[collateralPoolId][src];
-    Position storage _positionDst = positions[collateralPoolId][dst];
+    Position storage _positionSrc = positions[_collateralPoolId][_src];
+    Position storage _positionDst = positions[_collateralPoolId][_dst];
 
     LocalVar memory _vars;
-    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(collateralPoolId);
+    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(_collateralPoolId);
     _vars.priceWithSafetyMargin = ICollateralPoolConfig(collateralPoolConfig).getPriceWithSafetyMargin(
-      collateralPoolId
+      _collateralPoolId
     );
-    _vars.debtFloor = ICollateralPoolConfig(collateralPoolConfig).getDebtFloor(collateralPoolId);
+    _vars.debtFloor = ICollateralPoolConfig(collateralPoolConfig).getDebtFloor(_collateralPoolId);
 
-    _positionSrc.lockedCollateral = sub(_positionSrc.lockedCollateral, collateralAmount);
-    _positionSrc.debtShare = sub(_positionSrc.debtShare, debtShare);
-    _positionDst.lockedCollateral = add(_positionDst.lockedCollateral, collateralAmount);
-    _positionDst.debtShare = add(_positionDst.debtShare, debtShare);
+    _positionSrc.lockedCollateral = sub(_positionSrc.lockedCollateral, _collateralAmount);
+    _positionSrc.debtShare = sub(_positionSrc.debtShare, _debtShare);
+    _positionDst.lockedCollateral = add(_positionDst.lockedCollateral, _collateralAmount);
+    _positionDst.debtShare = add(_positionDst.debtShare, _debtShare);
 
-    uint256 utab = mul(_positionSrc.debtShare, _vars.debtAccumulatedRate);
-    uint256 vtab = mul(_positionDst.debtShare, _vars.debtAccumulatedRate);
+    uint256 _utab = mul(_positionSrc.debtShare, _vars.debtAccumulatedRate);
+    uint256 _vtab = mul(_positionDst.debtShare, _vars.debtAccumulatedRate);
 
     // both sides consent
-    require(both(wish(src, msg.sender), wish(dst, msg.sender)), "BookKeeper/not-allowed");
+    require(both(wish(_src, msg.sender), wish(_dst, msg.sender)), "BookKeeper/not-allowed");
 
     // both sides safe
-    require(utab <= mul(_positionSrc.lockedCollateral, _vars.priceWithSafetyMargin), "BookKeeper/not-safe-src");
-    require(vtab <= mul(_positionDst.lockedCollateral, _vars.priceWithSafetyMargin), "BookKeeper/not-safe-dst");
+    require(_utab <= mul(_positionSrc.lockedCollateral, _vars.priceWithSafetyMargin), "BookKeeper/not-safe-src");
+    require(_vtab <= mul(_positionDst.lockedCollateral, _vars.priceWithSafetyMargin), "BookKeeper/not-safe-dst");
 
     // both sides non-debtFloory
-    require(either(utab >= _vars.debtFloor, _positionSrc.debtShare == 0), "BookKeeper/debt-floor-src");
-    require(either(vtab >= _vars.debtFloor, _positionDst.debtShare == 0), "BookKeeper/debt-floor-dst");
+    require(either(_utab >= _vars.debtFloor, _positionSrc.debtShare == 0), "BookKeeper/debt-floor-src");
+    require(either(_vtab >= _vars.debtFloor, _positionDst.debtShare == 0), "BookKeeper/debt-floor-dst");
   }
 
   // --- CDP Confiscation ---
@@ -398,19 +401,19 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
       The stablecoin debt will be mark up on the SystemDebtEngine contract first. This would signify that the system currently has a bad debt of this amount. 
       But it will be cleared later on from a successful liquidation. If this debt is not fully liquidated, the remaining debt will stay inside SystemDebtEngine as bad debt.
   */
-  /// @param collateralPoolId Collateral pool id
-  /// @param positionAddress The position address
-  /// @param collateralCreditor The address which will temporarily own the collateral of the liquidated position; this will always be the Auctioneer
-  /// @param stablecoinDebtor The address which will be the one to be in debt for the amount of stablecoin debt of the liquidated position, this will always be the SystemDebtEngine
-  /// @param collateralAmount The amount of collateral to be confiscated [wad]
-  /// @param debtShare The debt share to be confiscated [wad]
+  /// @param _collateralPoolId Collateral pool id
+  /// @param _positionAddress The position address
+  /// @param _collateralCreditor The address which will temporarily own the collateral of the liquidated position; this will always be the Auctioneer
+  /// @param _stablecoinDebtor The address which will be the one to be in debt for the amount of stablecoin debt of the liquidated position, this will always be the SystemDebtEngine
+  /// @param _collateralAmount The amount of collateral to be confiscated [wad]
+  /// @param _debtShare The debt share to be confiscated [wad]
   function confiscatePosition(
-    bytes32 collateralPoolId,
-    address positionAddress,
-    address collateralCreditor,
-    address stablecoinDebtor,
-    int256 collateralAmount,
-    int256 debtShare
+    bytes32 _collateralPoolId,
+    address _positionAddress,
+    address _collateralCreditor,
+    address _stablecoinDebtor,
+    int256 _collateralAmount,
+    int256 _debtShare
   ) external override nonReentrant whenNotPaused {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(
@@ -418,24 +421,24 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
       "!liquidationEngineRole"
     );
 
-    Position storage position = positions[collateralPoolId][positionAddress];
+    Position storage position = positions[_collateralPoolId][_positionAddress];
     LocalVar memory _vars;
-    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(collateralPoolId);
-    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(collateralPoolId);
+    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(_collateralPoolId);
+    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(_collateralPoolId);
 
-    position.lockedCollateral = add(position.lockedCollateral, collateralAmount);
-    position.debtShare = add(position.debtShare, debtShare);
-    _vars.totalDebtShare = add(_vars.totalDebtShare, debtShare);
-    ICollateralPoolConfig(collateralPoolConfig).setTotalDebtShare(collateralPoolId, _vars.totalDebtShare);
+    position.lockedCollateral = add(position.lockedCollateral, _collateralAmount);
+    position.debtShare = add(position.debtShare, _debtShare);
+    _vars.totalDebtShare = add(_vars.totalDebtShare, _debtShare);
+    ICollateralPoolConfig(collateralPoolConfig).setTotalDebtShare(_collateralPoolId, _vars.totalDebtShare);
 
-    int256 debtValue = mul(_vars.debtAccumulatedRate, debtShare);
+    int256 _debtValue = mul(_vars.debtAccumulatedRate, _debtShare);
 
-    collateralToken[collateralPoolId][collateralCreditor] = sub(
-      collateralToken[collateralPoolId][collateralCreditor],
-      collateralAmount
+    collateralToken[_collateralPoolId][_collateralCreditor] = sub(
+      collateralToken[_collateralPoolId][_collateralCreditor],
+      _collateralAmount
     );
-    systemBadDebt[stablecoinDebtor] = sub(systemBadDebt[stablecoinDebtor], debtValue);
-    totalUnbackedStablecoin = sub(totalUnbackedStablecoin, debtValue);
+    systemBadDebt[_stablecoinDebtor] = sub(systemBadDebt[_stablecoinDebtor], _debtValue);
+    totalUnbackedStablecoin = sub(totalUnbackedStablecoin, _debtValue);
   }
 
   // --- Settlement ---
@@ -444,29 +447,29 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
       By executing this function, the SystemDebtEngine must have enough stablecoin which will come from the Surplus of the protocol.
       A successful `settleSystemBadDebt` would remove the bad debt from the system.
   */
-  /// @param value the value of stablecoin to be used to settle bad debt [rad]
-  function settleSystemBadDebt(uint256 value) external override nonReentrant whenNotPaused {
-    systemBadDebt[msg.sender] = sub(systemBadDebt[msg.sender], value);
-    stablecoin[msg.sender] = sub(stablecoin[msg.sender], value);
-    totalUnbackedStablecoin = sub(totalUnbackedStablecoin, value);
-    totalStablecoinIssued = sub(totalStablecoinIssued, value);
+  /// @param _value the value of stablecoin to be used to settle bad debt [rad]
+  function settleSystemBadDebt(uint256 _value) external override nonReentrant whenNotPaused {
+    systemBadDebt[msg.sender] = sub(systemBadDebt[msg.sender], _value);
+    stablecoin[msg.sender] = sub(stablecoin[msg.sender], _value);
+    totalUnbackedStablecoin = sub(totalUnbackedStablecoin, _value);
+    totalStablecoinIssued = sub(totalStablecoinIssued, _value);
   }
 
   /// @dev Mint unbacked stablecoin without any collateral to be used for incentives and flash mint.
-  /// @param from The address which will be the one who incur bad debt (will always be SystemDebtEngine here)
-  /// @param to The address which will receive the minted stablecoin
-  /// @param value The value of stablecoin to be minted [rad]
+  /// @param _from The address which will be the one who incur bad debt (will always be SystemDebtEngine here)
+  /// @param _to The address which will receive the minted stablecoin
+  /// @param _value The value of stablecoin to be minted [rad]
   function mintUnbackedStablecoin(
-    address from,
-    address to,
-    uint256 value
+    address _from,
+    address _to,
+    uint256 _value
   ) external override nonReentrant whenNotPaused {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(_accessControlConfig.hasRole(_accessControlConfig.MINTABLE_ROLE(), msg.sender), "!mintableRole");
-    systemBadDebt[from] = add(systemBadDebt[from], value);
-    stablecoin[to] = add(stablecoin[to], value);
-    totalUnbackedStablecoin = add(totalUnbackedStablecoin, value);
-    totalStablecoinIssued = add(totalStablecoinIssued, value);
+    systemBadDebt[_from] = add(systemBadDebt[_from], _value);
+    stablecoin[_to] = add(stablecoin[_to], _value);
+    totalUnbackedStablecoin = add(totalUnbackedStablecoin, _value);
+    totalStablecoinIssued = add(totalStablecoinIssued, _value);
   }
 
   // --- Rates ---
@@ -476,13 +479,13 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
       The higher the `debtAccumulatedRate` means the minter of the stablecoin will beed to pay back the debt with higher amount.
       The point of Stability Fee is to collect a surplus amount from minters and this is technically done by incrementing the `debtAccumulatedRate` overtime.
   */
-  /// @param collateralPoolId Collateral pool id
-  /// @param stabilityFeeRecipient The address which will receive the surplus from Stability Fee. This will always be SystemDebtEngine who will use the surplus to settle bad debt.
-  /// @param debtAccumulatedRate The difference value of `debtAccumulatedRate` which will be added to the current value of `debtAccumulatedRate`. [ray]
+  /// @param _collateralPoolId Collateral pool id
+  /// @param _stabilityFeeRecipient The address which will receive the surplus from Stability Fee. This will always be SystemDebtEngine who will use the surplus to settle bad debt.
+  /// @param _debtAccumulatedRate The difference value of `debtAccumulatedRate` which will be added to the current value of `debtAccumulatedRate`. [ray]
   function accrueStabilityFee(
-    bytes32 collateralPoolId,
-    address stabilityFeeRecipient,
-    int256 debtAccumulatedRate
+    bytes32 _collateralPoolId,
+    address _stabilityFeeRecipient,
+    int256 _debtAccumulatedRate
   ) external override nonReentrant whenNotPaused {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(
@@ -491,13 +494,13 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     );
     require(live == 1, "BookKeeper/not-live");
     LocalVar memory _vars;
-    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(collateralPoolId);
-    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(collateralPoolId);
+    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(_collateralPoolId);
+    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(_collateralPoolId);
 
-    _vars.debtAccumulatedRate = add(_vars.debtAccumulatedRate, debtAccumulatedRate);
-    ICollateralPoolConfig(collateralPoolConfig).setDebtAccumulatedRate(collateralPoolId, _vars.debtAccumulatedRate);
-    int256 value = mul(_vars.totalDebtShare, debtAccumulatedRate); // [rad]
-    stablecoin[stabilityFeeRecipient] = add(stablecoin[stabilityFeeRecipient], value);
-    totalStablecoinIssued = add(totalStablecoinIssued, value);
+    _vars.debtAccumulatedRate = add(_vars.debtAccumulatedRate, _debtAccumulatedRate);
+    ICollateralPoolConfig(collateralPoolConfig).setDebtAccumulatedRate(_collateralPoolId, _vars.debtAccumulatedRate);
+    int256 _value = mul(_vars.totalDebtShare, _debtAccumulatedRate); // [rad]
+    stablecoin[_stabilityFeeRecipient] = add(stablecoin[_stabilityFeeRecipient], _value);
+    totalStablecoinIssued = add(totalStablecoinIssued, _value);
   }
 }

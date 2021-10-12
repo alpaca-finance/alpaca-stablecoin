@@ -78,10 +78,10 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   uint256 internal toTokenConversionFactor;
 
   /// @notice Events
-  event Deposit(uint256 _val);
-  event Withdraw(uint256 _val);
-  event EmergencyWithdaraw();
-  event MoveStake(address indexed _src, address indexed _dst, uint256 _wad);
+  event LogDeposit(uint256 _val);
+  event LogWithdraw(uint256 _val);
+  event LogEmergencyWithdaraw();
+  event LogMoveStake(address indexed _src, address indexed _dst, uint256 _wad);
 
   modifier onlyOwner() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
@@ -308,7 +308,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
 
     fairlaunch.deposit(address(this), pid, _amount);
 
-    emit Deposit(_amount);
+    emit LogDeposit(_amount);
   }
 
   /// @dev Harvest and withdraw ibToken from FairLaunch
@@ -355,7 +355,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
       stake[_positionAddress] = sub(stake[_positionAddress], _share);
     }
     rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
-    emit Withdraw(_amount);
+    emit LogWithdraw(_amount);
   }
 
   /// @dev EMERGENCY ONLY. Withdraw ibToken from FairLaunch with invoking "_harvest"
@@ -379,7 +379,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     totalShare = sub(totalShare, _share);
     stake[_positionAddress] = sub(stake[_positionAddress], _share);
     rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
-    emit EmergencyWithdaraw();
+    emit LogEmergencyWithdaraw();
   }
 
   function moveStake(
@@ -430,7 +430,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
       stake[_destination] <= add(bookKeeper.collateralToken(collateralPoolId, _destination), _lockedCollateral),
       "IbTokenAdapter/stake[destination] > collateralTokens + lockedCollateral"
     );
-    emit MoveStake(_source, _destination, _share);
+    emit LogMoveStake(_source, _destination, _share);
   }
 
   /// @dev Hook function when PositionManager adjust position.
@@ -469,7 +469,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     require(live == 1, "IbTokenAdapter/not-live");
     fairlaunch.emergencyWithdraw(pid);
     live = 0;
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
@@ -481,7 +481,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     require(live == 0, "IbTokenAdapter/not-caged");
     fairlaunch.deposit(address(this), pid, totalShare);
     live = 1;
-    emit Uncage();
+    emit LogUncage();
   }
 
   // --- pause ---
@@ -489,7 +489,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -499,7 +499,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

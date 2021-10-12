@@ -48,10 +48,10 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
     keccak256("BookKeeperFlashBorrower.onBookKeeperFlashLoan");
 
   // --- Events ---
-  event SetMax(uint256 _data);
-  event SetFeeRate(uint256 _data);
-  event FlashLoan(address indexed _receiver, address _token, uint256 _amount, uint256 _fee);
-  event BookKeeperFlashLoan(address indexed _receiver, uint256 _amount, uint256 _fee);
+  event LogSetMax(uint256 _data);
+  event LogSetFeeRate(uint256 _data);
+  event LogFlashLoan(address indexed _receiver, address _token, uint256 _amount, uint256 _fee);
+  event LogBookKeeperFlashLoan(address indexed _receiver, uint256 _amount, uint256 _fee);
 
   modifier lock() {
     require(locked == 0, "FlashMintModule/reentrancy-guard");
@@ -91,12 +91,12 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
   function setMax(uint256 _data) external onlyOwner {
     // Add an upper limit of 10^27 Stablecoin to avoid breaking technical assumptions of Stablecoin << 2^256 - 1
     require((max = _data) <= RAD, "FlashMintModule/ceiling-too-high");
-    emit SetMax(_data);
+    emit LogSetMax(_data);
   }
 
   function setFeeRate(uint256 _data) external onlyOwner {
     feeRate = _data;
-    emit SetFeeRate(_data);
+    emit LogSetFeeRate(_data);
   }
 
   // --- ERC 3156 Spec ---
@@ -130,7 +130,7 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
     bookKeeper.mintUnbackedStablecoin(address(this), address(this), _amt);
     stablecoinAdapter.withdraw(address(_receiver), _amount, abi.encode(0));
 
-    emit FlashLoan(address(_receiver), _token, _amount, _fee);
+    emit LogFlashLoan(address(_receiver), _token, _amount, _fee);
 
     require(
       _receiver.onFlashLoan(msg.sender, _token, _amount, _fee, _data) == CALLBACK_SUCCESS,
@@ -157,7 +157,7 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
 
     bookKeeper.mintUnbackedStablecoin(address(this), address(_receiver), _amount);
 
-    emit BookKeeperFlashLoan(address(_receiver), _amount, _fee);
+    emit LogBookKeeperFlashLoan(address(_receiver), _amount, _fee);
 
     require(
       _receiver.onBookKeeperFlashLoan(msg.sender, _amount, _fee, _data) == CALLBACK_SUCCESS_BOOK_KEEPER_STABLE_COIN,
