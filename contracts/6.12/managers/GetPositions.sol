@@ -29,9 +29,9 @@ contract GetPositions is Initializable {
       bytes32[] memory collateralPools
     )
   {
-    uint256 count = PositionManager(_manager).ownerPositionCount(_user);
-    uint256 id = PositionManager(_manager).ownerFirstPositionId(_user);
-    return _getPositionsAsc(_manager, id, count);
+    uint256 _count = PositionManager(_manager).ownerPositionCount(_user);
+    uint256 _id = PositionManager(_manager).ownerFirstPositionId(_user);
+    return _getPositionsAsc(_manager, _id, _count);
   }
 
   function getPositionsAsc(
@@ -66,15 +66,15 @@ contract GetPositions is Initializable {
     ids = new uint256[](_size);
     positions = new address[](_size);
     collateralPools = new bytes32[](_size);
-    uint256 i = 0;
-    uint256 id = _fromId;
+    uint256 _i = 0;
+    uint256 _id = _fromId;
 
-    while (id > 0 && i < _size) {
-      ids[i] = id;
-      positions[i] = PositionManager(_manager).positions(id);
-      collateralPools[i] = PositionManager(_manager).collateralPools(id);
-      (, id) = PositionManager(_manager).list(id);
-      i++;
+    while (_id > 0 && _i < _size) {
+      ids[_i] = _id;
+      positions[_i] = PositionManager(_manager).positions(_id);
+      collateralPools[_i] = PositionManager(_manager).collateralPools(_id);
+      (, _id) = PositionManager(_manager).list(_id);
+      _i++;
     }
   }
 
@@ -87,9 +87,9 @@ contract GetPositions is Initializable {
       bytes32[] memory
     )
   {
-    uint256 count = PositionManager(_manager).ownerPositionCount(_user);
-    uint256 id = PositionManager(_manager).ownerLastPositionId(_user);
-    return _getPositionsDesc(_manager, id, count);
+    uint256 _count = PositionManager(_manager).ownerPositionCount(_user);
+    uint256 _id = PositionManager(_manager).ownerLastPositionId(_user);
+    return _getPositionsDesc(_manager, _id, _count);
   }
 
   function getPositionsDesc(
@@ -124,15 +124,15 @@ contract GetPositions is Initializable {
     ids = new uint256[](_size);
     positions = new address[](_size);
     collateralPools = new bytes32[](_size);
-    uint256 i = 0;
-    uint256 id = _fromId;
+    uint256 _i = 0;
+    uint256 _id = _fromId;
 
-    while (id > 0 && i < _size) {
-      ids[i] = id;
-      positions[i] = PositionManager(_manager).positions(id);
-      collateralPools[i] = PositionManager(_manager).collateralPools(id);
-      (id, ) = PositionManager(_manager).list(id);
-      i++;
+    while (_id > 0 && _i < _size) {
+      ids[_i] = _id;
+      positions[_i] = PositionManager(_manager).positions(_id);
+      collateralPools[_i] = PositionManager(_manager).collateralPools(_id);
+      (_id, ) = PositionManager(_manager).list(_id);
+      _i++;
     }
   }
 
@@ -152,7 +152,7 @@ contract GetPositions is Initializable {
     if (_startIndex.add(_offset) > PositionManager(_manager).lastPositionId())
       _offset = PositionManager(_manager).lastPositionId().sub(_startIndex).add(1);
 
-    IBookKeeper bookKeeper = IBookKeeper(PositionManager(_manager).bookKeeper());
+    IBookKeeper _bookKeeper = IBookKeeper(PositionManager(_manager).bookKeeper());
     positions = new address[](_offset);
     debtShares = new uint256[](_offset);
     safetyBuffers = new uint256[](_offset);
@@ -162,12 +162,12 @@ contract GetPositions is Initializable {
       positions[_resultIndex] = PositionManager(_manager).positions(_positionIndex);
 
       bytes32 _collateralPoolId = PositionManager(_manager).collateralPools(_positionIndex);
-      (uint256 _lockedCollateral, uint256 _debtShare) = bookKeeper.positions(
+      (uint256 _lockedCollateral, uint256 _debtShare) = _bookKeeper.positions(
         _collateralPoolId,
         positions[_resultIndex]
       );
 
-      ICollateralPoolConfig collateralPoolConfig = ICollateralPoolConfig(bookKeeper.collateralPoolConfig());
+      ICollateralPoolConfig collateralPoolConfig = ICollateralPoolConfig(_bookKeeper.collateralPoolConfig());
 
       uint256 safetyBuffer = calculateSafetyBuffer(
         _debtShare,
@@ -194,8 +194,8 @@ contract GetPositions is Initializable {
       uint256 _safetyBuffer // [rad]
     )
   {
-    uint256 collateralValue = _lockedCollateral.mul(_priceWithSafetyMargin);
-    uint256 debtValue = _debtShare.mul(_debtAccumulatedRate);
-    _safetyBuffer = collateralValue >= debtValue ? collateralValue.sub(debtValue) : 0;
+    uint256 _collateralValue = _lockedCollateral.mul(_priceWithSafetyMargin);
+    uint256 _debtValue = _debtShare.mul(_debtAccumulatedRate);
+    _safetyBuffer = _collateralValue >= _debtValue ? _collateralValue.sub(_debtValue) : 0;
   }
 }
