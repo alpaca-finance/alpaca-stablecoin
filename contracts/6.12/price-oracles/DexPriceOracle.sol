@@ -7,9 +7,9 @@ import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@alpaca-finance/alpaca-contract/contracts/6/protocol/apis/pancakeV2/PancakeLibraryV2.sol";
 import "../interfaces/IAlpacaOracle.sol";
 
-contract SimpleDexPriceOracle is PausableUpgradeable, AccessControlUpgradeable, IAlpacaOracle {
+contract DexPriceOracle is PausableUpgradeable, AccessControlUpgradeable, IAlpacaOracle {
   using SafeMathUpgradeable for uint256;
-  address dexFactory;
+  address public dexFactory;
 
   struct PriceData {
     uint192 price;
