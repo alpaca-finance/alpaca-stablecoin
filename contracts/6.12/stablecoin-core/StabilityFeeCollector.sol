@@ -27,8 +27,6 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IStabilityFeeCollector.sol";
 
-import "hardhat/console.sol";
-
 /// @title StabilityFeeCollector
 /// @author Alpaca Fin Corporation
 /** @notice A contract which acts as a collector for the stability fee.
@@ -182,9 +180,6 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
       rpow(add(globalStabilityFeeRate, _stabilityFeeRate), now - _lastAccumulationTime, RAY),
       _previousDebtAccumulatedRate
     );
-    console.log("now - collateralPools[collateralPool].lastAccumulationTime", now - _lastAccumulationTime);
-    console.log("debtAccumulatedRate", _debtAccumulatedRate);
-    console.log("previousDebtAccumulatedRate", _previousDebtAccumulatedRate);
     bookKeeper.accrueStabilityFee(
       _collateralPoolId,
       systemDebtEngine,

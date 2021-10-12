@@ -119,150 +119,150 @@ describe("StabilityFeeCollector", () => {
         await stabilityFeeCollectorAsAlice.collect(formatBytes32String("BNB"))
         const { calls } = mockedBookKeeper.smocked.accrueStabilityFee
         expect(calls.length).to.be.equal(1)
-        expect(calls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(calls[0].stabilityFeeRecipient).to.be.equal(AddressZero)
+        expect(calls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(calls[0]._stabilityFeeRecipient).to.be.equal(AddressZero)
         // rate ~ 0.01 ray ~ 1%
         AssertHelpers.assertAlmostEqual(
-          calls[0].debtAccumulatedRate.toString(),
+          calls[0]._debtAccumulatedRate.toString(),
           BigNumber.from("10000000000000000000000000").toString()
         )
       })
     })
   })
 
-  // describe("#setGlobalStabilityFeeRate", () => {
-  //   context("when the caller is not the owner", async () => {
-  //     it("should revert", async () => {
-  //       await expect(stabilityFeeCollectorAsAlice.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad)).to.be.revertedWith(
-  //         "!ownerRole"
-  //       )
-  //     })
-  //   })
-  //   context("when the caller is the owner", async () => {
-  //     it("should be able to call setGlobalStabilityFeeRate", async () => {
-  //       await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
+  describe("#setGlobalStabilityFeeRate", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
 
-  //       await expect(stabilityFeeCollector.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad))
-  //         .to.emit(stabilityFeeCollector, "LogSetGlobalStabilityFeeRate")
-  //         .withArgs(deployerAddress, UnitHelpers.WeiPerWad)
-  //     })
-  //   })
-  // })
+        await expect(stabilityFeeCollectorAsAlice.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad)).to.be.revertedWith(
+          "!ownerRole"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setGlobalStabilityFeeRate", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-  // describe("#setSystemDebtEngine", () => {
-  //   context("when the caller is not the owner", async () => {
-  //     it("should revert", async () => {
-  //       await expect(stabilityFeeCollectorAsAlice.setSystemDebtEngine(bookKeeper.address)).to.be.revertedWith(
-  //         "!ownerRole"
-  //       )
-  //     })
-  //   })
-  //   context("when the caller is the owner", async () => {
-  //     it("should be able to call setSystemDebtEngine", async () => {
-  //       await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
+        await expect(stabilityFeeCollector.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad))
+          .to.emit(stabilityFeeCollector, "LogSetGlobalStabilityFeeRate")
+          .withArgs(deployerAddress, UnitHelpers.WeiPerWad)
+      })
+    })
+  })
 
-  //       await expect(stabilityFeeCollector.setSystemDebtEngine(bookKeeper.address))
-  //         .to.emit(stabilityFeeCollector, "LogSetSystemDebtEngine")
-  //         .withArgs(deployerAddress, bookKeeper.address)
-  //     })
-  //   })
-  // })
+  describe("#setSystemDebtEngine", () => {
+    context("when the caller is not the owner", async () => {
+      it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
 
-  // describe("#setStabilityFeeRate", () => {
-  //   context("when the caller is not the owner", async () => {
-  //     it("should revert", async () => {
-  //       await expect(
-  //         collateralPoolConfigAsAlice.setStabilityFeeRate(
-  //           formatBytes32String("BNB"),
-  //           BigNumber.from("1000000000315522921573372069")
-  //         )
-  //       ).to.be.revertedWith("!ownerRole")
-  //     })
-  //   })
-  //   context("when the caller is the owner", async () => {
-  //     it("should be able to call setStabilityFeeRate", async () => {
-  //       await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
+        await expect(stabilityFeeCollectorAsAlice.setSystemDebtEngine(mockedBookKeeper.address)).to.be.revertedWith(
+          "!ownerRole"
+        )
+      })
+    })
+    context("when the caller is the owner", async () => {
+      it("should be able to call setSystemDebtEngine", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-  //       await expect(
-  //         collateralPoolConfig.setStabilityFeeRate(
-  //           formatBytes32String("BNB"),
-  //           BigNumber.from("1000000000315522921573372069")
-  //         )
-  //       )
-  //         .to.emit(collateralPoolConfig, "LogSetStabilityFeeRate")
-  //         .withArgs(deployerAddress, formatBytes32String("BNB"), BigNumber.from("1000000000315522921573372069"))
-  //     })
-  //   })
-  // })
+        await expect(stabilityFeeCollector.setSystemDebtEngine(mockedBookKeeper.address))
+          .to.emit(stabilityFeeCollector, "LogSetSystemDebtEngine")
+          .withArgs(deployerAddress, mockedBookKeeper.address)
+      })
+    })
+  })
 
-  // describe("#pause", () => {
-  //   context("when role can't access", () => {
-  //     it("should revert", async () => {
-  //       await expect(stabilityFeeCollectorAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
-  //     })
-  //   })
+  describe("#pause", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
 
-  //   context("when role can access", () => {
-  //     context("and role is owner role", () => {
-  //       it("should be success", async () => {
-  //         await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
-  //         await stabilityFeeCollector.pause()
-  //       })
-  //     })
-  //   })
+        await expect(stabilityFeeCollectorAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
+      })
+    })
 
-  //   context("and role is gov role", () => {
-  //     it("should be success", async () => {
-  //       await accessControlConfig.grantRole(await accessControlConfig.GOV_ROLE(), deployerAddress)
-  //       await stabilityFeeCollector.pause()
-  //     })
-  //   })
-  // })
+    context("when role can access", () => {
+      context("and role is owner role", () => {
+        it("should be success", async () => {
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-  // describe("#unpause", () => {
-  //   context("when role can't access", () => {
-  //     it("should revert", async () => {
-  //       await expect(stabilityFeeCollectorAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
-  //     })
-  //   })
+          await stabilityFeeCollector.pause()
+        })
+      })
+    })
 
-  //   context("when role can access", () => {
-  //     context("and role is owner role", () => {
-  //       it("should be success", async () => {
-  //         await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
-  //         await stabilityFeeCollector.pause()
-  //         await stabilityFeeCollector.unpause()
-  //       })
-  //     })
+    context("and role is gov role", () => {
+      it("should be success", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-  //     context("and role is gov role", () => {
-  //       it("should be success", async () => {
-  //         await accessControlConfig.grantRole(await accessControlConfig.GOV_ROLE(), deployerAddress)
-  //         await stabilityFeeCollector.pause()
-  //         await stabilityFeeCollector.unpause()
-  //       })
-  //     })
-  //   })
+        await stabilityFeeCollector.pause()
+      })
+    })
+  })
 
-  //   context("when unpause contract", () => {
-  //     it("should be success", async () => {
-  //       await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
+  describe("#unpause", () => {
+    context("when role can't access", () => {
+      it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
 
-  //       // pause contract
-  //       await stabilityFeeCollector.pause()
+        await expect(stabilityFeeCollectorAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
+      })
+    })
 
-  //       // unpause contract
-  //       await stabilityFeeCollector.unpause()
+    context("when role can access", () => {
+      context("and role is owner role", () => {
+        it("should be success", async () => {
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-  //       await expect(
-  //         collateralPoolConfig.setStabilityFeeRate(
-  //           formatBytes32String("BNB"),
-  //           BigNumber.from("1000000000315522921573372069")
-  //         )
-  //       )
-  //         .to.emit(collateralPoolConfig, "LogSetStabilityFeeRate")
-  //         .withArgs(deployerAddress, formatBytes32String("BNB"), BigNumber.from("1000000000315522921573372069"))
-  //     })
-  //   })
-  // })
+          await stabilityFeeCollector.pause()
+          await stabilityFeeCollector.unpause()
+        })
+      })
+
+      context("and role is gov role", () => {
+        it("should be success", async () => {
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
+          await stabilityFeeCollector.pause()
+          await stabilityFeeCollector.unpause()
+        })
+      })
+    })
+
+    context("when unpause contract", () => {
+      it("should be success", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
+        // pause contract
+        await stabilityFeeCollector.pause()
+
+        // unpause contract
+        await stabilityFeeCollector.unpause()
+
+        await stabilityFeeCollector.collect(formatBytes32String("BNB"))
+      })
+    })
+  })
 })
