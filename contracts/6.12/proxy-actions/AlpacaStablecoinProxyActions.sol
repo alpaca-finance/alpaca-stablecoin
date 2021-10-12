@@ -26,23 +26,23 @@ contract AlpacaStablecoinProxyActions {
   uint256 internal constant RAY = 10**27;
 
   /// @dev Internal functions
-  function _safeSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x - y) <= x, "sub-overflow");
+  function _safeSub(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x - _y) <= _x, "sub-overflow");
   }
 
-  function _safeToInt(uint256 x) internal pure returns (int256 y) {
-    y = int256(x);
-    require(y >= 0, "int-overflow");
+  function _safeToInt(uint256 _x) internal pure returns (int256 _y) {
+    _y = int256(_x);
+    require(_y >= 0, "int-overflow");
   }
 
   /// @notice Internal functions
   /// @dev Safe multiplication to prevent uint overflow
-  function _safeMul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y == 0 || (z = x * y) / y == x, "mul-overflow");
+  function _safeMul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x, "mul-overflow");
   }
 
   function _toRad(uint256 _wad) internal pure returns (uint256 _rad) {
-    _rad = _safeMul(_wad, 10**27);
+    _rad = _safeMul(_wad, RAY);
   }
 
   function convertTo18(address _tokenAdapter, uint256 _amt) internal returns (uint256 _wad) {
@@ -985,30 +985,30 @@ contract AlpacaStablecoinProxyActions {
     address _stablecoinAdapter,
     uint256 _positionId,
     uint256 _collateralAmount, // [in token decimal]
-    bytes calldata data
+    bytes calldata _data
   ) external {
-    wipeAllAndUnlockToken(_manager, _tokenAdapter, _stablecoinAdapter, _positionId, _collateralAmount, data);
+    wipeAllAndUnlockToken(_manager, _tokenAdapter, _stablecoinAdapter, _positionId, _collateralAmount, _data);
     ibTokenToToken(_vault, convertTo18(_tokenAdapter, _collateralAmount));
   }
 
   function harvest(
-    address manager,
-    address tokenAdapter,
-    uint256 positionId,
-    address harvestTo,
-    address harvestToken
+    address _manager,
+    address _tokenAdapter,
+    uint256 _positionId,
+    address _harvestTo,
+    address _harvestToken
   ) external {
-    address positionAddress = IManager(manager).positions(positionId);
-    IGenericTokenAdapter(tokenAdapter).deposit(positionAddress, 0, abi.encode(harvestTo));
-    transfer(harvestToken, msg.sender, harvestToken.myBalance());
+    address _positionAddress = IManager(_manager).positions(_positionId);
+    IGenericTokenAdapter(_tokenAdapter).deposit(_positionAddress, 0, abi.encode(_harvestTo));
+    transfer(_harvestToken, msg.sender, _harvestToken.myBalance());
   }
 
   function redeemLockedCollateral(
-    address manager,
-    uint256 positionId,
-    address tokenAdapter,
-    bytes calldata data
+    address _manager,
+    uint256 _positionId,
+    address _tokenAdapter,
+    bytes calldata _data
   ) external {
-    IManager(manager).redeemLockedCollateral(positionId, tokenAdapter, address(this), data);
+    IManager(_manager).redeemLockedCollateral(_positionId, _tokenAdapter, address(this), _data);
   }
 }

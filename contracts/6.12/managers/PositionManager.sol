@@ -103,12 +103,12 @@ contract PositionManager is PausableUpgradeable, IManager {
     showStopper = _showStopper;
   }
 
-  function _safeAdd(uint256 _x, uint256 _y) internal pure returns (uint256 z) {
-    require((z = _x + _y) >= _x, "add overflow");
+  function _safeAdd(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x, "add overflow");
   }
 
-  function _safeSub(uint256 _x, uint256 _y) internal pure returns (uint256 z) {
-    require((z = _x - _y) <= _x, "sub overflow");
+  function _safeSub(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x - _y) <= _x, "sub overflow");
   }
 
   function _safeToInt(uint256 _x) internal pure returns (int256 _y) {

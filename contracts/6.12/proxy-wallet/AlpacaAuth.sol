@@ -17,8 +17,8 @@ pragma solidity 0.6.12;
 import "../interfaces/IAuth.sol";
 
 contract AlpacaAuthEvents {
-  event LogSetAuthority(address indexed authority);
-  event LogSetOwner(address indexed owner);
+  event LogSetAuthority(address indexed _authority);
+  event LogSetOwner(address indexed _owner);
 }
 
 contract AlpacaAuth is AlpacaAuthEvents {
@@ -30,13 +30,13 @@ contract AlpacaAuth is AlpacaAuthEvents {
     emit LogSetOwner(msg.sender);
   }
 
-  function setOwner(address owner_) public auth {
-    owner = owner_;
+  function setOwner(address _owner) public auth {
+    owner = _owner;
     emit LogSetOwner(owner);
   }
 
-  function setAuthority(IAuthority authority_) public auth {
-    authority = authority_;
+  function setAuthority(IAuthority _authority) public auth {
+    authority = _authority;
     emit LogSetAuthority(address(authority));
   }
 
@@ -45,15 +45,15 @@ contract AlpacaAuth is AlpacaAuthEvents {
     _;
   }
 
-  function isAuthorized(address src, bytes4 sig) internal view returns (bool) {
-    if (src == address(this)) {
+  function isAuthorized(address _src, bytes4 _sig) internal view returns (bool) {
+    if (_src == address(this)) {
       return true;
-    } else if (src == owner) {
+    } else if (_src == owner) {
       return true;
     } else if (address(authority) == address(0)) {
       return false;
     } else {
-      return authority.canCall(src, address(this), sig);
+      return authority.canCall(_src, address(this), _sig);
     }
   }
 }

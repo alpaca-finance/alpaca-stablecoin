@@ -39,12 +39,12 @@ abstract contract FlashLoanReceiverBase is IBookKeeperFlashBorrower, IERC3156Fla
     return mul(_wad, RAY);
   }
 
-  function add(uint256 _x, uint256 _y) internal pure returns (uint256 z) {
-    require((z = _x + _y) >= _x);
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x);
   }
 
-  function mul(uint256 _x, uint256 _y) internal pure returns (uint256 z) {
-    require(_y == 0 || (z = _x * _y) / _y == _x);
+  function mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x);
   }
 
   // --- Helper Functions ---

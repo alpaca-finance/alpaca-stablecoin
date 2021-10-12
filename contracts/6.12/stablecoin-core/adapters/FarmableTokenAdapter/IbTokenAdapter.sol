@@ -78,10 +78,10 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   uint256 internal toTokenConversionFactor;
 
   /// @notice Events
-  event Deposit(uint256 val);
-  event Withdraw(uint256 val);
+  event Deposit(uint256 _val);
+  event Withdraw(uint256 _val);
   event EmergencyWithdaraw();
-  event MoveStake(address indexed src, address indexed dst, uint256 wad);
+  event MoveStake(address indexed _src, address indexed _dst, uint256 _wad);
 
   modifier onlyOwner() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
@@ -107,8 +107,8 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     // 2. Sanity checks
-    (address stakeToken, , , , ) = IAlpacaFairLaunch(_fairlaunch).poolInfo(_pid);
-    require(stakeToken == _collateralToken, "IbTokenAdapter/collateralToken-not-match");
+    (address _stakeToken, , , , ) = IAlpacaFairLaunch(_fairlaunch).poolInfo(_pid);
+    require(_stakeToken == _collateralToken, "IbTokenAdapter/collateralToken-not-match");
     require(IAlpacaFairLaunch(_fairlaunch).alpaca() == _rewardToken, "IbTokenAdapter/reward-token-not-match");
     require(IAlpacaFairLaunch(_fairlaunch).owner() == _shield, "IbTokenAdapter/shield-not-match");
     require(IShield(_shield).owner() == _timelock, "IbTokenAdapter/timelock-not-match");
@@ -139,54 +139,54 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     address(collateralToken).safeApprove(address(fairlaunch), uint256(-1));
   }
 
-  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x + y) >= x, "ds-math-add-overflow");
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x, "ds-math-add-overflow");
   }
 
-  function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x - y) <= x, "ds-math-sub-underflow");
+  function sub(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x - _y) <= _x, "ds-math-sub-underflow");
   }
 
-  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y == 0 || (z = x * y) / y == x, "ds-math-mul-overflow");
+  function mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x, "ds-math-mul-overflow");
   }
 
-  function div(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y > 0, "ds-math-div-by-zero");
-    z = x / y;
+  function div(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y > 0, "ds-math-div-by-zero");
+    _z = _x / _y;
   }
 
-  function divup(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = add(x, sub(y, 1)) / y;
+  function divup(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = add(_x, sub(_y, 1)) / _y;
   }
 
-  function wmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = mul(x, y) / WAD;
+  function wmul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = mul(_x, _y) / WAD;
   }
 
-  function wdiv(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = mul(x, WAD) / y;
+  function wdiv(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = mul(_x, WAD) / _y;
   }
 
-  function wdivup(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = divup(mul(x, WAD), y);
+  function wdivup(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = divup(mul(_x, WAD), _y);
   }
 
-  function rmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = mul(x, y) / RAY;
+  function rmul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = mul(_x, _y) / RAY;
   }
 
-  function rmulup(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = divup(mul(x, y), RAY);
+  function rmulup(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = divup(mul(_x, _y), RAY);
   }
 
-  function rdiv(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = mul(x, RAY) / y;
+  function rdiv(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = mul(_x, RAY) / _y;
   }
 
   function setTreasuryFeeBps(uint256 _treasuryFeeBps) external onlyOwner {
     require(live == 1, "IbTokenAdapter/not-live");
-    require(treasuryFeeBps <= 5000, "IbTokenAdapter/bad treasury fee bps");
+    require(_treasuryFeeBps <= 5000, "IbTokenAdapter/bad treasury fee bps");
     treasuryFeeBps = _treasuryFeeBps;
   }
 
@@ -249,210 +249,210 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   }
 
   /// @dev For FE to query pending rewards of a given positionAddress
-  /// @param positionAddress The address that you want to check pending ALPACA
-  function pendingRewards(address positionAddress) external view returns (uint256) {
-    return _pendingRewards(positionAddress, fairlaunch.pendingAlpaca(pid, address(this)));
+  /// @param _positionAddress The address that you want to check pending ALPACA
+  function pendingRewards(address _positionAddress) external view returns (uint256) {
+    return _pendingRewards(_positionAddress, fairlaunch.pendingAlpaca(pid, address(this)));
   }
 
   /// @dev Return the amount of rewards to be harvested for a giving position address
-  /// @param positionAddress The position address
-  /// @param pending The pending rewards from staking contract
-  function _pendingRewards(address positionAddress, uint256 pending) internal view returns (uint256) {
+  /// @param _positionAddress The position address
+  /// @param _pending The pending rewards from staking contract
+  function _pendingRewards(address _positionAddress, uint256 _pending) internal view returns (uint256) {
     if (totalShare == 0) return 0;
-    uint256 toBeHarvested = sub(add(pending, rewardToken.balanceOf(address(this))), accRewardBalance);
-    uint256 pendingAccRewardPerShare = add(accRewardPerShare, rdiv(toBeHarvested, totalShare));
-    return sub(rmul(stake[positionAddress], pendingAccRewardPerShare), rewardDebts[positionAddress]);
+    uint256 _toBeHarvested = sub(add(_pending, rewardToken.balanceOf(address(this))), accRewardBalance);
+    uint256 _pendingAccRewardPerShare = add(accRewardPerShare, rdiv(_toBeHarvested, totalShare));
+    return sub(rmul(stake[_positionAddress], _pendingAccRewardPerShare), rewardDebts[_positionAddress]);
   }
 
   /// @dev Harvest and deposit received ibToken to FairLaunch
-  /// @param positionAddress The address that holding states of the position
-  /// @param amount The ibToken amount that being used as a collateral and to be deposited to FairLaunch
-  /// @param data The extra data that may needs to execute the deposit
+  /// @param _positionAddress The address that holding states of the position
+  /// @param _amount The ibToken amount that being used as a collateral and to be deposited to FairLaunch
+  /// @param _data The extra data that may needs to execute the deposit
   function deposit(
-    address positionAddress,
-    uint256 amount,
-    bytes calldata data
+    address _positionAddress,
+    uint256 _amount,
+    bytes calldata _data
   ) external payable override nonReentrant whenNotPaused {
-    _deposit(positionAddress, amount, data);
+    _deposit(_positionAddress, _amount, _data);
   }
 
   /// @dev Harvest rewardTokens and distribute to user,
   /// deposit collateral tokens to staking contract, and update BookKeeper
-  /// @param positionAddress The position address to be updated
-  /// @param amount The amount to be deposited
-  /// @param data The extra data information pass along to this adapter
+  /// @param _positionAddress The position address to be updated
+  /// @param _amount The amount to be deposited
+  /// @param _data The extra data information pass along to this adapter
   function _deposit(
-    address positionAddress,
-    uint256 amount,
-    bytes calldata data
+    address _positionAddress,
+    uint256 _amount,
+    bytes calldata _data
   ) private {
     require(live == 1, "IbTokenAdapter/not live");
 
     // Try to decode user address for harvested rewards from calldata
     // if the user address is not passed, then send zero address to `harvest` and let it handle
-    address user = address(0);
-    if (data.length > 0) user = abi.decode(data, (address));
-    harvest(positionAddress, user);
+    address _user = address(0);
+    if (_data.length > 0) _user = abi.decode(_data, (address));
+    harvest(_positionAddress, _user);
 
-    if (amount > 0) {
-      uint256 share = wdiv(mul(amount, to18ConversionFactor), netAssetPerShare()); // [wad]
+    if (_amount > 0) {
+      uint256 _share = wdiv(mul(_amount, to18ConversionFactor), netAssetPerShare()); // [wad]
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
-      require(int256(share) > 0, "IbTokenAdapter/share-overflow");
-      address(collateralToken).safeTransferFrom(msg.sender, address(this), amount);
-      bookKeeper.addCollateral(collateralPoolId, positionAddress, int256(share));
-      totalShare = add(totalShare, share);
-      stake[positionAddress] = add(stake[positionAddress], share);
+      require(int256(_share) > 0, "IbTokenAdapter/share-overflow");
+      address(collateralToken).safeTransferFrom(msg.sender, address(this), _amount);
+      bookKeeper.addCollateral(collateralPoolId, _positionAddress, int256(_share));
+      totalShare = add(totalShare, _share);
+      stake[_positionAddress] = add(stake[_positionAddress], _share);
     }
-    rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
+    rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
 
-    fairlaunch.deposit(address(this), pid, amount);
+    fairlaunch.deposit(address(this), pid, _amount);
 
-    emit Deposit(amount);
+    emit Deposit(_amount);
   }
 
   /// @dev Harvest and withdraw ibToken from FairLaunch
-  /// @param positionAddress The address that holding states of the position
-  /// @param amount The ibToken amount to be withdrawn from FairLaunch and return to user
-  /// @param data The extra data that may needs to execute the withdraw
+  /// @param _positionAddress The address that holding states of the position
+  /// @param _amount The ibToken amount to be withdrawn from FairLaunch and return to user
+  /// @param _data The extra data that may needs to execute the withdraw
   function withdraw(
-    address positionAddress,
-    uint256 amount,
-    bytes calldata data
+    address _positionAddress,
+    uint256 _amount,
+    bytes calldata _data
   ) external override nonReentrant whenNotPaused {
     if (live == 1) {
-      fairlaunch.withdraw(address(this), pid, amount);
+      fairlaunch.withdraw(address(this), pid, _amount);
     }
-    _withdraw(positionAddress, amount, data);
+    _withdraw(_positionAddress, _amount, _data);
   }
 
   /// @dev Harvest rewardTokens and distribute to user,
   /// withdraw collateral tokens from staking contract, and update BookKeeper
-  /// @param positionAddress The position address to be updated
-  /// @param amount The amount to be deposited
-  /// @param data The extra data information pass along to this adapter
+  /// @param _positionAddress The position address to be updated
+  /// @param _amount The amount to be deposited
+  /// @param _data The extra data information pass along to this adapter
   function _withdraw(
-    address positionAddress,
-    uint256 amount,
-    bytes calldata data
+    address _positionAddress,
+    uint256 _amount,
+    bytes calldata _data
   ) private {
     // Try to decode user address for harvested rewards from calldata
     // if the user address is not passed, then send zero address to `harvest` and let it handle
-    address user = address(0);
-    if (data.length > 0) user = abi.decode(data, (address));
-    harvest(positionAddress, user);
+    address _user = address(0);
+    if (_data.length > 0) _user = abi.decode(_data, (address));
+    harvest(_positionAddress, _user);
 
-    if (amount > 0) {
-      uint256 share = wdivup(mul(amount, to18ConversionFactor), netAssetPerShare()); // [wad]
+    if (_amount > 0) {
+      uint256 _share = wdivup(mul(_amount, to18ConversionFactor), netAssetPerShare()); // [wad]
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
-      require(int256(share) > 0, "IbTokenAdapter/share-overflow");
-      require(stake[positionAddress] >= share, "IbTokenAdapter/insufficient staked amount");
+      require(int256(_share) > 0, "IbTokenAdapter/share-overflow");
+      require(stake[_positionAddress] >= _share, "IbTokenAdapter/insufficient staked amount");
 
-      address(collateralToken).safeTransfer(user, amount);
-      bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(share));
-      totalShare = sub(totalShare, share);
-      stake[positionAddress] = sub(stake[positionAddress], share);
+      address(collateralToken).safeTransfer(_user, _amount);
+      bookKeeper.addCollateral(collateralPoolId, _positionAddress, -int256(_share));
+      totalShare = sub(totalShare, _share);
+      stake[_positionAddress] = sub(stake[_positionAddress], _share);
     }
-    rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
-    emit Withdraw(amount);
+    rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
+    emit Withdraw(_amount);
   }
 
   /// @dev EMERGENCY ONLY. Withdraw ibToken from FairLaunch with invoking "_harvest"
-  function emergencyWithdraw(address positionAddress, address to) external nonReentrant whenNotPaused {
+  function emergencyWithdraw(address _positionAddress, address _to) external nonReentrant whenNotPaused {
     if (live == 1) {
-      uint256 amount = bookKeeper.collateralToken(collateralPoolId, positionAddress);
-      fairlaunch.withdraw(address(this), pid, amount);
+      uint256 _amount = bookKeeper.collateralToken(collateralPoolId, _positionAddress);
+      fairlaunch.withdraw(address(this), pid, _amount);
     }
-    _emergencyWithdraw(positionAddress, to);
+    _emergencyWithdraw(_positionAddress, _to);
   }
 
   /// @dev EMERGENCY ONLY. Withdraw collateralTokens from staking contract without invoking _harvest
-  /// @param positionAddress The positionAddress to do emergency withdraw
-  /// @param to The address to received collateralTokens
-  function _emergencyWithdraw(address positionAddress, address to) private {
-    uint256 share = bookKeeper.collateralToken(collateralPoolId, positionAddress); //[wad]
-    require(share <= 2**255, "IbTokenAdapter/share-overflow");
-    uint256 amount = wmul(wmul(share, netAssetPerShare()), toTokenConversionFactor);
-    address(collateralToken).safeTransfer(to, amount);
-    bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(share));
-    totalShare = sub(totalShare, share);
-    stake[positionAddress] = sub(stake[positionAddress], share);
-    rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
+  /// @param _positionAddress The positionAddress to do emergency withdraw
+  /// @param _to The address to received collateralTokens
+  function _emergencyWithdraw(address _positionAddress, address _to) private {
+    uint256 _share = bookKeeper.collateralToken(collateralPoolId, _positionAddress); //[wad]
+    require(_share <= 2**255, "IbTokenAdapter/share-overflow");
+    uint256 _amount = wmul(wmul(_share, netAssetPerShare()), toTokenConversionFactor);
+    address(collateralToken).safeTransfer(_to, _amount);
+    bookKeeper.addCollateral(collateralPoolId, _positionAddress, -int256(_share));
+    totalShare = sub(totalShare, _share);
+    stake[_positionAddress] = sub(stake[_positionAddress], _share);
+    rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
     emit EmergencyWithdaraw();
   }
 
   function moveStake(
-    address source,
-    address destination,
-    uint256 share,
-    bytes calldata data
+    address _source,
+    address _destination,
+    uint256 _share,
+    bytes calldata _data
   ) external override nonReentrant whenNotPaused {
-    _moveStake(source, destination, share, data);
+    _moveStake(_source, _destination, _share, _data);
   }
 
   /// @dev Move wad amount of staked balance from source to destination.
   /// Can only be moved if underlaying assets make sense.
-  /// @param source The address to be moved staked balance from
-  /// @param destination The address to be moved staked balance to
-  /// @param share The amount of staked balance to be moved
+  /// @param _source The address to be moved staked balance from
+  /// @param _destination The address to be moved staked balance to
+  /// @param _share The amount of staked balance to be moved
   function _moveStake(
-    address source,
-    address destination,
-    uint256 share,
+    address _source,
+    address _destination,
+    uint256 _share,
     bytes calldata /* data */
   ) private {
     // 1. Update collateral tokens for source and destination
-    uint256 stakedAmount = stake[source];
-    stake[source] = sub(stakedAmount, share);
-    stake[destination] = add(stake[destination], share);
+    uint256 _stakedAmount = stake[_source];
+    stake[_source] = sub(_stakedAmount, _share);
+    stake[_destination] = add(stake[_destination], _share);
     // 2. Update source's rewardDebt due to collateral tokens have
     // moved from source to destination. Hence, rewardDebt should be updated.
     // rewardDebtDiff is how many rewards has been paid for that share.
-    uint256 rewardDebt = rewardDebts[source];
-    uint256 rewardDebtDiff = mul(rewardDebt, share) / stakedAmount;
+    uint256 _rewardDebt = rewardDebts[_source];
+    uint256 _rewardDebtDiff = mul(_rewardDebt, _share) / _stakedAmount;
     // 3. Update rewardDebts for both source and destination
     // Safe since rewardDebtDiff <= rewardDebts[source]
-    rewardDebts[source] = rewardDebt - rewardDebtDiff;
-    rewardDebts[destination] = add(rewardDebts[destination], rewardDebtDiff);
+    rewardDebts[_source] = _rewardDebt - _rewardDebtDiff;
+    rewardDebts[_destination] = add(rewardDebts[_destination], _rewardDebtDiff);
     // 4. Sanity check.
     // - stake[source] must more than or equal to collateral + lockedCollateral that source has
     // to prevent a case where someone try to steal stake from source
     // - stake[destination] must less than or eqal to collateral + lockedCollateral that destination has
     // to prevent destination from claim stake > actual collateral that he has
-    (uint256 lockedCollateral, ) = bookKeeper.positions(collateralPoolId, source);
+    (uint256 _lockedCollateral, ) = bookKeeper.positions(collateralPoolId, _source);
     require(
-      stake[source] >= add(bookKeeper.collateralToken(collateralPoolId, source), lockedCollateral),
+      stake[_source] >= add(bookKeeper.collateralToken(collateralPoolId, _source), _lockedCollateral),
       "IbTokenAdapter/stake[source] < collateralTokens + lockedCollateral"
     );
-    (lockedCollateral, ) = bookKeeper.positions(collateralPoolId, destination);
+    (_lockedCollateral, ) = bookKeeper.positions(collateralPoolId, _destination);
     require(
-      stake[destination] <= add(bookKeeper.collateralToken(collateralPoolId, destination), lockedCollateral),
+      stake[_destination] <= add(bookKeeper.collateralToken(collateralPoolId, _destination), _lockedCollateral),
       "IbTokenAdapter/stake[destination] > collateralTokens + lockedCollateral"
     );
-    emit MoveStake(source, destination, share);
+    emit MoveStake(_source, _destination, _share);
   }
 
   /// @dev Hook function when PositionManager adjust position.
   function onAdjustPosition(
-    address source,
-    address destination,
-    int256 collateralValue,
+    address _source,
+    address _destination,
+    int256 _collateralValue,
     int256, /* debtShare */
-    bytes calldata data
+    bytes calldata _data
   ) external override nonReentrant whenNotPaused {
-    uint256 unsignedCollateralValue = collateralValue < 0 ? uint256(-collateralValue) : uint256(collateralValue);
-    _moveStake(source, destination, unsignedCollateralValue, data);
+    uint256 _unsignedCollateralValue = _collateralValue < 0 ? uint256(-_collateralValue) : uint256(_collateralValue);
+    _moveStake(_source, _destination, _unsignedCollateralValue, _data);
   }
 
   function onMoveCollateral(
-    address source,
-    address destination,
-    uint256 share,
-    bytes calldata data
+    address _source,
+    address _destination,
+    uint256 _share,
+    bytes calldata _data
   ) external override nonReentrant whenNotPaused {
-    _deposit(source, 0, data);
-    _moveStake(source, destination, share, data);
+    _deposit(_source, 0, _data);
+    _moveStake(_source, _destination, _share, _data);
   }
 
   /// @dev Pause ibTokenAdapter when assumptions change
