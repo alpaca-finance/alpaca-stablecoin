@@ -50,12 +50,14 @@
     "@nomiclabs/hardhat-etherscan": "^2.1.1",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@openzeppelin/contracts": "3.4",
+    "@openzeppelin/contracts-ethereum-package": "^3.0.0",
     "@openzeppelin/contracts-upgradeable": "^3.4.0",
     "@openzeppelin/hardhat-upgrades": "^1.9.0",
     "@openzeppelin/test-helpers": "^0.5.10",
     "@pancakeswap-libs/pancake-swap-core": "^0.1.0",
     "@typechain/ethers-v5": "^5.0.0",
     "@types/chai": "^4.2.15",
+    "@types/luxon": "^2.0.4",
     "@types/mocha": "^8.2.0",
     "@types/node": "^14.14.28",
     "chai": "^4.3.0",
@@ -68,6 +70,7 @@
     "hardhat": "^2.0.10",
     "hardhat-deploy": "^0.7.0-beta.45",
     "hardhat-typechain": "^0.3.5",
+    "luxon": "^2.0.2",
     "prettier": "^2.3.0",
     "prettier-plugin-solidity": "^1.0.0-beta.10",
     "solhint": "^3.3.4",
@@ -89,9 +92,5 @@
   ],
   "engines": {
     "node": ">=12"
-  },
-  "dependencies": {
-    "@types/luxon": "^2.0.4",
-    "luxon": "^2.0.2"
   }
 }
