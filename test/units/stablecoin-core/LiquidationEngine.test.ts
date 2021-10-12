@@ -275,7 +275,7 @@ describe("LiquidationEngine", () => {
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
 
-          await expect(liquidationEngineAsAlice.cage()).to.emit(liquidationEngineAsAlice, "Cage").withArgs()
+          await expect(liquidationEngineAsAlice.cage()).to.emit(liquidationEngineAsAlice, "LogCage").withArgs()
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
         })
@@ -289,7 +289,7 @@ describe("LiquidationEngine", () => {
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
 
-          await expect(liquidationEngineAsAlice.cage()).to.emit(liquidationEngineAsAlice, "Cage").withArgs()
+          await expect(liquidationEngineAsAlice.cage()).to.emit(liquidationEngineAsAlice, "LogCage").withArgs()
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
         })
@@ -321,7 +321,7 @@ describe("LiquidationEngine", () => {
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
 
-          await expect(liquidationEngineAsAlice.uncage()).to.emit(liquidationEngineAsAlice, "Uncage").withArgs()
+          await expect(liquidationEngineAsAlice.uncage()).to.emit(liquidationEngineAsAlice, "LogUncage").withArgs()
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
         })
@@ -339,7 +339,7 @@ describe("LiquidationEngine", () => {
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
 
-          await expect(liquidationEngineAsAlice.uncage()).to.emit(liquidationEngineAsAlice, "Uncage").withArgs()
+          await expect(liquidationEngineAsAlice.uncage()).to.emit(liquidationEngineAsAlice, "LogUncage").withArgs()
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
         })
