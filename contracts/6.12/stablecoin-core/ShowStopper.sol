@@ -228,10 +228,21 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
   }
 
   // --- Administration ---
+  event SetBookKeeper(address indexed caller, address _bookKeeper);
   event SetLiquidationEngine(address indexed caller, address _liquidationEngine);
   event SetSystemDebtEngine(address indexed caller, address _systemDebtEngine);
   event SetPriceOracle(address indexed caller, address _priceOracle);
   event SetCageCoolDown(address indexed caller, uint256 _cageCoolDown);
+
+  function setBookKeeper(address _bookKeeper) external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    require(live == 1, "ShowStopper/not-live");
+
+    IBookKeeper(_bookKeeper).totalStablecoinIssued(); // Sanity Check Call
+    bookKeeper = IBookKeeper(_bookKeeper);
+    emit SetBookKeeper(msg.sender, _bookKeeper);
+  }
 
   function setLiquidationEngine(address _liquidationEngine) external {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
