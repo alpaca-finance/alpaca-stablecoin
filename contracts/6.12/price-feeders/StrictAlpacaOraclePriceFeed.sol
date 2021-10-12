@@ -6,11 +6,10 @@ import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IAlpacaOracle.sol";
+import "../interfaces/IAccessControlConfig.sol";
 
 contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPriceFeed {
   using SafeMathUpgradeable for uint256;
-
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
   struct AlpacaOracleConfig {
     IAlpacaOracle alpacaOracle;
@@ -26,6 +25,8 @@ contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgrad
   uint256 public priceLife; // [seconds] how old the price is considered stale, default 1 day
   uint256 public maxPriceDiff; // [basis point] ie. 5% diff = 10500 (105%)
 
+  IAccessControlConfig public accessControlConfig;
+
   // --- Init ---
   function initialize(
     address _primaryAlpacaOracle,
@@ -33,14 +34,11 @@ contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgrad
     address _primaryToken1,
     address _secondaryAlpacaOracle,
     address _secondaryToken0,
-    address _secondaryToken1
+    address _secondaryToken1,
+    address _accessControlConfig
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
-
-    // Grant the contract deployer OWNER role: it will be able
-    // to grant and revoke any roles afterward
-    _setupRole(OWNER_ROLE, msg.sender);
 
     primary.alpacaOracle = IAlpacaOracle(_primaryAlpacaOracle);
     primary.token0 = _primaryToken0;
@@ -56,13 +54,23 @@ contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgrad
 
     priceLife = 1 days;
     maxPriceDiff = 10500;
+
+    accessControlConfig = IAccessControlConfig(_accessControlConfig);
   }
 
   modifier onlyOwner() {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     _;
   }
 
+  modifier onlyOwnerOrGov() {
+    require(
+      accessControlConfig.hasRole(accessControlConfig.GOV_ROLE(), msg.sender) ||
+        accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _;
+  }
   event LogSetPriceLife(address indexed caller, uint256 second);
   event LogSetMaxPriceDiff(address indexed caller, uint256 maxPriceDiff);
 
@@ -76,11 +84,11 @@ contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgrad
     emit LogSetMaxPriceDiff(msg.sender, _maxPriceDiff);
   }
 
-  function pause() external onlyOwner {
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external onlyOwner {
+  function unpause() external onlyOwnerOrGov {
     _unpause();
   }
 
