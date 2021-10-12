@@ -17,14 +17,15 @@
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+
 import "../interfaces/IStablecoin.sol";
 
 // FIXME: This contract was altered compared to the production version.
 // It doesn't use LibNote anymore.
 // New deployments of this contract will need to include custom events (TO DO).
 
-contract AlpacaStablecoin is IStablecoin, AccessControl {
+contract AlpacaStablecoin is IStablecoin, AccessControlUpgradeable {
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
@@ -56,11 +57,14 @@ contract AlpacaStablecoin is IStablecoin, AccessControl {
   // bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address holder,address spender,uint256 nonce,uint256 expiry,bool allowed)");
   bytes32 public constant PERMIT_TYPEHASH = 0xea2aa0a1be11a07ed86d755c93467f4f82362b452371d1ba94d1715123511acb;
 
-  constructor(
+  // --- Init ---
+  function initialize(
     string memory _name,
     string memory _symbol,
     uint256 _chainId
-  ) public {
+  ) external initializer {
+    AccessControlUpgradeable.__AccessControl_init();
+
     name = _name;
     symbol = _symbol;
 
