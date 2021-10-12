@@ -430,7 +430,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
   /// @dev Redeem all the stablecoin in the stablecoinAccumulator of the caller into the corresponding collateral token
   /// @param _collateralPoolId Collateral pool id
   /// @param _amount the amount of stablecoin to be redeemed [wad]
-  function LogredeemStablecoin(bytes32 _collateralPoolId, uint256 _amount) external {
+  function redeemStablecoin(bytes32 _collateralPoolId, uint256 _amount) external {
     require(finalCashPrice[_collateralPoolId] != 0, "ShowStopper/final-cash-price-collateral-pool-id-not-defined");
     bookKeeper.moveCollateral(
       _collateralPoolId,

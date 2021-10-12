@@ -173,7 +173,7 @@ describe("ShowStopper", () => {
         await showStopper.setSystemDebtEngine(mockedSystemDebtEngine.address)
         await showStopper.setPriceOracle(mockedPriceOracle.address)
 
-        await expect(showStopper["cage()"]()).to.emit(showStopper, "Cage()").withArgs()
+        await expect(showStopper["cage()"]()).to.emit(showStopper, "LogCage()").withArgs()
 
         expect(await showStopper.live()).to.be.equal(0)
       })
@@ -231,7 +231,7 @@ describe("ShowStopper", () => {
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
 
           await expect(showStopper["cage(bytes32)"](formatBytes32String("BNB")))
-            .to.emit(showStopper, "Cage(bytes32)")
+            .to.emit(showStopper, "LogCage(bytes32)")
             .withArgs(formatBytes32String("BNB"))
 
           expect(await showStopper.live()).to.be.equal(0)
@@ -363,7 +363,7 @@ describe("ShowStopper", () => {
                 "0x"
               )
             )
-              .to.emit(showStopper, "RedeemLockedCollateral")
+              .to.emit(showStopper, "LogRedeemLockedCollateral")
               .withArgs(formatBytes32String("BNB"), deployerAddress, UnitHelpers.WeiPerRay)
 
             const { calls: positions } = mockedBookKeeper.smocked.positions
@@ -374,10 +374,10 @@ describe("ShowStopper", () => {
             expect(positions[0][1]).to.be.equal(deployerAddress)
 
             expect(confiscatePosition.length).to.be.equal(1)
-            expect(confiscatePosition[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-            expect(confiscatePosition[0].positionAddress).to.be.equal(deployerAddress)
-            expect(confiscatePosition[0].collateralCreditor).to.be.equal(deployerAddress)
-            expect(confiscatePosition[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerRay.mul("-1"))
+            expect(confiscatePosition[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+            expect(confiscatePosition[0]._positionAddress).to.be.equal(deployerAddress)
+            expect(confiscatePosition[0]._collateralCreditor).to.be.equal(deployerAddress)
+            expect(confiscatePosition[0]._collateralAmount).to.be.equal(UnitHelpers.WeiPerRay.mul("-1"))
           })
         })
 
@@ -422,7 +422,7 @@ describe("ShowStopper", () => {
                   "0x"
                 )
               )
-                .to.emit(showStopper, "RedeemLockedCollateral")
+                .to.emit(showStopper, "LogRedeemLockedCollateral")
                 .withArgs(formatBytes32String("BNB"), aliceAddress, UnitHelpers.WeiPerRay)
 
               const { calls: positions } = mockedBookKeeper.smocked.positions
@@ -432,10 +432,10 @@ describe("ShowStopper", () => {
               expect(positions[0][1]).to.be.equal(aliceAddress)
 
               expect(confiscatePosition.length).to.be.equal(1)
-              expect(confiscatePosition[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-              expect(confiscatePosition[0].collateralCreditor).to.be.equal(aliceAddress)
-              expect(confiscatePosition[0].positionAddress).to.be.equal(aliceAddress)
-              expect(confiscatePosition[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerRay.mul("-1"))
+              expect(confiscatePosition[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+              expect(confiscatePosition[0]._collateralCreditor).to.be.equal(aliceAddress)
+              expect(confiscatePosition[0]._positionAddress).to.be.equal(aliceAddress)
+              expect(confiscatePosition[0]._collateralAmount).to.be.equal(UnitHelpers.WeiPerRay.mul("-1"))
             })
           }
         )
@@ -488,7 +488,7 @@ describe("ShowStopper", () => {
             mockedBookKeeper.smocked.totalStablecoinIssued.will.return.with(UnitHelpers.WeiPerRay)
             mockedBookKeeper.smocked.stablecoin.will.return.with(BigNumber.from("0"))
 
-            await expect(showStopper.finalizeDebt()).to.emit(showStopper, "FinalizeDebt").withArgs()
+            await expect(showStopper.finalizeDebt()).to.emit(showStopper, "LogFinalizeDebt").withArgs()
           })
         })
       })
@@ -540,7 +540,7 @@ describe("ShowStopper", () => {
           mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(UnitHelpers.WeiPerWad)
 
           await expect(showStopper.finalizeCashPrice(formatBytes32String("BNB")))
-            .to.emit(showStopper, "FinalizeCashPrice")
+            .to.emit(showStopper, "LogFinalizeCashPrice")
             .withArgs(formatBytes32String("BNB"))
         })
       })
@@ -567,7 +567,7 @@ describe("ShowStopper", () => {
           mockedBookKeeper.smocked.moveStablecoin.will.return.with()
 
           await expect(showStopper.accumulateStablecoin(UnitHelpers.WeiPerWad))
-            .to.emit(showStopper, "AccumulateStablecoin")
+            .to.emit(showStopper, "LogAccumulateStablecoin")
             .withArgs(deployerAddress, UnitHelpers.WeiPerWad)
         })
       })
@@ -620,16 +620,16 @@ describe("ShowStopper", () => {
             mockedBookKeeper.smocked.moveCollateral.will.return.with()
 
             await expect(showStopper.redeemStablecoin(formatBytes32String("BNB"), UnitHelpers.WeiPerWad))
-              .to.emit(showStopper, "RedeemStablecoin")
+              .to.emit(showStopper, "LogRedeemStablecoin")
               .withArgs(formatBytes32String("BNB"), deployerAddress, UnitHelpers.WeiPerWad)
 
             const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
 
             expect(moveCollateral.length).to.be.equal(1)
-            expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-            expect(moveCollateral[0].src).to.be.equal(showStopper.address)
-            expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-            expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerRay)
+            expect(moveCollateral[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+            expect(moveCollateral[0]._src).to.be.equal(showStopper.address)
+            expect(moveCollateral[0]._dst).to.be.equal(deployerAddress)
+            expect(moveCollateral[0]._amount).to.be.equal(UnitHelpers.WeiPerRay)
           })
         })
 
@@ -649,16 +649,16 @@ describe("ShowStopper", () => {
             mockedBookKeeper.smocked.moveCollateral.will.return.with()
 
             await expect(showStopper.redeemStablecoin(formatBytes32String("BNB"), UnitHelpers.WeiPerWad))
-              .to.emit(showStopper, "RedeemStablecoin")
+              .to.emit(showStopper, "LogRedeemStablecoin")
               .withArgs(formatBytes32String("BNB"), deployerAddress, UnitHelpers.WeiPerWad)
 
             const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
 
             expect(moveCollateral.length).to.be.equal(1)
-            expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-            expect(moveCollateral[0].src).to.be.equal(showStopper.address)
-            expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-            expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerRay)
+            expect(moveCollateral[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+            expect(moveCollateral[0]._src).to.be.equal(showStopper.address)
+            expect(moveCollateral[0]._dst).to.be.equal(deployerAddress)
+            expect(moveCollateral[0]._amount).to.be.equal(UnitHelpers.WeiPerRay)
           })
         })
       })
@@ -695,7 +695,7 @@ describe("ShowStopper", () => {
 
           // set total debt ceiling 1 rad
           await expect(showStopper.setBookKeeper(mockedBookKeeper.address))
-            .to.emit(showStopper, "SetBookKeeper")
+            .to.emit(showStopper, "LogSetBookKeeper")
             .withArgs(deployerAddress, mockedBookKeeper.address)
         })
       })
@@ -736,7 +736,7 @@ describe("ShowStopper", () => {
 
           // set total debt ceiling 1 rad
           await expect(showStopper.setLiquidationEngine(mockedLiquidationEngine.address))
-            .to.emit(showStopper, "SetLiquidationEngine")
+            .to.emit(showStopper, "LogSetLiquidationEngine")
             .withArgs(deployerAddress, mockedLiquidationEngine.address)
         })
       })
@@ -777,7 +777,7 @@ describe("ShowStopper", () => {
 
           // set total debt ceiling 1 rad
           await expect(showStopper.setSystemDebtEngine(mockedSystemDebtEngine.address))
-            .to.emit(showStopper, "SetSystemDebtEngine")
+            .to.emit(showStopper, "LogSetSystemDebtEngine")
             .withArgs(deployerAddress, mockedSystemDebtEngine.address)
         })
       })
@@ -814,7 +814,7 @@ describe("ShowStopper", () => {
 
           // set total debt ceiling 1 rad
           await expect(showStopper.setPriceOracle(mockedPriceOracle.address))
-            .to.emit(showStopper, "SetPriceOracle")
+            .to.emit(showStopper, "LogSetPriceOracle")
             .withArgs(deployerAddress, mockedPriceOracle.address)
         })
       })
