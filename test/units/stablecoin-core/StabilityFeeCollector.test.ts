@@ -108,12 +108,11 @@ describe("StabilityFeeCollector", () => {
         )
 
         // time increase 1 year
+        mockedCollateralPoolConfig.smocked.getLastAccumulationTime.will.return.with(await TimeHelpers.latest())
         await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from("31536000")))
         // mock bookeeper
         // set debtAccumulatedRate = 1 ray
         mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(UnitHelpers.WeiPerRay)
-
-        await stabilityFeeCollectorAsAlice.collect(formatBytes32String("BNB"))
 
         // rate ~ 0.01 ray ~ 1%
         mockedBookKeeper.smocked.accrueStabilityFee.will.return.with()
