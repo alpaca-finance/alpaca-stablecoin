@@ -22,15 +22,6 @@ import "../../interfaces/IManager.sol";
 contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardUpgradeable, ILiquidationStrategy {
   using SafeMathUpgradeable for uint256;
 
-  bytes32 public constant OWNER_ROLE = 0x00;
-
-  struct CollateralPool {
-    IGenericTokenAdapter adapter;
-    uint256 closeFactorBps; // Percentage (BPS) of how much  of debt could be liquidated in a single liquidation
-    uint256 liquidatorIncentiveBps; // Percentage (BPS) of how much additional collateral will be given to the liquidator incentive
-    uint256 treasuryFeesBps; // Percentage (BPS) of how much additional collateral will be transferred to the treasury
-  }
-
   struct LiquidationInfo {
     uint256 positionDebtShare; // [wad]
     uint256 positionCollateralAmount; // [wad]
@@ -41,6 +32,14 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     uint256 collateralAmountToBeLiquidated; // [wad]
     uint256 treasuryFees; // [wad]
     uint256 maxLiquidatableDebtShare; // [rad]
+  }
+
+  struct LocalVars {
+    uint256 debtAccumulatedRate; // [ray]
+    uint256 closeFactorBps;
+    uint256 liquidatorIncentiveBps;
+    uint256 debtFloor; // [rad]
+    uint256 treasuryFeesBps;
   }
 
   // --- Data ---
@@ -111,15 +110,17 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
   // --- Setter ---
   function setPositionManager(address _positionManager) external {
-    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     positionManager = IManager(_positionManager);
     emit LogSetPositionManager(msg.sender, _positionManager);
   }
 
   function setFlashLendingEnabled(uint256 _flashLendingEnabled) external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
-      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
-        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     flashLendingEnabled = _flashLendingEnabled;
@@ -128,9 +129,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
   // get the price directly from the PriceOracle
   function getFeedPrice(bytes32 collateralPoolId) internal view returns (uint256 feedPrice) {
-    address _priceFeedAddress = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
-      .collateralPools(collateralPoolId)
-      .priceFeed;
+    address _priceFeedAddress = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getPriceFeed(collateralPoolId);
     IPriceFeed _priceFeed = IPriceFeed(_priceFeedAddress);
     (bytes32 price, bool priceOk) = _priceFeed.peekPrice();
     require(priceOk, "FixedSpreadLiquidationStrategy/invalid-price");
@@ -145,15 +144,27 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     uint256 _positionCollateralAmount,
     uint256 _positionDebtShare
   ) internal view returns (LiquidationInfo memory info) {
-    ICollateralPoolConfig.CollateralPool memory _collateralPool = ICollateralPoolConfig(
-      bookKeeper.collateralPoolConfig()
-    ).collateralPools(_collateralPoolId);
-    uint256 _positionDebtValue = _positionDebtShare.mul(_collateralPool.debtAccumulatedRate);
+    LocalVars memory _vars;
+    _vars.debtAccumulatedRate = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getDebtAccumulatedRate(
+      _collateralPoolId
+    ); // [ray]
+    _vars.closeFactorBps = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getCloseFactorBps(
+      _collateralPoolId
+    );
+    _vars.liquidatorIncentiveBps = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getLiquidatorIncentiveBps(
+      _collateralPoolId
+    );
+    _vars.debtFloor = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getDebtFloor(_collateralPoolId); // [rad]
+    _vars.treasuryFeesBps = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getTreasuryFeesBps(
+      _collateralPoolId
+    );
+
+    uint256 _positionDebtValue = _positionDebtShare.mul(_vars.debtAccumulatedRate);
 
     // Calculate max liquidatable debt value based on the close factor
     // (_positionDebtShare [wad] * closeFactorBps [bps]) / 10000
-    require(_collateralPool.closeFactorBps > 0, "FixedSpreadLiquidationStrategy/close-factor-bps-not-set");
-    info.maxLiquidatableDebtShare = _positionDebtShare.mul(_collateralPool.closeFactorBps).div(10000); // [wad]
+    require(_vars.closeFactorBps > 0, "FixedSpreadLiquidationStrategy/close-factor-bps-not-set");
+    info.maxLiquidatableDebtShare = _positionDebtShare.mul(_vars.closeFactorBps).div(10000); // [wad]
 
     // Choose to use the minimum amount between `_debtValueToBeLiquidated` and `_maxLiquidatableDebtShare`
     // to not exceed the close factor
@@ -161,13 +172,13 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
       ? info.maxLiquidatableDebtShare
       : _debtShareToBeLiquidated; // [wad]
     // actualDebtShareToBeLiquidated [wad] * _debtAccumulatedRate [ray]
-    info.actualDebtValueToBeLiquidated = info.actualDebtShareToBeLiquidated.mul(_collateralPool.debtAccumulatedRate); // [rad]
+    info.actualDebtValueToBeLiquidated = info.actualDebtShareToBeLiquidated.mul(_vars.debtAccumulatedRate); // [rad]
 
     // Calculate the max collateral amount to be liquidated by taking all the fees into account
     // ( actualDebtValueToBeLiquidated [rad] * liquidatorIncentiveBps [bps] / 10000 / _currentCollateralPrice [ray]
     uint256 _maxCollateralAmountToBeLiquidated = info
       .actualDebtValueToBeLiquidated
-      .mul(_collateralPool.liquidatorIncentiveBps)
+      .mul(_vars.liquidatorIncentiveBps)
       .div(10000)
       .div(_currentCollateralPrice); // [wad]
 
@@ -179,8 +190,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
       _maxCollateralAmountToBeLiquidated > _positionCollateralAmount ||
       // If the remaining collateral amount value in stablecoin is smaller than `debtFloor`
       // (_positionCollateralAmount [wad] - _maxCollateralAmountToBeLiquidated [wad]) * _currentCollateralPrice [ray] = [rad]
-      _positionCollateralAmount.sub(_maxCollateralAmountToBeLiquidated).mul(_currentCollateralPrice) <
-      _collateralPool.debtFloor
+      _positionCollateralAmount.sub(_maxCollateralAmountToBeLiquidated).mul(_currentCollateralPrice) < _vars.debtFloor
     ) {
       // Full Collateral Liquidation
       // Take all collateral amount of the position
@@ -191,13 +201,13 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
       // (_currentCollateralPrice [ray] * _positionCollateralAmount [wad]) * 10000 / liquidatorIncentiveBps [bps])
 
       info.actualDebtValueToBeLiquidated = _currentCollateralPrice.mul(_positionCollateralAmount).mul(10000).div(
-        _collateralPool.liquidatorIncentiveBps
+        _vars.liquidatorIncentiveBps
       ); // [rad]
     } else {
       // If the remaining debt after liquidation is smaller than `debtFloor`
       if (
         _positionDebtValue > info.actualDebtValueToBeLiquidated &&
-        _positionDebtValue.sub(info.actualDebtValueToBeLiquidated) < _collateralPool.debtFloor
+        _positionDebtValue.sub(info.actualDebtValueToBeLiquidated) < _vars.debtFloor
       ) {
         // Full Debt Liquidation
         info.actualDebtValueToBeLiquidated = _positionDebtValue; // [rad]
@@ -206,7 +216,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
         info.collateralAmountToBeLiquidated = info
           .actualDebtValueToBeLiquidated
           .div(10000)
-          .mul(_collateralPool.liquidatorIncentiveBps)
+          .mul(_vars.liquidatorIncentiveBps)
           .div(_currentCollateralPrice); // [wad]
       } else {
         // Partial Liquidation
@@ -214,14 +224,14 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
       }
     }
 
-    info.actualDebtShareToBeLiquidated = info.actualDebtValueToBeLiquidated.div(_collateralPool.debtAccumulatedRate); // [wad]
+    info.actualDebtShareToBeLiquidated = info.actualDebtValueToBeLiquidated.div(_vars.debtAccumulatedRate); // [wad]
 
     // collateralAmountToBeLiquidated - (collateralAmountToBeLiquidated * 10000 / liquidatorIncentiveBps)
     uint256 liquidatorIncentiveCollectedFromPosition = info.collateralAmountToBeLiquidated.sub(
-      info.collateralAmountToBeLiquidated.mul(10000).div(_collateralPool.liquidatorIncentiveBps)
+      info.collateralAmountToBeLiquidated.mul(10000).div(_vars.liquidatorIncentiveBps)
     ); // [wad]
 
-    info.treasuryFees = liquidatorIncentiveCollectedFromPosition.mul(_collateralPool.treasuryFeesBps).div(10000); // [wad]
+    info.treasuryFees = liquidatorIncentiveCollectedFromPosition.mul(_vars.treasuryFeesBps).div(10000); // [wad]
   }
 
   function execute(
@@ -280,7 +290,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     address _positionOwnerAddress = positionManager.mapPositionHandlerToOwner(_positionAddress);
     if (_positionOwnerAddress == address(0)) _positionOwnerAddress = _positionAddress;
     IGenericTokenAdapter _adapter = IGenericTokenAdapter(
-      ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).collateralPools(_collateralPoolId).adapter
+      ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getAdapter(_collateralPoolId)
     );
     _adapter.onMoveCollateral(
       _positionAddress,
@@ -356,18 +366,20 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
   // --- pause ---
   function pause() external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
-      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
-        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
   }
 
   function unpause() external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
-      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
-        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

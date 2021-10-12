@@ -13,8 +13,6 @@ import "../interfaces/IShowStopper.sol";
 
 /// @title PositionManager is a contract for manging positions
 contract PositionManager is PausableUpgradeable, IManager {
-  bytes32 public constant OWNER_ROLE = 0x00;
-
   /// @dev Address of a BookKeeper
   address public override bookKeeper;
 
@@ -142,8 +140,7 @@ contract PositionManager is PausableUpgradeable, IManager {
   function open(bytes32 collateralPoolId, address user) public override whenNotPaused returns (uint256) {
     require(user != address(0), "PositionManager/user-address(0)");
     uint256 debtAccumulatedRate = ICollateralPoolConfig(IBookKeeper(bookKeeper).collateralPoolConfig())
-      .collateralPools(collateralPoolId)
-      .debtAccumulatedRate;
+      .getDebtAccumulatedRate(collateralPoolId);
     require(debtAccumulatedRate != 0, "PositionManager/collateralPool-not-init");
 
     lastPositionId = _safeAdd(lastPositionId, 1);
@@ -371,7 +368,7 @@ contract PositionManager is PausableUpgradeable, IManager {
   function pause() external {
     IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      accessControlConfig.hasRole(OWNER_ROLE, msg.sender) ||
+      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
         accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
@@ -381,7 +378,7 @@ contract PositionManager is PausableUpgradeable, IManager {
   function unpause() external {
     IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      accessControlConfig.hasRole(OWNER_ROLE, msg.sender) ||
+      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
         accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
@@ -397,7 +394,7 @@ contract PositionManager is PausableUpgradeable, IManager {
     address adapter,
     address collateralReceiver,
     bytes calldata data
-  ) public whenNotPaused onlyOwnerAllowed(posId) {
+  ) public override whenNotPaused onlyOwnerAllowed(posId) {
     address positionAddress = positions[posId];
     IShowStopper(showStopper).redeemLockedCollateral(
       collateralPools[posId],

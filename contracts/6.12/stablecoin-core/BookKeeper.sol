@@ -18,12 +18,20 @@ import "../interfaces/IAccessControlConfig.sol";
 */
 
 contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradeable, ICagable {
-  bytes32 public constant OWNER_ROLE = 0x00;
+  struct LocalVar {
+    uint256 debtAccumulatedRate; // [ray]
+    uint256 totalDebtShare; // [wad]
+    uint256 debtCeiling; // [rad]
+    uint256 priceWithSafetyMargin; // [ray]
+    uint256 debtFloor; // [rad]
+  }
 
   function pause() external {
     require(
-      IAccessControlConfig(accessControlConfig).hasRole(OWNER_ROLE, msg.sender) ||
-        IAccessControlConfig(accessControlConfig).hasRole(keccak256("GOV_ROLE"), msg.sender),
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).OWNER_ROLE(),
+        msg.sender
+      ) || IAccessControlConfig(accessControlConfig).hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -31,8 +39,10 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
 
   function unpause() external {
     require(
-      IAccessControlConfig(accessControlConfig).hasRole(OWNER_ROLE, msg.sender) ||
-        IAccessControlConfig(accessControlConfig).hasRole(keccak256("GOV_ROLE"), msg.sender),
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).OWNER_ROLE(),
+        msg.sender
+      ) || IAccessControlConfig(accessControlConfig).hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();
@@ -285,17 +295,25 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     require(live == 1, "BookKeeper/not-live");
 
     Position memory position = positions[collateralPoolId][positionAddress];
-    ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(collateralPoolConfig)
-      .collateralPools(collateralPoolId);
+
+    LocalVar memory _vars;
+    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(collateralPoolId); // [ray]
+    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(collateralPoolId); // [wad]
+    _vars.debtCeiling = ICollateralPoolConfig(collateralPoolConfig).getDebtCeiling(collateralPoolId); // [rad]
+    _vars.priceWithSafetyMargin = ICollateralPoolConfig(collateralPoolConfig).getPriceWithSafetyMargin(
+      collateralPoolId
+    ); // [ray]
+    _vars.debtFloor = ICollateralPoolConfig(collateralPoolConfig).getDebtFloor(collateralPoolId); // [rad]
+
     // collateralPool has been initialised
-    require(collateralPool.debtAccumulatedRate != 0, "BookKeeper/collateralPool-not-init");
+    require(_vars.debtAccumulatedRate != 0, "BookKeeper/collateralPool-not-init");
     position.lockedCollateral = add(position.lockedCollateral, collateralValue);
     position.debtShare = add(position.debtShare, debtShare);
-    collateralPool.totalDebtShare = add(collateralPool.totalDebtShare, debtShare);
-    ICollateralPoolConfig(collateralPoolConfig).setTotalDebtShare(collateralPoolId, collateralPool.totalDebtShare);
+    _vars.totalDebtShare = add(_vars.totalDebtShare, debtShare);
+    ICollateralPoolConfig(collateralPoolConfig).setTotalDebtShare(collateralPoolId, _vars.totalDebtShare);
 
-    int256 debtValue = mul(collateralPool.debtAccumulatedRate, debtShare);
-    uint256 positionDebtValue = mul(collateralPool.debtAccumulatedRate, position.debtShare);
+    int256 debtValue = mul(_vars.debtAccumulatedRate, debtShare);
+    uint256 positionDebtValue = mul(_vars.debtAccumulatedRate, position.debtShare);
     totalStablecoinIssued = add(totalStablecoinIssued, debtValue);
 
     // either debt has decreased, or debt ceilings are not exceeded
@@ -303,7 +321,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
       either(
         debtShare <= 0,
         both(
-          mul(collateralPool.totalDebtShare, collateralPool.debtAccumulatedRate) <= collateralPool.debtCeiling,
+          mul(_vars.totalDebtShare, _vars.debtAccumulatedRate) <= _vars.debtCeiling,
           totalStablecoinIssued <= totalDebtCeiling
         )
       ),
@@ -313,7 +331,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     require(
       either(
         both(debtShare <= 0, collateralValue >= 0),
-        positionDebtValue <= mul(position.lockedCollateral, collateralPool.priceWithSafetyMargin)
+        positionDebtValue <= mul(position.lockedCollateral, _vars.priceWithSafetyMargin)
       ),
       "BookKeeper/not-safe"
     );
@@ -329,7 +347,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     require(either(debtShare >= 0, wish(stablecoinOwner, msg.sender)), "BookKeeper/not-allowed-stablecoin-owner");
 
     // position has no debt, or a non-debtFloory amount
-    require(either(position.debtShare == 0, positionDebtValue >= collateralPool.debtFloor), "BookKeeper/debt-floor");
+    require(either(position.debtShare == 0, positionDebtValue >= _vars.debtFloor), "BookKeeper/debt-floor");
     collateralToken[collateralPoolId][collateralOwner] = sub(
       collateralToken[collateralPoolId][collateralOwner],
       collateralValue
@@ -363,33 +381,32 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
 
     Position storage _positionSrc = positions[collateralPoolId][src];
     Position storage _positionDst = positions[collateralPoolId][dst];
-    ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(collateralPoolConfig)
-      .collateralPools(collateralPoolId);
+
+    LocalVar memory _vars;
+    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(collateralPoolId);
+    _vars.priceWithSafetyMargin = ICollateralPoolConfig(collateralPoolConfig).getPriceWithSafetyMargin(
+      collateralPoolId
+    );
+    _vars.debtFloor = ICollateralPoolConfig(collateralPoolConfig).getDebtFloor(collateralPoolId);
 
     _positionSrc.lockedCollateral = sub(_positionSrc.lockedCollateral, collateralAmount);
     _positionSrc.debtShare = sub(_positionSrc.debtShare, debtShare);
     _positionDst.lockedCollateral = add(_positionDst.lockedCollateral, collateralAmount);
     _positionDst.debtShare = add(_positionDst.debtShare, debtShare);
 
-    uint256 utab = mul(_positionSrc.debtShare, collateralPool.debtAccumulatedRate);
-    uint256 vtab = mul(_positionDst.debtShare, collateralPool.debtAccumulatedRate);
+    uint256 utab = mul(_positionSrc.debtShare, _vars.debtAccumulatedRate);
+    uint256 vtab = mul(_positionDst.debtShare, _vars.debtAccumulatedRate);
 
     // both sides consent
     require(both(wish(src, msg.sender), wish(dst, msg.sender)), "BookKeeper/not-allowed");
 
     // both sides safe
-    require(
-      utab <= mul(_positionSrc.lockedCollateral, collateralPool.priceWithSafetyMargin),
-      "BookKeeper/not-safe-src"
-    );
-    require(
-      vtab <= mul(_positionDst.lockedCollateral, collateralPool.priceWithSafetyMargin),
-      "BookKeeper/not-safe-dst"
-    );
+    require(utab <= mul(_positionSrc.lockedCollateral, _vars.priceWithSafetyMargin), "BookKeeper/not-safe-src");
+    require(vtab <= mul(_positionDst.lockedCollateral, _vars.priceWithSafetyMargin), "BookKeeper/not-safe-dst");
 
     // both sides non-debtFloory
-    require(either(utab >= collateralPool.debtFloor, _positionSrc.debtShare == 0), "BookKeeper/debt-floor-src");
-    require(either(vtab >= collateralPool.debtFloor, _positionDst.debtShare == 0), "BookKeeper/debt-floor-dst");
+    require(either(utab >= _vars.debtFloor, _positionSrc.debtShare == 0), "BookKeeper/debt-floor-src");
+    require(either(vtab >= _vars.debtFloor, _positionDst.debtShare == 0), "BookKeeper/debt-floor-dst");
   }
 
   // --- CDP Confiscation ---
@@ -422,15 +439,16 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     );
 
     Position storage position = positions[collateralPoolId][positionAddress];
-    ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(collateralPoolConfig)
-      .collateralPools(collateralPoolId);
+    LocalVar memory _vars;
+    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(collateralPoolId);
+    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(collateralPoolId);
 
     position.lockedCollateral = add(position.lockedCollateral, collateralAmount);
     position.debtShare = add(position.debtShare, debtShare);
-    collateralPool.totalDebtShare = add(collateralPool.totalDebtShare, debtShare);
-    ICollateralPoolConfig(collateralPoolConfig).setTotalDebtShare(collateralPoolId, collateralPool.totalDebtShare);
+    _vars.totalDebtShare = add(_vars.totalDebtShare, debtShare);
+    ICollateralPoolConfig(collateralPoolConfig).setTotalDebtShare(collateralPoolId, _vars.totalDebtShare);
 
-    int256 debtValue = mul(collateralPool.debtAccumulatedRate, debtShare);
+    int256 debtValue = mul(_vars.debtAccumulatedRate, debtShare);
 
     collateralToken[collateralPoolId][collateralCreditor] = sub(
       collateralToken[collateralPoolId][collateralCreditor],
@@ -499,14 +517,13 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
       "!stabilityFeeCollectorRole"
     );
     require(live == 1, "BookKeeper/not-live");
-    ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(collateralPoolConfig)
-      .collateralPools(collateralPoolId);
-    collateralPool.debtAccumulatedRate = add(collateralPool.debtAccumulatedRate, debtAccumulatedRate);
-    ICollateralPoolConfig(collateralPoolConfig).setDebtAccumulatedRate(
-      collateralPoolId,
-      collateralPool.debtAccumulatedRate
-    );
-    int256 value = mul(collateralPool.totalDebtShare, debtAccumulatedRate); // [rad]
+    LocalVar memory _vars;
+    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(collateralPoolId);
+    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(collateralPoolId);
+
+    _vars.debtAccumulatedRate = add(_vars.debtAccumulatedRate, debtAccumulatedRate);
+    ICollateralPoolConfig(collateralPoolConfig).setDebtAccumulatedRate(collateralPoolId, _vars.debtAccumulatedRate);
+    int256 value = mul(_vars.totalDebtShare, debtAccumulatedRate); // [rad]
     stablecoin[stabilityFeeRecipient] = add(stablecoin[stabilityFeeRecipient], value);
     totalStablecoinIssued = add(totalStablecoinIssued, value);
   }

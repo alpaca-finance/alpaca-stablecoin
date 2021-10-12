@@ -32,4 +32,32 @@ interface ICollateralPoolConfig {
   function setDebtAccumulatedRate(bytes32 _collateralPoolId, uint256 _debtAccumulatedRate) external;
 
   function updateLastAccumulationTime(bytes32 _collateralPoolId) external;
+
+  function getTotalDebtShare(bytes32 _collateralPoolId) external view returns (uint256);
+
+  function getDebtAccumulatedRate(bytes32 _collateralPoolId) external view returns (uint256);
+
+  function getPriceWithSafetyMargin(bytes32 _collateralPoolId) external view returns (uint256);
+
+  function getDebtCeiling(bytes32 _collateralPoolId) external view returns (uint256);
+
+  function getDebtFloor(bytes32 _collateralPoolId) external view returns (uint256);
+
+  function getPriceFeed(bytes32 _collateralPoolId) external view returns (address);
+
+  function getLiquidationRatio(bytes32 _collateralPoolId) external view returns (uint256);
+
+  function getStabilityFeeRate(bytes32 _collateralPoolId) external view returns (uint256);
+
+  function getLastAccumulationTime(bytes32 _collateralPoolId) external view returns (uint256);
+
+  function getAdapter(bytes32 _collateralPoolId) external view returns (address);
+
+  function getCloseFactorBps(bytes32 _collateralPoolId) external view returns (uint256);
+
+  function getLiquidatorIncentiveBps(bytes32 _collateralPoolId) external view returns (uint256);
+
+  function getTreasuryFeesBps(bytes32 _collateralPoolId) external view returns (uint256);
+
+  function getStrategy(bytes32 _collateralPoolId) external view returns (address);
 }

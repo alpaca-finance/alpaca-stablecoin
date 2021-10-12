@@ -27,10 +27,9 @@ import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IBookKeeper.sol";
 
 contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeeperFlashLender {
-  bytes32 public constant OWNER_ROLE = 0x00;
-
   modifier onlyOwner() {
-    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     _;
   }
 
@@ -49,10 +48,10 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
     keccak256("BookKeeperFlashBorrower.onBookKeeperFlashLoan");
 
   // --- Events ---
-  event SetMax(uint256 data);
-  event SetFeeRate(uint256 data);
-  event FlashLoan(address indexed receiver, address token, uint256 amount, uint256 fee);
-  event BookKeeperFlashLoan(address indexed receiver, uint256 amount, uint256 fee);
+  event SetMax(uint256 _data);
+  event SetFeeRate(uint256 _data);
+  event FlashLoan(address indexed _receiver, address _token, uint256 _amount, uint256 _fee);
+  event BookKeeperFlashLoan(address indexed _receiver, uint256 _amount, uint256 _fee);
 
   modifier lock() {
     require(locked == 0, "FlashMintModule/reentrancy-guard");
@@ -62,17 +61,17 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
   }
 
   // --- Init ---
-  function initialize(address stablecoinAdapter_, address systemDebtEngine_) external initializer {
+  function initialize(address _stablecoinAdapter, address _systemDebtEngine) external initializer {
     // 1. Initialized all dependencies
     PausableUpgradeable.__Pausable_init();
 
-    IBookKeeper bookKeeper_ = bookKeeper = IBookKeeper(IStablecoinAdapter(stablecoinAdapter_).bookKeeper());
-    stablecoinAdapter = IStablecoinAdapter(stablecoinAdapter_);
-    IStablecoin stablecoin_ = stablecoin = IStablecoin(IStablecoinAdapter(stablecoinAdapter_).stablecoin());
-    systemDebtEngine = systemDebtEngine_;
+    bookKeeper = IBookKeeper(IStablecoinAdapter(_stablecoinAdapter).bookKeeper());
+    stablecoinAdapter = IStablecoinAdapter(_stablecoinAdapter);
+    stablecoin = IStablecoin(IStablecoinAdapter(_stablecoinAdapter).stablecoin());
+    systemDebtEngine = _systemDebtEngine;
 
-    bookKeeper_.whitelist(stablecoinAdapter_);
-    stablecoin_.approve(stablecoinAdapter_, type(uint256).max);
+    bookKeeper.whitelist(_stablecoinAdapter);
+    stablecoin.approve(_stablecoinAdapter, type(uint256).max);
   }
 
   // --- Math ---
@@ -80,29 +79,29 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
   uint256 constant RAY = 10**27;
   uint256 constant RAD = 10**45;
 
-  function _add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x + y) >= x);
+  function _add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x);
   }
 
-  function _mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y == 0 || (z = x * y) / y == x);
+  function _mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x);
   }
 
   // --- Administration ---
-  function setMax(uint256 data) external onlyOwner {
+  function setMax(uint256 _data) external onlyOwner {
     // Add an upper limit of 10^27 Stablecoin to avoid breaking technical assumptions of Stablecoin << 2^256 - 1
-    require((max = data) <= RAD, "FlashMintModule/ceiling-too-high");
-    emit SetMax(data);
+    require((max = _data) <= RAD, "FlashMintModule/ceiling-too-high");
+    emit SetMax(_data);
   }
 
-  function setFeeRate(uint256 data) external onlyOwner {
-    feeRate = data;
-    emit SetFeeRate(data);
+  function setFeeRate(uint256 _data) external onlyOwner {
+    feeRate = _data;
+    emit SetFeeRate(_data);
   }
 
   // --- ERC 3156 Spec ---
-  function maxFlashLoan(address token) external view override returns (uint256) {
-    if (token == address(stablecoin) && locked == 0) {
+  function maxFlashLoan(address _token) external view override returns (uint256) {
+    if (_token == address(stablecoin) && locked == 0) {
       return max;
     } else {
       return 0;

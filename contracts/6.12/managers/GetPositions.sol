@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
 import "./PositionManager.sol";
 import "../interfaces/IBookKeeper.sol";
+import "../interfaces/ICollateralPoolConfig.sol";
 
 contract GetPositions is Initializable {
   using SafeMathUpgradeable for uint256;
@@ -160,22 +161,21 @@ contract GetPositions is Initializable {
       if (PositionManager(_manager).positions(_positionIndex) == address(0)) break;
       positions[_resultIndex] = PositionManager(_manager).positions(_positionIndex);
 
+      bytes32 _collateralPoolId = PositionManager(_manager).collateralPools(_positionIndex);
       (uint256 _lockedCollateral, uint256 _debtShare) = bookKeeper.positions(
-        PositionManager(_manager).collateralPools(_positionIndex),
+        _collateralPoolId,
         positions[_resultIndex]
       );
-      ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(
-        IBookKeeper(bookKeeper).collateralPoolConfig()
-      ).collateralPools(PositionManager(_manager).collateralPools(_positionIndex));
-      uint256 _debtAccumulatedRate = collateralPool.debtAccumulatedRate;
-      uint256 _priceWithSafetyMargin = collateralPool.priceWithSafetyMargin;
+
+      ICollateralPoolConfig collateralPoolConfig = ICollateralPoolConfig(bookKeeper.collateralPoolConfig());
 
       uint256 safetyBuffer = calculateSafetyBuffer(
         _debtShare,
-        _debtAccumulatedRate,
+        collateralPoolConfig.getDebtAccumulatedRate(_collateralPoolId),
         _lockedCollateral,
-        _priceWithSafetyMargin
+        collateralPoolConfig.getPriceWithSafetyMargin(_collateralPoolId)
       );
+
       safetyBuffers[_resultIndex] = safetyBuffer;
       debtShares[_resultIndex] = _debtShare;
       _resultIndex++;

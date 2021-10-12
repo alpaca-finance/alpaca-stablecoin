@@ -35,8 +35,6 @@ import "../interfaces/IStabilityFeeCollector.sol";
 */
 
 contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeable, IStabilityFeeCollector {
-  bytes32 public constant OWNER_ROLE = 0x00;
-
   // --- Data ---
   struct CollateralPool {
     uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee debtAccumulatedRate or mint interest debtAccumulatedRate [ray]
@@ -136,13 +134,15 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   /// @dev Set the global stability fee debtAccumulatedRate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
   /// @param _globalStabilityFeeRate Global stability fee debtAccumulatedRate [ray]
   function setGlobalStabilityFeeRate(uint256 _globalStabilityFeeRate) external {
-    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     globalStabilityFeeRate = _globalStabilityFeeRate;
     emit LogSetGlobalStabilityFeeRate(msg.sender, _globalStabilityFeeRate);
   }
 
   function setSystemDebtEngine(address _systemDebtEngine) external {
-    require(IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     systemDebtEngine = _systemDebtEngine;
     emit LogSetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
@@ -165,12 +165,14 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   }
 
   function _collect(bytes32 _collateralPoolId) internal returns (uint256 _debtAccumulatedRate) {
-    ICollateralPoolConfig.CollateralPool memory collateralPool = ICollateralPoolConfig(
-      bookKeeper.collateralPoolConfig()
-    ).collateralPools(_collateralPoolId);
-    uint256 _previousDebtAccumulatedRate = collateralPool.debtAccumulatedRate;
-    uint256 _stabilityFeeRate = collateralPool.stabilityFeeRate;
-    uint256 _lastAccumulationTime = collateralPool.lastAccumulationTime;
+    uint256 _previousDebtAccumulatedRate = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
+      .getDebtAccumulatedRate(_collateralPoolId);
+    uint256 _stabilityFeeRate = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getStabilityFeeRate(
+      _collateralPoolId
+    );
+    uint256 _lastAccumulationTime = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getLastAccumulationTime(
+      _collateralPoolId
+    );
     require(now >= _lastAccumulationTime, "StabilityFeeCollector/invalid-now");
 
     // debtAccumulatedRate [ray]
@@ -188,18 +190,20 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
 
   // --- pause ---
   function pause() external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
-      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
-        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
   }
 
   function unpause() external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
-      IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(OWNER_ROLE, msg.sender) ||
-        IAccessControlConfig(bookKeeper.accessControlConfig()).hasRole(keccak256("GOV_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();
