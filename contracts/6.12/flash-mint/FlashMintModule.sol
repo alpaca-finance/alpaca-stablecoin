@@ -79,12 +79,12 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
   uint256 constant RAY = 10**27;
   uint256 constant RAD = 10**45;
 
-  function _add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
-    require((_z = _x + _y) >= _x);
+  function _add(uint256 _x, uint256 _y) internal pure returns (uint256 z) {
+    require((z = _x + _y) >= _x);
   }
 
-  function _mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
-    require(_y == 0 || (_z = _x * _y) / _y == _x);
+  function _mul(uint256 _x, uint256 _y) internal pure returns (uint256 z) {
+    require(_y == 0 || (z = _x * _y) / _y == _x);
   }
 
   // --- Administration ---
@@ -108,64 +108,64 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
     }
   }
 
-  function flashFee(address token, uint256 amount) external view override returns (uint256) {
-    require(token == address(stablecoin), "FlashMintModule/token-unsupported");
+  function flashFee(address _token, uint256 _amount) external view override returns (uint256) {
+    require(_token == address(stablecoin), "FlashMintModule/token-unsupported");
 
-    return _mul(amount, feeRate) / WAD;
+    return _mul(_amount, feeRate) / WAD;
   }
 
   function flashLoan(
-    IERC3156FlashBorrower receiver,
-    address token,
-    uint256 amount,
-    bytes calldata data
+    IERC3156FlashBorrower _receiver,
+    address _token,
+    uint256 _amount,
+    bytes calldata _data
   ) external override lock returns (bool) {
-    require(token == address(stablecoin), "FlashMintModule/token-unsupported");
-    require(amount <= max, "FlashMintModule/ceiling-exceeded");
+    require(_token == address(stablecoin), "FlashMintModule/token-unsupported");
+    require(_amount <= max, "FlashMintModule/ceiling-exceeded");
 
-    uint256 amt = _mul(amount, RAY);
-    uint256 fee = _mul(amount, feeRate) / WAD;
-    uint256 total = _add(amount, fee);
+    uint256 _amt = _mul(_amount, RAY);
+    uint256 _fee = _mul(_amount, feeRate) / WAD;
+    uint256 _total = _add(_amount, _fee);
 
-    bookKeeper.mintUnbackedStablecoin(address(this), address(this), amt);
-    stablecoinAdapter.withdraw(address(receiver), amount, abi.encode(0));
+    bookKeeper.mintUnbackedStablecoin(address(this), address(this), _amt);
+    stablecoinAdapter.withdraw(address(_receiver), _amount, abi.encode(0));
 
-    emit FlashLoan(address(receiver), token, amount, fee);
+    emit FlashLoan(address(_receiver), _token, _amount, _fee);
 
     require(
-      receiver.onFlashLoan(msg.sender, token, amount, fee, data) == CALLBACK_SUCCESS,
+      _receiver.onFlashLoan(msg.sender, _token, _amount, _fee, _data) == CALLBACK_SUCCESS,
       "FlashMintModule/callback-failed"
     );
 
-    stablecoin.transferFrom(address(receiver), address(this), total); // The fee is also enforced here
-    stablecoinAdapter.deposit(address(this), total, abi.encode(0));
-    bookKeeper.settleSystemBadDebt(amt);
+    stablecoin.transferFrom(address(_receiver), address(this), _total); // The fee is also enforced here
+    stablecoinAdapter.deposit(address(this), _total, abi.encode(0));
+    bookKeeper.settleSystemBadDebt(_amt);
 
     return true;
   }
 
   // --- BookKeeper Flash Loan ---
   function bookKeeperFlashLoan(
-    IBookKeeperFlashBorrower receiver, // address of conformant IBookKeeperFlashBorrower
-    uint256 amount, // amount to flash loan [rad]
-    bytes calldata data // arbitrary data to pass to the receiver
+    IBookKeeperFlashBorrower _receiver, // address of conformant IBookKeeperFlashBorrower
+    uint256 _amount, // amount to flash loan [rad]
+    bytes calldata _data // arbitrary data to pass to the receiver
   ) external override lock returns (bool) {
-    require(amount <= _mul(max, RAY), "FlashMintModule/ceiling-exceeded");
+    require(_amount <= _mul(max, RAY), "FlashMintModule/ceiling-exceeded");
 
-    uint256 prev = bookKeeper.stablecoin(address(this));
-    uint256 fee = _mul(amount, feeRate) / WAD;
+    uint256 _prev = bookKeeper.stablecoin(address(this));
+    uint256 _fee = _mul(_amount, feeRate) / WAD;
 
-    bookKeeper.mintUnbackedStablecoin(address(this), address(receiver), amount);
+    bookKeeper.mintUnbackedStablecoin(address(this), address(_receiver), _amount);
 
-    emit BookKeeperFlashLoan(address(receiver), amount, fee);
+    emit BookKeeperFlashLoan(address(_receiver), _amount, _fee);
 
     require(
-      receiver.onBookKeeperFlashLoan(msg.sender, amount, fee, data) == CALLBACK_SUCCESS_BOOK_KEEPER_STABLE_COIN,
+      _receiver.onBookKeeperFlashLoan(msg.sender, _amount, _fee, _data) == CALLBACK_SUCCESS_BOOK_KEEPER_STABLE_COIN,
       "FlashMintModule/callback-failed"
     );
 
-    bookKeeper.settleSystemBadDebt(amount);
-    require(bookKeeper.stablecoin(address(this)) >= _add(prev, fee), "FlashMintModule/insufficient-fee");
+    bookKeeper.settleSystemBadDebt(_amount);
+    require(bookKeeper.stablecoin(address(this)) >= _add(_prev, _fee), "FlashMintModule/insufficient-fee");
 
     return true;
   }
