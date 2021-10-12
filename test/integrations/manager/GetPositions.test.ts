@@ -74,6 +74,9 @@ type fixture = {
 
 const ALPACA_PER_BLOCK = ethers.utils.parseEther("100")
 const COLLATERAL_POOL_ID = formatBytes32String("ibDUMMY")
+const CLOSE_FACTOR_BPS = BigNumber.from(5000)
+const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(10250)
+const TREASURY_FEE_BPS = BigNumber.from(5000)
 
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer, alice, bob, dev] = await ethers.getSigners()
