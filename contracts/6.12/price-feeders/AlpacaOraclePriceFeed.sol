@@ -37,11 +37,11 @@ contract AlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable,
     _;
   }
 
-  event SetPriceLife(address indexed _caller, uint256 _second);
+  event LogSetPriceLife(address indexed _caller, uint256 _second);
 
   function setPriceLife(uint256 _second) external onlyOwner {
     priceLife = _second;
-    emit SetPriceLife(msg.sender, _second);
+    emit LogSetPriceLife(msg.sender, _second);
   }
 
   function pause() external onlyOwner {

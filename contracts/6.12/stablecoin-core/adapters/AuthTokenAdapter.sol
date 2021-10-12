@@ -48,10 +48,8 @@ contract AuthTokenAdapter is
   uint256 public live; // Access Flag
 
   // --- Events ---
-  event Rely(address indexed usr);
-  event Deny(address indexed usr);
-  event Deposit(address indexed urn, uint256 wad, address indexed msgSender);
-  event Withdraw(address indexed guy, uint256 wad);
+  event LogDeposit(address indexed urn, uint256 wad, address indexed msgSender);
+  event LogWithdraw(address indexed guy, uint256 wad);
 
   function initialize(
     address _bookKeeper,
@@ -78,7 +76,7 @@ contract AuthTokenAdapter is
     );
     require(live == 1, "AuthTokenAdapter/not-live");
     live = 0;
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
@@ -90,7 +88,7 @@ contract AuthTokenAdapter is
     );
     require(live == 0, "AuthTokenAdapter/not-caged");
     live = 1;
-    emit Uncage();
+    emit LogUncage();
   }
 
   function mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
@@ -114,7 +112,7 @@ contract AuthTokenAdapter is
     require(int256(_wad18) >= 0, "AuthTokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, _urn, int256(_wad18));
     require(token.transferFrom(_msgSender, address(this), _wad), "AuthTokenAdapter/failed-transfer");
-    emit Deposit(_urn, _wad, _msgSender);
+    emit LogDeposit(_urn, _wad, _msgSender);
   }
 
   /**
@@ -127,7 +125,7 @@ contract AuthTokenAdapter is
     require(int256(_wad18) >= 0, "AuthTokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_wad18));
     require(token.transfer(_guy, _wad), "AuthTokenAdapter/failed-transfer");
-    emit Withdraw(_guy, _wad);
+    emit LogWithdraw(_guy, _wad);
   }
 
   // --- pause ---
@@ -135,7 +133,7 @@ contract AuthTokenAdapter is
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -145,7 +143,7 @@ contract AuthTokenAdapter is
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

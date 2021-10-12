@@ -30,18 +30,18 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
     _;
   }
 
-  event SetPrice(address indexed _caller, uint256 _price, uint256 indexed _lastUpdate);
-  event SetPriceLife(address indexed _caller, uint256 _second);
+  event LogSetPrice(address indexed _caller, uint256 _price, uint256 indexed _lastUpdate);
+  event LogSetPriceLife(address indexed _caller, uint256 _second);
 
   function setPrice(uint256 _price) external onlyOwner {
     price = _price;
     lastUpdate = now;
-    emit SetPrice(msg.sender, price, lastUpdate);
+    emit LogSetPrice(msg.sender, price, lastUpdate);
   }
 
   function setPriceLife(uint256 _second) external onlyOwner {
     priceLife = _second;
-    emit SetPriceLife(msg.sender, _second);
+    emit LogSetPriceLife(msg.sender, _second);
   }
 
   function pause() external onlyOwner {

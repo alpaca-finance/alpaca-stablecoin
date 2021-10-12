@@ -77,7 +77,7 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     );
     require(live == 1, "StablecoinAdapter/not-live");
     live = 0;
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
@@ -89,7 +89,7 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     );
     require(live == 0, "StablecoinAdapter/not-caged");
     live = 1;
-    emit Uncage();
+    emit LogUncage();
   }
 
   uint256 constant ONE = 10**27;
@@ -128,7 +128,7 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -138,7 +138,7 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

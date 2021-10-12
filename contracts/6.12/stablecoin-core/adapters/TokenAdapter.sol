@@ -90,7 +90,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     );
     require(live == 1, "TokenAdapter/not-live");
     live = 0;
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
@@ -102,7 +102,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     );
     require(live == 0, "TokenAdapter/not-caged");
     live = 1;
-    emit Uncage();
+    emit LogUncage();
   }
 
   /// @dev Deposit token into the system from the caller to be used as collateral
@@ -156,7 +156,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -166,7 +166,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();
