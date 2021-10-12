@@ -144,14 +144,18 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await shield.transferOwnership(await deployer.getAddress())
   await alpacaToken.transferOwnership(fairLaunch.address)
 
+  // Deploy ShowStopper
+  const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
+  const showStopper = (await upgrades.deployProxy(ShowStopper, [bookKeeper.address])) as ShowStopper
+
   // Deploy PositionManager
   const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
   const positionManager = (await upgrades.deployProxy(PositionManager, [
     bookKeeper.address,
-    AddressZero,
+    showStopper.address,
   ])) as PositionManager
   await positionManager.deployed()
-  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
+  await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), positionManager.address)
 
   const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
   const ibTokenAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
