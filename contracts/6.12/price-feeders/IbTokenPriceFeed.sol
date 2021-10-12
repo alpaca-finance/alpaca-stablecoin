@@ -6,38 +6,45 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IAlpacaOracle.sol";
+import "../interfaces/IAccessControlConfig.sol";
 
 contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPriceFeed {
   using SafeMathUpgradeable for uint256;
 
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  IAccessControlConfig public accessControlConfig;
 
   IPriceFeed public ibInBasePriceFeed;
   IPriceFeed public baseInUsdPriceFeed;
 
   // --- Init ---
-  function initialize(address _ibInBasePriceFeed, address _baseInUsdPriceFeed) external initializer {
+  function initialize(
+    address _ibInBasePriceFeed,
+    address _baseInUsdPriceFeed,
+    address _accessControlConfig
+  ) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
-    // Grant the contract deployer OWNER role: it will be able
-    // to grant and revoke any roles afterward
-    _setupRole(OWNER_ROLE, msg.sender);
-
     ibInBasePriceFeed = IPriceFeed(_ibInBasePriceFeed);
     baseInUsdPriceFeed = IPriceFeed(_baseInUsdPriceFeed);
+
+    accessControlConfig = IAccessControlConfig(_accessControlConfig);
   }
 
-  modifier onlyOwner() {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+  modifier onlyOwnerOrGov() {
+    require(
+      accessControlConfig.hasRole(accessControlConfig.GOV_ROLE(), msg.sender) ||
+        accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _;
   }
 
-  function pause() external onlyOwner {
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external onlyOwner {
+  function unpause() external onlyOwnerOrGov {
     _unpause();
   }
 
