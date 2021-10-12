@@ -192,20 +192,20 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   // --- pause ---
   function pause() external {
-    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
   }
 
   function unpause() external {
-    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

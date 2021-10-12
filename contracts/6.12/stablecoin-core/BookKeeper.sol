@@ -30,7 +30,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -40,7 +40,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();

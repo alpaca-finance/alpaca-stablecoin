@@ -489,7 +489,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -499,7 +499,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();
