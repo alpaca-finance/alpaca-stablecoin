@@ -8,6 +8,8 @@ import {
   StrictAlpacaOraclePriceFeed__factory,
   MockAlpacaOracle__factory,
   MockAlpacaOracle,
+  AccessControlConfig,
+  AccessControlConfig__factory,
 } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 import { AddressOne, AddressTwo } from "../../helper/address"
@@ -20,6 +22,7 @@ type fixture = {
   strictAlpacaOraclePriceFeed: StrictAlpacaOraclePriceFeed
   mockedAlpacaOracleA: MockContract
   mockedAlpacaOracleB: MockContract
+  mockedAccessControlConfig: MockContract
 }
 
 const token0Address = AddressOne
@@ -44,6 +47,14 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   await mockAlpacaOracleB.deployed()
   const mockedAlpacaOracleB = await smockit(mockAlpacaOracleA)
 
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const mockAccessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+  await mockAccessControlConfig.deployed()
+  const mockedAccessControlConfig = await smockit(mockAccessControlConfig)
+
   // Deploy StrictAlpacaOraclePriceFeed
   const StrictAlpacaOraclePriceFeed = (await ethers.getContractFactory(
     "StrictAlpacaOraclePriceFeed",
@@ -56,10 +67,11 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     mockedAlpacaOracleB.address,
     token0Address,
     token1Address,
+    mockedAccessControlConfig.address,
   ])) as StrictAlpacaOraclePriceFeed
   await strictAlpacaOraclePriceFeed.deployed()
 
-  return { strictAlpacaOraclePriceFeed, mockedAlpacaOracleA, mockedAlpacaOracleB }
+  return { strictAlpacaOraclePriceFeed, mockedAlpacaOracleA, mockedAlpacaOracleB, mockedAccessControlConfig }
 }
 
 describe("StrictAlpacaOraclePriceFeed", () => {
@@ -79,13 +91,13 @@ describe("StrictAlpacaOraclePriceFeed", () => {
   let strictAlpacaOraclePriceFeed: StrictAlpacaOraclePriceFeed
   let mockedAlpacaOracleA: MockContract
   let mockedAlpacaOracleB: MockContract
+  let mockedAccessControlConfig: MockContract
   let alpacaOraclePriceFeedAsAlice: StrictAlpacaOraclePriceFeed
   let alpacaOraclePriceFeedAsBob: StrictAlpacaOraclePriceFeed
 
   beforeEach(async () => {
-    ;({ strictAlpacaOraclePriceFeed, mockedAlpacaOracleA, mockedAlpacaOracleB } = await waffle.loadFixture(
-      loadFixtureHandler
-    ))
+    ;({ strictAlpacaOraclePriceFeed, mockedAlpacaOracleA, mockedAlpacaOracleB, mockedAccessControlConfig } =
+      await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
       deployer.getAddress(),
@@ -222,7 +234,7 @@ describe("StrictAlpacaOraclePriceFeed", () => {
     })
     context("when in paused state", () => {
       it("should be able to get price with okFlag = false", async () => {
-        // pause
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
         await strictAlpacaOraclePriceFeed.pause()
 
         const now = DateTime.now()
