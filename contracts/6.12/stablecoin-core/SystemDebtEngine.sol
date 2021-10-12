@@ -40,7 +40,7 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
 
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
-  uint256 public surplusBuffer; // Surplus buffer         [rad]
+  uint256 public override surplusBuffer; // Surplus buffer         [rad]
   uint256 public live; // Active Flag
 
   // --- Init ---

@@ -98,7 +98,10 @@ contract PositionManager is PausableUpgradeable, IManager {
   function initialize(address _bookKeeper, address _showStopper) external initializer {
     PausableUpgradeable.__Pausable_init();
 
+    IBookKeeper(_bookKeeper).totalStablecoinIssued(); // Sanity Check Call
     bookKeeper = _bookKeeper;
+
+    IShowStopper(_showStopper).live(); // Sanity Check Call
     showStopper = _showStopper;
   }
 
@@ -397,7 +400,7 @@ contract PositionManager is PausableUpgradeable, IManager {
     address adapter,
     address collateralReceiver,
     bytes calldata data
-  ) public whenNotPaused onlyOwnerAllowed(posId) {
+  ) public override whenNotPaused onlyOwnerAllowed(posId) {
     address positionAddress = positions[posId];
     IShowStopper(showStopper).redeemLockedCollateral(
       collateralPools[posId],

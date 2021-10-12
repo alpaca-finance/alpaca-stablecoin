@@ -88,10 +88,19 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     PausableUpgradeable.__Pausable_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
+    IBookKeeper(_bookKeeper).totalStablecoinIssued(); // Sanity Check Call
     bookKeeper = IBookKeeper(_bookKeeper);
+
+    IPriceOracle(_priceOracle).stableCoinReferencePrice(); // Sanity Check Call
     priceOracle = IPriceOracle(_priceOracle);
+
+    ILiquidationEngine(_liquidationEngine).live(); // Sanity Check Call
     liquidationEngine = ILiquidationEngine(_liquidationEngine);
+
+    ISystemDebtEngine(_systemDebtEngine).surplusBuffer(); // Sanity Check Call
     systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
+
+    IManager(_positionManager).positions(1); // Sanity Check Call
     positionManager = IManager(_positionManager);
   }
 

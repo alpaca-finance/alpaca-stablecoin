@@ -33,6 +33,7 @@ import "../interfaces/IPriceOracle.sol";
 import "../interfaces/ISystemDebtEngine.sol";
 import "../interfaces/IGenericTokenAdapter.sol";
 import "../interfaces/ICagable.sol";
+import "../interfaces/IShowStopper.sol";
 
 /*
     This is the `End` and it coordinates Global Settlement. This is an
@@ -149,7 +150,7 @@ import "../interfaces/ICagable.sol";
         - the number of gems is limited by how big your stablecoinAccumulator is
 */
 
-contract ShowStopper is PausableUpgradeable {
+contract ShowStopper is PausableUpgradeable, IShowStopper {
   bytes32 public constant OWNER_ROLE = 0x00;
 
   // --- Data ---
@@ -158,7 +159,7 @@ contract ShowStopper is PausableUpgradeable {
   ISystemDebtEngine public systemDebtEngine; // Debt Engine
   IPriceOracle public priceOracle;
 
-  uint256 public live; // Active Flag
+  uint256 public override live; // Active Flag
   uint256 public cagedTimestamp; // Time of cage                   [unix epoch time]
   uint256 public cageCoolDown; // Processing Cooldown Length             [seconds]
   uint256 public debt; // Total outstanding stablecoin following processing [rad]
@@ -349,7 +350,7 @@ contract ShowStopper is PausableUpgradeable {
     address positionAddress,
     address collateralReceiver,
     bytes calldata data
-  ) external {
+  ) external override {
     require(live == 0, "ShowStopper/still-live");
     require(
       positionAddress == msg.sender || bookKeeper.positionWhitelist(positionAddress, msg.sender) == 1,
