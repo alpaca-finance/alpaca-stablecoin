@@ -233,24 +233,8 @@ describe("FixedSpreadLiquidationStrategy", () => {
           mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
           mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
           mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
-          // mock contract
-          mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
-            totalDebtShare: 0,
-            debtAccumulatedRate: UnitHelpers.WeiPerRay.mul(2),
-            priceWithSafetyMargin: UnitHelpers.WeiPerRay,
-            debtCeiling: 0,
-            debtFloor: 0,
-            priceFeed: mockedPriceFeed.address,
-            liquidationRatio: 10 ** 10,
-            stabilityFeeRate: UnitHelpers.WeiPerRay,
-            lastAccumulationTime: 0,
-            adapter: AddressZero,
-            closeFactorBps: 10,
-            liquidatorIncentiveBps: 10250,
-            treasuryFeesBps: 5000,
-            strategy: AddressZero,
-          })
-          // mockedCollateralPoolConfig.smocked.collateralPools.will.return.with()
+
+          mockedCollateralPoolConfig.smocked.getPriceFeed.will.return.with(mockedPriceFeed.address)
 
           mockedPriceFeed.smocked.peekPrice.will.return.with([
             formatBytes32BigNumber(BigNumber.from("700000000000")),
@@ -277,23 +261,9 @@ describe("FixedSpreadLiquidationStrategy", () => {
           mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
           mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
           mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
-          // mock contract
-          mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
-            totalDebtShare: 0,
-            debtAccumulatedRate: UnitHelpers.WeiPerRay.mul(2),
-            priceWithSafetyMargin: UnitHelpers.WeiPerRay,
-            debtCeiling: 0,
-            debtFloor: 0,
-            priceFeed: mockedPriceFeed.address,
-            liquidationRatio: 10 ** 10,
-            stabilityFeeRate: UnitHelpers.WeiPerRay,
-            lastAccumulationTime: 0,
-            adapter: AddressZero,
-            closeFactorBps: 10,
-            liquidatorIncentiveBps: 10250,
-            treasuryFeesBps: 5000,
-            strategy: AddressZero,
-          })
+
+          mockedCollateralPoolConfig.smocked.getPriceFeed.will.return.with(mockedPriceFeed.address)
+
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
           mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(BigNumber.from("0")), true])
 
@@ -321,23 +291,18 @@ describe("FixedSpreadLiquidationStrategy", () => {
             mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
             mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
             mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
-            // mock contract
-            mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
-              totalDebtShare: 0,
-              debtAccumulatedRate: UnitHelpers.WeiPerRay.mul(2),
-              priceWithSafetyMargin: UnitHelpers.WeiPerRay,
-              debtCeiling: 0,
-              debtFloor: 0,
-              priceFeed: mockedPriceFeed.address,
-              liquidationRatio: 10 ** 10,
-              stabilityFeeRate: UnitHelpers.WeiPerRay,
-              lastAccumulationTime: 0,
-              adapter: mockedIbTokenAdapter.address,
-              closeFactorBps: 10000,
-              liquidatorIncentiveBps: 10250,
-              treasuryFeesBps: 2500,
-              strategy: fixedSpreadLiquidationStrategy.address,
-            })
+
+            mockedCollateralPoolConfig.smocked.getPriceFeed.will.return.with(mockedPriceFeed.address)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(UnitHelpers.WeiPerRay.mul(2))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(UnitHelpers.WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getLiquidationRatio.will.return.with(10 ** 10)
+            mockedCollateralPoolConfig.smocked.getCloseFactorBps.will.return.with(10000)
+            mockedCollateralPoolConfig.smocked.getLiquidatorIncentiveBps.will.return.with(10250)
+            mockedCollateralPoolConfig.smocked.getTreasuryFeesBps.will.return.with(2500)
+            mockedCollateralPoolConfig.smocked.getAdapter.will.return.with(mockedIbTokenAdapter.address)
+
+            mockedIbTokenAdapter.smocked.onMoveCollateral.will.return.with()
+
             mockedBookKeeper.smocked.confiscatePosition.will.return.with()
             mockedBookKeeper.smocked.moveCollateral.will.return.with()
             mockedBookKeeper.smocked.moveStablecoin.will.return.with()
@@ -372,10 +337,6 @@ describe("FixedSpreadLiquidationStrategy", () => {
                 ethers.utils.parseEther("2.05"),
                 ethers.utils.parseEther("0.0125")
               )
-
-            const { calls: BookkeeperCollateralPools } = mockedCollateralPoolConfig.smocked.collateralPools
-            expect(BookkeeperCollateralPools.length).to.be.equal(3)
-            expect(BookkeeperCollateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
 
             const { calls: confiscatePosition } = mockedBookKeeper.smocked.confiscatePosition
             expect(confiscatePosition.length).to.be.equal(1)
@@ -412,23 +373,17 @@ describe("FixedSpreadLiquidationStrategy", () => {
             mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
             mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
             mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
-            // mock contract
-            mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
-              totalDebtShare: 0,
-              debtAccumulatedRate: UnitHelpers.WeiPerRay.mul(12345),
-              priceWithSafetyMargin: UnitHelpers.WeiPerRay,
-              debtCeiling: 0,
-              debtFloor: 0,
-              priceFeed: mockedPriceFeed.address,
-              liquidationRatio: 10 ** 10,
-              stabilityFeeRate: UnitHelpers.WeiPerRay,
-              lastAccumulationTime: 0,
-              adapter: mockedIbTokenAdapter.address,
-              closeFactorBps: 5000,
-              liquidatorIncentiveBps: 10300,
-              treasuryFeesBps: 700,
-              strategy: fixedSpreadLiquidationStrategy.address,
-            })
+
+            mockedCollateralPoolConfig.smocked.getPriceFeed.will.return.with(mockedPriceFeed.address)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(UnitHelpers.WeiPerRay.mul(12345))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(UnitHelpers.WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getLiquidationRatio.will.return.with(10 ** 10)
+            mockedCollateralPoolConfig.smocked.getCloseFactorBps.will.return.with(5000)
+            mockedCollateralPoolConfig.smocked.getLiquidatorIncentiveBps.will.return.with(10300)
+            mockedCollateralPoolConfig.smocked.getTreasuryFeesBps.will.return.with(700)
+            mockedCollateralPoolConfig.smocked.getAdapter.will.return.with(mockedIbTokenAdapter.address)
+
+            mockedIbTokenAdapter.smocked.onMoveCollateral.will.return.with()
 
             mockedBookKeeper.smocked.confiscatePosition.will.return.with()
             mockedBookKeeper.smocked.moveCollateral.will.return.with()
@@ -450,10 +405,6 @@ describe("FixedSpreadLiquidationStrategy", () => {
               deployerAddress,
               "0x"
             )
-
-            const { calls: BookkeeperCollateralPools } = mockedCollateralPoolConfig.smocked.collateralPools
-            expect(BookkeeperCollateralPools.length).to.be.equal(3)
-            expect(BookkeeperCollateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
 
             const { calls: confiscatePosition } = mockedBookKeeper.smocked.confiscatePosition
             expect(confiscatePosition.length).to.be.equal(1)
@@ -498,23 +449,17 @@ describe("FixedSpreadLiquidationStrategy", () => {
         mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
         mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-        // mock contract
-        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
-          totalDebtShare: 0,
-          debtAccumulatedRate: UnitHelpers.WeiPerRay.mul(3),
-          priceWithSafetyMargin: UnitHelpers.WeiPerRay,
-          debtCeiling: 0,
-          debtFloor: 0,
-          priceFeed: mockedPriceFeed.address,
-          liquidationRatio: 10 ** 10,
-          stabilityFeeRate: UnitHelpers.WeiPerRay,
-          lastAccumulationTime: 0,
-          adapter: mockedIbTokenAdapter.address,
-          closeFactorBps: 5000,
-          liquidatorIncentiveBps: 10001,
-          treasuryFeesBps: 17,
-          strategy: fixedSpreadLiquidationStrategy.address,
-        })
+        mockedCollateralPoolConfig.smocked.getPriceFeed.will.return.with(mockedPriceFeed.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(UnitHelpers.WeiPerRay.mul(3))
+        mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(UnitHelpers.WeiPerRay)
+        mockedCollateralPoolConfig.smocked.getLiquidationRatio.will.return.with(10 ** 10)
+        mockedCollateralPoolConfig.smocked.getCloseFactorBps.will.return.with(5000)
+        mockedCollateralPoolConfig.smocked.getLiquidatorIncentiveBps.will.return.with(10001)
+        mockedCollateralPoolConfig.smocked.getTreasuryFeesBps.will.return.with(17)
+        mockedCollateralPoolConfig.smocked.getAdapter.will.return.with(mockedIbTokenAdapter.address)
+
+        mockedIbTokenAdapter.smocked.onMoveCollateral.will.return.with()
+
         mockedBookKeeper.smocked.confiscatePosition.will.return.with()
         mockedBookKeeper.smocked.moveCollateral.will.return.with()
         mockedBookKeeper.smocked.moveStablecoin.will.return.with()
@@ -555,10 +500,6 @@ describe("FixedSpreadLiquidationStrategy", () => {
             ethers.utils.parseEther("1.110111"),
             ethers.utils.parseEther("0.0000001887")
           )
-
-        const { calls: BookkeeperCollateralPools } = mockedCollateralPoolConfig.smocked.collateralPools
-        expect(BookkeeperCollateralPools.length).to.be.equal(3)
-        expect(BookkeeperCollateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
 
         const { calls: confiscatePosition } = mockedBookKeeper.smocked.confiscatePosition
         expect(confiscatePosition.length).to.be.equal(1)
