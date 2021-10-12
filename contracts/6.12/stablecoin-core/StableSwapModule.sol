@@ -31,15 +31,7 @@ import "../interfaces/IStableSwapModule.sol";
 // Allows anyone to go between AUSD and the Token by pooling the liquidity
 // An optional fee is charged for incoming and outgoing transfers
 
-contract StableSwapModule is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  IStableSwapModule
-{
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-
+contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IStableSwapModule {
   IBookKeeper public bookKeeper;
   IAuthTokenAdapter public override authTokenAdapter;
   IStablecoin public stablecoin;
@@ -65,7 +57,6 @@ contract StableSwapModule is
     address _systemDebtEngine
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     IAuthTokenAdapter __authTokenAdapter = authTokenAdapter = IAuthTokenAdapter(_authTokenAdapter);
@@ -77,10 +68,6 @@ contract StableSwapModule is
     to18ConversionFactor = 10**(18 - __authTokenAdapter.decimals());
     _stablecoin.approve(_stablecoinAdapter, uint256(-1));
     _bookKeeper.whitelist(_stablecoinAdapter);
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -100,14 +87,16 @@ contract StableSwapModule is
   }
 
   function setFeeIn(uint256 _feeIn) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(_feeIn <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeIn is 0.5 Ethers or 50%
     feeIn = _feeIn;
     emit SetFeeIn(msg.sender, _feeIn);
   }
 
   function setFeeOut(uint256 _feeOut) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(_feeOut <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeOut is 0.5 Ethers or 50%
     feeOut = _feeOut;
     emit SetFeeOut(msg.sender, _feeOut);
@@ -116,12 +105,14 @@ contract StableSwapModule is
   // hope can be used to transfer control of the PSM vault to another contract
   // This can be used to upgrade the contract
   function whitelist(address _usr) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     bookKeeper.whitelist(_usr);
   }
 
   function blacklist(address _usr) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     bookKeeper.blacklist(_usr);
   }
 
@@ -177,12 +168,22 @@ contract StableSwapModule is
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _unpause();
   }
 }

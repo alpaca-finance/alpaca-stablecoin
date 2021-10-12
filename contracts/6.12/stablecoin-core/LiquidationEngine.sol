@@ -38,18 +38,8 @@ import "../interfaces/ICagable.sol";
     LiquidationEngine will be the interface for the liquidator to trigger any positions into the liquidation process.
 */
 
-contract LiquidationEngine is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  ICagable,
-  ILiquidationEngine
-{
+contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, ICagable, ILiquidationEngine {
   using SafeMathUpgradeable for uint256;
-
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
 
   struct LocalVars {
     uint256 positionLockedCollateral;
@@ -60,27 +50,31 @@ contract LiquidationEngine is
     uint256 wantStablecoinValueFromLiquidation;
   }
 
+  struct CollateralPoolLocalVars {
+    address strategy;
+    uint256 priceWithSafetyMargin; // [ray]
+    uint256 debtAccumulatedRate; // [ray]
+  }
+
   IBookKeeper public bookKeeper; // CDP Engine
   ISystemDebtEngine public systemDebtEngine; // Debt Engine
-  uint256 public live; // Active Flag
+  uint256 public override live; // Active Flag
 
   // --- Init ---
   function initialize(address _bookKeeper, address _systemDebtEngine) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
+    IBookKeeper(_bookKeeper).totalStablecoinIssued(); // Sanity Check Call
     bookKeeper = IBookKeeper(_bookKeeper);
+
+    ISystemDebtEngine(_systemDebtEngine).surplusBuffer(); // Sanity Check Call
     systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
 
     // Sanity check
     bookKeeper.totalStablecoinIssued();
 
     live = 1;
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -105,18 +99,24 @@ contract LiquidationEngine is
       _positionAddress
     );
     // 1. Check if the position is underwater
-    ICollateralPoolConfig.CollateralPool memory collateralPool = bookKeeper.collateralPoolConfig().collateralPools(
+    CollateralPoolLocalVars memory _collateralPoolLocalVars;
+    _collateralPoolLocalVars.strategy = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getStrategy(
       _collateralPoolId
     );
-    ILiquidationStrategy _strategy = collateralPool.strategy;
+    _collateralPoolLocalVars.priceWithSafetyMargin = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
+      .getPriceWithSafetyMargin(_collateralPoolId); // [ray]
+    _collateralPoolLocalVars.debtAccumulatedRate = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
+      .getDebtAccumulatedRate(_collateralPoolId); // [ray]
+
+    ILiquidationStrategy _strategy = ILiquidationStrategy(_collateralPoolLocalVars.strategy);
     require(address(_strategy) != address(0), "LiquidationEngine/not-set-strategy");
 
     // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]
     // (positionDebtShare [wad] * debtAccumulatedRate [ray]) [rad]
     require(
-      collateralPool.priceWithSafetyMargin > 0 &&
-        _vars.positionLockedCollateral.mul(collateralPool.priceWithSafetyMargin) <
-        _vars.positionDebtShare.mul(collateralPool.debtAccumulatedRate),
+      _collateralPoolLocalVars.priceWithSafetyMargin > 0 &&
+        _vars.positionLockedCollateral.mul(_collateralPoolLocalVars.priceWithSafetyMargin) <
+        _vars.positionDebtShare.mul(_collateralPoolLocalVars.debtAccumulatedRate),
       "LiquidationEngine/position-is-safe"
     );
 
@@ -142,7 +142,7 @@ contract LiquidationEngine is
     // (positionDebtShare [wad] - newPositionDebtShare [wad]) * debtAccumulatedRate [ray]
 
     _vars.wantStablecoinValueFromLiquidation = _vars.positionDebtShare.sub(_vars.newPositionDebtShare).mul(
-      collateralPool.debtAccumulatedRate
+      _collateralPoolLocalVars.debtAccumulatedRate
     ); // [rad]
     require(
       bookKeeper.stablecoin(address(systemDebtEngine)).sub(_vars.systemDebtEngineStablecoinBefore) >=
@@ -167,8 +167,10 @@ contract LiquidationEngine is
   }
 
   function cage() external override {
+    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "LiquidationEngine/not-live");
@@ -177,8 +179,10 @@ contract LiquidationEngine is
   }
 
   function uncage() external override {
+    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "LiquidationEngine/not-caged");
@@ -188,12 +192,22 @@ contract LiquidationEngine is
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    require(
+      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    IAccessControlConfig accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    require(
+      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _unpause();
   }
 }

@@ -22,7 +22,7 @@ pragma solidity 0.6.12;
 import "../interfaces/IBookKeeper.sol";
 
 contract PositionHandler {
-  constructor(address bookKeeper) public {
-    IBookKeeper(bookKeeper).whitelist(msg.sender);
+  constructor(address _bookKeeper) public {
+    IBookKeeper(_bookKeeper).whitelist(msg.sender);
   }
 }

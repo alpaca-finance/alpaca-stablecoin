@@ -10,4 +10,6 @@ interface IShowStopper {
     address collateralReceiver,
     bytes calldata data
   ) external;
+
+  function live() external view returns (uint256);
 }

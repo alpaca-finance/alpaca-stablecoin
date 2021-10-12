@@ -32,33 +32,33 @@ contract ProxyWalletRegistry is OwnableUpgradeable, PausableUpgradeable, AccessC
   ProxyWalletFactory factory;
 
   // --- Init ---
-  function initialize(address factory_) external initializer {
+  function initialize(address _factory) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
-    factory = ProxyWalletFactory(factory_);
+    factory = ProxyWalletFactory(_factory);
   }
 
   // deploys a new proxy instance
   // sets owner of proxy to caller
-  function build() public returns (address payable proxy) {
-    proxy = build(msg.sender);
+  function build() public returns (address payable _proxy) {
+    _proxy = build(msg.sender);
   }
 
   // deploys a new proxy instance
   // sets custom owner of proxy
-  function build(address owner) public returns (address payable proxy) {
+  function build(address owner) public returns (address payable _proxy) {
     require(proxies[owner] == ProxyWallet(0)); // Not allow new proxy if the user already has one
-    proxy = factory.build(owner);
-    proxies[owner] = ProxyWallet(proxy);
+    _proxy = factory.build(owner);
+    proxies[owner] = ProxyWallet(_proxy);
   }
 
-  function setOwner(address newOwner) public {
-    require(proxies[newOwner] == ProxyWallet(0));
-    ProxyWallet proxy = proxies[msg.sender];
-    require(proxy.owner() == newOwner);
-    proxies[newOwner] = proxy;
+  function setOwner(address _newOwner) public {
+    require(proxies[_newOwner] == ProxyWallet(0));
+    ProxyWallet _proxy = proxies[msg.sender];
+    require(_proxy.owner() == _newOwner);
+    proxies[_newOwner] = _proxy;
     proxies[msg.sender] = ProxyWallet(0);
   }
 }

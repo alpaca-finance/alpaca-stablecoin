@@ -18,8 +18,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import "../interfaces/ICollateralPoolConfig.sol";
+import "../interfaces/IAccessControlConfig.sol";
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 interface IBookKeeper {
   function collateralToken(bytes32 collateralPoolId, address ownerAddress) external view returns (uint256);
@@ -103,5 +105,7 @@ interface IBookKeeper {
 
   function blacklist(address toBeBlacklistedAddress) external;
 
-  function collateralPoolConfig() external view returns (ICollateralPoolConfig);
+  function collateralPoolConfig() external view returns (address);
+
+  function accessControlConfig() external view returns (address);
 }
