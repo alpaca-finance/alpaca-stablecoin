@@ -12,19 +12,28 @@ contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgrad
 
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
-  IAlpacaOracle public alpacaOracleA;
-  IAlpacaOracle public alpacaOracleB;
-  address public token0;
-  address public token1;
+  struct AlpacaOracleConfig {
+    IAlpacaOracle alpacaOracle;
+    address token0;
+    address token1;
+  }
+
+  // primary.alpacaOracle will be use as the price source
+  AlpacaOracleConfig public primary;
+  // secondary.alpacaOracle will be use as the price ref for diff checking
+  AlpacaOracleConfig public secondary;
+
   uint256 public priceLife; // [seconds] how old the price is considered stale, default 1 day
   uint256 public maxPriceDiff; // [basis point] ie. 5% diff = 10500 (105%)
 
   // --- Init ---
   function initialize(
-    address _alpacaOracleA,
-    address _alpacaOracleB,
-    address _token0,
-    address _token1
+    address _primaryAlpacaOracle,
+    address _primaryToken0,
+    address _primaryToken1,
+    address _secondaryAlpacaOracle,
+    address _secondaryToken0,
+    address _secondaryToken1
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
@@ -33,10 +42,18 @@ contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgrad
     // to grant and revoke any roles afterward
     _setupRole(OWNER_ROLE, msg.sender);
 
-    alpacaOracleA = IAlpacaOracle(_alpacaOracleA);
-    alpacaOracleB = IAlpacaOracle(_alpacaOracleB);
-    token0 = _token0;
-    token1 = _token1;
+    primary.alpacaOracle = IAlpacaOracle(_primaryAlpacaOracle);
+    primary.token0 = _primaryToken0;
+    primary.token1 = _primaryToken1;
+
+    secondary.alpacaOracle = IAlpacaOracle(_secondaryAlpacaOracle);
+    secondary.token0 = _secondaryToken0;
+    secondary.token1 = _secondaryToken1;
+
+    // Sanity check
+    primary.alpacaOracle.getPrice(primary.token0, primary.token1);
+    secondary.alpacaOracle.getPrice(secondary.token0, secondary.token1);
+
     priceLife = 1 days;
     maxPriceDiff = 10500;
   }
@@ -68,36 +85,42 @@ contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgrad
   }
 
   function readPrice() external view override returns (bytes32) {
-    (uint256 price, ) = alpacaOracleA.getPrice(token0, token1);
+    (uint256 price, ) = primary.alpacaOracle.getPrice(primary.token0, primary.token1);
     return bytes32(price);
   }
 
   function peekPrice() external view override returns (bytes32, bool) {
-    (uint256 priceA, uint256 lastUpdateA) = alpacaOracleA.getPrice(token0, token1);
-    (uint256 priceB, uint256 lastUpdateB) = alpacaOracleB.getPrice(token0, token1);
+    (uint256 primaryPrice, uint256 primaryLastUpdate) = primary.alpacaOracle.getPrice(primary.token0, primary.token1);
+    (uint256 secondaryPrice, uint256 secondaryLastUpdate) = secondary.alpacaOracle.getPrice(
+      secondary.token0,
+      secondary.token1
+    );
 
-    return (bytes32(priceA), _isPriceOk(priceA, priceB, lastUpdateA, lastUpdateB));
+    return (bytes32(primaryPrice), _isPriceOk(primaryPrice, secondaryPrice, primaryLastUpdate, secondaryLastUpdate));
   }
 
   function _isPriceOk(
-    uint256 priceA,
-    uint256 priceB,
-    uint256 lastUpdateA,
-    uint256 lastUpdateB
+    uint256 primaryPrice,
+    uint256 secondaryPrice,
+    uint256 primaryLastUpdate,
+    uint256 secondaryLastUpdate
   ) internal view returns (bool) {
-    return _isPriceFresh(lastUpdateA, lastUpdateB) && _isPriceStable(priceA, priceB) && !paused();
+    return
+      _isPriceFresh(primaryLastUpdate, secondaryLastUpdate) &&
+      _isPriceStable(primaryPrice, secondaryPrice) &&
+      !paused();
   }
 
-  function _isPriceFresh(uint256 lastUpdateA, uint256 lastUpdateB) internal view returns (bool) {
+  function _isPriceFresh(uint256 primaryLastUpdate, uint256 secondaryLastUpdate) internal view returns (bool) {
     // solhint-disable not-rely-on-time
-    return lastUpdateA >= now - priceLife && lastUpdateB >= now - priceLife;
+    return primaryLastUpdate >= now - priceLife && secondaryLastUpdate >= now - priceLife;
   }
 
-  function _isPriceStable(uint256 priceA, uint256 priceB) internal view returns (bool) {
+  function _isPriceStable(uint256 primaryPrice, uint256 secondaryPrice) internal view returns (bool) {
     return
       // price too high
-      priceA.mul(10000) <= priceB.mul(maxPriceDiff) &&
+      primaryPrice.mul(10000) <= secondaryPrice.mul(maxPriceDiff) &&
       // price too low
-      priceA.mul(maxPriceDiff) >= priceB.mul(10000);
+      primaryPrice.mul(maxPriceDiff) >= secondaryPrice.mul(10000);
   }
 }
