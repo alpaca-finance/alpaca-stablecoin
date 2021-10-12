@@ -2,10 +2,13 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+
 import "@alpaca-finance/alpaca-contract/contracts/6/protocol/apis/pancakeV2/PancakeLibraryV2.sol";
 import "../interfaces/IAlpacaOracle.sol";
 
 contract SimpleDexPriceOracle is PausableUpgradeable, AccessControlUpgradeable, IAlpacaOracle {
+  using SafeMathUpgradeable for uint256;
   address dexFactory;
 
   struct PriceData {
@@ -22,7 +25,7 @@ contract SimpleDexPriceOracle is PausableUpgradeable, AccessControlUpgradeable, 
 
   /// @dev Return the wad price of token0/token1, multiplied by 1e18
   /// NOTE: (if you have 1 token0 how much you can sell it for token1)
-  function getPrice(address token0, address token1) external view override returns (uint256 price, uint256 lastUpdate) {
+  function getPrice(address token0, address token1) external view override returns (uint256, uint256) {
     if (token0 == token1) return (1e18, uint64(now));
 
     (uint256 r0, uint256 r1) = PancakeLibraryV2.getReserves(dexFactory, token0, token1);
