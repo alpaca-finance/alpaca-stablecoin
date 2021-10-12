@@ -77,7 +77,7 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     );
     require(live == 1, "StablecoinAdapter/not-live");
     live = 0;
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
@@ -89,7 +89,7 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     );
     require(live == 0, "StablecoinAdapter/not-caged");
     live = 1;
-    emit Uncage();
+    emit LogUncage();
   }
 
   uint256 constant ONE = 10**27;

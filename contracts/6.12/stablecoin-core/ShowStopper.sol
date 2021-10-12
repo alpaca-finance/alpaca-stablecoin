@@ -170,24 +170,24 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
   mapping(address => uint256) public stablecoinAccumulator; //    [wad]
   mapping(bytes32 => mapping(address => uint256)) public redeemedStablecoinAmount; //    [wad]
 
-  event Cage();
-  event Cage(bytes32 indexed collateralPoolId);
+  event LogCage();
+  event LogCage(bytes32 indexed collateralPoolId);
 
-  event AccumulateBadDebt(
+  event LogAccumulateBadDebt(
     bytes32 indexed collateralPoolId,
     address indexed positionAddress,
     uint256 amount,
     uint256 debtShare
   );
-  event RedeemLockedCollateral(
+  event LogRedeemLockedCollateral(
     bytes32 indexed collateralPoolId,
     address indexed positionAddress,
     uint256 lockedCollateral
   );
-  event FinalizeDebt();
-  event FinalizeCashPrice(bytes32 indexed collateralPoolId);
-  event AccumulateStablecoin(address indexed ownerAddress, uint256 amount);
-  event RedeemStablecoin(bytes32 indexed collateralPoolId, address indexed ownerAddress, uint256 amount);
+  event LogFinalizeDebt();
+  event LogFinalizeCashPrice(bytes32 indexed collateralPoolId);
+  event LogAccumulateStablecoin(address indexed ownerAddress, uint256 amount);
+  event LogRedeemStablecoin(bytes32 indexed collateralPoolId, address indexed ownerAddress, uint256 amount);
 
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
@@ -228,17 +228,17 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
   }
 
   // --- Administration ---
-  event SetLiquidationEngine(address indexed caller, address _liquidationEngine);
-  event SetSystemDebtEngine(address indexed caller, address _systemDebtEngine);
-  event SetPriceOracle(address indexed caller, address _priceOracle);
-  event SetCageCoolDown(address indexed caller, uint256 _cageCoolDown);
+  event LogSetLiquidationEngine(address indexed caller, address _liquidationEngine);
+  event LogSetSystemDebtEngine(address indexed caller, address _systemDebtEngine);
+  event LogSetPriceOracle(address indexed caller, address _priceOracle);
+  event LogSetCageCoolDown(address indexed caller, uint256 _cageCoolDown);
 
   function setLiquidationEngine(address _liquidationEngine) external {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 1, "ShowStopper/not-live");
     liquidationEngine = ILiquidationEngine(_liquidationEngine);
-    emit SetLiquidationEngine(msg.sender, _liquidationEngine);
+    emit LogSetLiquidationEngine(msg.sender, _liquidationEngine);
   }
 
   function setSystemDebtEngine(address _systemDebtEngine) external {
@@ -246,7 +246,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 1, "ShowStopper/not-live");
     systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
-    emit SetSystemDebtEngine(msg.sender, _systemDebtEngine);
+    emit LogSetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
 
   function setPriceOracle(address _priceOracle) external {
@@ -254,7 +254,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 1, "ShowStopper/not-live");
     priceOracle = IPriceOracle(_priceOracle);
-    emit SetPriceOracle(msg.sender, _priceOracle);
+    emit LogSetPriceOracle(msg.sender, _priceOracle);
   }
 
   function setCageCoolDown(uint256 _cageCoolDown) external {
@@ -262,7 +262,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 1, "ShowStopper/not-live");
     cageCoolDown = _cageCoolDown;
-    emit SetCageCoolDown(msg.sender, _cageCoolDown);
+    emit LogSetCageCoolDown(msg.sender, _cageCoolDown);
   }
 
   // --- Settlement ---
@@ -283,7 +283,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     ICagable(address(liquidationEngine)).cage();
     ICagable(address(systemDebtEngine)).cage();
     ICagable(address(priceOracle)).cage();
-    emit Cage();
+    emit LogCage();
   }
 
   /// @dev Set the cage price of the collateral pool with the latest price from the price oracle
@@ -303,7 +303,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     totalDebtShare[_collateralPoolId] = _totalDebtShare;
     // par is a ray, priceFeed returns a wad
     cagePrice[_collateralPoolId] = wdiv(priceOracle.stableCoinReferencePrice(), uint256(_priceFeed.readPrice()));
-    emit Cage(_collateralPoolId);
+    emit LogCage(_collateralPoolId);
   }
 
   /** @dev Inspect the specified position and use the cage price of the collateral pool id to calculate the current badDebtAccumulator of the position.
@@ -338,7 +338,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
       -int256(_amount),
       -int256(_debtShare)
     );
-    emit AccumulateBadDebt(_collateralPoolId, _positionAddress, _amount, _debtShare);
+    emit LogAccumulateBadDebt(_collateralPoolId, _positionAddress, _amount, _debtShare);
   }
 
   /** @dev Redeem locked collateral from the position which has been safely settled by the emergency shutdown and give the collateral back to the position owner.
@@ -371,7 +371,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
       0
     );
     _adapter.onMoveCollateral(_positionAddress, _collateralReceiver, _lockedCollateralAmount, _data);
-    emit RedeemLockedCollateral(_collateralPoolId, _collateralReceiver, _lockedCollateralAmount);
+    emit LogRedeemLockedCollateral(_collateralPoolId, _collateralReceiver, _lockedCollateralAmount);
   }
 
   /** @dev Finalize the total debt of the system after the emergency shutdown.
@@ -388,7 +388,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     require(bookKeeper.stablecoin(address(systemDebtEngine)) == 0, "ShowStopper/surplus-not-zero");
     require(block.timestamp >= add(cagedTimestamp, cageCoolDown), "ShowStopper/cage-cool-down-not-finished");
     debt = bookKeeper.totalStablecoinIssued();
-    emit FinalizeDebt();
+    emit LogFinalizeDebt();
   }
 
   /** @dev Calculate the redeemStablecoin price of the collateral pool id.
@@ -404,7 +404,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
       .getDebtAccumulatedRate(_collateralPoolId); // [ray]
     uint256 _wad = rmul(rmul(totalDebtShare[_collateralPoolId], _debtAccumulatedRate), cagePrice[_collateralPoolId]);
     finalCashPrice[_collateralPoolId] = mul(sub(_wad, badDebtAccumulator[_collateralPoolId]), RAY) / (debt / RAY);
-    emit FinalizeCashPrice(_collateralPoolId);
+    emit LogFinalizeCashPrice(_collateralPoolId);
   }
 
   /// @dev Accumulate the deposited stablecoin of the caller into a stablecoinAccumulator to be redeemed into collateral token later
@@ -413,13 +413,13 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     require(debt != 0, "ShowStopper/debt-zero");
     bookKeeper.moveStablecoin(msg.sender, address(systemDebtEngine), mul(_amount, RAY));
     stablecoinAccumulator[msg.sender] = add(stablecoinAccumulator[msg.sender], _amount);
-    emit AccumulateStablecoin(msg.sender, _amount);
+    emit LogAccumulateStablecoin(msg.sender, _amount);
   }
 
   /// @dev Redeem all the stablecoin in the stablecoinAccumulator of the caller into the corresponding collateral token
   /// @param _collateralPoolId Collateral pool id
   /// @param _amount the amount of stablecoin to be redeemed [wad]
-  function redeemStablecoin(bytes32 _collateralPoolId, uint256 _amount) external {
+  function LogredeemStablecoin(bytes32 _collateralPoolId, uint256 _amount) external {
     require(finalCashPrice[_collateralPoolId] != 0, "ShowStopper/final-cash-price-collateral-pool-id-not-defined");
     bookKeeper.moveCollateral(
       _collateralPoolId,
@@ -435,6 +435,6 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
       redeemedStablecoinAmount[_collateralPoolId][msg.sender] <= stablecoinAccumulator[msg.sender],
       "ShowStopper/insufficient-stablecoin-accumulator-balance"
     );
-    emit RedeemStablecoin(_collateralPoolId, msg.sender, _amount);
+    emit LogRedeemStablecoin(_collateralPoolId, msg.sender, _amount);
   }
 }

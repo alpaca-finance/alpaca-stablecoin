@@ -40,8 +40,8 @@ contract AlpacaStablecoin is IStablecoin, AccessControlUpgradeable {
   mapping(address => mapping(address => uint256)) public allowance;
   mapping(address => uint256) public nonces;
 
-  event Approval(address indexed src, address indexed guy, uint256 wad);
-  event Transfer(address indexed src, address indexed dst, uint256 wad);
+  event LogApproval(address indexed src, address indexed guy, uint256 wad);
+  event LogTransfer(address indexed src, address indexed dst, uint256 wad);
 
   // --- Math ---
   function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
@@ -100,7 +100,7 @@ contract AlpacaStablecoin is IStablecoin, AccessControlUpgradeable {
     }
     balanceOf[_src] = sub(balanceOf[_src], _wad);
     balanceOf[_dst] = add(balanceOf[_dst], _wad);
-    emit Transfer(_src, _dst, _wad);
+    emit LogTransfer(_src, _dst, _wad);
     return true;
   }
 
@@ -109,7 +109,7 @@ contract AlpacaStablecoin is IStablecoin, AccessControlUpgradeable {
 
     balanceOf[_usr] = add(balanceOf[_usr], _wad);
     totalSupply = add(totalSupply, _wad);
-    emit Transfer(address(0), _usr, _wad);
+    emit LogTransfer(address(0), _usr, _wad);
   }
 
   function burn(address _usr, uint256 _wad) external override {
@@ -120,12 +120,12 @@ contract AlpacaStablecoin is IStablecoin, AccessControlUpgradeable {
     }
     balanceOf[_usr] = sub(balanceOf[_usr], _wad);
     totalSupply = sub(totalSupply, _wad);
-    emit Transfer(_usr, address(0), _wad);
+    emit LogTransfer(_usr, address(0), _wad);
   }
 
   function approve(address _usr, uint256 _wad) external override returns (bool) {
     allowance[msg.sender][_usr] = _wad;
-    emit Approval(msg.sender, _usr, _wad);
+    emit LogApproval(msg.sender, _usr, _wad);
     return true;
   }
 
@@ -171,6 +171,6 @@ contract AlpacaStablecoin is IStablecoin, AccessControlUpgradeable {
     require(_nonce == nonces[_holder]++, "AlpacaStablecoin/invalid-nonce");
     uint256 _wad = _allowed ? uint256(-1) : 0;
     allowance[_holder][_spender] = _wad;
-    emit Approval(_holder, _spender, _wad);
+    emit LogApproval(_holder, _spender, _wad);
   }
 }

@@ -90,13 +90,13 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
   }
 
   // --- Administration ---
-  event SetSurplusBuffer(address indexed _caller, uint256 _data);
+  event LogSetSurplusBuffer(address indexed _caller, uint256 _data);
 
   function setSurplusBuffer(uint256 _data) external whenNotPaused {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     surplusBuffer = _data;
-    emit SetSurplusBuffer(msg.sender, _data);
+    emit LogSetSurplusBuffer(msg.sender, _data);
   }
 
   // Debt settlement
@@ -121,7 +121,7 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     require(live == 1, "SystemDebtEngine/not-live");
     live = 0;
     bookKeeper.settleSystemBadDebt(min(bookKeeper.stablecoin(address(this)), bookKeeper.systemBadDebt(address(this))));
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
@@ -133,7 +133,7 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     );
     require(live == 0, "SystemDebtEngine/not-caged");
     live = 1;
-    emit Uncage();
+    emit LogUncage();
   }
 
   // --- pause ---

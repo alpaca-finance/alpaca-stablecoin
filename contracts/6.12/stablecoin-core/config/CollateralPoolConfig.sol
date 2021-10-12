@@ -27,7 +27,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
   event LogSetTreasuryFeesBps(address indexed caller, bytes32 collateralPoolId, uint256 _treasuryFeeBps);
   event LogSetStrategy(address indexed caller, bytes32 _collateralPoolId, address strategy);
 
-  mapping(bytes32 => ICollateralPoolConfig.CollateralPool) public _collateralPools;
+  mapping(bytes32 => ICollateralPoolConfig.CollateralPool) private _collateralPools;
 
   function collateralPools(bytes32 _collateralPoolId)
     external

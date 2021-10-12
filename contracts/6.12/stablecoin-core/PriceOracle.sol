@@ -114,7 +114,7 @@ contract PriceOracle is PausableUpgradeable, ReentrancyGuardUpgradeable, IPriceO
     );
     require(live == 1, "PriceOracle/not-live");
     live = 0;
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
@@ -126,7 +126,7 @@ contract PriceOracle is PausableUpgradeable, ReentrancyGuardUpgradeable, IPriceO
     );
     require(live == 0, "PriceOracle/not-caged");
     live = 1;
-    emit Uncage();
+    emit LogUncage();
   }
 
   // --- pause ---

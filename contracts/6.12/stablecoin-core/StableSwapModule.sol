@@ -45,10 +45,10 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
   uint256 public feeOut; // fee out [wad]
 
   // --- Events ---
-  event SetFeeIn(address indexed _caller, uint256 _feeIn);
-  event SetFeeOut(address indexed _caller, uint256 _feeOut);
-  event SwapTokenToStablecoin(address indexed _owner, uint256 _value, uint256 _fee);
-  event SwapStablecoinToToken(address indexed _owner, uint256 _value, uint256 _fee);
+  event LogSetFeeIn(address indexed _caller, uint256 _feeIn);
+  event LogSetFeeOut(address indexed _caller, uint256 _feeOut);
+  event LogSwapTokenToStablecoin(address indexed _owner, uint256 _value, uint256 _fee);
+  event LogSwapStablecoinToToken(address indexed _owner, uint256 _value, uint256 _fee);
 
   // --- Init ---
   function initialize(
@@ -91,7 +91,7 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(_feeIn <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeIn is 0.5 Ethers or 50%
     feeIn = _feeIn;
-    emit SetFeeIn(msg.sender, _feeIn);
+    emit LogSetFeeIn(msg.sender, _feeIn);
   }
 
   function setFeeOut(uint256 _feeOut) external {
@@ -99,7 +99,7 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(_feeOut <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeOut is 0.5 Ethers or 50%
     feeOut = _feeOut;
-    emit SetFeeOut(msg.sender, _feeOut);
+    emit LogSetFeeOut(msg.sender, _feeOut);
   }
 
   // hope can be used to transfer control of the PSM vault to another contract
@@ -138,7 +138,7 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(_fee, RAY));
     stablecoinAdapter.withdraw(_usr, _stablecoinAmount, abi.encode(0));
 
-    emit SwapTokenToStablecoin(_usr, _tokenAmount, _fee);
+    emit LogSwapTokenToStablecoin(_usr, _tokenAmount, _fee);
   }
 
   /**
@@ -163,7 +163,7 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     authTokenAdapter.withdraw(_usr, _tokenAmount);
     bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(_fee, RAY));
 
-    emit SwapStablecoinToToken(_usr, _tokenAmount, _fee);
+    emit LogSwapStablecoinToToken(_usr, _tokenAmount, _fee);
   }
 
   // --- pause ---

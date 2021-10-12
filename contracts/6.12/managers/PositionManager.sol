@@ -48,30 +48,30 @@ contract PositionManager is PausableUpgradeable, IManager {
     uint256 next;
   }
 
-  event NewPosition(address indexed _usr, address indexed _own, uint256 indexed _positionId);
-  event AllowManagePosition(
+  event LogNewPosition(address indexed _usr, address indexed _own, uint256 indexed _positionId);
+  event LogAllowManagePosition(
     address indexed _caller,
     uint256 indexed _positionId,
     address _owner,
     address _user,
     uint256 _ok
   );
-  event AllowMigratePosition(address indexed _caller, address _user, uint256 _ok);
-  event ExportPosition(
+  event LogAllowMigratePosition(address indexed _caller, address _user, uint256 _ok);
+  event LogExportPosition(
     uint256 indexed _positionId,
     address _source,
     address _destination,
     uint256 _lockedCollateral,
     uint256 _debtShare
   );
-  event ImportPosition(
+  event LogImportPosition(
     uint256 indexed _positionId,
     address _source,
     address _destination,
     uint256 _lockedCollateral,
     uint256 _debtShare
   );
-  event MovePosition(uint256 _sourceId, uint256 _destinationId, uint256 _lockedCollateral, uint256 _debtShare);
+  event LogMovePosition(uint256 _sourceId, uint256 _destinationId, uint256 _lockedCollateral, uint256 _debtShare);
 
   /// @dev Require that the caller must be position's owner or owner whitelist
   modifier onlyOwnerAllowed(uint256 _positionId) {
@@ -126,7 +126,7 @@ contract PositionManager is PausableUpgradeable, IManager {
     uint256 _ok
   ) public override whenNotPaused onlyOwnerAllowed(_positionId) {
     ownerWhitelist[owners[_positionId]][_positionId][_user] = _ok;
-    emit AllowManagePosition(msg.sender, _positionId, owners[_positionId], _user, _ok);
+    emit LogAllowManagePosition(msg.sender, _positionId, owners[_positionId], _user, _ok);
   }
 
   /// @dev Allow/disallow a user to importPosition/exportPosition from/to msg.sender
@@ -134,7 +134,7 @@ contract PositionManager is PausableUpgradeable, IManager {
   /// @param _ok Ok flag to allow/disallow
   function allowMigratePosition(address _user, uint256 _ok) public override whenNotPaused {
     migrationWhitelist[msg.sender][_user] = _ok;
-    emit AllowMigratePosition(msg.sender, _user, _ok);
+    emit LogAllowMigratePosition(msg.sender, _user, _ok);
   }
 
   /// @dev Open a new position for a given user address.
@@ -163,7 +163,7 @@ contract PositionManager is PausableUpgradeable, IManager {
     ownerLastPositionId[_user] = lastPositionId;
     ownerPositionCount[_user] = _safeAdd(ownerPositionCount[_user], 1);
 
-    emit NewPosition(msg.sender, _user, lastPositionId);
+    emit LogNewPosition(msg.sender, _user, lastPositionId);
 
     return lastPositionId;
   }
@@ -318,7 +318,7 @@ contract PositionManager is PausableUpgradeable, IManager {
       _safeToInt(_lockedCollateral),
       _safeToInt(_debtShare)
     );
-    emit ExportPosition(_positionId, positions[_positionId], _destination, _lockedCollateral, _debtShare);
+    emit LogExportPosition(_positionId, positions[_positionId], _destination, _lockedCollateral, _debtShare);
   }
 
   /// @dev Import lockedCollateral and debtShare from the source address to
@@ -344,7 +344,7 @@ contract PositionManager is PausableUpgradeable, IManager {
       _safeToInt(_lockedCollateral),
       _safeToInt(_debtShare)
     );
-    emit ImportPosition(_positionId, _source, positions[_positionId], _lockedCollateral, _debtShare);
+    emit LogImportPosition(_positionId, _source, positions[_positionId], _lockedCollateral, _debtShare);
   }
 
   /// @dev Move position's lockedCollateral and debtShare
@@ -370,7 +370,7 @@ contract PositionManager is PausableUpgradeable, IManager {
       _safeToInt(_lockedCollateral),
       _safeToInt(_debtShare)
     );
-    emit MovePosition(_sourceId, _destinationId, _lockedCollateral, _debtShare);
+    emit LogMovePosition(_sourceId, _destinationId, _lockedCollateral, _debtShare);
   }
 
   // --- pause ---

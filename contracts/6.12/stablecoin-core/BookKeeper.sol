@@ -180,7 +180,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     require(live == 1, "BookKeeper/not-live");
     live = 0;
 
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
@@ -193,7 +193,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     require(live == 0, "BookKeeper/not-caged");
     live = 1;
 
-    emit Uncage();
+    emit LogUncage();
   }
 
   // --- Fungibility ---
