@@ -1,4 +1,4 @@
-import { ethers, waffle } from "hardhat"
+import { ethers, upgrades, waffle } from "hardhat"
 import { Signer } from "ethers"
 import chai from "chai"
 import { solidity } from "ethereum-waffle"
@@ -22,7 +22,11 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   // Deploy mocked BookKeeper
   const AlpacaStablecoin = (await ethers.getContractFactory("AlpacaStablecoin", deployer)) as AlpacaStablecoin__factory
-  const alpacaStablecoin = await AlpacaStablecoin.deploy("Alpaca USD", "AUSD", "31337")
+  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [
+    "Alpaca USD",
+    "AUSD",
+    "31337",
+  ])) as AlpacaStablecoin
   await alpacaStablecoin.deployed()
 
   return { alpacaStablecoin }
