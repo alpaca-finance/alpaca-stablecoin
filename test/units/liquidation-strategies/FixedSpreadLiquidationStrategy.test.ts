@@ -28,10 +28,16 @@ type fixture = {
   mockedFlashLendingCallee: MockContract
   mockedPositionManager: MockContract
   mockedIbTokenAdapter: MockContract
+  mockedCollateralPoolConfig: MockContract
+  mockedAccessControlConfig: MockContract
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
+
+  const mockedAccessControlConfig = await smockit(await ethers.getContractFactory("AccessControlConfig", deployer))
+
+  const mockedCollateralPoolConfig = await smockit(await ethers.getContractFactory("CollateralPoolConfig", deployer))
 
   // Deploy mocked BookKeeper
   const mockedBookKeeper = await smockit(await ethers.getContractFactory("BookKeeper", deployer))
@@ -79,6 +85,8 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     mockedFlashLendingCallee,
     mockedPositionManager,
     mockedIbTokenAdapter,
+    mockedAccessControlConfig,
+    mockedCollateralPoolConfig,
   }
 }
 
@@ -100,6 +108,8 @@ describe("FixedSpreadLiquidationStrategy", () => {
   let mockedFlashLendingCallee: MockContract
   let mockedPositionManager: MockContract
   let mockedIbTokenAdapter: MockContract
+  let mockedCollateralPoolConfig: MockContract
+  let mockedAccessControlConfig: MockContract
 
   let fixedSpreadLiquidationStrategy: FixedSpreadLiquidationStrategy
   let fixedSpreadLiquidationStrategyAsAlice: FixedSpreadLiquidationStrategy
@@ -115,6 +125,8 @@ describe("FixedSpreadLiquidationStrategy", () => {
       mockedFlashLendingCallee,
       mockedPositionManager,
       mockedIbTokenAdapter,
+      mockedCollateralPoolConfig,
+      mockedAccessControlConfig,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
@@ -125,247 +137,13 @@ describe("FixedSpreadLiquidationStrategy", () => {
     ) as FixedSpreadLiquidationStrategy
   })
 
-  describe("#setCollateralPool", () => {
-    context("when the caller is not the owner", () => {
-      it("should be revert", async () => {
-        await expect(
-          fixedSpreadLiquidationStrategyAsAlice.setCollateralPool(
-            formatBytes32String("BNB"),
-            mockedIbTokenAdapter.address,
-            10,
-            10010,
-            10
-          )
-        ).to.be.revertedWith("!ownerRole")
-      })
-    })
-    context("when close factor is more than 100%", () => {
-      it("should be revert", async () => {
-        // grant role access
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.OWNER_ROLE(),
-          deployerAddress
-        )
-
-        // set Collateral
-        await expect(
-          fixedSpreadLiquidationStrategy.setCollateralPool(
-            formatBytes32String("BNB"),
-            mockedIbTokenAdapter.address,
-            10001,
-            10010,
-            10
-          )
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-close-factor")
-      })
-    })
-    context("when liquidator incentive is more than 25%", () => {
-      it("should be revert", async () => {
-        // grant role access
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.OWNER_ROLE(),
-          deployerAddress
-        )
-
-        // set Collateral
-        await expect(
-          fixedSpreadLiquidationStrategy.setCollateralPool(
-            formatBytes32String("BNB"),
-            mockedIbTokenAdapter.address,
-            10,
-            2501,
-            10
-          )
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-liquidator-incentive-bps")
-      })
-    })
-    context("when treasury fees is more than 90%", () => {
-      it("should be revert", async () => {
-        // grant role access
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.OWNER_ROLE(),
-          deployerAddress
-        )
-
-        // set Collateral
-        await expect(
-          fixedSpreadLiquidationStrategy.setCollateralPool(
-            formatBytes32String("BNB"),
-            mockedIbTokenAdapter.address,
-            10,
-            10010,
-            9001
-          )
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps")
-      })
-    })
-    context("when parameters are valid", () => {
-      it("should be able to call setCollateralPool", async () => {
-        // grant role access
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.OWNER_ROLE(),
-          deployerAddress
-        )
-
-        // set Collateral
-        await expect(
-          fixedSpreadLiquidationStrategy.setCollateralPool(
-            formatBytes32String("BNB"),
-            mockedIbTokenAdapter.address,
-            10,
-            10010,
-            10
-          )
-        )
-          .to.emit(fixedSpreadLiquidationStrategy, "SetCollateralPool")
-          .withArgs(deployerAddress, formatBytes32String("BNB"), mockedIbTokenAdapter.address, 10, 10010, 10)
-      })
-    })
-  })
-
-  describe("#setAdapter", () => {
-    context("when the caller is not the owner", () => {
-      it("should be revert", async () => {
-        await expect(
-          fixedSpreadLiquidationStrategyAsAlice.setAdapter(formatBytes32String("BNB"), mockedIbTokenAdapter.address)
-        ).to.be.revertedWith("!ownerRole")
-      })
-    })
-    context("when parameters are valid", () => {
-      it("should be able to call setAdapter", async () => {
-        // grant role access
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.OWNER_ROLE(),
-          deployerAddress
-        )
-
-        // set Adapter
-        await expect(
-          fixedSpreadLiquidationStrategy.setAdapter(formatBytes32String("BNB"), mockedIbTokenAdapter.address)
-        )
-          .to.emit(fixedSpreadLiquidationStrategy, "SetAdapter")
-          .withArgs(deployerAddress, formatBytes32String("BNB"), mockedIbTokenAdapter.address)
-      })
-    })
-  })
-
-  describe("#setCloseFactorBps", () => {
-    context("when the caller is not the owner", () => {
-      it("should be revert", async () => {
-        await expect(
-          fixedSpreadLiquidationStrategyAsAlice.setCloseFactorBps(formatBytes32String("BNB"), 10)
-        ).to.be.revertedWith("!ownerRole")
-      })
-    })
-    context("when close factor is more than 100%", () => {
-      it("should be revert", async () => {
-        // grant role access
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.OWNER_ROLE(),
-          deployerAddress
-        )
-
-        // set Close Factor
-        await expect(
-          fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 10001)
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-close-factor")
-      })
-    })
-    context("when parameters are valid", () => {
-      it("should be able to call setCloseFactorBps", async () => {
-        // grant role access
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.OWNER_ROLE(),
-          deployerAddress
-        )
-
-        // set Close Factor
-        await expect(fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 10))
-          .to.emit(fixedSpreadLiquidationStrategy, "SetCloseFactorBps")
-          .withArgs(deployerAddress, formatBytes32String("BNB"), 10)
-      })
-    })
-  })
-
-  describe("#setLiquidatorIncentiveBps", () => {
-    context("when the caller is not the owner", () => {
-      it("should be revert", async () => {
-        await expect(
-          fixedSpreadLiquidationStrategyAsAlice.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10010)
-        ).to.be.revertedWith("!ownerRole")
-      })
-    })
-    context("when liquidator incentive is more than 25%", () => {
-      it("should be revert", async () => {
-        // grant role access
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.OWNER_ROLE(),
-          deployerAddress
-        )
-
-        // set liquidator incentive
-        await expect(
-          fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 2501)
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-liquidator-incentive-bps")
-      })
-    })
-    context("when parameters are valid", () => {
-      it("should be able to call setLiquidatorIncentiveBps", async () => {
-        // grant role access
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.OWNER_ROLE(),
-          deployerAddress
-        )
-
-        // set liquidator incentive
-        await expect(fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10010))
-          .to.emit(fixedSpreadLiquidationStrategy, "SetLiquidatorIncentiveBps")
-          .withArgs(deployerAddress, formatBytes32String("BNB"), 10010)
-      })
-    })
-  })
-
-  describe("#setTreasuryFeesBps", () => {
-    context("when the caller is not the owner", () => {
-      it("should be revert", async () => {
-        await expect(
-          fixedSpreadLiquidationStrategyAsAlice.setTreasuryFeesBps(formatBytes32String("BNB"), 10)
-        ).to.be.revertedWith("!ownerRole")
-      })
-    })
-    context("when treasury fees is more than 90%", () => {
-      it("should be revert", async () => {
-        // grant role access
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.OWNER_ROLE(),
-          deployerAddress
-        )
-
-        // set treasury fees
-        await expect(
-          fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 12501)
-        ).to.be.revertedWith("FixedSpreadLiquidationStrategy/invalid-treasury-fees-bps")
-      })
-    })
-    context("when parameters are valid", () => {
-      it("should be able to call setTreasuryFeesBps", async () => {
-        // grant role access
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.OWNER_ROLE(),
-          deployerAddress
-        )
-
-        // set treasury fees
-        await expect(fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 10))
-          .to.emit(fixedSpreadLiquidationStrategy, "SetTreasuryFeesBps")
-          .withArgs(deployerAddress, formatBytes32String("BNB"), 10)
-      })
-    })
-  })
-
   describe("#execute", () => {
-    context("when the caller is not the owner", () => {
+    context("when the caller is not allowed", () => {
       it("should be revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
+
         await expect(
           fixedSpreadLiquidationStrategyAsAlice.execute(
             formatBytes32String("BNB"),
@@ -384,10 +162,9 @@ describe("FixedSpreadLiquidationStrategy", () => {
     context("when input is invalid", () => {
       context("when positionDebtShare <= 0", () => {
         it("should be revert", async () => {
-          await fixedSpreadLiquidationStrategy.grantRole(
-            await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
-            deployerAddress
-          )
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           await expect(
             fixedSpreadLiquidationStrategy.execute(
@@ -407,10 +184,9 @@ describe("FixedSpreadLiquidationStrategy", () => {
 
       context("when positionCollateralAmount <= 0", () => {
         it("should be revert", async () => {
-          await fixedSpreadLiquidationStrategy.grantRole(
-            await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
-            deployerAddress
-          )
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           await expect(
             fixedSpreadLiquidationStrategy.execute(
@@ -430,10 +206,9 @@ describe("FixedSpreadLiquidationStrategy", () => {
 
       context("when positionAddress == 0", () => {
         it("should be revert", async () => {
-          await fixedSpreadLiquidationStrategy.grantRole(
-            await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
-            deployerAddress
-          )
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           await expect(
             fixedSpreadLiquidationStrategy.execute(
@@ -455,25 +230,16 @@ describe("FixedSpreadLiquidationStrategy", () => {
     context("when feedprice is invalid", () => {
       context("when priceFeed marked price as not ok", () => {
         it("should be revert", async () => {
-          await fixedSpreadLiquidationStrategy.grantRole(
-            await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
-            deployerAddress
-          )
-          // mock contract
-          mockedBookKeeper.smocked.collateralPools.will.return.with([
-            BigNumber.from(0),
-            UnitHelpers.WeiPerRay.mul(2),
-            UnitHelpers.WeiPerRay,
-            BigNumber.from(0),
-            BigNumber.from(0),
-          ])
-          mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, 0])
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
+          mockedCollateralPoolConfig.smocked.getPriceFeed.will.return.with(mockedPriceFeed.address)
+
           mockedPriceFeed.smocked.peekPrice.will.return.with([
             formatBytes32BigNumber(BigNumber.from("700000000000")),
             false,
           ])
-
-          await fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 10)
 
           await expect(
             fixedSpreadLiquidationStrategy.execute(
@@ -492,23 +258,14 @@ describe("FixedSpreadLiquidationStrategy", () => {
       })
       context("feedprice <= 0", () => {
         it("should be revert", async () => {
-          await fixedSpreadLiquidationStrategy.grantRole(
-            await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
-            deployerAddress
-          )
-          // mock contract
-          mockedBookKeeper.smocked.collateralPools.will.return.with([
-            BigNumber.from(0),
-            UnitHelpers.WeiPerRay.mul(2),
-            UnitHelpers.WeiPerRay,
-            BigNumber.from(0),
-            BigNumber.from(0),
-          ])
-          mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, 0])
-          mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with([UnitHelpers.WeiPerRay])
-          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(BigNumber.from("0")), true])
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-          await fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 10)
+          mockedCollateralPoolConfig.smocked.getPriceFeed.will.return.with(mockedPriceFeed.address)
+
+          mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
+          mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(BigNumber.from("0")), true])
 
           await expect(
             fixedSpreadLiquidationStrategy.execute(
@@ -531,29 +288,26 @@ describe("FixedSpreadLiquidationStrategy", () => {
       context("when feedprice == 1", () => {
         context("and debtAccumulatedRate == 2", () => {
           it("should be success", async () => {
-            await fixedSpreadLiquidationStrategy.grantRole(
-              await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
-              deployerAddress
-            )
-            // mock contract
-            mockedBookKeeper.smocked.collateralPools.will.return.with([
-              BigNumber.from(0),
-              UnitHelpers.WeiPerRay.mul(2),
-              UnitHelpers.WeiPerRay,
-              BigNumber.from(0),
-              BigNumber.from(0),
-            ])
+            mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+            mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+            mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
+            mockedCollateralPoolConfig.smocked.getPriceFeed.will.return.with(mockedPriceFeed.address)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(UnitHelpers.WeiPerRay.mul(2))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(UnitHelpers.WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getLiquidationRatio.will.return.with(10 ** 10)
+            mockedCollateralPoolConfig.smocked.getCloseFactorBps.will.return.with(10000)
+            mockedCollateralPoolConfig.smocked.getLiquidatorIncentiveBps.will.return.with(10250)
+            mockedCollateralPoolConfig.smocked.getTreasuryFeesBps.will.return.with(2500)
+            mockedCollateralPoolConfig.smocked.getAdapter.will.return.with(mockedIbTokenAdapter.address)
+
+            mockedIbTokenAdapter.smocked.onMoveCollateral.will.return.with()
+
             mockedBookKeeper.smocked.confiscatePosition.will.return.with()
             mockedBookKeeper.smocked.moveCollateral.will.return.with()
             mockedBookKeeper.smocked.moveStablecoin.will.return.with()
-            mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, 0])
             mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
             mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(UnitHelpers.WeiPerWad), true])
-
-            await fixedSpreadLiquidationStrategy.setAdapter(formatBytes32String("BNB"), mockedIbTokenAdapter.address)
-            await fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 10000)
-            await fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10250)
-            await fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 2500)
 
             await expect(
               fixedSpreadLiquidationStrategy.execute(
@@ -568,7 +322,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
                 "0x"
               )
             )
-              .to.emit(fixedSpreadLiquidationStrategy, "FixedSpreadLiquidate")
+              .to.emit(fixedSpreadLiquidationStrategy, "LogFixedSpreadLiquidate")
               .withArgs(
                 formatBytes32String("BNB"),
                 UnitHelpers.WeiPerWad,
@@ -583,10 +337,6 @@ describe("FixedSpreadLiquidationStrategy", () => {
                 ethers.utils.parseEther("2.05"),
                 ethers.utils.parseEther("0.0125")
               )
-
-            const { calls: BookkeeperCollateralPools } = mockedBookKeeper.smocked.collateralPools
-            expect(BookkeeperCollateralPools.length).to.be.equal(1)
-            expect(BookkeeperCollateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
 
             const { calls: confiscatePosition } = mockedBookKeeper.smocked.confiscatePosition
             expect(confiscatePosition.length).to.be.equal(1)
@@ -610,10 +360,6 @@ describe("FixedSpreadLiquidationStrategy", () => {
             expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
             expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("0.0125"))
 
-            const { calls: PriceOracleCollateralPools } = mockedPriceOracle.smocked.collateralPools
-            expect(PriceOracleCollateralPools.length).to.be.equal(1)
-            expect(PriceOracleCollateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
-
             const { calls: stableCoinReferencePrice } = mockedPriceOracle.smocked.stableCoinReferencePrice
             expect(stableCoinReferencePrice.length).to.be.equal(1)
 
@@ -624,32 +370,29 @@ describe("FixedSpreadLiquidationStrategy", () => {
 
         context("and debtAccumulatedRate == 12345", () => {
           it("should be success", async () => {
-            await fixedSpreadLiquidationStrategy.grantRole(
-              await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
-              deployerAddress
-            )
-            // mock contract
-            mockedBookKeeper.smocked.collateralPools.will.return.with([
-              BigNumber.from(0),
-              UnitHelpers.WeiPerRay.mul(12345),
-              UnitHelpers.WeiPerRay,
-              BigNumber.from(0),
-              BigNumber.from(0),
-            ])
+            mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+            mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+            mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
+            mockedCollateralPoolConfig.smocked.getPriceFeed.will.return.with(mockedPriceFeed.address)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(UnitHelpers.WeiPerRay.mul(12345))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(UnitHelpers.WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getLiquidationRatio.will.return.with(10 ** 10)
+            mockedCollateralPoolConfig.smocked.getCloseFactorBps.will.return.with(5000)
+            mockedCollateralPoolConfig.smocked.getLiquidatorIncentiveBps.will.return.with(10300)
+            mockedCollateralPoolConfig.smocked.getTreasuryFeesBps.will.return.with(700)
+            mockedCollateralPoolConfig.smocked.getAdapter.will.return.with(mockedIbTokenAdapter.address)
+
+            mockedIbTokenAdapter.smocked.onMoveCollateral.will.return.with()
+
             mockedBookKeeper.smocked.confiscatePosition.will.return.with()
             mockedBookKeeper.smocked.moveCollateral.will.return.with()
             mockedBookKeeper.smocked.moveStablecoin.will.return.with()
-            mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, 0])
             mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
             mockedPriceFeed.smocked.peekPrice.will.return.with([
               formatBytes32BigNumber(UnitHelpers.WeiPerWad.mul(2)),
               true,
             ])
-
-            await fixedSpreadLiquidationStrategy.setAdapter(formatBytes32String("BNB"), mockedIbTokenAdapter.address)
-            await fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 5000)
-            await fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10300)
-            await fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 700)
 
             await fixedSpreadLiquidationStrategy.execute(
               formatBytes32String("BNB"),
@@ -662,10 +405,6 @@ describe("FixedSpreadLiquidationStrategy", () => {
               deployerAddress,
               "0x"
             )
-
-            const { calls: BookkeeperCollateralPools } = mockedBookKeeper.smocked.collateralPools
-            expect(BookkeeperCollateralPools.length).to.be.equal(1)
-            expect(BookkeeperCollateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
 
             const { calls: confiscatePosition } = mockedBookKeeper.smocked.confiscatePosition
             expect(confiscatePosition.length).to.be.equal(1)
@@ -684,16 +423,12 @@ describe("FixedSpreadLiquidationStrategy", () => {
             expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[0].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-            expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(15861781875).div(10000000))
+            expect(moveCollateral[0].amount).to.be.equal(ethers.utils.parseEther("1586.1781875"))
             //Give the treasury fees to System Debt Engine to be stored as system surplus
             expect(moveCollateral[1].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
             expect(moveCollateral[1].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
             expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
-            expect(moveCollateral[1].amount).to.be.equal(UnitHelpers.WeiPerWad.mul(32405625).div(10000000))
-
-            const { calls: PriceOracleCollateralPools } = mockedPriceOracle.smocked.collateralPools
-            expect(PriceOracleCollateralPools.length).to.be.equal(1)
-            expect(PriceOracleCollateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
+            expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("3.2405625"))
 
             const { calls: stableCoinReferencePrice } = mockedPriceOracle.smocked.stableCoinReferencePrice
             expect(stableCoinReferencePrice.length).to.be.equal(1)
@@ -710,30 +445,28 @@ describe("FixedSpreadLiquidationStrategy", () => {
 
     context("when contract call FlashLending", () => {
       it("should be success", async () => {
-        await fixedSpreadLiquidationStrategy.grantRole(
-          await fixedSpreadLiquidationStrategy.LIQUIDATION_ENGINE_ROLE(),
-          deployerAddress
-        )
-        // mock contract
-        mockedBookKeeper.smocked.collateralPools.will.return.with([
-          BigNumber.from(0),
-          UnitHelpers.WeiPerRay.mul(3),
-          UnitHelpers.WeiPerRay,
-          BigNumber.from(0),
-          BigNumber.from(0),
-        ])
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
+        mockedCollateralPoolConfig.smocked.getPriceFeed.will.return.with(mockedPriceFeed.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(UnitHelpers.WeiPerRay.mul(3))
+        mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(UnitHelpers.WeiPerRay)
+        mockedCollateralPoolConfig.smocked.getLiquidationRatio.will.return.with(10 ** 10)
+        mockedCollateralPoolConfig.smocked.getCloseFactorBps.will.return.with(5000)
+        mockedCollateralPoolConfig.smocked.getLiquidatorIncentiveBps.will.return.with(10001)
+        mockedCollateralPoolConfig.smocked.getTreasuryFeesBps.will.return.with(17)
+        mockedCollateralPoolConfig.smocked.getAdapter.will.return.with(mockedIbTokenAdapter.address)
+
+        mockedIbTokenAdapter.smocked.onMoveCollateral.will.return.with()
+
         mockedBookKeeper.smocked.confiscatePosition.will.return.with()
         mockedBookKeeper.smocked.moveCollateral.will.return.with()
         mockedBookKeeper.smocked.moveStablecoin.will.return.with()
-        mockedPriceOracle.smocked.collateralPools.will.return.with([mockedPriceFeed.address, 0])
         mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
         mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(UnitHelpers.WeiPerWad), true])
         mockedFlashLendingCallee.smocked.flashLendingCall.will.return.with()
 
-        await fixedSpreadLiquidationStrategy.setAdapter(formatBytes32String("BNB"), mockedIbTokenAdapter.address)
-        await fixedSpreadLiquidationStrategy.setCloseFactorBps(formatBytes32String("BNB"), 5000)
-        await fixedSpreadLiquidationStrategy.setLiquidatorIncentiveBps(formatBytes32String("BNB"), 10001)
-        await fixedSpreadLiquidationStrategy.setTreasuryFeesBps(formatBytes32String("BNB"), 17)
         await fixedSpreadLiquidationStrategy.setFlashLendingEnabled(1)
 
         await expect(
@@ -752,7 +485,7 @@ describe("FixedSpreadLiquidationStrategy", () => {
             )
           )
         )
-          .to.emit(fixedSpreadLiquidationStrategy, "FixedSpreadLiquidate")
+          .to.emit(fixedSpreadLiquidationStrategy, "LogFixedSpreadLiquidate")
           .withArgs(
             formatBytes32String("BNB"),
             UnitHelpers.WeiPerWad,
@@ -765,12 +498,8 @@ describe("FixedSpreadLiquidationStrategy", () => {
             UnitHelpers.WeiPerWad.mul(37).div(100),
             ethers.utils.parseEther("1.11").mul(UnitHelpers.WeiPerRay),
             ethers.utils.parseEther("1.110111"),
-            ethers.utils.parseEther("0.000000188700000000")
+            ethers.utils.parseEther("0.0000001887")
           )
-
-        const { calls: BookkeeperCollateralPools } = mockedBookKeeper.smocked.collateralPools
-        expect(BookkeeperCollateralPools.length).to.be.equal(1)
-        expect(BookkeeperCollateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
 
         const { calls: confiscatePosition } = mockedBookKeeper.smocked.confiscatePosition
         expect(confiscatePosition.length).to.be.equal(1)
@@ -793,10 +522,6 @@ describe("FixedSpreadLiquidationStrategy", () => {
         expect(moveCollateral[1].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
         expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
         expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("0.0000001887"))
-
-        const { calls: PriceOracleCollateralPools } = mockedPriceOracle.smocked.collateralPools
-        expect(PriceOracleCollateralPools.length).to.be.equal(1)
-        expect(PriceOracleCollateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
 
         const { calls: stableCoinReferencePrice } = mockedPriceOracle.smocked.stableCoinReferencePrice
         expect(stableCoinReferencePrice.length).to.be.equal(1)

@@ -9,4 +9,6 @@ interface ILiquidationEngine {
     address _collateralRecipient,
     bytes calldata data
   ) external;
+
+  function live() external view returns (uint256);
 }

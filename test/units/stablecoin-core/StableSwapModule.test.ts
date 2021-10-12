@@ -18,10 +18,16 @@ type fixture = {
   mockStablecoinAdapter: MockContract
   mockAlpacaStablecoin: MockContract
   mockSystemDebtEngine: MockContract
+  mockedAccessControlConfig: MockContract
+  mockedCollateralPoolConfig: MockContract
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
+
+  const mockedAccessControlConfig = await smockit(await ethers.getContractFactory("AccessControlConfig", deployer))
+
+  const mockedCollateralPoolConfig = await smockit(await ethers.getContractFactory("CollateralPoolConfig", deployer))
 
   // Deploy mocked BookKeeper
   const mockBookKeeper = await smockit(await ethers.getContractFactory("BookKeeper", deployer))
@@ -53,6 +59,8 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     mockStablecoinAdapter,
     mockAlpacaStablecoin,
     mockSystemDebtEngine,
+    mockedAccessControlConfig,
+    mockedCollateralPoolConfig,
   }
 }
 
@@ -71,6 +79,8 @@ describe("StableSwapModule", () => {
   let mockStablecoinAdapter: MockContract
   let mockAlpacaStablecoin: MockContract
   let mockSystemDebtEngine: MockContract
+  let mockedAccessControlConfig: MockContract
+  let mockedCollateralPoolConfig: MockContract
 
   let stableSwapModule: StableSwapModule
   let stableSwapModuleAsAlice: StableSwapModule
@@ -83,6 +93,8 @@ describe("StableSwapModule", () => {
       mockStablecoinAdapter,
       mockAlpacaStablecoin,
       mockSystemDebtEngine,
+      mockedAccessControlConfig,
+      mockedCollateralPoolConfig,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
@@ -93,6 +105,10 @@ describe("StableSwapModule", () => {
   describe("#swapTokenToStablecoin", () => {
     context("when parameters are valid", () => {
       it("should be able to call swapTokenToStablecoin", async () => {
+        mockBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
         await stableSwapModule.setFeeIn(WeiPerWad.div(10))
         await expect(stableSwapModuleAsAlice.swapTokenToStablecoin(aliceAddress, WeiPerWad.mul(10)))
           .to.be.emit(stableSwapModule, "SwapTokenToStablecoin")

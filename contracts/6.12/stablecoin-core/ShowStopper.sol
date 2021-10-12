@@ -33,6 +33,7 @@ import "../interfaces/IPriceOracle.sol";
 import "../interfaces/ISystemDebtEngine.sol";
 import "../interfaces/IGenericTokenAdapter.sol";
 import "../interfaces/ICagable.sol";
+import "../interfaces/IShowStopper.sol";
 
 /*
     This is the `End` and it coordinates Global Settlement. This is an
@@ -149,16 +150,14 @@ import "../interfaces/ICagable.sol";
         - the number of gems is limited by how big your stablecoinAccumulator is
 */
 
-contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-
+contract ShowStopper is PausableUpgradeable, IShowStopper {
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
   ILiquidationEngine public liquidationEngine;
   ISystemDebtEngine public systemDebtEngine; // Debt Engine
   IPriceOracle public priceOracle;
 
-  uint256 public live; // Active Flag
+  uint256 public override live; // Active Flag
   uint256 public cagedTimestamp; // Time of cage                   [unix epoch time]
   uint256 public cageCoolDown; // Processing Cooldown Length             [seconds]
   uint256 public debt; // Total outstanding stablecoin following processing [rad]
@@ -191,14 +190,12 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
   event RedeemStablecoin(bytes32 indexed collateralPoolId, address indexed ownerAddress, uint256 amount);
 
   // --- Init ---
-  function initialize() external initializer {
+  function initialize(address _bookKeeper) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
-    live = 1;
 
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
+    IBookKeeper(_bookKeeper).totalStablecoinIssued(); // Sanity Check Call
+    bookKeeper = IBookKeeper(_bookKeeper);
+    live = 1;
   }
 
   // --- Math ---
@@ -231,42 +228,38 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
   }
 
   // --- Administration ---
-  event SetBookKeeper(address indexed caller, address _bookKeeper);
   event SetLiquidationEngine(address indexed caller, address _liquidationEngine);
   event SetSystemDebtEngine(address indexed caller, address _systemDebtEngine);
   event SetPriceOracle(address indexed caller, address _priceOracle);
   event SetCageCoolDown(address indexed caller, uint256 _cageCoolDown);
 
-  function setBookKeeper(address _bookKeeper) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    require(live == 1, "ShowStopper/not-live");
-    bookKeeper = IBookKeeper(_bookKeeper);
-    emit SetBookKeeper(msg.sender, _bookKeeper);
-  }
-
   function setLiquidationEngine(address _liquidationEngine) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 1, "ShowStopper/not-live");
     liquidationEngine = ILiquidationEngine(_liquidationEngine);
     emit SetLiquidationEngine(msg.sender, _liquidationEngine);
   }
 
   function setSystemDebtEngine(address _systemDebtEngine) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 1, "ShowStopper/not-live");
     systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
     emit SetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
 
   function setPriceOracle(address _priceOracle) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 1, "ShowStopper/not-live");
     priceOracle = IPriceOracle(_priceOracle);
     emit SetPriceOracle(msg.sender, _priceOracle);
   }
 
   function setCageCoolDown(uint256 _cageCoolDown) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 1, "ShowStopper/not-live");
     cageCoolDown = _cageCoolDown;
     emit SetCageCoolDown(msg.sender, _cageCoolDown);
@@ -281,7 +274,8 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
       - PriceOracle will be paused: no new price update, no liquidation trigger
    */
   function cage() external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 1, "ShowStopper/not-live");
     live = 0;
     cagedTimestamp = block.timestamp;
@@ -295,11 +289,15 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
   /// @dev Set the cage price of the collateral pool with the latest price from the price oracle
   /// @param collateralPoolId Collateral pool id
   function cage(bytes32 collateralPoolId) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 0, "ShowStopper/still-live");
     require(cagePrice[collateralPoolId] == 0, "ShowStopper/cage-price-collateral-pool-id-already-defined");
-    uint256 _totalDebtShare = bookKeeper.collateralPoolConfig().collateralPools(collateralPoolId).totalDebtShare;
-    IPriceFeed _priceFeed = bookKeeper.collateralPoolConfig().collateralPools(collateralPoolId).priceFeed;
+    uint256 _totalDebtShare = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getTotalDebtShare(
+      collateralPoolId
+    );
+    address _priceFeedAddress = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getPriceFeed(collateralPoolId);
+    IPriceFeed _priceFeed = IPriceFeed(_priceFeedAddress);
     totalDebtShare[collateralPoolId] = _totalDebtShare;
     // par is a ray, priceFeed returns a wad
     cagePrice[collateralPoolId] = wdiv(priceOracle.stableCoinReferencePrice(), uint256(_priceFeed.readPrice()));
@@ -314,10 +312,8 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
   /// @param positionAddress Position address
   function accumulateBadDebt(bytes32 collateralPoolId, address positionAddress) external {
     require(cagePrice[collateralPoolId] != 0, "ShowStopper/cage-price-collateral-pool-id-not-defined");
-    uint256 _debtAccumulatedRate = IBookKeeper(bookKeeper)
-      .collateralPoolConfig()
-      .collateralPools(collateralPoolId)
-      .debtAccumulatedRate; // [ray]
+    uint256 _debtAccumulatedRate = ICollateralPoolConfig(IBookKeeper(bookKeeper).collateralPoolConfig())
+      .getDebtAccumulatedRate(collateralPoolId); // [ray]
     (uint256 lockedCollateralAmount, uint256 debtShare) = bookKeeper.positions(collateralPoolId, positionAddress);
 
     // find the amount of debt in the unit of collateralToken
@@ -355,7 +351,7 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
     address positionAddress,
     address collateralReceiver,
     bytes calldata data
-  ) external {
+  ) external override {
     require(live == 0, "ShowStopper/still-live");
     require(
       positionAddress == msg.sender || bookKeeper.positionWhitelist(positionAddress, msg.sender) == 1,
@@ -402,10 +398,8 @@ contract ShowStopper is PausableUpgradeable, AccessControlUpgradeable {
     require(debt != 0, "ShowStopper/debt-zero");
     require(finalCashPrice[collateralPoolId] == 0, "ShowStopper/final-cash-price-collateral-pool-id-already-defined");
 
-    uint256 _debtAccumulatedRate = IBookKeeper(bookKeeper)
-      .collateralPoolConfig()
-      .collateralPools(collateralPoolId)
-      .debtAccumulatedRate; // [ray]
+    uint256 _debtAccumulatedRate = ICollateralPoolConfig(IBookKeeper(bookKeeper).collateralPoolConfig())
+      .getDebtAccumulatedRate(collateralPoolId); // [ray]
     uint256 wad = rmul(rmul(totalDebtShare[collateralPoolId], _debtAccumulatedRate), cagePrice[collateralPoolId]);
     finalCashPrice[collateralPoolId] = mul(sub(wad, badDebtAccumulator[collateralPoolId]), RAY) / (debt / RAY);
     emit FinalizeCashPrice(collateralPoolId);

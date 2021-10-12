@@ -35,26 +35,26 @@ abstract contract FlashLoanReceiverBase is IBookKeeperFlashBorrower, IERC3156Fla
   // --- Math ---
   uint256 constant RAY = 10**27;
 
-  function rad(uint256 wad) internal pure returns (uint256) {
-    return mul(wad, RAY);
+  function rad(uint256 _wad) internal pure returns (uint256) {
+    return mul(_wad, RAY);
   }
 
-  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x + y) >= x);
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x);
   }
 
-  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y == 0 || (z = x * y) / y == x);
+  function mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x);
   }
 
   // --- Helper Functions ---
-  function approvePayback(uint256 amount) internal {
+  function approvePayback(uint256 _amount) internal {
     // Lender takes back the stablecoin as per ERC 3156 spec
-    flash.stablecoin().approve(address(flash), amount);
+    flash.stablecoin().approve(address(flash), _amount);
   }
 
-  function payBackBookKeeper(uint256 amount) internal {
+  function payBackBookKeeper(uint256 _amount) internal {
     // Lender takes back the stablecoin as per ERC 3156 spec
-    flash.bookKeeper().moveStablecoin(address(this), address(flash), amount);
+    flash.bookKeeper().moveStablecoin(address(this), address(flash), _amount);
   }
 }

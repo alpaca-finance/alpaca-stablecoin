@@ -3,10 +3,19 @@ import { Signer, BigNumber } from "ethers"
 import chai from "chai"
 import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import { PriceOracle, PriceOracle__factory } from "../../../typechain"
+import {
+  PriceOracle,
+  PriceOracle__factory,
+  AccessControlConfig,
+  AccessControlConfig__factory,
+  CollateralPoolConfig__factory,
+  CollateralPoolConfig,
+} from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 
 import { formatBytes32BigNumber } from "../../helper/format"
+import { WeiPerRay } from "../../helper/unit"
+import { AddressZero } from "../../helper/address"
 
 chai.use(solidity)
 const { expect } = chai
@@ -17,10 +26,26 @@ type fixture = {
   priceOracle: PriceOracle
   mockedBookKeeper: MockContract
   mockedPriceFeed: MockContract
+  collateralPoolConfig: CollateralPoolConfig
+  mockedCollateralPoolConfig: MockContract
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
+
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const accessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [
+    accessControlConfig.address,
+  ])) as CollateralPoolConfig
+  const mockedCollateralPoolConfig = await smockit(collateralPoolConfig)
 
   // Deploy mocked BookKeeper
   const mockedBookKeeper = await smockit(await ethers.getContractFactory("BookKeeper", deployer))
@@ -33,7 +58,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const priceOracle = (await upgrades.deployProxy(PriceOracle, [mockedBookKeeper.address])) as PriceOracle
   await priceOracle.deployed()
 
-  return { priceOracle, mockedBookKeeper, mockedPriceFeed }
+  return { priceOracle, mockedBookKeeper, mockedPriceFeed, collateralPoolConfig, mockedCollateralPoolConfig }
 }
 
 describe("PriceOracle", () => {
@@ -48,16 +73,24 @@ describe("PriceOracle", () => {
   // Contracts
   let mockedBookKeeper: MockContract
   let mockedPriceFeed: MockContract
+  let mockedCollateralPoolConfig: MockContract
 
   let priceOracle: PriceOracle
   let priceOracleAsAlice: PriceOracle
 
+  let collateralPoolConfig: CollateralPoolConfig
+  let collateralPoolConfigAsAlice: CollateralPoolConfig
+  let collateralPoolConfigAsBob: CollateralPoolConfig
+
   beforeEach(async () => {
-    ;({ priceOracle, mockedBookKeeper, mockedPriceFeed } = await waffle.loadFixture(loadFixtureHandler))
+    ;({ priceOracle, mockedBookKeeper, mockedPriceFeed, collateralPoolConfig, mockedCollateralPoolConfig } =
+      await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
 
     priceOracleAsAlice = PriceOracle__factory.connect(priceOracle.address, alice) as PriceOracle
+
+    collateralPoolConfigAsAlice = CollateralPoolConfig__factory.connect(collateralPoolConfig.address, alice)
   })
 
   describe("#setPrice()", () => {
@@ -65,15 +98,31 @@ describe("PriceOracle", () => {
       context("and price with safety margin is 0", () => {
         it("should be success", async () => {
           mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(One), false])
-          await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
 
-          mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
+          mockedBookKeeper.smocked.collateralPools.will.return.with({
+            totalDebtShare: 0,
+            debtAccumulatedRate: WeiPerRay,
+            priceWithSafetyMargin: WeiPerRay,
+            debtCeiling: 0,
+            debtFloor: 0,
+            priceFeed: mockedPriceFeed.address,
+            liquidationRatio: WeiPerRay,
+            stabilityFeeRate: WeiPerRay,
+            lastAccumulationTime: 0,
+            adapter: AddressZero,
+            closeFactorBps: 5000,
+            liquidatorIncentiveBps: 10250,
+            treasuryFeesBps: 5000,
+            strategy: AddressZero,
+          })
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin.will.return.with()
           await expect(priceOracle.setPrice(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "SetPrice")
+            .to.emit(priceOracle, "LogSetPrice")
             .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(One), 0)
 
           const { calls: peek } = mockedPriceFeed.smocked.peekPrice
-          const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
+          const { calls: setPriceWithSafetyMargin } = mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin
           expect(peek.length).to.be.equal(1)
 
           expect(setPriceWithSafetyMargin.length).to.be.equal(1)
@@ -84,20 +133,34 @@ describe("PriceOracle", () => {
 
       context("and price with safety margin is 10^43", () => {
         it("should be success", async () => {
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
           mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(One), true])
-          await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
-
-          await priceOracle.setLiquidationRatio(formatBytes32String("BNB"), 10 ** 10)
+          mockedBookKeeper.smocked.collateralPools.will.return.with({
+            totalDebtShare: 0,
+            debtAccumulatedRate: WeiPerRay,
+            priceWithSafetyMargin: WeiPerRay,
+            debtCeiling: 0,
+            debtFloor: 0,
+            priceFeed: mockedPriceFeed.address,
+            liquidationRatio: 10 ** 10,
+            stabilityFeeRate: WeiPerRay,
+            lastAccumulationTime: 0,
+            adapter: AddressZero,
+            closeFactorBps: 5000,
+            liquidatorIncentiveBps: 10250,
+            treasuryFeesBps: 5000,
+            strategy: AddressZero,
+          })
 
           await priceOracle.setStableCoinReferencePrice(10 ** 10)
 
-          mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
+          mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin.will.return.with()
           await expect(priceOracle.setPrice(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "SetPrice")
+            .to.emit(priceOracle, "LogSetPrice")
             .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(One), BigNumber.from("10").pow("43"))
 
           const { calls: peek } = mockedPriceFeed.smocked.peekPrice
-          const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
+          const { calls: setPriceWithSafetyMargin } = mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin
           expect(peek.length).to.be.equal(1)
 
           expect(setPriceWithSafetyMargin.length).to.be.equal(1)
@@ -109,15 +172,30 @@ describe("PriceOracle", () => {
       context("and price with safety margin is 9.31322574615478515625 * 10^53", () => {
         it("should be success", async () => {
           mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(One), true])
-          await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
+          await collateralPoolConfig.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
 
-          await priceOracle.setLiquidationRatio(formatBytes32String("BNB"), 4 ** 10)
+          mockedBookKeeper.smocked.collateralPools.will.return.with({
+            totalDebtShare: 0,
+            debtAccumulatedRate: WeiPerRay,
+            priceWithSafetyMargin: WeiPerRay,
+            debtCeiling: 0,
+            debtFloor: 0,
+            priceFeed: mockedPriceFeed.address,
+            liquidationRatio: 4 ** 10,
+            stabilityFeeRate: WeiPerRay,
+            lastAccumulationTime: 0,
+            adapter: AddressZero,
+            closeFactorBps: 5000,
+            liquidatorIncentiveBps: 10250,
+            treasuryFeesBps: 5000,
+            strategy: AddressZero,
+          })
 
           await priceOracle.setStableCoinReferencePrice(2 ** 10)
 
-          mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
+          mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin.will.return.with()
           await expect(priceOracle.setPrice(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "SetPrice")
+            .to.emit(priceOracle, "LogSetPrice")
             .withArgs(
               formatBytes32String("BNB"),
               formatBytes32BigNumber(One),
@@ -125,7 +203,7 @@ describe("PriceOracle", () => {
             )
 
           const { calls: peek } = mockedPriceFeed.smocked.peekPrice
-          const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
+          const { calls: setPriceWithSafetyMargin } = mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin
           expect(peek.length).to.be.equal(1)
 
           expect(setPriceWithSafetyMargin.length).to.be.equal(1)
@@ -144,15 +222,15 @@ describe("PriceOracle", () => {
             formatBytes32BigNumber(BigNumber.from("700000000000")),
             false,
           ])
-          await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
+          await collateralPoolConfig.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
 
-          mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
+          mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin.will.return.with()
           await expect(priceOracle.setPrice(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "SetPrice")
+            .to.emit(priceOracle, "LogSetPrice")
             .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(BigNumber.from("700000000000")), 0)
 
           const { calls: peek } = mockedPriceFeed.smocked.peekPrice
-          const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
+          const { calls: setPriceWithSafetyMargin } = mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin
           expect(peek.length).to.be.equal(1)
 
           expect(setPriceWithSafetyMargin.length).to.be.equal(1)
@@ -163,19 +241,36 @@ describe("PriceOracle", () => {
 
       context("and price with safety margin is 7 * 10^54", () => {
         it("should be success", async () => {
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
+
           mockedPriceFeed.smocked.peekPrice.will.return.with([
             formatBytes32BigNumber(BigNumber.from("700000000000")),
             true,
           ])
-          await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
+          await collateralPoolConfig.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
 
-          await priceOracle.setLiquidationRatio(formatBytes32String("BNB"), 10 ** 10)
+          mockedBookKeeper.smocked.collateralPools.will.return.with({
+            totalDebtShare: 0,
+            debtAccumulatedRate: WeiPerRay,
+            priceWithSafetyMargin: WeiPerRay,
+            debtCeiling: 0,
+            debtFloor: 0,
+            priceFeed: mockedPriceFeed.address,
+            liquidationRatio: 10 ** 10,
+            stabilityFeeRate: WeiPerRay,
+            lastAccumulationTime: 0,
+            adapter: AddressZero,
+            closeFactorBps: 5000,
+            liquidatorIncentiveBps: 10250,
+            treasuryFeesBps: 5000,
+            strategy: AddressZero,
+          })
 
           await priceOracle.setStableCoinReferencePrice(10 ** 10)
 
-          mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
+          // mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
           await expect(priceOracle.setPrice(formatBytes32String("BNB")))
-            .to.emit(priceOracle, "SetPrice")
+            .to.emit(priceOracle, "LogSetPrice")
             .withArgs(
               formatBytes32String("BNB"),
               formatBytes32BigNumber(BigNumber.from("700000000000")),
@@ -183,7 +278,7 @@ describe("PriceOracle", () => {
             )
 
           const { calls: peek } = mockedPriceFeed.smocked.peekPrice
-          const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
+          const { calls: setPriceWithSafetyMargin } = mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin
           expect(peek.length).to.be.equal(1)
 
           expect(setPriceWithSafetyMargin.length).to.be.equal(1)
@@ -200,26 +295,24 @@ describe("PriceOracle", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
         await expect(
-          priceOracleAsAlice.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
+          collateralPoolConfigAsAlice.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
         ).to.be.revertedWith("!ownerRole")
       })
     })
     context("when the caller is the owner", async () => {
       context("when priceOracle does not live", () => {
         it("should be revert", async () => {
-          await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), deployerAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
           priceOracle.cage()
 
-          await expect(
-            priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
-          ).to.be.revertedWith("Spotter/not-live")
+          await expect(priceOracle.setStableCoinReferencePrice(WeiPerRay)).to.be.revertedWith("PriceOracle/not-live")
         })
       })
       context("when priceOracle is live", () => {
         it("should be able to call setPriceFeed", async () => {
-          await expect(priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address))
-            .to.emit(priceOracle, "SetPriceFeed")
+          await expect(collateralPoolConfig.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address))
+            .to.emit(collateralPoolConfig, "LogSetPriceFeed")
             .withArgs(deployerAddress, formatBytes32String("BNB"), mockedPriceFeed.address)
         })
       })
@@ -229,27 +322,26 @@ describe("PriceOracle", () => {
   describe("#setLiquidationRatio", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
-        await expect(priceOracleAsAlice.setLiquidationRatio(formatBytes32String("BNB"), 10 ** 10)).to.be.revertedWith(
-          "!ownerRole"
-        )
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(false)
+        await expect(
+          collateralPoolConfigAsAlice.setLiquidationRatio(formatBytes32String("BNB"), 10 ** 10)
+        ).to.be.revertedWith("!ownerRole")
       })
     })
     context("when the caller is the owner", async () => {
       context("when priceOracle does not live", () => {
         it("should be revert", async () => {
-          await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), deployerAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
           priceOracle.cage()
 
-          await expect(priceOracle.setLiquidationRatio(formatBytes32String("BNB"), 10 ** 10)).to.be.revertedWith(
-            "Spotter/not-live"
-          )
+          await expect(priceOracle.setStableCoinReferencePrice(WeiPerRay)).to.be.revertedWith("PriceOracle/not-live")
         })
       })
       context("when priceOracle is live", () => {
         it("should be able to call setLiquidationRatio", async () => {
-          await expect(priceOracle.setLiquidationRatio(formatBytes32String("BNB"), 10 ** 10))
-            .to.emit(priceOracle, "SetLiquidationRatio")
+          await expect(collateralPoolConfig.setLiquidationRatio(formatBytes32String("BNB"), 10 ** 10))
+            .to.emit(collateralPoolConfig, "LogSetLiquidationRatio")
             .withArgs(deployerAddress, formatBytes32String("BNB"), 10 ** 10)
         })
       })
@@ -259,17 +351,19 @@ describe("PriceOracle", () => {
   describe("#setStableCoinReferencePrice", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(false)
+
         await expect(priceOracleAsAlice.setStableCoinReferencePrice(10 ** 10)).to.be.revertedWith("!ownerRole")
       })
     })
     context("when the caller is the owner", async () => {
       context("when priceOracle does not live", () => {
         it("should be revert", async () => {
-          await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), deployerAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
           priceOracle.cage()
 
-          await expect(priceOracle.setStableCoinReferencePrice(10 ** 10)).to.be.revertedWith("Spotter/not-live")
+          await expect(priceOracle.setStableCoinReferencePrice(10 ** 10)).to.be.revertedWith("PriceOracle/not-live")
         })
       })
       context("when priceOracle is live", () => {
@@ -285,6 +379,8 @@ describe("PriceOracle", () => {
   describe("#pause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(false)
+
         await expect(priceOracleAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
@@ -292,7 +388,7 @@ describe("PriceOracle", () => {
     context("when role can access", () => {
       context("and role is owner role", () => {
         it("should be success", async () => {
-          await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), deployerAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
           await priceOracle.pause()
         })
       })
@@ -300,20 +396,35 @@ describe("PriceOracle", () => {
 
     context("and role is gov role", () => {
       it("should be success", async () => {
-        await priceOracle.grantRole(await priceOracle.GOV_ROLE(), deployerAddress)
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
         await priceOracle.pause()
       })
     })
 
     context("when pause contract", () => {
       it("should be success", async () => {
-        await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), deployerAddress)
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
         await priceOracle.pause()
 
         mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(One), false])
-        await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
+        mockedBookKeeper.smocked.collateralPools.will.return.with({
+          totalDebtShare: 0,
+          debtAccumulatedRate: WeiPerRay,
+          priceWithSafetyMargin: WeiPerRay,
+          debtCeiling: 0,
+          debtFloor: 0,
+          priceFeed: mockedPriceFeed.address,
+          liquidationRatio: 10 ** 10,
+          stabilityFeeRate: WeiPerRay,
+          lastAccumulationTime: 0,
+          adapter: AddressZero,
+          closeFactorBps: 5000,
+          liquidatorIncentiveBps: 10250,
+          treasuryFeesBps: 5000,
+          strategy: AddressZero,
+        })
 
-        mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
+        mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin.will.return.with()
         await expect(priceOracle.setPrice(formatBytes32String("BNB"))).to.be.revertedWith("Pausable: paused")
       })
     })
@@ -322,6 +433,7 @@ describe("PriceOracle", () => {
   describe("#unpause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(false)
         await expect(priceOracleAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
@@ -329,7 +441,7 @@ describe("PriceOracle", () => {
     context("when role can access", () => {
       context("and role is owner role", () => {
         it("should be success", async () => {
-          await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), deployerAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
           await priceOracle.pause()
           await priceOracle.unpause()
         })
@@ -337,7 +449,7 @@ describe("PriceOracle", () => {
 
       context("and role is gov role", () => {
         it("should be success", async () => {
-          await priceOracle.grantRole(await priceOracle.GOV_ROLE(), deployerAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
           await priceOracle.pause()
           await priceOracle.unpause()
         })
@@ -346,7 +458,7 @@ describe("PriceOracle", () => {
 
     context("when unpause contract", () => {
       it("should be success", async () => {
-        await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), deployerAddress)
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
         // pause contract
         await priceOracle.pause()
@@ -355,15 +467,30 @@ describe("PriceOracle", () => {
         await priceOracle.unpause()
 
         mockedPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(One), false])
-        await priceOracle.setPriceFeed(formatBytes32String("BNB"), mockedPriceFeed.address)
+        mockedBookKeeper.smocked.collateralPools.will.return.with({
+          totalDebtShare: 0,
+          debtAccumulatedRate: WeiPerRay,
+          priceWithSafetyMargin: WeiPerRay,
+          debtCeiling: 0,
+          debtFloor: 0,
+          priceFeed: mockedPriceFeed.address,
+          liquidationRatio: 10 ** 10,
+          stabilityFeeRate: WeiPerRay,
+          lastAccumulationTime: 0,
+          adapter: AddressZero,
+          closeFactorBps: 5000,
+          liquidatorIncentiveBps: 10250,
+          treasuryFeesBps: 5000,
+          strategy: AddressZero,
+        })
 
-        mockedBookKeeper.smocked.setPriceWithSafetyMargin.will.return.with()
+        mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin.will.return.with()
         await expect(priceOracle.setPrice(formatBytes32String("BNB")))
-          .to.emit(priceOracle, "SetPrice")
+          .to.emit(priceOracle, "LogSetPrice")
           .withArgs(formatBytes32String("BNB"), formatBytes32BigNumber(One), 0)
 
         const { calls: peek } = mockedPriceFeed.smocked.peekPrice
-        const { calls: setPriceWithSafetyMargin } = mockedBookKeeper.smocked.setPriceWithSafetyMargin
+        const { calls: setPriceWithSafetyMargin } = mockedCollateralPoolConfig.smocked.setPriceWithSafetyMargin
         expect(peek.length).to.be.equal(1)
 
         expect(setPriceWithSafetyMargin.length).to.be.equal(1)
@@ -376,6 +503,7 @@ describe("PriceOracle", () => {
   describe("#cage()", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(false)
         await expect(priceOracleAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
@@ -384,7 +512,7 @@ describe("PriceOracle", () => {
       context("caller is owner role ", () => {
         it("should be set live to 0", async () => {
           // grant role access
-          await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
           expect(await priceOracleAsAlice.live()).to.be.equal(1)
 
@@ -397,7 +525,7 @@ describe("PriceOracle", () => {
       context("caller is showStopper role", () => {
         it("should be set live to 0", async () => {
           // grant role access
-          await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
           expect(await priceOracleAsAlice.live()).to.be.equal(1)
 
@@ -412,6 +540,7 @@ describe("PriceOracle", () => {
   describe("#uncage()", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(false)
         await expect(priceOracleAsAlice.uncage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
@@ -420,7 +549,7 @@ describe("PriceOracle", () => {
       context("caller is owner role ", () => {
         it("should be set live to 1", async () => {
           // grant role access
-          await priceOracle.grantRole(await priceOracle.OWNER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
           expect(await priceOracleAsAlice.live()).to.be.equal(1)
 
@@ -437,7 +566,7 @@ describe("PriceOracle", () => {
       context("caller is showStopper role", () => {
         it("should be set live to 1", async () => {
           // grant role access
-          await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.accessControlConfigHasRole.will.return.with(true)
 
           expect(await priceOracleAsAlice.live()).to.be.equal(1)
 

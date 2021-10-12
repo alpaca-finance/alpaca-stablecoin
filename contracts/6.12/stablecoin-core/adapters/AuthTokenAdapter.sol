@@ -39,8 +39,6 @@ contract AuthTokenAdapter is
   IAuthTokenAdapter,
   ICagable
 {
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
   bytes32 public constant WHITELISTED = keccak256("WHITELISTED");
 
   IBookKeeper public override bookKeeper; // cdp engine
@@ -56,84 +54,100 @@ contract AuthTokenAdapter is
   event Withdraw(address indexed guy, uint256 wad);
 
   function initialize(
-    address bookKeeper_,
-    bytes32 collateralPoolId_,
-    address token_
+    address _bookKeeper,
+    bytes32 _collateralPoolId,
+    address _token
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    token = IToken(token_);
-    decimals = IToken(token_).decimals();
+    token = IToken(_token);
+    decimals = IToken(_token).decimals();
     live = 1;
-    bookKeeper = IBookKeeper(bookKeeper_);
-    collateralPoolId = collateralPoolId_;
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
+    bookKeeper = IBookKeeper(_bookKeeper);
+    collateralPoolId = _collateralPoolId;
   }
 
   function cage() external override {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
     require(live == 1, "AuthTokenAdapter/not-live");
     live = 0;
     emit Cage();
   }
 
   function uncage() external override {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
     require(live == 0, "AuthTokenAdapter/not-caged");
     live = 1;
     emit Uncage();
   }
 
-  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y == 0 || (z = x * y) / y == x, "AuthTokenAdapter/overflow");
+  function mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x, "AuthTokenAdapter/overflow");
   }
 
   /**
    * @dev Deposit token into the system from the msgSender to be used as collateral
-   * @param urn The destination address which is holding the collateral token
-   * @param wad The amount of collateral to be deposit [wad]
-   * @param msgSender The source address which transfer token
+   * @param _urn The destination address which is holding the collateral token
+   * @param _wad The amount of collateral to be deposit [wad]
+   * @param _msgSender The source address which transfer token
    */
   function deposit(
-    address urn,
-    uint256 wad,
-    address msgSender
+    address _urn,
+    uint256 _wad,
+    address _msgSender
   ) external override nonReentrant whenNotPaused {
     require(hasRole(WHITELISTED, msg.sender), "AuthTokenAdapter/not-whitelisted");
     require(live == 1, "AuthTokenAdapter/not-live");
-    uint256 wad18 = mul(wad, 10**(18 - decimals));
-    require(int256(wad18) >= 0, "AuthTokenAdapter/overflow");
-    bookKeeper.addCollateral(collateralPoolId, urn, int256(wad18));
-    require(token.transferFrom(msgSender, address(this), wad), "AuthTokenAdapter/failed-transfer");
-    emit Deposit(urn, wad, msgSender);
+    uint256 _wad18 = mul(_wad, 10**(18 - decimals));
+    require(int256(_wad18) >= 0, "AuthTokenAdapter/overflow");
+    bookKeeper.addCollateral(collateralPoolId, _urn, int256(_wad18));
+    require(token.transferFrom(_msgSender, address(this), _wad), "AuthTokenAdapter/failed-transfer");
+    emit Deposit(_urn, _wad, _msgSender);
   }
 
   /**
    * @dev Withdraw token from the system to guy
-   * @param guy The destination address to receive collateral token
-   * @param wad The amount of collateral to be withdraw [wad]
+   * @param _guy The destination address to receive collateral token
+   * @param _wad The amount of collateral to be withdraw [wad]
    */
-  function withdraw(address guy, uint256 wad) external override nonReentrant whenNotPaused {
-    uint256 wad18 = mul(wad, 10**(18 - decimals));
-    require(int256(wad18) >= 0, "AuthTokenAdapter/overflow");
-    bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad18));
-    require(token.transfer(guy, wad), "AuthTokenAdapter/failed-transfer");
-    emit Withdraw(guy, wad);
+  function withdraw(address _guy, uint256 _wad) external override nonReentrant whenNotPaused {
+    uint256 _wad18 = mul(_wad, 10**(18 - decimals));
+    require(int256(_wad18) >= 0, "AuthTokenAdapter/overflow");
+    bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_wad18));
+    require(token.transfer(_guy, _wad), "AuthTokenAdapter/failed-transfer");
+    emit Withdraw(_guy, _wad);
   }
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _unpause();
   }
 }
