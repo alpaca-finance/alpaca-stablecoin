@@ -111,25 +111,25 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
 
   uint256 constant RAY = 10**27;
 
-  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = x + y;
-    require(z >= x);
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = _x + _y;
+    require(_z >= _x);
   }
 
-  function diff(uint256 x, uint256 y) internal pure returns (int256 z) {
-    z = int256(x) - int256(y);
-    require(int256(x) >= 0 && int256(y) >= 0);
+  function diff(uint256 _x, uint256 _y) internal pure returns (int256 _z) {
+    _z = int256(_x) - int256(_y);
+    require(int256(_x) >= 0 && int256(_y) >= 0);
   }
 
-  function rmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = x * y;
-    require(y == 0 || z / y == x);
-    z = z / RAY;
+  function rmul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = _x * _y;
+    require(_y == 0 || _z / _y == _x);
+    _z = _z / RAY;
   }
 
   // --- Administration ---
-  event LogSetGlobalStabilityFeeRate(address indexed caller, uint256 data);
-  event LogSetSystemDebtEngine(address indexed caller, address data);
+  event LogSetGlobalStabilityFeeRate(address indexed _caller, uint256 _data);
+  event LogSetSystemDebtEngine(address indexed _caller, address _data);
 
   /// @dev Set the global stability fee debtAccumulatedRate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
   /// @param _globalStabilityFeeRate Global stability fee debtAccumulatedRate [ray]
@@ -153,15 +153,15 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
       It will update the `debtAccumulatedRate` of the specified collateral pool according to
       the global and per-pool stability fee rates with respect to the last block that `collect` was called.
   */
-  /// @param collateralPool Collateral pool id
-  function collect(bytes32 collateralPool)
+  /// @param _collateralPool Collateral pool id
+  function collect(bytes32 _collateralPool)
     external
     override
     whenNotPaused
     nonReentrant
-    returns (uint256 debtAccumulatedRate)
+    returns (uint256 _debtAccumulatedRate)
   {
-    debtAccumulatedRate = _collect(collateralPool);
+    _debtAccumulatedRate = _collect(_collateralPool);
   }
 
   function _collect(bytes32 _collateralPoolId) internal returns (uint256 _debtAccumulatedRate) {
@@ -193,7 +193,7 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _pause();
@@ -203,7 +203,7 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
       _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("GOV_ROLE"), msg.sender),
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
       "!(ownerRole or govRole)"
     );
     _unpause();
