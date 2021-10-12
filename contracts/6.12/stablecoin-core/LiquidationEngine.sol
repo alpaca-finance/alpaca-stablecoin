@@ -58,14 +58,17 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
 
   IBookKeeper public bookKeeper; // CDP Engine
   ISystemDebtEngine public systemDebtEngine; // Debt Engine
-  uint256 public live; // Active Flag
+  uint256 public override live; // Active Flag
 
   // --- Init ---
   function initialize(address _bookKeeper, address _systemDebtEngine) external initializer {
     PausableUpgradeable.__Pausable_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
+    IBookKeeper(_bookKeeper).totalStablecoinIssued(); // Sanity Check Call
     bookKeeper = IBookKeeper(_bookKeeper);
+
+    ISystemDebtEngine(_systemDebtEngine).surplusBuffer(); // Sanity Check Call
     systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
 
     // Sanity check

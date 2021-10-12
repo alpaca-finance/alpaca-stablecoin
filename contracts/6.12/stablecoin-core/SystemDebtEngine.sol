@@ -38,7 +38,7 @@ import "../interfaces/ICagable.sol";
 contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, ISystemDebtEngine, ICagable {
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
-  uint256 public surplusBuffer; // Surplus buffer         [rad]
+  uint256 public override surplusBuffer; // Surplus buffer         [rad]
   uint256 public live; // Active Flag
 
   // --- Init ---

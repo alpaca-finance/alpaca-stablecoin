@@ -96,7 +96,10 @@ contract PositionManager is PausableUpgradeable, IManager {
   function initialize(address _bookKeeper, address _showStopper) external initializer {
     PausableUpgradeable.__Pausable_init();
 
+    IBookKeeper(_bookKeeper).totalStablecoinIssued(); // Sanity Check Call
     bookKeeper = _bookKeeper;
+
+    IShowStopper(_showStopper).live(); // Sanity Check Call
     showStopper = _showStopper;
   }
 
