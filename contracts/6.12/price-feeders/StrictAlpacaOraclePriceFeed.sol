@@ -118,9 +118,9 @@ contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgrad
 
   function _isPriceStable(uint256 primaryPrice, uint256 secondaryPrice) internal view returns (bool) {
     return
-      // price too high
+      // price must not too high
       primaryPrice.mul(10000) <= secondaryPrice.mul(maxPriceDiff) &&
-      // price too low
+      // price must not too low
       primaryPrice.mul(maxPriceDiff) >= secondaryPrice.mul(10000);
   }
 }
