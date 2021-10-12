@@ -23,6 +23,7 @@
     "test:priceoracle": "hardhat test --no-compile ./test/units/stablecoin-core/PriceOracle.test.ts",
     "test:alpacaoraclepricefeed": "hardhat test --no-compile ./test/units/price-feeders/AlpacaOraclePriceFeed.test.ts",
     "test:strictalpacaoraclepricefeed": "hardhat test --no-compile ./test/units/price-feeders/StrictAlpacaOraclePriceFeed.test.ts",
+    "test:ibtokenpricefeed": "hardhat test --no-compile ./test/units/price-feeders/IbTokenPriceFeed.test.ts",
     "test:showstopper": "hardhat test --no-compile ./test/units/stablecoin-core/ShowStopper.test.ts",
     "test:alpacastablecoin": "hardhat test --no-compile ./test/units/stablecoin-core/AlpacaStablecoin.test.ts",
     "test:liquidationengine": "hardhat test --no-compile ./test/units/stablecoin-core/LiquidationEngine.test.ts",

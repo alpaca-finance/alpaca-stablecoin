@@ -12,13 +12,8 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
 
   bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
 
-  IAlpacaOracle public alpacaOracle;
-  address public token0;
-  address public token1;
-  uint256 public priceLife; // [seconds] how old the price is considered stale, default 1 day
-
-  IPriceFeed ibInBasePriceFeed;
-  IPriceFeed baseInUsdPriceFeed;
+  IPriceFeed public ibInBasePriceFeed;
+  IPriceFeed public baseInUsdPriceFeed;
 
   // --- Init ---
   function initialize(address _ibInBasePriceFeed, address _baseInUsdPriceFeed) external initializer {
