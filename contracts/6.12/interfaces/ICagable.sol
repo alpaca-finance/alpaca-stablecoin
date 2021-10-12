@@ -1,8 +1,8 @@
 pragma solidity 0.6.12;
 
 interface ICagable {
-  event Cage();
-  event Uncage();
+  event LogCage();
+  event LogUncage();
 
   function cage() external;
 
