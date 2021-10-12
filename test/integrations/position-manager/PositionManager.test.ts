@@ -442,7 +442,7 @@ describe("position manager", () => {
           )
           const txReceipt = await tx.wait()
 
-          const event = await getEvent(positionManager, txReceipt.blockNumber, "NewPosition")
+          const event = await getEvent(positionManager, txReceipt.blockNumber, "LogNewPosition")
           expectEmit(event, aliceProxyWallet.address, aliceProxyWallet.address, 1)
 
           expect(await positionManager.ownerLastPositionId(aliceProxyWallet.address)).to.be.equal(1)
@@ -1792,7 +1792,7 @@ describe("position manager", () => {
             openPositionCall
           )
           const txReceipt = await tx.wait()
-          const event = await getEvent(positionManager, txReceipt.blockNumber, "NewPosition")
+          const event = await getEvent(positionManager, txReceipt.blockNumber, "LogNewPosition")
           expectEmit(event, aliceProxyWallet.address, aliceProxyWallet.address, 1)
           expect(await positionManager.ownerLastPositionId(aliceProxyWallet.address)).to.be.equal(1)
         })
@@ -2635,7 +2635,7 @@ describe("position manager", () => {
           )
           const txReceipt = await tx.wait()
 
-          const event = await getEvent(positionManager, txReceipt.blockNumber, "NewPosition")
+          const event = await getEvent(positionManager, txReceipt.blockNumber, "LogNewPosition")
           expectEmit(event, aliceProxyWallet.address, aliceProxyWallet.address, 1)
 
           expect(await positionManager.ownerLastPositionId(aliceProxyWallet.address)).to.be.equal(1)
