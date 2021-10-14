@@ -31,6 +31,7 @@ type fixture = {
   mockedDummyToken: MockContract
   mockedTokenAdapter: MockContract
   mockedShowStopper: MockContract
+  mockedCollateralPoolConfig: MockContract
 }
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
@@ -48,6 +49,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [
     accessControlConfig.address,
   ])) as CollateralPoolConfig
+  const mockedCollateralPoolConfig = await smockit(collateralPoolConfig)
 
   // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
@@ -88,7 +90,14 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   ])) as PositionManager
   await positionManager.deployed()
 
-  return { positionManager, mockedBookKeeper, mockedDummyToken, mockedTokenAdapter, mockedShowStopper }
+  return {
+    positionManager,
+    mockedBookKeeper,
+    mockedDummyToken,
+    mockedTokenAdapter,
+    mockedShowStopper,
+    mockedCollateralPoolConfig,
+  }
 }
 
 describe("PositionManager", () => {
@@ -111,14 +120,21 @@ describe("PositionManager", () => {
   let mockedDummyToken: MockContract
   let mockedTokenAdapter: MockContract
   let mockedShowStopper: MockContract
+  let mockedCollateralPoolConfig: MockContract
 
   // Signer
   let positionManagerAsAlice: PositionManager
   let positionManagerAsBob: PositionManager
 
   beforeEach(async () => {
-    ;({ positionManager, mockedBookKeeper, mockedDummyToken, mockedTokenAdapter, mockedShowStopper } =
-      await waffle.loadFixture(loadFixtureHandler))
+    ;({
+      positionManager,
+      mockedBookKeeper,
+      mockedDummyToken,
+      mockedTokenAdapter,
+      mockedShowStopper,
+      mockedCollateralPoolConfig,
+    } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
       deployer.getAddress(),
@@ -141,6 +157,8 @@ describe("PositionManager", () => {
     })
     context("when collateral pool doesn't init", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(0)
         await expect(positionManager.open(formatBytes32String("BNB"), aliceAddress)).to.be.revertedWith(
           "PositionManager/collateralPool-not-init"
         )
@@ -148,7 +166,9 @@ describe("PositionManager", () => {
     })
     context("when parameters are valid", () => {
       it("should be able to open CDP with an incremental CDP index", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -186,7 +206,9 @@ describe("PositionManager", () => {
   describe("#give()", () => {
     context("when caller has no access to the position (or have no allowance)", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -208,7 +230,9 @@ describe("PositionManager", () => {
     })
     context("when input destination as zero address", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -230,7 +254,9 @@ describe("PositionManager", () => {
     })
     context("when input destination as current owner address", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -252,7 +278,9 @@ describe("PositionManager", () => {
     })
     context("when parameters are valid", () => {
       it("should be able to change the owner of CDP ", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -279,7 +307,9 @@ describe("PositionManager", () => {
   describe("#allowManagePosition()", () => {
     context("when caller has no access to the position (or have no allowance)", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -301,7 +331,9 @@ describe("PositionManager", () => {
     })
     context("when parameters are valid", () => {
       it("should be able to add user allowance to a position", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -340,7 +372,9 @@ describe("PositionManager", () => {
   describe("#list()", () => {
     context("when a few position has been opened", () => {
       it("should work as a linklist perfectly", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -424,7 +458,9 @@ describe("PositionManager", () => {
   describe("#adjustPosition()", () => {
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -448,7 +484,9 @@ describe("PositionManager", () => {
     })
     context("when parameters are valid", async () => {
       it("should be able to call BookKeeper.adjustPosition", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -478,12 +516,12 @@ describe("PositionManager", () => {
 
         const { calls: bookKeeperCalls } = mockedBookKeeper.smocked.adjustPosition
         expect(bookKeeperCalls.length).to.be.equal(1)
-        expect(bookKeeperCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(bookKeeperCalls[0].positionAddress).to.be.equal(positionAddress)
-        expect(bookKeeperCalls[0].collateralOwner).to.be.equal(positionAddress)
-        expect(bookKeeperCalls[0].stablecoinOwner).to.be.equal(positionAddress)
-        expect(bookKeeperCalls[0].collateralValue).to.be.equal(parseEther("1"))
-        expect(bookKeeperCalls[0].debtShare).to.be.equal(parseEther("50"))
+        expect(bookKeeperCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(bookKeeperCalls[0]._positionAddress).to.be.equal(positionAddress)
+        expect(bookKeeperCalls[0]._collateralOwner).to.be.equal(positionAddress)
+        expect(bookKeeperCalls[0]._stablecoinOwner).to.be.equal(positionAddress)
+        expect(bookKeeperCalls[0]._collateralValue).to.be.equal(parseEther("1"))
+        expect(bookKeeperCalls[0]._debtShare).to.be.equal(parseEther("50"))
 
         const { calls: tokenAdapterCalls } = mockedTokenAdapter.smocked.onAdjustPosition
         expect(tokenAdapterCalls.length).to.be.eq(1)
@@ -499,7 +537,9 @@ describe("PositionManager", () => {
   describe("#moveCollateral(uint256,address,uint256,address,bytes)", () => {
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -529,7 +569,9 @@ describe("PositionManager", () => {
     })
     context("when parameters are valid", async () => {
       it("should be able to call moveCollateral(uint256,address,uint256,address,bytes)", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -559,10 +601,10 @@ describe("PositionManager", () => {
 
         const { calls: bookKeeperCalls } = mockedBookKeeper.smocked.moveCollateral
         expect(bookKeeperCalls.length).to.be.equal(1)
-        expect(bookKeeperCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(bookKeeperCalls[0].src).to.be.equal(positionAddress)
-        expect(bookKeeperCalls[0].dst).to.be.equal(bobAddress)
-        expect(bookKeeperCalls[0].amount).to.be.equal(parseEther("1"))
+        expect(bookKeeperCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(bookKeeperCalls[0]._src).to.be.equal(positionAddress)
+        expect(bookKeeperCalls[0]._dst).to.be.equal(bobAddress)
+        expect(bookKeeperCalls[0]._amount).to.be.equal(parseEther("1"))
 
         const { calls: tokenAdapterCalls } = mockedTokenAdapter.smocked.onMoveCollateral
         expect(tokenAdapterCalls.length).to.be.equal(1)
@@ -578,7 +620,9 @@ describe("PositionManager", () => {
   describe("#moveCollateral(bytes32,uint256,address,uint256,address,bytes)", () => {
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -609,7 +653,9 @@ describe("PositionManager", () => {
     })
     context("when parameters are valid", async () => {
       it("should be able to call moveCollateral(bytes32,uint256,address,uint256,address,bytes)", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -640,10 +686,10 @@ describe("PositionManager", () => {
 
         const { calls: bookKeeperCalls } = mockedBookKeeper.smocked.moveCollateral
         expect(bookKeeperCalls.length).to.be.equal(1)
-        expect(bookKeeperCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(bookKeeperCalls[0].src).to.be.equal(positionAddress)
-        expect(bookKeeperCalls[0].dst).to.be.equal(bobAddress)
-        expect(bookKeeperCalls[0].amount).to.be.equal(parseEther("1"))
+        expect(bookKeeperCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(bookKeeperCalls[0]._src).to.be.equal(positionAddress)
+        expect(bookKeeperCalls[0]._dst).to.be.equal(bobAddress)
+        expect(bookKeeperCalls[0]._amount).to.be.equal(parseEther("1"))
 
         const { calls: tokenAdapterCalls } = mockedTokenAdapter.smocked.onMoveCollateral
         expect(tokenAdapterCalls[0].src).to.be.equal(positionAddress)
@@ -657,7 +703,9 @@ describe("PositionManager", () => {
   describe("#moveStablecoin()", () => {
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -681,7 +729,9 @@ describe("PositionManager", () => {
     })
     context("when parameters are valid", async () => {
       it("should be able to call moveStablecoin()", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -705,9 +755,9 @@ describe("PositionManager", () => {
 
         const { calls } = mockedBookKeeper.smocked.moveStablecoin
         expect(calls.length).to.be.equal(1)
-        expect(calls[0].src).to.be.equal(positionAddress)
-        expect(calls[0].dst).to.be.equal(bobAddress)
-        expect(calls[0].value).to.be.equal(WeiPerRad.mul(10))
+        expect(calls[0]._src).to.be.equal(positionAddress)
+        expect(calls[0]._dst).to.be.equal(bobAddress)
+        expect(calls[0]._value).to.be.equal(WeiPerRad.mul(10))
       })
     })
   })
@@ -715,7 +765,9 @@ describe("PositionManager", () => {
   describe("#exportPosition()", () => {
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -737,7 +789,9 @@ describe("PositionManager", () => {
     })
     context("when destination (Bob) has no migration access on caller (Alice)", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -760,7 +814,9 @@ describe("PositionManager", () => {
     })
     context("when Alice wants to export her own position to her own address", async () => {
       it("should be able to call exportPosition()", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -792,16 +848,18 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(positionAddress)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(positionAddress)
-        expect(movePositionCalls[0].dst).to.be.equal(aliceAddress)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(positionAddress)
+        expect(movePositionCalls[0]._dst).to.be.equal(aliceAddress)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
     context("when Alice wants Bob to export her position to Bob's address", async () => {
       it("should be able to call exportPosition()", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -837,11 +895,11 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(positionAddress)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(positionAddress)
-        expect(movePositionCalls[0].dst).to.be.equal(bobAddress)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(positionAddress)
+        expect(movePositionCalls[0]._dst).to.be.equal(bobAddress)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
   })
@@ -849,7 +907,9 @@ describe("PositionManager", () => {
   describe("#importPosition()", () => {
     context("when caller (Bob) has no migration access on source address (Alice)", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -871,7 +931,9 @@ describe("PositionManager", () => {
     })
     context("when caller has no access to the position", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -895,7 +957,9 @@ describe("PositionManager", () => {
     })
     context("when Alice wants to import her own position from her address", async () => {
       it("should be able to call importPosition()", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -927,16 +991,18 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(aliceAddress)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(aliceAddress)
-        expect(movePositionCalls[0].dst).to.be.equal(positionAddress)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(aliceAddress)
+        expect(movePositionCalls[0]._dst).to.be.equal(positionAddress)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
     context("when Alice wants Bob to import her position from Bob's address", async () => {
       it("should be able to call importPosition()", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -974,11 +1040,11 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(bobAddress)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(bobAddress)
-        expect(movePositionCalls[0].dst).to.be.equal(positionAddress)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(bobAddress)
+        expect(movePositionCalls[0]._dst).to.be.equal(positionAddress)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
   })
@@ -986,7 +1052,9 @@ describe("PositionManager", () => {
   describe("#movePosition()", () => {
     context("when caller (Bob) has no access to the source position", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -1010,7 +1078,9 @@ describe("PositionManager", () => {
     })
     context("when caller (Alice) has no access to the destination position", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -1034,7 +1104,9 @@ describe("PositionManager", () => {
     })
     context("when these two positions are from different collateral pool", () => {
       it("should revert", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -1059,7 +1131,9 @@ describe("PositionManager", () => {
     })
     context("when Alice wants to move her position#1 to her position#2", async () => {
       it("should be able to call movePosition()", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -1093,16 +1167,18 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(position1Address)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(position1Address)
-        expect(movePositionCalls[0].dst).to.be.equal(position2Address)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(position1Address)
+        expect(movePositionCalls[0]._dst).to.be.equal(position2Address)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
     context("when Alice wants to move her position#1 to Bob's position#2", async () => {
       it("should be able to call movePosition()", async () => {
-        mockedBookKeeper.smocked.collateralPools.will.return.with({
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,
           priceWithSafetyMargin: WeiPerRay,
@@ -1137,11 +1213,11 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(position1Address)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(position1Address)
-        expect(movePositionCalls[0].dst).to.be.equal(position2Address)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(position1Address)
+        expect(movePositionCalls[0]._dst).to.be.equal(position2Address)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
   })
@@ -1150,23 +1226,24 @@ describe("PositionManager", () => {
     context("when caller has no access to the position (or have no allowance)", () => {
       it("should revert", async () => {
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
-        await expect(positionManager.redeemLockedCollateral(1, mockedTokenAdapter.address, "0x")).to.be.revertedWith(
-          "owner not allowed"
-        )
+        await expect(
+          positionManager.redeemLockedCollateral(1, mockedTokenAdapter.address, aliceAddress, "0x")
+        ).to.be.revertedWith("owner not allowed")
       })
     })
     context("when parameters are valid", () => {
       it("should be able to redeemLockedCollateral", async () => {
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         const position1Address = await positionManager.positions(1)
-        await positionManagerAsAlice.redeemLockedCollateral(1, mockedTokenAdapter.address, "0x")
+        await positionManagerAsAlice.redeemLockedCollateral(1, mockedTokenAdapter.address, aliceAddress, "0x")
 
         const { calls: redeemLockedCollateralCalls } = mockedShowStopper.smocked.redeemLockedCollateral
         expect(redeemLockedCollateralCalls.length).to.be.equal(1)
         expect(redeemLockedCollateralCalls[0][0]).to.be.equal(formatBytes32String("BNB"))
         expect(redeemLockedCollateralCalls[0][1]).to.be.equal(mockedTokenAdapter.address)
         expect(redeemLockedCollateralCalls[0][2]).to.be.equal(position1Address)
-        expect(redeemLockedCollateralCalls[0][3]).to.be.equal("0x")
+        expect(redeemLockedCollateralCalls[0][3]).to.be.equal(aliceAddress)
+        expect(redeemLockedCollateralCalls[0][4]).to.be.equal("0x")
       })
     })
   })

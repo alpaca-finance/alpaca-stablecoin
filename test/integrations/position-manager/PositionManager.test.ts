@@ -266,7 +266,9 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), stablecoinAdapter.address)
 
   const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
-  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [
+    accessControlConfig.address,
+  ])) as SimplePriceFeed
   await simplePriceFeed.deployed()
 
   // set total debt ceiling 10000 rad
@@ -440,7 +442,7 @@ describe("position manager", () => {
           )
           const txReceipt = await tx.wait()
 
-          const event = await getEvent(positionManager, txReceipt.blockNumber, "NewPosition")
+          const event = await getEvent(positionManager, txReceipt.blockNumber, "LogNewPosition")
           expectEmit(event, aliceProxyWallet.address, aliceProxyWallet.address, 1)
 
           expect(await positionManager.ownerLastPositionId(aliceProxyWallet.address)).to.be.equal(1)
@@ -737,7 +739,8 @@ describe("position manager", () => {
             ])
             await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestCall)
             const harvestedALPACABalance = await alpacaToken.balanceOf(aliceAddress)
-            expect(harvestedALPACABalance).to.be.equal(ethers.utils.parseEther("4500"))
+
+            expect(harvestedALPACABalance).to.be.equal(ethers.utils.parseEther("4600"))
           })
         }
       )
@@ -1635,7 +1638,7 @@ describe("position manager", () => {
             formatBytes32String("ibBUSD")
           )
 
-          const alpacaTokenBefore = await alpacaToken.balanceOf(aliceAddress)
+          const alpacaTokenBefore = await alpacaToken.balanceOf(aliceProxyWallet.address)
 
           // time increase 1 year
           await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from("31536000")))
@@ -1685,14 +1688,14 @@ describe("position manager", () => {
             positionAddress
           )
 
-          const alpacaTokenAfter = await alpacaToken.balanceOf(aliceAddress)
+          const alpacaTokenAfter = await alpacaToken.balanceOf(aliceProxyWallet.address)
 
           expect(alpacaStablecoinBefore.sub(alpacaStablecoinAfter)).to.be.equal(WeiPerWad.mul(1))
           expect(baseTokenAfter.sub(baseTokenBefore)).to.be.equal(WeiPerWad.mul(1))
           expect(lockedCollateralBefore.sub(lockedCollateralAfter)).to.be.equal(WeiPerWad.mul(1))
           // debtShareToRepay = 1 rad / 1.2 ray = 0.833333333333333333 wad
-          // AssertHelpers.assertAlmostEqual(debtShareBefore.sub(debtShareAfter).toString(), "833333333333333333")
-          // expect(alpacaTokenAfter).to.be.gt(alpacaTokenBefore)
+          AssertHelpers.assertAlmostEqual(debtShareBefore.sub(debtShareAfter).toString(), "833333333333333333")
+          expect(alpacaTokenAfter).to.be.gt(alpacaTokenBefore)
         })
       })
     })
@@ -1789,7 +1792,7 @@ describe("position manager", () => {
             openPositionCall
           )
           const txReceipt = await tx.wait()
-          const event = await getEvent(positionManager, txReceipt.blockNumber, "NewPosition")
+          const event = await getEvent(positionManager, txReceipt.blockNumber, "LogNewPosition")
           expectEmit(event, aliceProxyWallet.address, aliceProxyWallet.address, 1)
           expect(await positionManager.ownerLastPositionId(aliceProxyWallet.address)).to.be.equal(1)
         })
@@ -2632,7 +2635,7 @@ describe("position manager", () => {
           )
           const txReceipt = await tx.wait()
 
-          const event = await getEvent(positionManager, txReceipt.blockNumber, "NewPosition")
+          const event = await getEvent(positionManager, txReceipt.blockNumber, "LogNewPosition")
           expectEmit(event, aliceProxyWallet.address, aliceProxyWallet.address, 1)
 
           expect(await positionManager.ownerLastPositionId(aliceProxyWallet.address)).to.be.equal(1)
