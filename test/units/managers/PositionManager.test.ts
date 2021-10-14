@@ -516,12 +516,12 @@ describe("PositionManager", () => {
 
         const { calls: bookKeeperCalls } = mockedBookKeeper.smocked.adjustPosition
         expect(bookKeeperCalls.length).to.be.equal(1)
-        expect(bookKeeperCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(bookKeeperCalls[0].positionAddress).to.be.equal(positionAddress)
-        expect(bookKeeperCalls[0].collateralOwner).to.be.equal(positionAddress)
-        expect(bookKeeperCalls[0].stablecoinOwner).to.be.equal(positionAddress)
-        expect(bookKeeperCalls[0].collateralValue).to.be.equal(parseEther("1"))
-        expect(bookKeeperCalls[0].debtShare).to.be.equal(parseEther("50"))
+        expect(bookKeeperCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(bookKeeperCalls[0]._positionAddress).to.be.equal(positionAddress)
+        expect(bookKeeperCalls[0]._collateralOwner).to.be.equal(positionAddress)
+        expect(bookKeeperCalls[0]._stablecoinOwner).to.be.equal(positionAddress)
+        expect(bookKeeperCalls[0]._collateralValue).to.be.equal(parseEther("1"))
+        expect(bookKeeperCalls[0]._debtShare).to.be.equal(parseEther("50"))
 
         const { calls: tokenAdapterCalls } = mockedTokenAdapter.smocked.onAdjustPosition
         expect(tokenAdapterCalls.length).to.be.eq(1)
@@ -601,10 +601,10 @@ describe("PositionManager", () => {
 
         const { calls: bookKeeperCalls } = mockedBookKeeper.smocked.moveCollateral
         expect(bookKeeperCalls.length).to.be.equal(1)
-        expect(bookKeeperCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(bookKeeperCalls[0].src).to.be.equal(positionAddress)
-        expect(bookKeeperCalls[0].dst).to.be.equal(bobAddress)
-        expect(bookKeeperCalls[0].amount).to.be.equal(parseEther("1"))
+        expect(bookKeeperCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(bookKeeperCalls[0]._src).to.be.equal(positionAddress)
+        expect(bookKeeperCalls[0]._dst).to.be.equal(bobAddress)
+        expect(bookKeeperCalls[0]._amount).to.be.equal(parseEther("1"))
 
         const { calls: tokenAdapterCalls } = mockedTokenAdapter.smocked.onMoveCollateral
         expect(tokenAdapterCalls.length).to.be.equal(1)
@@ -686,10 +686,10 @@ describe("PositionManager", () => {
 
         const { calls: bookKeeperCalls } = mockedBookKeeper.smocked.moveCollateral
         expect(bookKeeperCalls.length).to.be.equal(1)
-        expect(bookKeeperCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(bookKeeperCalls[0].src).to.be.equal(positionAddress)
-        expect(bookKeeperCalls[0].dst).to.be.equal(bobAddress)
-        expect(bookKeeperCalls[0].amount).to.be.equal(parseEther("1"))
+        expect(bookKeeperCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(bookKeeperCalls[0]._src).to.be.equal(positionAddress)
+        expect(bookKeeperCalls[0]._dst).to.be.equal(bobAddress)
+        expect(bookKeeperCalls[0]._amount).to.be.equal(parseEther("1"))
 
         const { calls: tokenAdapterCalls } = mockedTokenAdapter.smocked.onMoveCollateral
         expect(tokenAdapterCalls[0].src).to.be.equal(positionAddress)
@@ -755,9 +755,9 @@ describe("PositionManager", () => {
 
         const { calls } = mockedBookKeeper.smocked.moveStablecoin
         expect(calls.length).to.be.equal(1)
-        expect(calls[0].src).to.be.equal(positionAddress)
-        expect(calls[0].dst).to.be.equal(bobAddress)
-        expect(calls[0].value).to.be.equal(WeiPerRad.mul(10))
+        expect(calls[0]._src).to.be.equal(positionAddress)
+        expect(calls[0]._dst).to.be.equal(bobAddress)
+        expect(calls[0]._value).to.be.equal(WeiPerRad.mul(10))
       })
     })
   })
@@ -848,11 +848,11 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(positionAddress)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(positionAddress)
-        expect(movePositionCalls[0].dst).to.be.equal(aliceAddress)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(positionAddress)
+        expect(movePositionCalls[0]._dst).to.be.equal(aliceAddress)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
     context("when Alice wants Bob to export her position to Bob's address", async () => {
@@ -895,11 +895,11 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(positionAddress)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(positionAddress)
-        expect(movePositionCalls[0].dst).to.be.equal(bobAddress)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(positionAddress)
+        expect(movePositionCalls[0]._dst).to.be.equal(bobAddress)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
   })
@@ -991,11 +991,11 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(aliceAddress)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(aliceAddress)
-        expect(movePositionCalls[0].dst).to.be.equal(positionAddress)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(aliceAddress)
+        expect(movePositionCalls[0]._dst).to.be.equal(positionAddress)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
     context("when Alice wants Bob to import her position from Bob's address", async () => {
@@ -1040,11 +1040,11 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(bobAddress)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(bobAddress)
-        expect(movePositionCalls[0].dst).to.be.equal(positionAddress)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(bobAddress)
+        expect(movePositionCalls[0]._dst).to.be.equal(positionAddress)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
   })
@@ -1167,11 +1167,11 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(position1Address)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(position1Address)
-        expect(movePositionCalls[0].dst).to.be.equal(position2Address)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(position1Address)
+        expect(movePositionCalls[0]._dst).to.be.equal(position2Address)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
     context("when Alice wants to move her position#1 to Bob's position#2", async () => {
@@ -1213,11 +1213,11 @@ describe("PositionManager", () => {
         expect(positionsCalls[0][1]).to.be.equal(position1Address)
 
         expect(movePositionCalls.length).to.be.equal(1)
-        expect(movePositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(movePositionCalls[0].src).to.be.equal(position1Address)
-        expect(movePositionCalls[0].dst).to.be.equal(position2Address)
-        expect(movePositionCalls[0].collateralAmount).to.be.equal(WeiPerWad.mul(2))
-        expect(movePositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(1))
+        expect(movePositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(movePositionCalls[0]._src).to.be.equal(position1Address)
+        expect(movePositionCalls[0]._dst).to.be.equal(position2Address)
+        expect(movePositionCalls[0]._collateralAmount).to.be.equal(WeiPerWad.mul(2))
+        expect(movePositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(1))
       })
     })
   })
