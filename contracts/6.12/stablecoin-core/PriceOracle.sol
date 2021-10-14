@@ -79,7 +79,7 @@ contract PriceOracle is PausableUpgradeable, ReentrancyGuardUpgradeable, IPriceO
   event LogSetStableCoinReferencePrice(address indexed _caller, uint256 _data);
 
   function setStableCoinReferencePrice(uint256 _data) external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(live == 1, "PriceOracle/not-live");
     stableCoinReferencePrice = _data;
