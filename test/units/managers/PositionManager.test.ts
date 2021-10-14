@@ -1150,16 +1150,16 @@ describe("PositionManager", () => {
     context("when caller has no access to the position (or have no allowance)", () => {
       it("should revert", async () => {
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
-        await expect(positionManager.redeemLockedCollateral(1, mockedTokenAdapter.address, "0x")).to.be.revertedWith(
-          "owner not allowed"
-        )
+        await expect(
+          positionManager.redeemLockedCollateral(1, mockedTokenAdapter.address, deployerAddress, "0x")
+        ).to.be.revertedWith("owner not allowed")
       })
     })
     context("when parameters are valid", () => {
       it("should be able to redeemLockedCollateral", async () => {
         await positionManager.open(formatBytes32String("BNB"), aliceAddress)
         const position1Address = await positionManager.positions(1)
-        await positionManagerAsAlice.redeemLockedCollateral(1, mockedTokenAdapter.address, "0x")
+        await positionManagerAsAlice.redeemLockedCollateral(1, mockedTokenAdapter.address, deployerAddress, "0x")
 
         const { calls: redeemLockedCollateralCalls } = mockedShowStopper.smocked.redeemLockedCollateral
         expect(redeemLockedCollateralCalls.length).to.be.equal(1)

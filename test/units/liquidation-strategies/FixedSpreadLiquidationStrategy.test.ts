@@ -340,25 +340,25 @@ describe("FixedSpreadLiquidationStrategy", () => {
 
             const { calls: confiscatePosition } = mockedBookKeeper.smocked.confiscatePosition
             expect(confiscatePosition.length).to.be.equal(1)
-            expect(confiscatePosition[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-            expect(confiscatePosition[0].positionAddress).to.be.equal(aliceAddress)
-            expect(confiscatePosition[0].collateralCreditor).to.be.equal(fixedSpreadLiquidationStrategy.address)
-            expect(confiscatePosition[0].stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
-            expect(confiscatePosition[0].collateralAmount).to.be.equal(ethers.utils.parseEther("2.05").mul(-1))
-            expect(confiscatePosition[0].debtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(-1))
+            expect(confiscatePosition[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+            expect(confiscatePosition[0]._positionAddress).to.be.equal(aliceAddress)
+            expect(confiscatePosition[0]._collateralCreditor).to.be.equal(fixedSpreadLiquidationStrategy.address)
+            expect(confiscatePosition[0]._stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
+            expect(confiscatePosition[0]._collateralAmount).to.be.equal(ethers.utils.parseEther("2.05").mul(-1))
+            expect(confiscatePosition[0]._debtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(-1))
 
             const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
             expect(moveCollateral.length).to.be.equal(2)
             //Give the collateral to the collateralRecipient
-            expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-            expect(moveCollateral[0].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
-            expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-            expect(moveCollateral[0].amount).to.be.equal(ethers.utils.parseEther("2.0375"))
+            expect(moveCollateral[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+            expect(moveCollateral[0]._src).to.be.equal(fixedSpreadLiquidationStrategy.address)
+            expect(moveCollateral[0]._dst).to.be.equal(deployerAddress)
+            expect(moveCollateral[0]._amount).to.be.equal(ethers.utils.parseEther("2.0375"))
             //Give the treasury fees to System Debt Engine to be stored as system surplus
-            expect(moveCollateral[1].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-            expect(moveCollateral[1].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
-            expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
-            expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("0.0125"))
+            expect(moveCollateral[1]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+            expect(moveCollateral[1]._src).to.be.equal(fixedSpreadLiquidationStrategy.address)
+            expect(moveCollateral[1]._dst).to.be.equal(mockedSystemDebtEngine.address)
+            expect(moveCollateral[1]._amount).to.be.equal(ethers.utils.parseEther("0.0125"))
 
             const { calls: stableCoinReferencePrice } = mockedPriceOracle.smocked.stableCoinReferencePrice
             expect(stableCoinReferencePrice.length).to.be.equal(1)
@@ -408,27 +408,27 @@ describe("FixedSpreadLiquidationStrategy", () => {
 
             const { calls: confiscatePosition } = mockedBookKeeper.smocked.confiscatePosition
             expect(confiscatePosition.length).to.be.equal(1)
-            expect(confiscatePosition[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-            expect(confiscatePosition[0].positionAddress).to.be.equal(aliceAddress)
-            expect(confiscatePosition[0].collateralCreditor).to.be.equal(fixedSpreadLiquidationStrategy.address)
-            expect(confiscatePosition[0].stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
-            expect(confiscatePosition[0].collateralAmount).to.be.equal(
+            expect(confiscatePosition[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+            expect(confiscatePosition[0]._positionAddress).to.be.equal(aliceAddress)
+            expect(confiscatePosition[0]._collateralCreditor).to.be.equal(fixedSpreadLiquidationStrategy.address)
+            expect(confiscatePosition[0]._stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
+            expect(confiscatePosition[0]._collateralAmount).to.be.equal(
               UnitHelpers.WeiPerWad.mul(-158941875).div(100000)
             )
-            expect(confiscatePosition[0].debtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(-25).div(100))
+            expect(confiscatePosition[0]._debtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(-25).div(100))
 
             const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
             expect(moveCollateral.length).to.be.equal(2)
             //Give the collateral to the collateralRecipient
-            expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-            expect(moveCollateral[0].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
-            expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-            expect(moveCollateral[0].amount).to.be.equal(ethers.utils.parseEther("1586.1781875"))
+            expect(moveCollateral[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+            expect(moveCollateral[0]._src).to.be.equal(fixedSpreadLiquidationStrategy.address)
+            expect(moveCollateral[0]._dst).to.be.equal(deployerAddress)
+            expect(moveCollateral[0]._amount).to.be.equal(ethers.utils.parseEther("1586.1781875"))
             //Give the treasury fees to System Debt Engine to be stored as system surplus
-            expect(moveCollateral[1].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-            expect(moveCollateral[1].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
-            expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
-            expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("3.2405625"))
+            expect(moveCollateral[1]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+            expect(moveCollateral[1]._src).to.be.equal(fixedSpreadLiquidationStrategy.address)
+            expect(moveCollateral[1]._dst).to.be.equal(mockedSystemDebtEngine.address)
+            expect(moveCollateral[1]._amount).to.be.equal(ethers.utils.parseEther("3.2405625"))
 
             const { calls: stableCoinReferencePrice } = mockedPriceOracle.smocked.stableCoinReferencePrice
             expect(stableCoinReferencePrice.length).to.be.equal(1)
@@ -503,25 +503,25 @@ describe("FixedSpreadLiquidationStrategy", () => {
 
         const { calls: confiscatePosition } = mockedBookKeeper.smocked.confiscatePosition
         expect(confiscatePosition.length).to.be.equal(1)
-        expect(confiscatePosition[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(confiscatePosition[0].positionAddress).to.be.equal(aliceAddress)
-        expect(confiscatePosition[0].collateralCreditor).to.be.equal(fixedSpreadLiquidationStrategy.address)
-        expect(confiscatePosition[0].stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
-        expect(confiscatePosition[0].collateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(-1110111).div(1000000))
-        expect(confiscatePosition[0].debtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(-37).div(100))
+        expect(confiscatePosition[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(confiscatePosition[0]._positionAddress).to.be.equal(aliceAddress)
+        expect(confiscatePosition[0]._collateralCreditor).to.be.equal(fixedSpreadLiquidationStrategy.address)
+        expect(confiscatePosition[0]._stablecoinDebtor).to.be.equal(mockedSystemDebtEngine.address)
+        expect(confiscatePosition[0]._collateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(-1110111).div(1000000))
+        expect(confiscatePosition[0]._debtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(-37).div(100))
 
         const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
         expect(moveCollateral.length).to.be.equal(2)
         //Give the collateral to the collateralRecipient
-        expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(moveCollateral[0].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
-        expect(moveCollateral[0].dst).to.be.equal(mockedFlashLendingCallee.address)
-        expect(moveCollateral[0].amount).to.be.equal(ethers.utils.parseEther("1.1101108113"))
+        expect(moveCollateral[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(moveCollateral[0]._src).to.be.equal(fixedSpreadLiquidationStrategy.address)
+        expect(moveCollateral[0]._dst).to.be.equal(mockedFlashLendingCallee.address)
+        expect(moveCollateral[0]._amount).to.be.equal(ethers.utils.parseEther("1.1101108113"))
         //Give the treasury fees to System Debt Engine to be stored as system surplus
-        expect(moveCollateral[1].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(moveCollateral[1].src).to.be.equal(fixedSpreadLiquidationStrategy.address)
-        expect(moveCollateral[1].dst).to.be.equal(mockedSystemDebtEngine.address)
-        expect(moveCollateral[1].amount).to.be.equal(ethers.utils.parseEther("0.0000001887"))
+        expect(moveCollateral[1]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(moveCollateral[1]._src).to.be.equal(fixedSpreadLiquidationStrategy.address)
+        expect(moveCollateral[1]._dst).to.be.equal(mockedSystemDebtEngine.address)
+        expect(moveCollateral[1]._amount).to.be.equal(ethers.utils.parseEther("0.0000001887"))
 
         const { calls: stableCoinReferencePrice } = mockedPriceOracle.smocked.stableCoinReferencePrice
         expect(stableCoinReferencePrice.length).to.be.equal(1)
