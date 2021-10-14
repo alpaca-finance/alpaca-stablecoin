@@ -30,6 +30,8 @@ import {
   CollateralPoolConfig__factory,
   SimplePriceFeed,
   SimplePriceFeed__factory,
+  ShowStopper__factory,
+  ShowStopper,
 } from "../../../typechain"
 import { expect } from "chai"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
@@ -102,10 +104,13 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
 
   await accessControlConfig.grantRole(await accessControlConfig.PRICE_ORACLE_ROLE(), deployer.address)
 
+  const ShowStopper = new ShowStopper__factory(deployer)
+  const showStopper = (await upgrades.deployProxy(ShowStopper, [bookKeeper.address])) as ShowStopper
+
   const PositionManager = new PositionManager__factory(deployer)
   const positionManager = (await upgrades.deployProxy(PositionManager, [
     bookKeeper.address,
-    AddressZero,
+    showStopper.address,
   ])) as PositionManager
 
   const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
@@ -148,7 +153,9 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), stablecoinAdapter.address)
 
   const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
-  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [
+    accessControlConfig.address,
+  ])) as SimplePriceFeed
   await simplePriceFeed.deployed()
 
   // Deploy TokenAdapter

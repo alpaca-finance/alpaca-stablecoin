@@ -23,14 +23,18 @@ type fixture = {
   mockedFixedSpreadLiquidationStrategy: MockContract
   mockedSystemDebtEngine: MockContract
   mockedCollateralPoolConfig: MockContract
+  mockedAccessControlConfig: MockContract
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
 
+  const mockedAccessControlConfig = await smockit(await ethers.getContractFactory("AccessControlConfig", deployer))
+
+  const mockedCollateralPoolConfig = await smockit(await ethers.getContractFactory("CollateralPoolConfig", deployer))
+
   // Deploy mocked BookKeeper
   const mockedBookKeeper = await smockit(await ethers.getContractFactory("BookKeeper", deployer))
-  const mockedCollateralPoolConfig = await smockit(await ethers.getContractFactory("CollateralPoolConfig", deployer))
 
   // Deploy mocked SystemDebtEngine
   const mockedSystemDebtEngine = await smockit(await ethers.getContractFactory("SystemDebtEngine", deployer))
@@ -55,6 +59,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     mockedFixedSpreadLiquidationStrategy,
     mockedSystemDebtEngine,
     mockedCollateralPoolConfig,
+    mockedAccessControlConfig,
   }
 }
 
@@ -72,6 +77,7 @@ describe("LiquidationEngine", () => {
   let mockedFixedSpreadLiquidationStrategy: MockContract
   let mockedSystemDebtEngine: MockContract
   let mockedCollateralPoolConfig: MockContract
+  let mockedAccessControlConfig: MockContract
 
   let liquidationEngine: LiquidationEngine
   let liquidationEngineAsAlice: LiquidationEngine
@@ -83,6 +89,7 @@ describe("LiquidationEngine", () => {
       mockedFixedSpreadLiquidationStrategy,
       mockedSystemDebtEngine,
       mockedCollateralPoolConfig,
+      mockedAccessControlConfig,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
@@ -93,6 +100,10 @@ describe("LiquidationEngine", () => {
   describe("#liquidate", () => {
     context("when liquidation engine does not live", () => {
       it("should be revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
         await liquidationEngine.cage()
         await expect(
           liquidationEngine.liquidate(
@@ -108,6 +119,10 @@ describe("LiquidationEngine", () => {
     })
     context("when debtShareToRepay == 0", () => {
       it("should be revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
         await expect(
           liquidationEngine.liquidate(
             formatBytes32String("BNB"),
@@ -122,17 +137,17 @@ describe("LiquidationEngine", () => {
     })
     context("when liquidation engine colllteral pool does not set strategy", () => {
       it("should be revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
         mockedBookKeeper.smocked.positions.will.return.with([
           UnitHelpers.WeiPerWad.mul(10),
           UnitHelpers.WeiPerWad.mul(5),
         ])
-        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with([
-          BigNumber.from(0),
-          UnitHelpers.WeiPerRay,
-          UnitHelpers.WeiPerRay,
-          BigNumber.from(0),
-          BigNumber.from(0),
-        ])
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(UnitHelpers.WeiPerRay)
+        mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(UnitHelpers.WeiPerRay)
+        mockedCollateralPoolConfig.smocked.getStrategy.will.return.with(AddressZero)
 
         await expect(
           liquidationEngine.liquidate(
@@ -243,6 +258,10 @@ describe("LiquidationEngine", () => {
   describe("#cage()", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
+
         await expect(liquidationEngineAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
@@ -250,12 +269,13 @@ describe("LiquidationEngine", () => {
     context("when role can access", () => {
       context("caller is owner role ", () => {
         it("should be set live to 0", async () => {
-          // grant role access
-          await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
 
-          await expect(liquidationEngineAsAlice.cage()).to.emit(liquidationEngineAsAlice, "Cage").withArgs()
+          await expect(liquidationEngineAsAlice.cage()).to.emit(liquidationEngineAsAlice, "LogCage").withArgs()
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
         })
@@ -263,12 +283,13 @@ describe("LiquidationEngine", () => {
 
       context("caller is showStopper role", () => {
         it("should be set live to 0", async () => {
-          // grant role access
-          await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
 
-          await expect(liquidationEngineAsAlice.cage()).to.emit(liquidationEngineAsAlice, "Cage").withArgs()
+          await expect(liquidationEngineAsAlice.cage()).to.emit(liquidationEngineAsAlice, "LogCage").withArgs()
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
         })
@@ -279,6 +300,10 @@ describe("LiquidationEngine", () => {
   describe("#uncage()", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
+
         await expect(liquidationEngineAsAlice.uncage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
@@ -286,8 +311,9 @@ describe("LiquidationEngine", () => {
     context("when role can access", () => {
       context("caller is owner role ", () => {
         it("should be set live to 1", async () => {
-          // grant role access
-          await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
 
@@ -295,7 +321,7 @@ describe("LiquidationEngine", () => {
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
 
-          await expect(liquidationEngineAsAlice.uncage()).to.emit(liquidationEngineAsAlice, "Uncage").withArgs()
+          await expect(liquidationEngineAsAlice.uncage()).to.emit(liquidationEngineAsAlice, "LogUncage").withArgs()
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
         })
@@ -303,8 +329,9 @@ describe("LiquidationEngine", () => {
 
       context("caller is showStopper role", () => {
         it("should be set live to 1", async () => {
-          // grant role access
-          await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), aliceAddress)
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
 
@@ -312,7 +339,7 @@ describe("LiquidationEngine", () => {
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(0)
 
-          await expect(liquidationEngineAsAlice.uncage()).to.emit(liquidationEngineAsAlice, "Uncage").withArgs()
+          await expect(liquidationEngineAsAlice.uncage()).to.emit(liquidationEngineAsAlice, "LogUncage").withArgs()
 
           expect(await liquidationEngineAsAlice.live()).to.be.equal(1)
         })
@@ -323,6 +350,10 @@ describe("LiquidationEngine", () => {
   describe("#pause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
+
         await expect(liquidationEngineAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
@@ -330,7 +361,10 @@ describe("LiquidationEngine", () => {
     context("when role can access", () => {
       context("and role is owner role", () => {
         it("should be success", async () => {
-          await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), deployerAddress)
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
           await liquidationEngine.pause()
         })
       })
@@ -338,14 +372,20 @@ describe("LiquidationEngine", () => {
 
     context("and role is gov role", () => {
       it("should be success", async () => {
-        await liquidationEngine.grantRole(await liquidationEngine.GOV_ROLE(), deployerAddress)
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
         await liquidationEngine.pause()
       })
     })
 
     context("when pause contract", () => {
       it("shouldn't be able to call liquidate", async () => {
-        await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), deployerAddress)
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
         await liquidationEngine.pause()
 
         // mock contract
@@ -353,16 +393,11 @@ describe("LiquidationEngine", () => {
           UnitHelpers.WeiPerWad.mul(10),
           UnitHelpers.WeiPerWad.mul(10),
         ])
-        mockedCollateralPoolConfig.smocked.collateralPools.will.return.with([
-          BigNumber.from(0),
-          UnitHelpers.WeiPerRay.mul(2),
-          UnitHelpers.WeiPerRay,
-          BigNumber.from(0),
-          BigNumber.from(0),
-        ])
-        mockedFixedSpreadLiquidationStrategy.smocked.execute.will.return.with()
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(UnitHelpers.WeiPerRay)
+        mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(UnitHelpers.WeiPerRay)
+        mockedCollateralPoolConfig.smocked.getStrategy.will.return.with(mockedFixedSpreadLiquidationStrategy.address)
 
-        await liquidationEngine.setStrategy(formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
+        mockedFixedSpreadLiquidationStrategy.smocked.execute.will.return.with()
 
         await expect(
           liquidationEngine.liquidate(
@@ -381,6 +416,10 @@ describe("LiquidationEngine", () => {
   describe("#unpause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
+
         await expect(liquidationEngineAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
@@ -388,7 +427,10 @@ describe("LiquidationEngine", () => {
     context("when role can access", () => {
       context("and role is owner role", () => {
         it("should be success", async () => {
-          await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), deployerAddress)
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
           await liquidationEngine.pause()
           await liquidationEngine.unpause()
         })
@@ -396,91 +438,69 @@ describe("LiquidationEngine", () => {
 
       context("and role is gov role", () => {
         it("should be success", async () => {
-          await liquidationEngine.grantRole(await liquidationEngine.GOV_ROLE(), deployerAddress)
+          mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+          mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
           await liquidationEngine.pause()
           await liquidationEngine.unpause()
         })
       })
     })
 
-    // @dev this test case is moved to integration test
-    // context("when unpause contract", () => {
-    //   it("should be success", async () => {
-    //     await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), deployerAddress)
+    context("when unpause contract", () => {
+      it("should liquidate but revert because debt share not decrease", async () => {
+        mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-    //     // pause contract
-    //     await liquidationEngine.pause()
+        // pause contract
+        await liquidationEngine.pause()
 
-    //     // unpause contract
-    //     await liquidationEngine.unpause()
+        // unpause contract
+        await liquidationEngine.unpause()
 
-    //     // mock contract
-    //     mockedBookKeeper.smocked.positions.will.return.with([
-    //       UnitHelpers.WeiPerWad.mul(10),
-    //       UnitHelpers.WeiPerWad.mul(10),
-    //     ])
-    //     mockedCollateralPoolConfig.smocked.collateralPools.will.return.with([
-    //       BigNumber.from(0),
-    //       UnitHelpers.WeiPerRay.mul(2),
-    //       UnitHelpers.WeiPerRay,
-    //       BigNumber.from(0),
-    //       BigNumber.from(0),
-    //     ])
-    //     mockedFixedSpreadLiquidationStrategy.smocked.execute.will.return.with()
+        // mock contract
+        mockedBookKeeper.smocked.positions.will.return.with([
+          UnitHelpers.WeiPerWad.mul(10),
+          UnitHelpers.WeiPerWad.mul(10),
+        ])
 
-    //     await liquidationEngine.setStrategy(formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
+        mockedFixedSpreadLiquidationStrategy.smocked.execute.will.return.with()
 
-    //     await liquidationEngine.liquidate(
-    //       formatBytes32String("BNB"),
-    //       aliceAddress,
-    //       UnitHelpers.WeiPerWad,
-    //       UnitHelpers.WeiPerWad,
-    //       deployerAddress,
-    //       ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
-    //     )
+        mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(UnitHelpers.WeiPerRay.mul(2))
+        mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(UnitHelpers.WeiPerRay)
+        mockedCollateralPoolConfig.smocked.getStrategy.will.return.with(mockedFixedSpreadLiquidationStrategy.address)
 
-    //     const { calls: positions } = mockedBookKeeper.smocked.positions
-    //     expect(positions.length).to.be.equal(2)
-    //     expect(positions[0][0]).to.be.equal(formatBytes32String("BNB"))
-    //     expect(positions[0][1]).to.be.equal(aliceAddress)
-
-    //     const { calls: collateralPools } = mockedCollateralPoolConfig.smocked.collateralPools
-    //     expect(collateralPools.length).to.be.equal(1)
-    //     expect(collateralPools[0][0]).to.be.equal(formatBytes32String("BNB"))
-
-    //     const { calls: execute } = mockedFixedSpreadLiquidationStrategy.smocked.execute
-    //     expect(execute.length).to.be.equal(1)
-    //     expect(execute[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-    //     expect(execute[0].positionDebtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
-    //     expect(execute[0].positionCollateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
-    //     expect(execute[0].positionAddress).to.be.equal(aliceAddress)
-    //     expect(execute[0].debtShareToRepay).to.be.equal(UnitHelpers.WeiPerWad)
-    //     expect(execute[0].data).to.be.equal(
-    //       ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
-    //     )
-    //   })
-    // })
-  })
-
-  describe("#setStrategy", () => {
-    context("when the caller is not the owner", () => {
-      it("should be revert", async () => {
         await expect(
-          liquidationEngineAsAlice.setStrategy(formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
-        ).to.be.revertedWith("!ownerRole")
-      })
-    })
-    context("when parameters are valid", () => {
-      it("should be able to call setStrategy", async () => {
-        // grant role access
-        await liquidationEngine.grantRole(await liquidationEngine.OWNER_ROLE(), deployerAddress)
+          liquidationEngine.liquidate(
+            formatBytes32String("BNB"),
+            aliceAddress,
+            UnitHelpers.WeiPerWad,
+            UnitHelpers.WeiPerWad,
+            deployerAddress,
+            ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
+          )
+        ).to.be.revertedWith("LiquidationEngine/debt-not-liquidated")
 
-        // set Strategy
-        await expect(
-          liquidationEngine.setStrategy(formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
+        const { calls: positions } = mockedBookKeeper.smocked.positions
+        expect(positions.length).to.be.equal(2)
+        expect(positions[0][0]).to.be.equal(formatBytes32String("BNB"))
+        expect(positions[0][1]).to.be.equal(aliceAddress)
+
+        const { calls: execute } = mockedFixedSpreadLiquidationStrategy.smocked.execute
+        expect(execute.length).to.be.equal(1)
+        expect(execute[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(execute[0]._positionDebtShare).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
+        expect(execute[0]._positionCollateralAmount).to.be.equal(UnitHelpers.WeiPerWad.mul(10))
+        expect(execute[0]._positionAddress).to.be.equal(aliceAddress)
+        expect(execute[0]._debtShareToBeLiquidated).to.be.equal(UnitHelpers.WeiPerWad)
+        expect(execute[0]._maxDebtShareToBeLiquidated).to.be.equal(UnitHelpers.WeiPerWad)
+        expect(execute[0]._liquidatorAddress).to.be.equal(deployerAddress)
+        expect(execute[0]._collateralRecipient).to.be.equal(deployerAddress)
+        expect(execute[0]._data).to.be.equal(
+          ethers.utils.defaultAbiCoder.encode(["address", "address"], [deployerAddress, deployerAddress])
         )
-          .to.emit(liquidationEngine, "LogSetStrategy")
-          .withArgs(deployerAddress, formatBytes32String("BNB"), mockedFixedSpreadLiquidationStrategy.address)
       })
     })
   })
