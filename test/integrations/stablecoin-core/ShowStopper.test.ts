@@ -32,11 +32,17 @@ import {
   TokenAdapter__factory,
   GetPositions,
   GetPositions__factory,
+  CollateralPoolConfig__factory,
+  CollateralPoolConfig,
 } from "../../../typechain"
 import { expect } from "chai"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
 import { formatBytes32String } from "ethers/lib/utils"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
+import { AccessControlConfig__factory } from "../../../typechain/factories/AccessControlConfig__factory"
+import { AccessControlConfig } from "../../../typechain/AccessControlConfig"
+import { AddressZero } from "../../helper/address"
+import { advanceBlock } from "../../helper/time"
 
 type Fixture = {
   positionManager: PositionManager
@@ -51,10 +57,25 @@ type Fixture = {
   systemDebtEngine: SystemDebtEngine
   priceOracle: PriceOracle
   getPositions: GetPositions
+  accessControlConfig: AccessControlConfig
 }
 
 const loadFixtureHandler = async (): Promise<Fixture> => {
   const [deployer, alice, bob, dev] = await ethers.getSigners()
+
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const accessControlConfig = (await upgrades.deployProxy(AccessControlConfig)) as AccessControlConfig
+
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [
+    accessControlConfig.address,
+  ])) as CollateralPoolConfig
 
   // Deploy BEP20
   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
@@ -78,46 +99,35 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   ])) as AlpacaStablecoin
 
   const BookKeeper = new BookKeeper__factory(deployer)
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper)) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [
+    collateralPoolConfig.address,
+    accessControlConfig.address,
+  ])) as BookKeeper
 
   const PriceOracle = new PriceOracle__factory(deployer)
   const priceOracle = (await upgrades.deployProxy(PriceOracle, [bookKeeper.address])) as PriceOracle
 
   const SimplePriceFeed = new SimplePriceFeed__factory(deployer)
-  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed)) as SimplePriceFeed
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [
+    accessControlConfig.address,
+  ])) as SimplePriceFeed
   await simplePriceFeed.setPrice(WeiPerWad)
 
   const PriceFeed = new MockPriceFeed__factory(deployer)
   const priceFeed = await PriceFeed.deploy()
 
-  priceOracle.setPriceFeed(formatBytes32String("BUSD"), simplePriceFeed.address)
-  priceOracle.setPriceFeed(formatBytes32String("USDT"), simplePriceFeed.address)
+  await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployer.address)
 
-  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployer.address)
-  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), priceOracle.address)
+  collateralPoolConfig.setPriceFeed(formatBytes32String("BUSD"), simplePriceFeed.address)
+  collateralPoolConfig.setPriceFeed(formatBytes32String("USDT"), simplePriceFeed.address)
 
-  await bookKeeper.init(formatBytes32String("BUSD"))
-  // set pool debt ceiling 100 rad
-  await bookKeeper.setDebtCeiling(formatBytes32String("BUSD"), WeiPerRad.mul(100))
-  // set price with safety margin 1 ray
-  await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BUSD"), WeiPerRay)
-  // set position debt floor 1 rad
-  await bookKeeper.setDebtFloor(formatBytes32String("BUSD"), WeiPerRad.mul(1))
-  // set total debt ceiling 100 rad
-  await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100))
+  await accessControlConfig.grantRole(await accessControlConfig.PRICE_ORACLE_ROLE(), deployer.address)
+  await accessControlConfig.grantRole(await accessControlConfig.PRICE_ORACLE_ROLE(), priceOracle.address)
 
-  await bookKeeper.init(formatBytes32String("USDT"))
-  // set pool debt ceiling 100 rad
-  await bookKeeper.setDebtCeiling(formatBytes32String("USDT"), WeiPerRad.mul(100))
-  // set price with safety margin 1 ray
-  await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("USDT"), WeiPerRay)
-  // set position debt floor 1 rad
-  await bookKeeper.setDebtFloor(formatBytes32String("USDT"), WeiPerRad.mul(1))
-  // set total debt ceiling 100 rad
   await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100))
 
   const ShowStopper = new ShowStopper__factory(deployer)
-  const showStopper = (await upgrades.deployProxy(ShowStopper)) as ShowStopper
+  const showStopper = (await upgrades.deployProxy(ShowStopper, [bookKeeper.address])) as ShowStopper
 
   const PositionManager = new PositionManager__factory(deployer)
   const positionManager = (await upgrades.deployProxy(PositionManager, [
@@ -156,9 +166,6 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     bookKeeper.address,
   ])) as StabilityFeeCollector
 
-  await stabilityFeeCollector.init(formatBytes32String("BUSD"))
-  await stabilityFeeCollector.init(formatBytes32String("USDT"))
-
   const SystemDebtEngine = new SystemDebtEngine__factory(deployer)
   const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
 
@@ -168,18 +175,60 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     systemDebtEngine.address,
   ])) as LiquidationEngine
 
-  await showStopper.setBookKeeper(bookKeeper.address)
+  // await showStopper.setBookKeeper(bookKeeper.address)
   await showStopper.setLiquidationEngine(liquidationEngine.address)
   await showStopper.setSystemDebtEngine(systemDebtEngine.address)
   await showStopper.setPriceOracle(priceOracle.address)
 
-  await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), liquidationEngine.address)
-  await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), showStopper.address)
-  await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), priceOracle.address)
-  await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), busdTokenAdapter.address)
-  await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), usdtTokenAdapter.address)
-  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
-  await bookKeeper.grantRole(await bookKeeper.STABILITY_FEE_COLLECTOR_ROLE(), stabilityFeeCollector.address)
+  // init BUSD pool
+  await collateralPoolConfig.initCollateralPool(
+    formatBytes32String("BUSD"),
+    // set pool debt ceiling 100 rad
+    WeiPerRad.mul(100),
+    // set position debt floor 1 rad
+    WeiPerRad.mul(1),
+    simplePriceFeed.address,
+    WeiPerRay,
+    WeiPerRay,
+    busdTokenAdapter.address,
+    0,
+    0,
+    0,
+    AddressZero
+  )
+  // set price with safety margin 1 ray (1 BUSD = 1 USD)
+  await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BUSD"), WeiPerRay)
+
+  // init USDT pool
+  await collateralPoolConfig.initCollateralPool(
+    formatBytes32String("USDT"),
+    // set pool debt ceiling 100 rad
+    WeiPerRad.mul(100),
+    // set position debt floor 1 rad
+    WeiPerRad.mul(1),
+    simplePriceFeed.address,
+    WeiPerRay,
+    WeiPerRay,
+    usdtTokenAdapter.address,
+    0,
+    0,
+    0,
+    AddressZero
+  )
+  // set price with safety margin 1 ray (1 USDT = 1 USD)
+  await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("USDT"), WeiPerRay)
+
+  await accessControlConfig.grantRole(await accessControlConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
+  await accessControlConfig.grantRole(await accessControlConfig.LIQUIDATION_ENGINE_ROLE(), liquidationEngine.address)
+  await accessControlConfig.grantRole(await accessControlConfig.LIQUIDATION_ENGINE_ROLE(), showStopper.address)
+  await accessControlConfig.grantRole(await accessControlConfig.PRICE_ORACLE_ROLE(), priceOracle.address)
+  await accessControlConfig.grantRole(await accessControlConfig.ADAPTER_ROLE(), busdTokenAdapter.address)
+  await accessControlConfig.grantRole(await accessControlConfig.ADAPTER_ROLE(), usdtTokenAdapter.address)
+  await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), positionManager.address)
+  await accessControlConfig.grantRole(
+    await accessControlConfig.STABILITY_FEE_COLLECTOR_ROLE(),
+    stabilityFeeCollector.address
+  )
   await alpacaStablecoin.grantRole(await alpacaStablecoin.MINTER_ROLE(), stablecoinAdapter.address)
 
   return {
@@ -195,6 +244,7 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     systemDebtEngine,
     priceOracle,
     getPositions,
+    accessControlConfig,
   }
 }
 
@@ -234,6 +284,7 @@ describe("ShowStopper", () => {
   let showStopperAsAlice: ShowStopper
   let stablecoinAdapterAsAlice: StablecoinAdapter
   let bookKeeperAsAlice: BookKeeper
+  let accessControlConfig: AccessControlConfig
 
   beforeEach(async () => {
     ;({
@@ -248,6 +299,7 @@ describe("ShowStopper", () => {
       liquidationEngine,
       systemDebtEngine,
       priceOracle,
+      accessControlConfig,
     } = await loadFixtureHandler())
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
@@ -287,36 +339,9 @@ describe("ShowStopper", () => {
         await expect(showStopper["cage()"]()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
-    context("when doesn't grant showStopperRole for liquidationEngine", () => {
-      it("should be revert", async () => {
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
-
-        await expect(showStopper["cage()"]()).to.be.revertedWith("!(ownerRole or showStopperRole)")
-      })
-    })
-    context("when doesn't grant showStopperRole for systemDebtEngine", () => {
-      it("should be revert", async () => {
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
-        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-
-        await expect(showStopper["cage()"]()).to.be.revertedWith("!(ownerRole or showStopperRole)")
-      })
-    })
-    context("when doesn't grant showStopperRole for priceOracle", () => {
-      it("should be revert", async () => {
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
-        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-
-        await expect(showStopper["cage()"]()).to.be.revertedWith("!(ownerRole or showStopperRole)")
-      })
-    })
     context("when grant showStopperRole for all contract", () => {
       it("should be able to cage", async () => {
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
-        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), showStopper.address)
+        await accessControlConfig.grantRole(await accessControlConfig.SHOW_STOPPER_ROLE(), showStopper.address)
 
         await showStopper["cage()"]()
 
@@ -350,10 +375,7 @@ describe("ShowStopper", () => {
         )
         await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
 
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
-        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), showStopper.address)
+        await accessControlConfig.grantRole(await accessControlConfig.SHOW_STOPPER_ROLE(), showStopper.address)
 
         await showStopper["cage()"]()
 
@@ -386,14 +408,11 @@ describe("ShowStopper", () => {
           ]
         )
         await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
-
+        await advanceBlock()
         const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
         const positionAddress = await positionManager.positions(positionId)
 
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
-        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), showStopper.address)
+        await accessControlConfig.grantRole(await accessControlConfig.SHOW_STOPPER_ROLE(), showStopper.address)
 
         await showStopper["cage()"]()
 
@@ -438,7 +457,7 @@ describe("ShowStopper", () => {
           ]
         )
         await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
-
+        await advanceBlock()
         const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
         const positionAddress = await positionManager.positions(positionId)
 
@@ -461,14 +480,11 @@ describe("ShowStopper", () => {
           ]
         )
         await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDraw2Call)
-
+        await advanceBlock()
         const positionId2 = await positionManager.ownerLastPositionId(bobProxyWallet.address)
         const positionAddress2 = await positionManager.positions(positionId2)
 
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
-        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), showStopper.address)
+        await accessControlConfig.grantRole(await accessControlConfig.SHOW_STOPPER_ROLE(), showStopper.address)
 
         await showStopper["cage()"]()
 
@@ -560,7 +576,7 @@ describe("ShowStopper", () => {
           ]
         )
         await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
-
+        await advanceBlock()
         const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
         const positionAddress = await positionManager.positions(positionId)
 
@@ -583,14 +599,11 @@ describe("ShowStopper", () => {
           ]
         )
         await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDraw2Call)
-
+        await advanceBlock()
         const positionId2 = await positionManager.ownerLastPositionId(bobProxyWallet.address)
         const positionAddress2 = await positionManager.positions(positionId2)
 
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
-        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), showStopper.address)
+        await accessControlConfig.grantRole(await accessControlConfig.SHOW_STOPPER_ROLE(), showStopper.address)
 
         await showStopper["cage()"]()
 
@@ -650,7 +663,7 @@ describe("ShowStopper", () => {
           ]
         )
         await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDrawCall)
-
+        await advanceBlock()
         const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
         const positionAddress = await positionManager.positions(positionId)
 
@@ -673,7 +686,7 @@ describe("ShowStopper", () => {
           ]
         )
         await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDraw2Call)
-
+        await advanceBlock()
         const positionId2 = await positionManager.ownerLastPositionId(bobProxyWallet.address)
         const positionAddress2 = await positionManager.positions(positionId2)
 
@@ -696,14 +709,11 @@ describe("ShowStopper", () => {
           ]
         )
         await bobProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openLockTokenAndDraw3Call)
-
+        await advanceBlock()
         const positionId3 = await positionManager.ownerLastPositionId(bobProxyWallet.address)
         const positionAddress3 = await positionManager.positions(positionId3)
 
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), showStopper.address)
-        await liquidationEngine.grantRole(await liquidationEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await systemDebtEngine.grantRole(await systemDebtEngine.SHOW_STOPPER_ROLE(), showStopper.address)
-        await priceOracle.grantRole(await priceOracle.SHOW_STOPPER_ROLE(), showStopper.address)
+        await accessControlConfig.grantRole(await accessControlConfig.SHOW_STOPPER_ROLE(), showStopper.address)
 
         await showStopper["cage()"]()
 
