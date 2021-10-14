@@ -6,8 +6,10 @@ import "@openzeppelin/test-helpers"
 import {
   AlpacaOraclePriceFeed,
   AlpacaOraclePriceFeed__factory,
-  MockAlpacaOracle__factory,
   MockAlpacaOracle,
+  MockAlpacaOracle__factory,
+  AccessControlConfig,
+  AccessControlConfig__factory,
 } from "../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 import { AddressOne, AddressTwo } from "../../helper/address"
@@ -19,6 +21,7 @@ const { expect } = chai
 type fixture = {
   alpacaOraclePriceFeed: AlpacaOraclePriceFeed
   mockedAlpacaOracle: MockContract
+  mockedAccessControlConfig: MockContract
 }
 
 const token0Address = AddressOne
@@ -38,6 +41,14 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   await mockAlpacaOracle.deployed()
   const mockedAlpacaOracle = await smockit(mockAlpacaOracle)
 
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const mockAccessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+  await mockAccessControlConfig.deployed()
+  const mockedAccessControlConfig = await smockit(mockAccessControlConfig)
+
   // Deploy AlpacaOraclePriceFeed
   const AlpacaOraclePriceFeed = (await ethers.getContractFactory(
     "AlpacaOraclePriceFeed",
@@ -47,10 +58,11 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     mockedAlpacaOracle.address,
     token0Address,
     token1Address,
+    mockedAccessControlConfig.address,
   ])) as AlpacaOraclePriceFeed
   await alpacaOraclePriceFeed.deployed()
 
-  return { alpacaOraclePriceFeed, mockedAlpacaOracle }
+  return { alpacaOraclePriceFeed, mockedAlpacaOracle, mockedAccessControlConfig }
 }
 
 describe("AlpacaOraclePriceFeed", () => {
@@ -69,11 +81,14 @@ describe("AlpacaOraclePriceFeed", () => {
   // Contracts
   let alpacaOraclePriceFeed: AlpacaOraclePriceFeed
   let mockedAlpacaOracle: MockContract
+  let mockedAccessControlConfig: MockContract
   let alpacaOraclePriceFeedAsAlice: AlpacaOraclePriceFeed
   let alpacaOraclePriceFeedAsBob: AlpacaOraclePriceFeed
 
   beforeEach(async () => {
-    ;({ alpacaOraclePriceFeed, mockedAlpacaOracle } = await waffle.loadFixture(loadFixtureHandler))
+    ;({ alpacaOraclePriceFeed, mockedAlpacaOracle, mockedAccessControlConfig } = await waffle.loadFixture(
+      loadFixtureHandler
+    ))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
       deployer.getAddress(),
@@ -115,6 +130,7 @@ describe("AlpacaOraclePriceFeed", () => {
           const now = DateTime.now()
 
           mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 23)])
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           const [price, ok] = await alpacaOraclePriceFeed.peekPrice()
           expect(price).to.be.equal(WeiPerWad.mul(10))
@@ -133,6 +149,7 @@ describe("AlpacaOraclePriceFeed", () => {
           const now = DateTime.now()
 
           mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 3)])
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           await alpacaOraclePriceFeed.setPriceLife(2 * 60 * 60)
           const [price, ok] = await alpacaOraclePriceFeed.peekPrice()
@@ -149,6 +166,7 @@ describe("AlpacaOraclePriceFeed", () => {
         it("should be able to get price with okFlag = true", async () => {
           const now = DateTime.now()
           mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 1)])
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           await alpacaOraclePriceFeed.setPriceLife(2 * 60 * 60)
           const [price, ok] = await alpacaOraclePriceFeed.peekPrice()
@@ -168,6 +186,7 @@ describe("AlpacaOraclePriceFeed", () => {
         // return the price with last update nearly to present
         const now = DateTime.now()
         mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 0)])
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
         await alpacaOraclePriceFeed.pause()
         const [price, ok] = await alpacaOraclePriceFeed.peekPrice()
@@ -184,13 +203,15 @@ describe("AlpacaOraclePriceFeed", () => {
   describe("#pause(), #unpause()", () => {
     context("when caller is not the owner", () => {
       it("should revert", async () => {
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
+
         await expect(alpacaOraclePriceFeedAsAlice.pause()).to.be.revertedWith("!ownerRole")
         await expect(alpacaOraclePriceFeedAsAlice.unpause()).to.be.revertedWith("!ownerRole")
       })
     })
     context("when caller is the owner", () => {
       it("should be able to call pause and unpause perfectly", async () => {
-        await alpacaOraclePriceFeed.grantRole(await alpacaOraclePriceFeed.OWNER_ROLE(), aliceAddress)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
         expect(await alpacaOraclePriceFeedAsAlice.paused()).to.be.false
         await alpacaOraclePriceFeedAsAlice.pause()
