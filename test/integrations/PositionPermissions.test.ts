@@ -91,15 +91,17 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     proxyWalletFactory.address,
   ])) as ProxyWalletRegistry
 
-  const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
-  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
-  await simplePriceFeed.deployed()
-
   const AccessControlConfig = (await ethers.getContractFactory(
     "AccessControlConfig",
     deployer
   )) as AccessControlConfig__factory
   const accessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+
+  const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [
+    accessControlConfig.address,
+  ])) as SimplePriceFeed
+  await simplePriceFeed.deployed()
 
   const CollateralPoolConfig = (await ethers.getContractFactory(
     "CollateralPoolConfig",

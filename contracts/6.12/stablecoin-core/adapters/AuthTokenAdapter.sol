@@ -65,6 +65,10 @@ contract AuthTokenAdapter is
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = _collateralPoolId;
+
+    // Grant the contract deployer the owner role: it will be able
+    // to grant and revoke any roles
+    _setupRole(IAccessControlConfig(bookKeeper.accessControlConfig()).OWNER_ROLE(), msg.sender);
   }
 
   function cage() external override {
