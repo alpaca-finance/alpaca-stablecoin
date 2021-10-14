@@ -13,7 +13,7 @@
     "test:integrations:showstopper": "hardhat test --no-compile ./test/integrations/stablecoin-core/ShowStopper.test.ts",
     "test:integrations:stabilityfeecollector": "hardhat test --no-compile ./test/integrations/stablecoin-core/StabilityFeeCollector.test.ts",
     "test:integrations:positionmanager": "hardhat test --no-compile ./test/integrations/position-manager/PositionManager.test.ts",
-    "test:position-manager": "hardhat test --no-compile ./test/units/managers/PositionManager.test.ts",
+    "test:positionmanager": "hardhat test --no-compile ./test/units/managers/PositionManager.test.ts",
     "testnet": "hardhat console --no-compile --network testnet",
     "test:bookkeeper": "hardhat test --no-compile ./test/units/stablecoin-core/BookKeeper.test.ts",
     "test:tokenadapter": "hardhat test --no-compile ./test/units/adapter/TokenAdapter.test.ts",
