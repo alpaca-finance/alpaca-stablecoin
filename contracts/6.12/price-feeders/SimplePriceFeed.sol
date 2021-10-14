@@ -26,7 +26,7 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
   }
 
   modifier onlyOwner() {
-    require(hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     _;
   }
 
