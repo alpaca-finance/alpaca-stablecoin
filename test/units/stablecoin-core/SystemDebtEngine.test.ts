@@ -104,7 +104,7 @@ describe("SystemDebtEngine", () => {
 
         const { calls } = mockedBookKeeper.smocked.settleSystemBadDebt
         expect(calls.length).to.be.equal(1)
-        expect(calls[0].value).to.be.equal(UnitHelpers.WeiPerRad)
+        expect(calls[0]._value).to.be.equal(UnitHelpers.WeiPerRad)
       })
     })
   })
@@ -129,7 +129,7 @@ describe("SystemDebtEngine", () => {
 
           expect(await systemDebtEngineAsAlice.live()).to.be.equal(1)
 
-          await expect(systemDebtEngineAsAlice.cage()).to.emit(systemDebtEngineAsAlice, "Cage").withArgs()
+          await expect(systemDebtEngineAsAlice.cage()).to.emit(systemDebtEngineAsAlice, "LogCage").withArgs()
 
           expect(await systemDebtEngineAsAlice.live()).to.be.equal(0)
         })
@@ -143,7 +143,7 @@ describe("SystemDebtEngine", () => {
 
           expect(await systemDebtEngineAsAlice.live()).to.be.equal(1)
 
-          await expect(systemDebtEngineAsAlice.cage()).to.emit(systemDebtEngineAsAlice, "Cage").withArgs()
+          await expect(systemDebtEngineAsAlice.cage()).to.emit(systemDebtEngineAsAlice, "LogCage").withArgs()
 
           expect(await systemDebtEngineAsAlice.live()).to.be.equal(0)
         })
@@ -175,7 +175,7 @@ describe("SystemDebtEngine", () => {
 
           expect(await systemDebtEngineAsAlice.live()).to.be.equal(0)
 
-          await expect(systemDebtEngineAsAlice.uncage()).to.emit(systemDebtEngineAsAlice, "Uncage").withArgs()
+          await expect(systemDebtEngineAsAlice.uncage()).to.emit(systemDebtEngineAsAlice, "LogUncage").withArgs()
 
           expect(await systemDebtEngineAsAlice.live()).to.be.equal(1)
         })
@@ -193,7 +193,7 @@ describe("SystemDebtEngine", () => {
 
           expect(await systemDebtEngineAsAlice.live()).to.be.equal(0)
 
-          await expect(systemDebtEngineAsAlice.uncage()).to.emit(systemDebtEngineAsAlice, "Uncage").withArgs()
+          await expect(systemDebtEngineAsAlice.uncage()).to.emit(systemDebtEngineAsAlice, "LogUncage").withArgs()
 
           expect(await systemDebtEngineAsAlice.live()).to.be.equal(1)
         })
@@ -218,7 +218,7 @@ describe("SystemDebtEngine", () => {
         mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
         await expect(systemDebtEngine.setSurplusBuffer(UnitHelpers.WeiPerRad))
-          .to.emit(systemDebtEngine, "SetSurplusBuffer")
+          .to.emit(systemDebtEngine, "LogSetSurplusBuffer")
           .withArgs(deployerAddress, UnitHelpers.WeiPerRad)
       })
     })
@@ -318,7 +318,7 @@ describe("SystemDebtEngine", () => {
         await systemDebtEngine.unpause()
 
         await expect(systemDebtEngine.setSurplusBuffer(UnitHelpers.WeiPerRad))
-          .to.emit(systemDebtEngine, "SetSurplusBuffer")
+          .to.emit(systemDebtEngine, "LogSetSurplusBuffer")
           .withArgs(deployerAddress, UnitHelpers.WeiPerRad)
       })
     })
@@ -358,17 +358,17 @@ describe("SystemDebtEngine", () => {
 
         const { calls: moveCollateral } = mockedBookKeeper.smocked.moveCollateral
         expect(moveCollateral.length).to.be.equal(1)
-        expect(moveCollateral[0].collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(moveCollateral[0].src).to.be.equal(systemDebtEngine.address)
-        expect(moveCollateral[0].dst).to.be.equal(deployerAddress)
-        expect(moveCollateral[0].amount).to.be.equal(UnitHelpers.WeiPerWad)
+        expect(moveCollateral[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+        expect(moveCollateral[0]._src).to.be.equal(systemDebtEngine.address)
+        expect(moveCollateral[0]._dst).to.be.equal(deployerAddress)
+        expect(moveCollateral[0]._amount).to.be.equal(UnitHelpers.WeiPerWad)
 
         const { calls: onMoveCollateral } = mockedIbTokenAdapter.smocked.onMoveCollateral
         expect(onMoveCollateral.length).to.be.equal(1)
-        expect(onMoveCollateral[0].source).to.be.equal(systemDebtEngine.address)
-        expect(onMoveCollateral[0].destination).to.be.equal(deployerAddress)
-        expect(onMoveCollateral[0].share).to.be.equal(UnitHelpers.WeiPerWad)
-        expect(onMoveCollateral[0].data).to.be.equal(
+        expect(onMoveCollateral[0]._source).to.be.equal(systemDebtEngine.address)
+        expect(onMoveCollateral[0]._destination).to.be.equal(deployerAddress)
+        expect(onMoveCollateral[0]._share).to.be.equal(UnitHelpers.WeiPerWad)
+        expect(onMoveCollateral[0]._data).to.be.equal(
           ethers.utils.defaultAbiCoder.encode(["address"], [deployerAddress])
         )
       })
@@ -402,9 +402,9 @@ describe("SystemDebtEngine", () => {
 
           const { calls: moveStablecoin } = mockedBookKeeper.smocked.moveStablecoin
           expect(moveStablecoin.length).to.be.equal(1)
-          expect(moveStablecoin[0].src).to.be.equal(systemDebtEngine.address)
-          expect(moveStablecoin[0].dst).to.be.equal(deployerAddress)
-          expect(moveStablecoin[0].value).to.be.equal(UnitHelpers.WeiPerRad)
+          expect(moveStablecoin[0]._src).to.be.equal(systemDebtEngine.address)
+          expect(moveStablecoin[0]._dst).to.be.equal(deployerAddress)
+          expect(moveStablecoin[0]._value).to.be.equal(UnitHelpers.WeiPerRad)
         })
       })
 
