@@ -1,13 +1,12 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IAlpacaOracle.sol";
 import "../interfaces/IAccessControlConfig.sol";
 
-contract AlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPriceFeed {
+contract AlpacaOraclePriceFeed is PausableUpgradeable, IPriceFeed {
   IAlpacaOracle public alpacaOracle;
   IAccessControlConfig public accessControlConfig;
   address public token0;
@@ -22,7 +21,6 @@ contract AlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable,
     address _accessControlConfig
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
 
     accessControlConfig = IAccessControlConfig(_accessControlConfig);
 
@@ -33,7 +31,7 @@ contract AlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgradeable,
   }
 
   modifier onlyOwner() {
-    require(hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     _;
   }
 

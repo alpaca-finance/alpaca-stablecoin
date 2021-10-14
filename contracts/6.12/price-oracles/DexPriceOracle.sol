@@ -7,7 +7,7 @@ import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@alpaca-finance/alpaca-contract/contracts/6/protocol/apis/pancakeV2/PancakeLibraryV2.sol";
 import "../interfaces/IAlpacaOracle.sol";
 
-contract DexPriceOracle is PausableUpgradeable, AccessControlUpgradeable, IAlpacaOracle {
+contract DexPriceOracle is PausableUpgradeable, IAlpacaOracle {
   using SafeMathUpgradeable for uint256;
   address public dexFactory;
 
@@ -17,9 +17,6 @@ contract DexPriceOracle is PausableUpgradeable, AccessControlUpgradeable, IAlpac
   }
 
   function initialize(address _dexFactory) external initializer {
-    PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
-
     dexFactory = _dexFactory;
   }
 
@@ -29,7 +26,7 @@ contract DexPriceOracle is PausableUpgradeable, AccessControlUpgradeable, IAlpac
     if (token0 == token1) return (1e18, uint64(now));
 
     (uint256 r0, uint256 r1) = PancakeLibraryV2.getReserves(dexFactory, token0, token1);
-    uint256 price = r1.mul(1e18).div(r0);
+    uint256 price = r0.mul(1e18).div(r1);
     return (price, uint64(now));
   }
 }
