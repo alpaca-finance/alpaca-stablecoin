@@ -219,7 +219,9 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const priceOracle = (await upgrades.deployProxy(PriceOracle, [bookKeeper.address])) as PriceOracle
 
   const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
-  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [
+    accessControlConfig.address,
+  ])) as SimplePriceFeed
   await simplePriceFeed.deployed()
 
   const GetPositions = (await ethers.getContractFactory("GetPositions", deployer)) as GetPositions__factory

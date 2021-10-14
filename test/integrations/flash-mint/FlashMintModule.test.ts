@@ -112,7 +112,9 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await accessControlConfig.grantRole(await accessControlConfig.MINTABLE_ROLE(), deployer.address)
 
   const SimplePriceFeed = (await ethers.getContractFactory("SimplePriceFeed", deployer)) as SimplePriceFeed__factory
-  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [])) as SimplePriceFeed
+  const simplePriceFeed = (await upgrades.deployProxy(SimplePriceFeed, [
+    accessControlConfig.address,
+  ])) as SimplePriceFeed
   await simplePriceFeed.deployed()
 
   await collateralPoolConfig.initCollateralPool(
