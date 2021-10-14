@@ -11,6 +11,8 @@ import "../interfaces/ICagable.sol";
 import "../interfaces/ICollateralPoolConfig.sol";
 import "../interfaces/IAccessControlConfig.sol";
 
+import "hardhat/console.sol";
+
 /// @title BookKeeper
 /// @author Alpaca Fin Corporation
 /** @notice A contract which acts as a book keeper of the Alpaca Stablecoin protocol. 
@@ -294,6 +296,8 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     position.lockedCollateral = add(position.lockedCollateral, _collateralValue);
     position.debtShare = add(position.debtShare, _debtShare);
     _vars.totalDebtShare = add(_vars.totalDebtShare, _debtShare);
+    console.log("collateralPoolConfig", collateralPoolConfig);
+    console.log("_vars.totalDebtShare", _vars.totalDebtShare);
     ICollateralPoolConfig(collateralPoolConfig).setTotalDebtShare(_collateralPoolId, _vars.totalDebtShare);
 
     int256 _debtValue = mul(_vars.debtAccumulatedRate, _debtShare);
