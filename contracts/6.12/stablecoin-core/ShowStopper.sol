@@ -228,10 +228,21 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
   }
 
   // --- Administration ---
+  event LogSetBookKeeper(address indexed caller, address _bookKeeper);
   event LogSetLiquidationEngine(address indexed caller, address _liquidationEngine);
   event LogSetSystemDebtEngine(address indexed caller, address _systemDebtEngine);
   event LogSetPriceOracle(address indexed caller, address _priceOracle);
   event LogSetCageCoolDown(address indexed caller, uint256 _cageCoolDown);
+
+  function setBookKeeper(address _bookKeeper) external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    require(live == 1, "ShowStopper/not-live");
+
+    IBookKeeper(_bookKeeper).totalStablecoinIssued(); // Sanity Check Call
+    bookKeeper = IBookKeeper(_bookKeeper);
+    emit LogSetBookKeeper(msg.sender, _bookKeeper);
+  }
 
   function setLiquidationEngine(address _liquidationEngine) external {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
@@ -419,7 +430,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
   /// @dev Redeem all the stablecoin in the stablecoinAccumulator of the caller into the corresponding collateral token
   /// @param _collateralPoolId Collateral pool id
   /// @param _amount the amount of stablecoin to be redeemed [wad]
-  function LogredeemStablecoin(bytes32 _collateralPoolId, uint256 _amount) external {
+  function redeemStablecoin(bytes32 _collateralPoolId, uint256 _amount) external {
     require(finalCashPrice[_collateralPoolId] != 0, "ShowStopper/final-cash-price-collateral-pool-id-not-defined");
     bookKeeper.moveCollateral(
       _collateralPoolId,

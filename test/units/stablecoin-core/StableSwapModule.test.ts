@@ -111,29 +111,29 @@ describe("StableSwapModule", () => {
 
         await stableSwapModule.setFeeIn(WeiPerWad.div(10))
         await expect(stableSwapModuleAsAlice.swapTokenToStablecoin(aliceAddress, WeiPerWad.mul(10)))
-          .to.be.emit(stableSwapModule, "SwapTokenToStablecoin")
+          .to.be.emit(stableSwapModule, "LogSwapTokenToStablecoin")
           .withArgs(aliceAddress, WeiPerWad.mul(10), WeiPerWad)
 
         const { calls: authTokenAdapterDepositCalls } = mockAuthTokenAdapter.smocked.deposit
         expect(authTokenAdapterDepositCalls.length).to.be.equal(1)
-        expect(authTokenAdapterDepositCalls[0].urn).to.be.equal(stableSwapModule.address)
-        expect(authTokenAdapterDepositCalls[0].wad).to.be.equal(WeiPerWad.mul(10))
-        expect(authTokenAdapterDepositCalls[0].msgSender).to.be.equal(aliceAddress)
+        expect(authTokenAdapterDepositCalls[0]._urn).to.be.equal(stableSwapModule.address)
+        expect(authTokenAdapterDepositCalls[0]._wad).to.be.equal(WeiPerWad.mul(10))
+        expect(authTokenAdapterDepositCalls[0]._msgSender).to.be.equal(aliceAddress)
 
         const { calls: bookKeeperAdjustPositionCalls } = mockBookKeeper.smocked.adjustPosition
         expect(bookKeeperAdjustPositionCalls.length).to.be.equal(1)
-        expect(bookKeeperAdjustPositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BUSD"))
-        expect(bookKeeperAdjustPositionCalls[0].positionAddress).to.be.equal(stableSwapModule.address)
-        expect(bookKeeperAdjustPositionCalls[0].collateralOwner).to.be.equal(stableSwapModule.address)
-        expect(bookKeeperAdjustPositionCalls[0].stablecoinOwner).to.be.equal(stableSwapModule.address)
-        expect(bookKeeperAdjustPositionCalls[0].collateralValue).to.be.equal(WeiPerWad.mul(10))
-        expect(bookKeeperAdjustPositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(10))
+        expect(bookKeeperAdjustPositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BUSD"))
+        expect(bookKeeperAdjustPositionCalls[0]._positionAddress).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperAdjustPositionCalls[0]._collateralOwner).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperAdjustPositionCalls[0]._stablecoinOwner).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperAdjustPositionCalls[0]._collateralValue).to.be.equal(WeiPerWad.mul(10))
+        expect(bookKeeperAdjustPositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(10))
 
         const { calls: bookKeeperMoveStablecoinCalls } = mockBookKeeper.smocked.moveStablecoin
         expect(bookKeeperMoveStablecoinCalls.length).to.be.equal(1)
-        expect(bookKeeperMoveStablecoinCalls[0].src).to.be.equal(stableSwapModule.address)
-        expect(bookKeeperMoveStablecoinCalls[0].dst).to.be.equal(mockSystemDebtEngine.address)
-        expect(bookKeeperMoveStablecoinCalls[0].value).to.be.equal(WeiPerWad.mul(WeiPerRay))
+        expect(bookKeeperMoveStablecoinCalls[0]._src).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperMoveStablecoinCalls[0]._dst).to.be.equal(mockSystemDebtEngine.address)
+        expect(bookKeeperMoveStablecoinCalls[0]._value).to.be.equal(WeiPerWad.mul(WeiPerRay))
 
         const { calls: stablecoinAdapterWithdrawCalls } = mockStablecoinAdapter.smocked.withdraw
         expect(stablecoinAdapterWithdrawCalls.length).to.be.equal(1)
@@ -157,7 +157,7 @@ describe("StableSwapModule", () => {
         mockAlpacaStablecoin.smocked.transferFrom.will.return.with(true)
 
         await expect(stableSwapModuleAsAlice.swapStablecoinToToken(aliceAddress, WeiPerWad.mul(10)))
-          .to.be.emit(stableSwapModule, "SwapStablecoinToToken")
+          .to.be.emit(stableSwapModule, "LogSwapStablecoinToToken")
           .withArgs(aliceAddress, WeiPerWad.mul(10), WeiPerWad)
 
         const { calls: stablecoinAdapterDepositCalls } = mockStablecoinAdapter.smocked.deposit
@@ -167,23 +167,23 @@ describe("StableSwapModule", () => {
 
         const { calls: bookKeeperAdjustPositionCalls } = mockBookKeeper.smocked.adjustPosition
         expect(bookKeeperAdjustPositionCalls.length).to.be.equal(1)
-        expect(bookKeeperAdjustPositionCalls[0].collateralPoolId).to.be.equal(formatBytes32String("BUSD"))
-        expect(bookKeeperAdjustPositionCalls[0].positionAddress).to.be.equal(stableSwapModule.address)
-        expect(bookKeeperAdjustPositionCalls[0].collateralOwner).to.be.equal(stableSwapModule.address)
-        expect(bookKeeperAdjustPositionCalls[0].stablecoinOwner).to.be.equal(stableSwapModule.address)
-        expect(bookKeeperAdjustPositionCalls[0].collateralValue).to.be.equal(WeiPerWad.mul(-10))
-        expect(bookKeeperAdjustPositionCalls[0].debtShare).to.be.equal(WeiPerWad.mul(-10))
+        expect(bookKeeperAdjustPositionCalls[0]._collateralPoolId).to.be.equal(formatBytes32String("BUSD"))
+        expect(bookKeeperAdjustPositionCalls[0]._positionAddress).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperAdjustPositionCalls[0]._collateralOwner).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperAdjustPositionCalls[0]._stablecoinOwner).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperAdjustPositionCalls[0]._collateralValue).to.be.equal(WeiPerWad.mul(-10))
+        expect(bookKeeperAdjustPositionCalls[0]._debtShare).to.be.equal(WeiPerWad.mul(-10))
 
         const { calls: authTokenAdapterWithdrawCalls } = mockAuthTokenAdapter.smocked.withdraw
         expect(authTokenAdapterWithdrawCalls.length).to.be.equal(1)
-        expect(authTokenAdapterWithdrawCalls[0].guy).to.be.equal(aliceAddress)
-        expect(authTokenAdapterWithdrawCalls[0].wad).to.be.equal(WeiPerWad.mul(10))
+        expect(authTokenAdapterWithdrawCalls[0]._guy).to.be.equal(aliceAddress)
+        expect(authTokenAdapterWithdrawCalls[0]._wad).to.be.equal(WeiPerWad.mul(10))
 
         const { calls: bookKeeperMoveStablecoinCalls } = mockBookKeeper.smocked.moveStablecoin
         expect(bookKeeperMoveStablecoinCalls.length).to.be.equal(1)
-        expect(bookKeeperMoveStablecoinCalls[0].src).to.be.equal(stableSwapModule.address)
-        expect(bookKeeperMoveStablecoinCalls[0].dst).to.be.equal(mockSystemDebtEngine.address)
-        expect(bookKeeperMoveStablecoinCalls[0].value).to.be.equal(WeiPerWad.mul(WeiPerRay))
+        expect(bookKeeperMoveStablecoinCalls[0]._src).to.be.equal(stableSwapModule.address)
+        expect(bookKeeperMoveStablecoinCalls[0]._dst).to.be.equal(mockSystemDebtEngine.address)
+        expect(bookKeeperMoveStablecoinCalls[0]._value).to.be.equal(WeiPerWad.mul(WeiPerRay))
       })
     })
   })
