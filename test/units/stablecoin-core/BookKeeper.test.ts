@@ -758,8 +758,6 @@ describe("BookKeeper", () => {
               mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
               mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
-              console.log("mockedCollateralPoolConfig.address", mockedCollateralPoolConfig.address)
-
               // set total debt ceiling 10 rad
               await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -776,20 +774,19 @@ describe("BookKeeper", () => {
                 0
               )
 
-              // bob allow alice
-              await bookKeeperAsBob.whitelist(aliceAddress)
+              const { calls: setTotalDebtShare } = mockedCollateralPoolConfig.smocked.setTotalDebtShare
+              expect(setTotalDebtShare.length).to.be.equal(1)
+              expect(setTotalDebtShare[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+              expect(setTotalDebtShare[0]._totalDebtShare).to.be.equal(0)
 
               const positionBobBefore = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
               expect(positionBobBefore.debtShare).to.be.equal(0)
 
-              const { calls: setTotalDebtShare } = mockedCollateralPoolConfig.smocked.setTotalDebtShare
-              console.log(setTotalDebtShare)
-              expect(setTotalDebtShare.length).to.be.equal(1)
-              expect(setTotalDebtShare[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-              expect(setTotalDebtShare[0]._totalDebtShare).to.be.equal(WeiPerWad.mul(10))
-
               const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
               expect(stablecoinAliceBefore).to.be.equal(0)
+
+              // bob allow alice
+              await bookKeeperAsBob.whitelist(aliceAddress)
 
               // alice draw
               await bookKeeperAsAlice.adjustPosition(
@@ -801,87 +798,75 @@ describe("BookKeeper", () => {
                 WeiPerWad.mul(10)
               )
 
-              const positionBobAfter = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
-              expect(positionBobAfter.debtShare).to.be.equal(WeiPerWad.mul(10))
-
               const { calls: setTotalDebtShare2 } = mockedCollateralPoolConfig.smocked.setTotalDebtShare
               expect(setTotalDebtShare2.length).to.be.equal(1)
               expect(setTotalDebtShare2[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
               expect(setTotalDebtShare2[0]._totalDebtShare).to.be.equal(WeiPerWad.mul(10))
+
+              const positionBobAfter = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
+              expect(positionBobAfter.debtShare).to.be.equal(WeiPerWad.mul(10))
 
               const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
               expect(stablecoinAliceAfter).to.be.equal(WeiPerRad.mul(10))
             })
           })
         })
-        // context("when alice call and alice is position owner", () => {
-        //   it("should be able to call adjustPosition(draw)", async () => {
-        //     // grant role access
-        //     await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
-        //     await accessControlConfig.grantRole(await accessControlConfig.PRICE_ORACLE_ROLE(), deployerAddress)
-        //     await accessControlConfig.grantRole(await accessControlConfig.ADAPTER_ROLE(), deployerAddress)
-        //     await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), aliceAddress)
+        context("when alice call and alice is position owner", () => {
+          it("should be able to call adjustPosition(draw)", async () => {
+            mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-        //     // initialize BNB colleteral pool
-        //     await collateralPoolConfig.initCollateralPool(
-        //       formatBytes32String("BNB"),
-        //       0,
-        //       0,
-        //       simplePriceFeed.address,
-        //       0,
-        //       WeiPerRay,
-        //       tokenAdapter.address,
-        //       0,
-        //       0,
-        //       0,
-        //       AddressZero
-        //     )
-        //     // set pool debt ceiling 10 rad
-        //     await collateralPoolConfig.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-        //     // set price with safety margin 1 ray
-        //     await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
-        //     // set total debt ceiling 10 rad
-        //     await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
+            // set total debt ceiling 10 rad
+            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
-        //     // add collateral to 10 BNB
-        //     await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
+            // add collateral to 10 BNB
+            await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
 
-        //     // alice lock collateral 10 BNB
-        //     await bookKeeperAsAlice.adjustPosition(
-        //       formatBytes32String("BNB"),
-        //       aliceAddress,
-        //       aliceAddress,
-        //       aliceAddress,
-        //       WeiPerWad.mul(10),
-        //       0
-        //     )
+            // alice lock collateral 10 BNB
+            await bookKeeperAsAlice.adjustPosition(
+              formatBytes32String("BNB"),
+              aliceAddress,
+              aliceAddress,
+              aliceAddress,
+              WeiPerWad.mul(10),
+              0
+            )
 
-        //     const positionaliceBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
-        //     expect(positionaliceBefore.debtShare).to.be.equal(0)
-        //     const BNBPoolBefore = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
-        //     expect(BNBPoolBefore.totalDebtShare).to.be.equal(0)
-        //     const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
-        //     expect(stablecoinAliceBefore).to.be.equal(0)
+            const { calls: setTotalDebtShare } = mockedCollateralPoolConfig.smocked.setTotalDebtShare
+            expect(setTotalDebtShare.length).to.be.equal(1)
+            expect(setTotalDebtShare[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+            expect(setTotalDebtShare[0]._totalDebtShare).to.be.equal(0)
 
-        //     // alice draw
-        //     await bookKeeperAsAlice.adjustPosition(
-        //       formatBytes32String("BNB"),
-        //       aliceAddress,
-        //       aliceAddress,
-        //       aliceAddress,
-        //       0,
-        //       WeiPerWad.mul(10)
-        //     )
+            const positionaliceBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
+            expect(positionaliceBefore.debtShare).to.be.equal(0)
 
-        //     const positionaliceAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
-        //     expect(positionaliceAfter.debtShare).to.be.equal(WeiPerWad.mul(10))
-        //     const BNBPoolAfter = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
-        //     expect(BNBPoolAfter.totalDebtShare).to.be.equal(WeiPerWad.mul(10))
-        //     const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
-        //     expect(stablecoinAliceAfter).to.be.equal(WeiPerRad.mul(10))
-        //   })
-        // })
+            const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
+            expect(stablecoinAliceBefore).to.be.equal(0)
+
+            // alice draw
+            await bookKeeperAsAlice.adjustPosition(
+              formatBytes32String("BNB"),
+              aliceAddress,
+              aliceAddress,
+              aliceAddress,
+              0,
+              WeiPerWad.mul(10)
+            )
+
+            const positionaliceAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
+            expect(positionaliceAfter.debtShare).to.be.equal(WeiPerWad.mul(10))
+            const BNBPoolAfter = await collateralPoolConfig.collateralPools(formatBytes32String("BNB"))
+            expect(BNBPoolAfter.totalDebtShare).to.be.equal(WeiPerWad.mul(10))
+            const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
+            expect(stablecoinAliceAfter).to.be.equal(WeiPerRad.mul(10))
+          })
+        })
         // context("when position debt value < debt floor", () => {
         //   it("should be revert", async () => {
         //     // grant role access
