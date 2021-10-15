@@ -30,6 +30,7 @@
     "test:stableswapmodule": "hardhat test --no-compile ./test/units/stablecoin-core/StableSwapModule.test.ts",
     "test:fixedSpreadliquidationstrategy": "hardhat test --no-compile ./test/units/liquidation-strategies/FixedSpreadLiquidationStrategy.test.ts",
     "test:flashmintmodule": "hardhat test --no-compile ./test/units/flash-mint/FlashMintModule.test.ts",
+    "test:collateralPoolConfig": "hardhat test --no-compile ./test/units/config/CollateralPoolConfig.test.ts",
     "test:integrations:alpacastablecoinproxyaction": "hardhat test --no-compile ./test/integrations/AlpacaStablecoinProxyAction.test.ts",
     "test:integrations:liquidationengine": "hardhat test --no-compile ./test/integrations/stablecoin-core/LiquidationEngine.test.ts",
     "test:integrations:positionpermissions": "hardhat test --no-compile ./test/integrations/PositionPermissions.test.ts",
