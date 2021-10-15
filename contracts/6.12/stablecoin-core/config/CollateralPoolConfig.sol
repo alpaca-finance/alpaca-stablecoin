@@ -107,13 +107,11 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
   }
 
   function setPriceFeed(bytes32 _poolId, address _priceFeed) external onlyOwner {
-    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     _collateralPools[_poolId].priceFeed = _priceFeed;
     emit LogSetPriceFeed(msg.sender, _poolId, _priceFeed);
   }
 
-  function setLiquidationRatio(bytes32 _poolId, uint256 _data) external {
-    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  function setLiquidationRatio(bytes32 _poolId, uint256 _data) external onlyOwner {
     _collateralPools[_poolId].liquidationRatio = _data;
     emit LogSetLiquidationRatio(msg.sender, _poolId, _data);
   }
@@ -144,35 +142,30 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
   */
   /// @param _collateralPool Collateral pool id
   /// @param _stabilityFeeRate the new stability fee rate [ray]
-  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _stabilityFeeRate) external {
-    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  function setStabilityFeeRate(bytes32 _collateralPool, uint256 _stabilityFeeRate) external onlyOwner {
     require(_stabilityFeeRate > RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
     _collateralPools[_collateralPool].stabilityFeeRate = _stabilityFeeRate;
     emit LogSetStabilityFeeRate(msg.sender, _collateralPool, _stabilityFeeRate);
   }
 
-  function setAdapter(bytes32 collateralPoolId, address _adapter) external {
-    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  function setAdapter(bytes32 collateralPoolId, address _adapter) external onlyOwner {
     _collateralPools[collateralPoolId].adapter = _adapter;
     emit LogSetAdapter(msg.sender, collateralPoolId, _adapter);
   }
 
-  function setCloseFactorBps(bytes32 collateralPoolId, uint256 _closeFactorBps) external {
-    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  function setCloseFactorBps(bytes32 collateralPoolId, uint256 _closeFactorBps) external onlyOwner {
     require(_closeFactorBps <= 10000, "CollateralPoolConfig/close-factor-bps-more-10000");
     _collateralPools[collateralPoolId].closeFactorBps = _closeFactorBps;
     emit LogSetCloseFactorBps(msg.sender, collateralPoolId, _closeFactorBps);
   }
 
-  function setLiquidatorIncentiveBps(bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps) external {
-    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  function setLiquidatorIncentiveBps(bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps) external onlyOwner {
     require(_liquidatorIncentiveBps <= 2500, "CollateralPoolConfig/liquidator-incentive-bps-more-2500");
     _collateralPools[collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
     emit LogSetLiquidatorIncentiveBps(msg.sender, collateralPoolId, _liquidatorIncentiveBps);
   }
 
-  function setTreasuryFeesBps(bytes32 collateralPoolId, uint256 _treasuryFeesBps) external {
-    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  function setTreasuryFeesBps(bytes32 collateralPoolId, uint256 _treasuryFeesBps) external onlyOwner {
     require(_treasuryFeesBps <= 2500, "CollateralPoolConfig/treasury-fees-bps-more-2500");
     _collateralPools[collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
     emit LogSetTreasuryFeesBps(msg.sender, collateralPoolId, _treasuryFeesBps);
@@ -188,8 +181,7 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
     _collateralPools[_collateralPoolId].debtAccumulatedRate = _debtAccumulatedRate;
   }
 
-  function setStrategy(bytes32 _collateralPoolId, address _strategy) external {
-    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  function setStrategy(bytes32 _collateralPoolId, address _strategy) external onlyOwner {
     _collateralPools[_collateralPoolId].strategy = _strategy;
     emit LogSetStrategy(msg.sender, _collateralPoolId, address(_strategy));
   }
