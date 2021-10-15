@@ -2264,6 +2264,7 @@ describe("position manager", () => {
             openLockBNBAndDrawCall,
             { value: parseEther("1"), gasPrice: 0 }
           )
+          await TimeHelpers.advanceBlock()
           const openLockBNBAndDraw2Call = alpacaStablecoinProxyActions.interface.encodeFunctionData(
             "openLockBNBAndDraw",
             [
@@ -2281,7 +2282,7 @@ describe("position manager", () => {
             openLockBNBAndDrawCall,
             { value: parseEther("1"), gasPrice: 0 }
           )
-
+          await TimeHelpers.advanceBlock()
           const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
           const positionAddress = await positionManager.positions(positionId)
 
