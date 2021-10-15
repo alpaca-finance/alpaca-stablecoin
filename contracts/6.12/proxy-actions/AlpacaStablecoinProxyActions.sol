@@ -1,4 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
+
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
@@ -17,6 +29,7 @@ import "../utils/SafeToken.sol";
 
 /// ==============================
 /// @notice WARNING: These functions meant to be used as a a library for a Proxy.
+/// @notice DO NOT CALL ANY FUNCTION IN THIS CONTRACT DIRECTLY.
 /// @notice Hence, it shouldn't has any state vairables. Some are unsafe if you call them directly.
 /// ==============================
 

@@ -1,14 +1,18 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
+
 pragma solidity 0.6.12;
 
-// ProxyWalletCache
-// This global cache stores addresses of contracts previously deployed
-// by a proxy. This saves gas from repeat deployment of the same
-// contracts and eliminates blockchain bloat.
-
-// By default, all proxies deployed from the same factory store
-// contracts in the same cache. The cache a proxy instance uses can be
-// changed.  The cache uses the sha3 hash of a contract's bytecode to
-// lookup the address
 contract ProxyWalletCache {
   mapping(bytes32 => address) cache;
 
