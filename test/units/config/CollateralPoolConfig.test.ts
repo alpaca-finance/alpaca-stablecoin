@@ -14,6 +14,7 @@ import {
 import { time, timeLog, timeStamp } from "console"
 import { DateTime } from "luxon"
 import * as AssertHelpers from "../../helper/assert"
+import { latest } from "../../helper/time"
 
 chai.use(solidity)
 const { expect } = chai
@@ -32,9 +33,8 @@ const CLOSE_FACTOR_BPS = BigNumber.from(5000)
 const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(12500)
 const TREASURY_FEE_BPS = BigNumber.from(2500)
 
-const nHoursAgoInSec = (now: DateTime, n: number): BigNumber => {
-  const d = now.minus({ hours: n })
-  return BigNumber.from(Math.floor(d.toSeconds()))
+const nHoursAgoInSec = (now: BigNumber, n: number): BigNumber => {
+  return now.sub(n * 60 * 60)
 }
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
@@ -462,7 +462,7 @@ describe("CollateralPoolConfig", () => {
         await accessControlConfig.grantRole(await accessControlConfig.STABILITY_FEE_COLLECTOR_ROLE(), deployerAddress)
         await collateralPoolConfig.updateLastAccumulationTime(COLLATERAL_POOL_ID)
 
-        const now = DateTime.now()
+        const now = await latest()
         AssertHelpers.assertAlmostEqual(
           (await collateralPoolConfig.collateralPools(COLLATERAL_POOL_ID)).lastAccumulationTime.toString(),
           nHoursAgoInSec(now, 0).toString()
@@ -551,7 +551,7 @@ describe("CollateralPoolConfig", () => {
         await accessControlConfig.grantRole(await accessControlConfig.STABILITY_FEE_COLLECTOR_ROLE(), deployerAddress)
         await collateralPoolConfig.updateLastAccumulationTime(COLLATERAL_POOL_ID)
 
-        const now = DateTime.now()
+        const now = await latest()
         AssertHelpers.assertAlmostEqual(
           (await collateralPoolConfig.collateralPools(COLLATERAL_POOL_ID)).lastAccumulationTime.toString(),
           nHoursAgoInSec(now, 0).toString()

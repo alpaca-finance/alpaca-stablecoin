@@ -66,6 +66,10 @@ type fixture = {
   bookKeeperFlashMintArbitrager: BookKeeperFlashMintArbitrager
 }
 
+const CLOSE_FACTOR_BPS = BigNumber.from(5000)
+const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(12500)
+const TREASURY_FEE_BPS = BigNumber.from(2500)
+
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer, alice, bob, dev] = await ethers.getSigners()
 
@@ -125,9 +129,9 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     0,
     WeiPerRay,
     authTokenAdapter.address,
-    0,
-    0,
-    0,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
     AddressZero
   )
   await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(100000000000000))

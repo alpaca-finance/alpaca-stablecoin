@@ -1,5 +1,5 @@
 import { ethers, upgrades, waffle } from "hardhat"
-import { Signer } from "ethers"
+import { BigNumber, Signer } from "ethers"
 
 import {
   ProxyWallet,
@@ -59,6 +59,10 @@ type Fixture = {
   getPositions: GetPositions
   accessControlConfig: AccessControlConfig
 }
+
+const CLOSE_FACTOR_BPS = BigNumber.from(5000)
+const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(12500)
+const TREASURY_FEE_BPS = BigNumber.from(2500)
 
 const loadFixtureHandler = async (): Promise<Fixture> => {
   const [deployer, alice, bob, dev] = await ethers.getSigners()
@@ -191,9 +195,9 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     WeiPerRay,
     WeiPerRay,
     busdTokenAdapter.address,
-    0,
-    0,
-    0,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
     AddressZero
   )
   // set price with safety margin 1 ray (1 BUSD = 1 USD)
@@ -210,9 +214,9 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     WeiPerRay,
     WeiPerRay,
     usdtTokenAdapter.address,
-    0,
-    0,
-    0,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
     AddressZero
   )
   // set price with safety margin 1 ray (1 USDT = 1 USD)
