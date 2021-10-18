@@ -15,6 +15,7 @@ import { smockit, MockContract } from "@eth-optimism/smock"
 import { AddressOne, AddressTwo } from "../../helper/address"
 import { WeiPerWad } from "../../helper/unit"
 import { DateTime } from "luxon"
+import { duration, increase, latest } from "../../helper/time"
 
 chai.use(solidity)
 const { expect } = chai
@@ -28,9 +29,8 @@ type fixture = {
 const token0Address = AddressOne
 const token1Address = AddressTwo
 
-const nHoursAgoInSec = (now: DateTime, n: number): BigNumber => {
-  const d = now.minus({ hours: n })
-  return BigNumber.from(Math.floor(d.toSeconds()))
+const nHoursAgoInSec = (now: BigNumber, n: number): BigNumber => {
+  return now.sub(n * 60 * 60)
 }
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
@@ -126,7 +126,7 @@ describe("StrictAlpacaOraclePriceFeed", () => {
     context("when priceLife is 24 hours", () => {
       context("when primary alpacaOracle returns 25 hours old price", () => {
         it("should be able to get price with okFlag = false, with price from primary", async () => {
-          const now = DateTime.now()
+          const now = await latest()
 
           mockedAlpacaOracleA.smocked.getPrice.will.return.with([WeiPerWad.mul(100), nHoursAgoInSec(now, 25)])
           mockedAlpacaOracleB.smocked.getPrice.will.return.with([WeiPerWad.mul(99), nHoursAgoInSec(now, 1)])
@@ -141,7 +141,7 @@ describe("StrictAlpacaOraclePriceFeed", () => {
       })
       context("when secondary alpacaOracle returns 25 hours old price", () => {
         it("should be able to get price with okFlag = false, with price from primary", async () => {
-          const now = DateTime.now()
+          const now = await latest()
 
           mockedAlpacaOracleA.smocked.getPrice.will.return.with([WeiPerWad.mul(100), nHoursAgoInSec(now, 1)])
           mockedAlpacaOracleB.smocked.getPrice.will.return.with([WeiPerWad.mul(99), nHoursAgoInSec(now, 25)])
@@ -156,7 +156,7 @@ describe("StrictAlpacaOraclePriceFeed", () => {
       })
       context("when both alpacaOracle returns 1 hours old price", () => {
         it("should be able to get price with okFlag = true, with price from primary", async () => {
-          const now = DateTime.now()
+          const now = await latest()
 
           mockedAlpacaOracleA.smocked.getPrice.will.return.with([WeiPerWad.mul(100), nHoursAgoInSec(now, 1)])
           mockedAlpacaOracleB.smocked.getPrice.will.return.with([WeiPerWad.mul(99), nHoursAgoInSec(now, 1)])
@@ -173,7 +173,7 @@ describe("StrictAlpacaOraclePriceFeed", () => {
     context("when maxPriceDiff is 10500 (5%)", () => {
       context("when primary returns price = 100 WAD, secondary returns price = 106 WAD (diff -6%)", () => {
         it("should be able to get price with okFlag = false (primary price too low)", async () => {
-          const now = DateTime.now()
+          const now = await latest()
 
           mockedAlpacaOracleA.smocked.getPrice.will.return.with([WeiPerWad.mul(100), nHoursAgoInSec(now, 1)])
           mockedAlpacaOracleB.smocked.getPrice.will.return.with([WeiPerWad.mul(106), nHoursAgoInSec(now, 1)])
@@ -188,7 +188,7 @@ describe("StrictAlpacaOraclePriceFeed", () => {
       })
       context("when primary returns price = 106 WAD, secondary returns price = 100 WAD (diff +6%)", () => {
         it("should be able to get price with okFlag = false (primary price too high)", async () => {
-          const now = DateTime.now()
+          const now = await latest()
 
           mockedAlpacaOracleA.smocked.getPrice.will.return.with([WeiPerWad.mul(106), nHoursAgoInSec(now, 1)])
           mockedAlpacaOracleB.smocked.getPrice.will.return.with([WeiPerWad.mul(100), nHoursAgoInSec(now, 1)])
@@ -203,7 +203,7 @@ describe("StrictAlpacaOraclePriceFeed", () => {
       })
       context("when primary returns price = 100 WAD, secondary returns price = 105 WAD (diff -5%)", () => {
         it("should be able to get price with okFlag = true", async () => {
-          const now = DateTime.now()
+          const now = await latest()
 
           mockedAlpacaOracleA.smocked.getPrice.will.return.with([WeiPerWad.mul(100), nHoursAgoInSec(now, 1)])
           mockedAlpacaOracleB.smocked.getPrice.will.return.with([WeiPerWad.mul(105), nHoursAgoInSec(now, 1)])
@@ -218,7 +218,7 @@ describe("StrictAlpacaOraclePriceFeed", () => {
       })
       context("when primary returns price = 105 WAD, secondary returns price = 100 WAD (diff +5%)", () => {
         it("should be able to get price with okFlag = true", async () => {
-          const now = DateTime.now()
+          const now = await latest()
 
           mockedAlpacaOracleA.smocked.getPrice.will.return.with([WeiPerWad.mul(105), nHoursAgoInSec(now, 1)])
           mockedAlpacaOracleB.smocked.getPrice.will.return.with([WeiPerWad.mul(100), nHoursAgoInSec(now, 1)])
@@ -237,7 +237,7 @@ describe("StrictAlpacaOraclePriceFeed", () => {
         mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
         await strictAlpacaOraclePriceFeed.pause()
 
-        const now = DateTime.now()
+        const now = await latest()
 
         mockedAlpacaOracleA.smocked.getPrice.will.return.with([WeiPerWad.mul(100), nHoursAgoInSec(now, 1)])
         mockedAlpacaOracleB.smocked.getPrice.will.return.with([WeiPerWad.mul(99), nHoursAgoInSec(now, 1)])

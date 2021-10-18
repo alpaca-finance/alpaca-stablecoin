@@ -72,6 +72,10 @@ type Fixture = {
   collateralPoolConfig: CollateralPoolConfig
 }
 
+const CLOSE_FACTOR_BPS = BigNumber.from(5000)
+const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(12500)
+const TREASURY_FEE_BPS = BigNumber.from(2500)
+
 const loadFixtureHandler = async (): Promise<Fixture> => {
   const [deployer, alice, , dev] = await ethers.getSigners()
 
@@ -285,9 +289,9 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     WeiPerRay,
     WeiPerRay,
     ibTokenAdapter.address,
-    0,
-    0,
-    0,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
     AddressZero
   )
   // set price with safety margin 1 ray (1 ibBUSD = 1 USD)
@@ -304,9 +308,9 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     WeiPerRay,
     WeiPerRay,
     ibTokenAdapter.address,
-    0,
-    0,
-    0,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
     AddressZero
   )
   // set price with safety margin 400 ray (1 BNB = 400 USD)
@@ -323,9 +327,9 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     WeiPerRay,
     WeiPerRay,
     ibTokenAdapter.address,
-    0,
-    0,
-    0,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
     AddressZero
   )
   // set price with safety margin 10 ray (1 ALPACA = 10 USD)
@@ -2264,6 +2268,7 @@ describe("position manager", () => {
             openLockBNBAndDrawCall,
             { value: parseEther("1"), gasPrice: 0 }
           )
+          await TimeHelpers.advanceBlock()
           const openLockBNBAndDraw2Call = alpacaStablecoinProxyActions.interface.encodeFunctionData(
             "openLockBNBAndDraw",
             [
@@ -2281,7 +2286,7 @@ describe("position manager", () => {
             openLockBNBAndDrawCall,
             { value: parseEther("1"), gasPrice: 0 }
           )
-
+          await TimeHelpers.advanceBlock()
           const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
           const positionAddress = await positionManager.positions(positionId)
 

@@ -15,6 +15,7 @@ import { smockit, MockContract } from "@eth-optimism/smock"
 import { AddressOne, AddressTwo } from "../../helper/address"
 import { WeiPerWad } from "../../helper/unit"
 import { DateTime } from "luxon"
+import { duration, increase, latest } from "../../helper/time"
 
 chai.use(solidity)
 const { expect } = chai
@@ -27,9 +28,8 @@ type fixture = {
 const token0Address = AddressOne
 const token1Address = AddressTwo
 
-const nHoursAgoInSec = (now: DateTime, n: number): BigNumber => {
-  const d = now.minus({ hours: n })
-  return BigNumber.from(Math.floor(d.toSeconds()))
+const nHoursAgoInSec = (now: BigNumber, n: number): BigNumber => {
+  return now.sub(n * 60 * 60)
 }
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
@@ -111,7 +111,7 @@ describe("AlpacaOraclePriceFeed", () => {
     context("when priceLife is 24 hours", () => {
       context("when alpacaOracle returns 25 hours old price", () => {
         it("should be able to get price with okFlag = false", async () => {
-          const now = DateTime.now()
+          const now = await latest()
 
           mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 25)])
 
@@ -127,7 +127,7 @@ describe("AlpacaOraclePriceFeed", () => {
       })
       context("when alpacaOracle returns 23 hours old price", () => {
         it("should be able to get price with okFlag = true", async () => {
-          const now = DateTime.now()
+          const now = await latest()
 
           mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 23)])
           mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
@@ -146,7 +146,7 @@ describe("AlpacaOraclePriceFeed", () => {
     context("when priceLife is 2 hour", () => {
       context("when alpacaOracle returns 3 hour old price", () => {
         it("should be able to get price with okFlag = false", async () => {
-          const now = DateTime.now()
+          const now = await latest()
 
           mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 3)])
           mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
@@ -164,7 +164,7 @@ describe("AlpacaOraclePriceFeed", () => {
       })
       context("when alpacaOracle returns 1 hours old price", () => {
         it("should be able to get price with okFlag = true", async () => {
-          const now = DateTime.now()
+          const now = await latest()
           mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 1)])
           mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
@@ -184,7 +184,7 @@ describe("AlpacaOraclePriceFeed", () => {
     context("when AlpacaOraclePriceFeed is in paused state", () => {
       it("should always return okFlag = false no matter what the alpacaOracle says", async () => {
         // return the price with last update nearly to present
-        const now = DateTime.now()
+        const now = await latest()
         mockedAlpacaOracle.smocked.getPrice.will.return.with([WeiPerWad.mul(10), nHoursAgoInSec(now, 0)])
         mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 

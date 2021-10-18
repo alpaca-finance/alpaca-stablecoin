@@ -1,3 +1,16 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
+
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
@@ -15,17 +28,23 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
 
   uint256 constant RAY = 10**27;
 
-  event LogSetPriceWithSafetyMargin(address indexed caller, bytes32 collateralPoolId, uint256 priceWithSafetyMargin);
-  event LogSetDebtCeiling(address indexed caller, bytes32 collateralPoolId, uint256 debtCeiling);
-  event LogSetDebtFloor(address indexed caller, bytes32 collateralPoolId, uint256 debtFloor);
-  event LogSetPriceFeed(address indexed caller, bytes32 poolId, address priceFeed);
-  event LogSetLiquidationRatio(address indexed caller, bytes32 poolId, uint256 data);
-  event LogSetStabilityFeeRate(address indexed caller, bytes32 poolId, uint256 data);
-  event LogSetAdapter(address indexed caller, bytes32 collateralPoolId, address _adapter);
-  event LogSetCloseFactorBps(address indexed caller, bytes32 collateralPoolId, uint256 _closeFactorBps);
-  event LogSetLiquidatorIncentiveBps(address indexed caller, bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps);
-  event LogSetTreasuryFeesBps(address indexed caller, bytes32 collateralPoolId, uint256 _treasuryFeeBps);
-  event LogSetStrategy(address indexed caller, bytes32 _collateralPoolId, address strategy);
+  event LogSetPriceWithSafetyMargin(address indexed _caller, bytes32 _collateralPoolId, uint256 _priceWithSafetyMargin);
+  event LogSetDebtCeiling(address indexed _caller, bytes32 _collateralPoolId, uint256 _debtCeiling);
+  event LogSetDebtFloor(address indexed _caller, bytes32 _collateralPoolId, uint256 _debtFloor);
+  event LogSetPriceFeed(address indexed _caller, bytes32 _poolId, address _priceFeed);
+  event LogSetLiquidationRatio(address indexed _caller, bytes32 _poolId, uint256 _data);
+  event LogSetStabilityFeeRate(address indexed _caller, bytes32 _poolId, uint256 _data);
+  event LogSetAdapter(address indexed _caller, bytes32 _collateralPoolId, address _adapter);
+  event LogSetCloseFactorBps(address indexed _caller, bytes32 _collateralPoolId, uint256 _closeFactorBps);
+  event LogSetLiquidatorIncentiveBps(
+    address indexed _caller,
+    bytes32 _collateralPoolId,
+    uint256 _liquidatorIncentiveBps
+  );
+  event LogSetTreasuryFeesBps(address indexed _caller, bytes32 _collateralPoolId, uint256 _treasuryFeeBps);
+  event LogSetStrategy(address indexed _caller, bytes32 _collateralPoolId, address strategy);
+  event LogSetTotalDebtShare(address indexed _caller, bytes32 _collateralPoolId, uint256 _totalDebtShare);
+  event LogSetDebtAccumulatedRate(address indexed _caller, bytes32 _collateralPoolId, uint256 _debtAccumulatedRate);
 
   mapping(bytes32 => ICollateralPoolConfig.CollateralPool) private _collateralPools;
 
@@ -84,6 +103,12 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
     _collateralPools[_collateralPoolId].lastAccumulationTime = now;
     IGenericTokenAdapter(_adapter).decimals(); // Sanity Check Call
     _collateralPools[_collateralPoolId].adapter = _adapter;
+    require(_closeFactorBps <= 10000, "CollateralPoolConfig/invalid-close-factor-bps");
+    require(
+      _liquidatorIncentiveBps >= 10000 && _liquidatorIncentiveBps <= 19000,
+      "CollateralPoolConfig/invalid-liquidator-incentive-bps"
+    );
+    require(_treasuryFeesBps <= 9000, "CollateralPoolConfig/invalid-treasury-fees-bps");
     _collateralPools[_collateralPoolId].closeFactorBps = _closeFactorBps;
     _collateralPools[_collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
     _collateralPools[_collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
@@ -143,42 +168,47 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
   /// @param _collateralPool Collateral pool id
   /// @param _stabilityFeeRate the new stability fee rate [ray]
   function setStabilityFeeRate(bytes32 _collateralPool, uint256 _stabilityFeeRate) external onlyOwner {
-    require(_stabilityFeeRate > RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
+    require(_stabilityFeeRate >= RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
     _collateralPools[_collateralPool].stabilityFeeRate = _stabilityFeeRate;
     emit LogSetStabilityFeeRate(msg.sender, _collateralPool, _stabilityFeeRate);
   }
 
-  function setAdapter(bytes32 collateralPoolId, address _adapter) external onlyOwner {
-    _collateralPools[collateralPoolId].adapter = _adapter;
-    emit LogSetAdapter(msg.sender, collateralPoolId, _adapter);
+  function setAdapter(bytes32 _collateralPoolId, address _adapter) external onlyOwner {
+    _collateralPools[_collateralPoolId].adapter = _adapter;
+    emit LogSetAdapter(msg.sender, _collateralPoolId, _adapter);
   }
 
-  function setCloseFactorBps(bytes32 collateralPoolId, uint256 _closeFactorBps) external onlyOwner {
-    require(_closeFactorBps <= 10000, "CollateralPoolConfig/close-factor-bps-more-10000");
-    _collateralPools[collateralPoolId].closeFactorBps = _closeFactorBps;
-    emit LogSetCloseFactorBps(msg.sender, collateralPoolId, _closeFactorBps);
+  function setCloseFactorBps(bytes32 _collateralPoolId, uint256 _closeFactorBps) external onlyOwner {
+    require(_closeFactorBps <= 10000, "CollateralPoolConfig/invalid-close-factor-bps");
+    _collateralPools[_collateralPoolId].closeFactorBps = _closeFactorBps;
+    emit LogSetCloseFactorBps(msg.sender, _collateralPoolId, _closeFactorBps);
   }
 
-  function setLiquidatorIncentiveBps(bytes32 collateralPoolId, uint256 _liquidatorIncentiveBps) external onlyOwner {
-    require(_liquidatorIncentiveBps <= 2500, "CollateralPoolConfig/liquidator-incentive-bps-more-2500");
-    _collateralPools[collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
-    emit LogSetLiquidatorIncentiveBps(msg.sender, collateralPoolId, _liquidatorIncentiveBps);
+  function setLiquidatorIncentiveBps(bytes32 _collateralPoolId, uint256 _liquidatorIncentiveBps) external onlyOwner {
+    require(
+      _liquidatorIncentiveBps >= 10000 && _liquidatorIncentiveBps <= 19000,
+      "CollateralPoolConfig/invalid-liquidator-incentive-bps"
+    );
+    _collateralPools[_collateralPoolId].liquidatorIncentiveBps = _liquidatorIncentiveBps;
+    emit LogSetLiquidatorIncentiveBps(msg.sender, _collateralPoolId, _liquidatorIncentiveBps);
   }
 
-  function setTreasuryFeesBps(bytes32 collateralPoolId, uint256 _treasuryFeesBps) external onlyOwner {
-    require(_treasuryFeesBps <= 2500, "CollateralPoolConfig/treasury-fees-bps-more-2500");
-    _collateralPools[collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
-    emit LogSetTreasuryFeesBps(msg.sender, collateralPoolId, _treasuryFeesBps);
+  function setTreasuryFeesBps(bytes32 _collateralPoolId, uint256 _treasuryFeesBps) external onlyOwner {
+    require(_treasuryFeesBps <= 9000, "CollateralPoolConfig/invalid-treasury-fees-bps");
+    _collateralPools[_collateralPoolId].treasuryFeesBps = _treasuryFeesBps;
+    emit LogSetTreasuryFeesBps(msg.sender, _collateralPoolId, _treasuryFeesBps);
   }
 
   function setTotalDebtShare(bytes32 _collateralPoolId, uint256 _totalDebtShare) external override {
     require(accessControlConfig.hasRole(accessControlConfig.BOOK_KEEPER_ROLE(), msg.sender), "!bookKeeperRole");
     _collateralPools[_collateralPoolId].totalDebtShare = _totalDebtShare;
+    emit LogSetTotalDebtShare(msg.sender, _collateralPoolId, _totalDebtShare);
   }
 
   function setDebtAccumulatedRate(bytes32 _collateralPoolId, uint256 _debtAccumulatedRate) external override {
     require(accessControlConfig.hasRole(accessControlConfig.BOOK_KEEPER_ROLE(), msg.sender), "!bookKeeperRole");
     _collateralPools[_collateralPoolId].debtAccumulatedRate = _debtAccumulatedRate;
+    emit LogSetDebtAccumulatedRate(msg.sender, _collateralPoolId, _debtAccumulatedRate);
   }
 
   function setStrategy(bytes32 _collateralPoolId, address _strategy) external onlyOwner {
