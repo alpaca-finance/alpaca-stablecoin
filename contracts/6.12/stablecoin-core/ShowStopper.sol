@@ -163,7 +163,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
   mapping(bytes32 => mapping(address => uint256)) public redeemedStablecoinAmount; //    [wad]
 
   event LogCage();
-  event LogCage(bytes32 indexed collateralPoolId);
+  event LogCageCollateralPool(bytes32 indexed collateralPoolId);
 
   event LogAccumulateBadDebt(
     bytes32 indexed collateralPoolId,
@@ -306,7 +306,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     totalDebtShare[_collateralPoolId] = _totalDebtShare;
     // par is a ray, priceFeed returns a wad
     cagePrice[_collateralPoolId] = wdiv(priceOracle.stableCoinReferencePrice(), uint256(_priceFeed.readPrice()));
-    emit LogCage(_collateralPoolId);
+    emit LogCageCollateralPool(_collateralPoolId);
   }
 
   /** @dev Inspect the specified position and use the cage price of the collateral pool id to calculate the current badDebtAccumulator of the position.
