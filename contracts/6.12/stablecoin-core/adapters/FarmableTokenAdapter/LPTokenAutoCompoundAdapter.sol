@@ -19,6 +19,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
 import "@alpaca-finance/alpaca-contract/contracts/6/protocol/apis/pancake/IPancakeRouter02.sol";
+import "@pancakeswap-libs/pancake-swap-core/contracts/interfaces/IPancakePair.sol";
 
 import "../../../interfaces/IBookKeeper.sol";
 import "../../../interfaces/IFarmableTokenAdapter.sol";
@@ -50,12 +51,15 @@ contract LPTokenAutoCompoundAdapter is
   IAlpacaVault public beneficialVault;
   uint256 public beneficialVaultBountyBps;
   address[] public rewardPath;
-  address public baseToken;
   address public wNative;
   address[] public reinvestPath;
   ILyfStrategy public addStrat;
   uint256 public buybackAmount;
   uint256 reinvestThreshold;
+
+  // worker interface
+  address public baseToken;
+  address public farmingToken;
 
   /// @dev The pool id that this LPTokenAdapter is working with
   uint256 public pid;
@@ -85,8 +89,6 @@ contract LPTokenAutoCompoundAdapter is
   /// @dev Accummulate reward balance in WAD
   uint256 public accRewardBalance;
 
-  /// @dev Mapping of user => rewardDebts
-  mapping(address => uint256) public rewardDebts;
   /// @dev Mapping of user => collteralTokens that he is staking
   mapping(address => uint256) public stake;
 
@@ -139,7 +141,10 @@ contract LPTokenAutoCompoundAdapter is
     uint256 _pid,
     uint256 _treasuryFeeBps,
     address _treasuryAccount,
-    address _positionManager
+    address _positionManager,
+    address _router,
+    address _baseToken,
+    address _addStrat
   ) external initializer {
     // 1. Initialized all dependencies
     PausableUpgradeable.__Pausable_init();
@@ -169,6 +174,16 @@ contract LPTokenAutoCompoundAdapter is
     treasuryAccount = _treasuryAccount;
 
     positionManager = IManager(_positionManager);
+
+    router = IPancakeRouter02(_router);
+    wNative = IPancakeRouter02(_router).WETH();
+    baseToken = _baseToken;
+    addStrat = ILyfStrategy(_addStrat);
+
+    IPancakePair lpToken = IPancakePair(address(_collateralToken));
+    address token0 = lpToken.token0();
+    address token1 = lpToken.token1();
+    farmingToken = token0 == baseToken ? token1 : token0;
 
     address(collateralToken).safeApprove(_masterChef, uint256(-1));
   }
@@ -394,22 +409,6 @@ contract LPTokenAutoCompoundAdapter is
     }
   }
 
-  /// @dev For FE to query pending rewards of a given positionAddress
-  /// @param _positionAddress The address that you want to check pending ALPACA
-  function pendingRewards(address _positionAddress) external view returns (uint256) {
-    return _pendingRewards(_positionAddress, masterChef.pendingCake(pid, address(this)));
-  }
-
-  /// @dev Return the amount of rewards to be harvested for a giving position address
-  /// @param _positionAddress The position address
-  /// @param _pending The pending rewards from staking contract
-  function _pendingRewards(address _positionAddress, uint256 _pending) internal view returns (uint256) {
-    if (totalShare == 0) return 0;
-    uint256 _toBeHarvested = sub(add(_pending, rewardToken.balanceOf(address(this))), accRewardBalance);
-    uint256 _pendingAccRewardPerShare = add(accRewardPerShare, rdiv(_toBeHarvested, totalShare));
-    return sub(rmul(stake[_positionAddress], _pendingAccRewardPerShare), rewardDebts[_positionAddress]);
-  }
-
   /// @dev Harvest and deposit received ibToken to FairLaunch
   /// @param _positionAddress The address that holding states of the position
   /// @param _amount The ibToken amount that being used as a collateral and to be deposited to FairLaunch
@@ -445,10 +444,9 @@ contract LPTokenAutoCompoundAdapter is
       bookKeeper.addCollateral(collateralPoolId, _positionAddress, int256(_share));
       totalShare = add(totalShare, _share);
       stake[_positionAddress] = add(stake[_positionAddress], _share);
-    }
-    rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
 
-    masterChef.deposit(pid, _amount);
+      masterChef.deposit(pid, _amount);
+    }
 
     emit LogDeposit(_amount);
   }
@@ -496,7 +494,6 @@ contract LPTokenAutoCompoundAdapter is
       totalShare = sub(totalShare, _share);
       stake[_positionAddress] = sub(stake[_positionAddress], _share);
     }
-    rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
     emit LogWithdraw(_amount);
   }
 
@@ -520,7 +517,6 @@ contract LPTokenAutoCompoundAdapter is
     bookKeeper.addCollateral(collateralPoolId, _positionAddress, -int256(_share));
     totalShare = sub(totalShare, _share);
     stake[_positionAddress] = sub(stake[_positionAddress], _share);
-    rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
     emit LogEmergencyWithdaraw();
   }
 
@@ -544,34 +540,8 @@ contract LPTokenAutoCompoundAdapter is
     uint256 _share,
     bytes calldata /* data */
   ) private {
-    // 1. Update collateral tokens for source and destination
-    uint256 _stakedAmount = stake[_source];
-    stake[_source] = sub(_stakedAmount, _share);
-    stake[_destination] = add(stake[_destination], _share);
-    // 2. Update source's rewardDebt due to collateral tokens have
-    // moved from source to destination. Hence, rewardDebt should be updated.
-    // rewardDebtDiff is how many rewards has been paid for that share.
-    uint256 _rewardDebt = rewardDebts[_source];
-    uint256 _rewardDebtDiff = mul(_rewardDebt, _share) / _stakedAmount;
-    // 3. Update rewardDebts for both source and destination
-    // Safe since rewardDebtDiff <= rewardDebts[source]
-    rewardDebts[_source] = _rewardDebt - _rewardDebtDiff;
-    rewardDebts[_destination] = add(rewardDebts[_destination], _rewardDebtDiff);
-    // 4. Sanity check.
-    // - stake[source] must more than or equal to collateral + lockedCollateral that source has
-    // to prevent a case where someone try to steal stake from source
-    // - stake[destination] must less than or eqal to collateral + lockedCollateral that destination has
-    // to prevent destination from claim stake > actual collateral that he has
-    (uint256 _lockedCollateral, ) = bookKeeper.positions(collateralPoolId, _source);
-    require(
-      stake[_source] >= add(bookKeeper.collateralToken(collateralPoolId, _source), _lockedCollateral),
-      "LPTokenAutoCompoundAdapter/stake[source] < collateralTokens + lockedCollateral"
-    );
-    (_lockedCollateral, ) = bookKeeper.positions(collateralPoolId, _destination);
-    require(
-      stake[_destination] <= add(bookKeeper.collateralToken(collateralPoolId, _destination), _lockedCollateral),
-      "LPTokenAutoCompoundAdapter/stake[destination] > collateralTokens + lockedCollateral"
-    );
+    // This function is not used because we do not allow users to harvest the rewards.
+    return;
     emit LogMoveStake(_source, _destination, _share);
   }
 
