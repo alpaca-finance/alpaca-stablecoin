@@ -30,10 +30,10 @@ import "../../../interfaces/ILyfStrategy.sol";
 import "../../../interfaces/IStablecoinAdapter.sol";
 import "../../../utils/SafeToken.sol";
 
-/// @title LPTokenAutoCompoundAdapter is the adapter that inherited BaseFarmableTokenAdapter.
+/// @title LPTokenAutoDebtRepayAdapter is the adapter that inherited BaseFarmableTokenAdapter.
 /// It receives Alpaca's ibTOKEN from users and deposit in Alpaca's FairLaunch.
 /// Hence, users will still earn ALPACA rewards while holding positions.
-contract LPTokenAutoCompoundAdapter is
+contract LPTokenAutoDebtRepayAdapter is
   IFarmableTokenAdapter,
   PausableUpgradeable,
   ReentrancyGuardUpgradeable,
