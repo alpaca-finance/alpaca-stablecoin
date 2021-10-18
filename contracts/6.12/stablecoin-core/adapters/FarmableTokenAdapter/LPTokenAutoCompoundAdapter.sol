@@ -55,7 +55,7 @@ contract LPTokenAutoCompoundAdapter is
   address[] public reinvestPath;
   ILyfStrategy public addStrat;
   uint256 public buybackAmount;
-  uint256 reinvestThreshold;
+  uint256 public reinvestThreshold;
 
   // worker interface
   address public baseToken;
@@ -80,7 +80,7 @@ contract LPTokenAutoCompoundAdapter is
   /// @dev The token that will get after collateral has been staked
   address public rewardToken;
 
-  IManager positionManager;
+  IManager public positionManager;
 
   /// @dev Rewards per collateralToken in RAY
   uint256 public accRewardPerShare;
