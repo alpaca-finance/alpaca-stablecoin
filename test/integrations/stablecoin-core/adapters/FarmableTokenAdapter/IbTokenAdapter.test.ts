@@ -18,6 +18,10 @@ import {
   Shield,
   AlpacaToken,
   FairLaunch,
+  CollateralPoolConfig__factory,
+  CollateralPoolConfig,
+  AccessControlConfig__factory,
+  AccessControlConfig,
 } from "../../../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 import { WeiPerRad, WeiPerRay, WeiPerWad, weiToRay } from "../../../../helper/unit"
@@ -43,9 +47,26 @@ const COLLATERAL_POOL_ID = formatBytes32String("ibDUMMY")
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer, alice, bob, dev] = await ethers.getSigners()
 
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const accessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [
+    accessControlConfig.address,
+  ])) as CollateralPoolConfig
+
   // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [
+    collateralPoolConfig.address,
+    accessControlConfig.address,
+  ])) as BookKeeper
   await bookKeeper.deployed()
 
   // Deploy mocked BEP20
@@ -90,7 +111,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     bookKeeper.address,
   ])) as PositionManager
   await positionManager.deployed()
-  await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), positionManager.address)
+  await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), positionManager.address)
 
   const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
   const ibTokenAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
@@ -108,7 +129,10 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
-  await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter.address)
+  await accessControlConfig.grantRole(
+    ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]),
+    ibTokenAdapter.address
+  )
 
   return {
     ibTokenAdapter,

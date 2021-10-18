@@ -1,4 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
+
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
@@ -17,6 +29,7 @@ import "../utils/SafeToken.sol";
 
 /// ==============================
 /// @notice WARNING: These functions meant to be used as a a library for a Proxy.
+/// @notice DO NOT CALL ANY FUNCTION IN THIS CONTRACT DIRECTLY.
 /// @notice Hence, it shouldn't has any state vairables. Some are unsafe if you call them directly.
 /// ==============================
 
@@ -26,960 +39,989 @@ contract AlpacaStablecoinProxyActions {
   uint256 internal constant RAY = 10**27;
 
   /// @dev Internal functions
-  function _safeSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x - y) <= x, "sub-overflow");
+  function _safeSub(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x - _y) <= _x, "sub-overflow");
   }
 
-  function _safeToInt(uint256 x) internal pure returns (int256 y) {
-    y = int256(x);
-    require(y >= 0, "int-overflow");
+  function _safeToInt(uint256 _x) internal pure returns (int256 _y) {
+    _y = int256(_x);
+    require(_y >= 0, "int-overflow");
   }
 
   /// @notice Internal functions
   /// @dev Safe multiplication to prevent uint overflow
-  function _safeMul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y == 0 || (z = x * y) / y == x, "mul-overflow");
+  function _safeMul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x, "mul-overflow");
   }
 
-  function _toRad(uint256 wad) internal pure returns (uint256 rad) {
-    rad = _safeMul(wad, 10**27);
+  function _toRad(uint256 _wad) internal pure returns (uint256 _rad) {
+    _rad = _safeMul(_wad, RAY);
   }
 
-  function convertTo18(address tokenAdapter, uint256 amt) internal returns (uint256 wad) {
+  function convertTo18(address _tokenAdapter, uint256 _amt) internal returns (uint256 _wad) {
     // For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to adjustPosition function
     // Adapters will automatically handle the difference of precision
-    wad = _safeMul(amt, 10**(18 - IGenericTokenAdapter(tokenAdapter).decimals()));
+    _wad = _safeMul(_amt, 10**(18 - IGenericTokenAdapter(_tokenAdapter).decimals()));
   }
 
   function _getDrawDebtShare(
-    address bookKeeper,
-    address stabilityFeeCollector,
-    address positionAddress,
-    bytes32 collateralPoolId,
-    uint256 stablecoinAmount // [wad]
-  ) internal returns (int256 resultDebtShare) {
+    address _bookKeeper,
+    address _stabilityFeeCollector,
+    address _positionAddress,
+    bytes32 _collateralPoolId,
+    uint256 _stablecoinAmount // [wad]
+  ) internal returns (int256 _resultDebtShare) {
     // Updates stability fee rate
-    uint256 debtAccumulatedRate = IStabilityFeeCollector(stabilityFeeCollector).collect(collateralPoolId); // [ray]
+    uint256 _debtAccumulatedRate = IStabilityFeeCollector(_stabilityFeeCollector).collect(_collateralPoolId); // [ray]
 
     // Gets Alpaca Stablecoin balance of the positionAddress in the bookKeeper
-    uint256 positionStablecoinValue = IBookKeeper(bookKeeper).stablecoin(positionAddress); // [rad]
+    uint256 _positionStablecoinValue = IBookKeeper(_bookKeeper).stablecoin(_positionAddress); // [rad]
 
     // If there was already enough Alpaca Stablecoin in the bookKeeper balance, just exits it without adding more debt
-    if (positionStablecoinValue < _safeMul(stablecoinAmount, RAY)) {
+    if (_positionStablecoinValue < _safeMul(_stablecoinAmount, RAY)) {
       // Calculates the needed resultDebtShare so together with the existing positionStablecoinValue in the bookKeeper is enough to exit stablecoinAmount of Alpaca Stablecoin tokens
-      resultDebtShare = _safeToInt(
-        _safeSub(_safeMul(stablecoinAmount, RAY), positionStablecoinValue) / debtAccumulatedRate
+      _resultDebtShare = _safeToInt(
+        _safeSub(_safeMul(_stablecoinAmount, RAY), _positionStablecoinValue) / _debtAccumulatedRate
       );
       // This is neeeded due lack of precision. It might need to sum an extra resultDebtShare wei (for the given Alpaca Stablecoin stablecoinAmount)
-      resultDebtShare = _safeMul(uint256(resultDebtShare), debtAccumulatedRate) < _safeMul(stablecoinAmount, RAY)
-        ? resultDebtShare + 1
-        : resultDebtShare;
+      _resultDebtShare = _safeMul(uint256(_resultDebtShare), _debtAccumulatedRate) < _safeMul(_stablecoinAmount, RAY)
+        ? _resultDebtShare + 1
+        : _resultDebtShare;
     }
   }
 
   function _getWipeDebtShare(
-    address bookKeeper,
-    uint256 stablecoinValue, // [rad]
-    address positionAddress,
-    bytes32 collateralPoolId
-  ) internal view returns (int256 resultDebtShare) {
+    address _bookKeeper,
+    uint256 _stablecoinValue, // [rad]
+    address _positionAddress,
+    bytes32 _collateralPoolId
+  ) internal view returns (int256 _resultDebtShare) {
     // Gets actual rate from the bookKeeper
-    uint256 _debtAccumulatedRate = IBookKeeper(bookKeeper)
-      .collateralPoolConfig()
-      .collateralPools(collateralPoolId)
-      .debtAccumulatedRate; // [ray]
+    uint256 _debtAccumulatedRate = ICollateralPoolConfig(IBookKeeper(_bookKeeper).collateralPoolConfig())
+      .getDebtAccumulatedRate(_collateralPoolId); // [ray]
+
     // Gets actual debtShare value of the positionAddress
-    (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress); // [wad]
+    (, uint256 _debtShare) = IBookKeeper(_bookKeeper).positions(_collateralPoolId, _positionAddress); // [wad]
 
     // Uses the whole stablecoin balance in the bookKeeper to reduce the debt
-    resultDebtShare = _safeToInt(stablecoinValue / _debtAccumulatedRate); // [wad]
+    _resultDebtShare = _safeToInt(_stablecoinValue / _debtAccumulatedRate); // [wad]
+
     // Checks the calculated resultDebtShare is not higher than positionAddress.art (total debt), otherwise uses its value
-    resultDebtShare = uint256(resultDebtShare) <= debtShare ? -resultDebtShare : -_safeToInt(debtShare); // [wad]
+    _resultDebtShare = uint256(_resultDebtShare) <= _debtShare ? -_resultDebtShare : -_safeToInt(_debtShare); // [wad]
   }
 
   function _getWipeAllStablecoinAmount(
-    address bookKeeper,
-    address usr,
-    address positionAddress,
-    bytes32 collateralPoolId
-  ) internal view returns (uint256 requiredStablecoinAmount) {
+    address _bookKeeper,
+    address _usr,
+    address _positionAddress,
+    bytes32 _collateralPoolId
+  ) internal view returns (uint256 _requiredStablecoinAmount) {
     // Gets actual rate from the bookKeeper
-    uint256 _debtAccumulatedRate = IBookKeeper(bookKeeper)
-      .collateralPoolConfig()
-      .collateralPools(collateralPoolId)
-      .debtAccumulatedRate; // [ray]
+    uint256 _debtAccumulatedRate = ICollateralPoolConfig(IBookKeeper(_bookKeeper).collateralPoolConfig())
+      .getDebtAccumulatedRate(_collateralPoolId); // [ray]
     // Gets actual debtShare value of the positionAddress
-    (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress); // [wad]
+    (, uint256 _debtShare) = IBookKeeper(_bookKeeper).positions(_collateralPoolId, _positionAddress); // [wad]
     // Gets actual stablecoin amount in the usr
-    uint256 stablecoinValue = IBookKeeper(bookKeeper).stablecoin(usr); // [rad]
+    uint256 _stablecoinValue = IBookKeeper(_bookKeeper).stablecoin(_usr); // [rad]
 
-    uint256 requiredStablecoinValue = _safeSub(_safeMul(debtShare, _debtAccumulatedRate), stablecoinValue); // [rad]
-    requiredStablecoinAmount = requiredStablecoinValue / RAY; // [wad] = [rad]/[ray]
+    uint256 _requiredStablecoinValue = _safeSub(_safeMul(_debtShare, _debtAccumulatedRate), _stablecoinValue); // [rad]
+    _requiredStablecoinAmount = _requiredStablecoinValue / RAY; // [wad] = [rad]/[ray]
 
     // If the value precision has some dust, it will need to request for 1 extra amount wei
-    requiredStablecoinAmount = _safeMul(requiredStablecoinAmount, RAY) < requiredStablecoinValue
-      ? requiredStablecoinAmount + 1
-      : requiredStablecoinAmount;
+    _requiredStablecoinAmount = _safeMul(_requiredStablecoinAmount, RAY) < _requiredStablecoinValue
+      ? _requiredStablecoinAmount + 1
+      : _requiredStablecoinAmount;
   }
 
   /// @notice Public functions
-  /// @param adapter The address of stablecoin adapter
-  /// @param positionAddress The address of the Position Handler
-  /// @param stablecoinAmount The amount in wad to be deposit to Stablecoin adapter [wad]
-  /// @param data The extra data for stable adapter context
+  /// @param _adapter The address of stablecoin adapter
+  /// @param _positionAddress The address of the Position Handler
+  /// @param _stablecoinAmount The amount in wad to be deposit to Stablecoin adapter [wad]
+  /// @param _data The extra data for stable adapter context
   function stablecoinAdapterDeposit(
-    address adapter,
-    address positionAddress,
-    uint256 stablecoinAmount, // [wad]
-    bytes calldata data
+    address _adapter,
+    address _positionAddress,
+    uint256 _stablecoinAmount, // [wad]
+    bytes calldata _data
   ) public {
-    address stablecoin = address(IStablecoinAdapter(adapter).stablecoin());
+    address _stablecoin = address(IStablecoinAdapter(_adapter).stablecoin());
     // Gets Alpaca Stablecoin from the user's wallet
-    stablecoin.safeTransferFrom(msg.sender, address(this), stablecoinAmount);
+    _stablecoin.safeTransferFrom(msg.sender, address(this), _stablecoinAmount);
     // Approves adapter to take the Alpaca Stablecoin amount
-    stablecoin.safeApprove(adapter, stablecoinAmount);
+    _stablecoin.safeApprove(_adapter, _stablecoinAmount);
     // Deposits Alpaca Stablecoin into the bookKeeper
-    IStablecoinAdapter(adapter).deposit(positionAddress, stablecoinAmount, data);
+    IStablecoinAdapter(_adapter).deposit(_positionAddress, _stablecoinAmount, _data);
   }
 
   // Public functions
   function transfer(
-    address collateralToken,
-    address dst,
-    uint256 amt
+    address _collateralToken,
+    address _dst,
+    uint256 _amt
   ) public {
-    address(collateralToken).safeTransfer(dst, amt);
+    address(_collateralToken).safeTransfer(_dst, _amt);
   }
 
   function bnbAdapterDeposit(
-    address adapter,
-    address positionAddress,
-    bytes calldata data
+    address _adapter,
+    address _positionAddress,
+    bytes calldata _data
   ) public payable {
-    address collateralToken = address(IGenericTokenAdapter(adapter).collateralToken());
+    address _collateralToken = address(IGenericTokenAdapter(_adapter).collateralToken());
     // Wraps BNB into WBNB
-    IWBNB(collateralToken).deposit{ value: msg.value }();
+    IWBNB(_collateralToken).deposit{ value: msg.value }();
     // Approves adapter to take the WBNB amount
-    collateralToken.safeApprove(address(adapter), msg.value);
+    _collateralToken.safeApprove(address(_adapter), msg.value);
     // Deposits WBNB collateral into the bookKeeper
-    IGenericTokenAdapter(adapter).deposit(positionAddress, msg.value, data);
+    IGenericTokenAdapter(_adapter).deposit(_positionAddress, msg.value, _data);
   }
 
   function tokenAdapterDeposit(
-    address adapter,
-    address positionAddress,
-    uint256 amount, // [wad]
-    bool transferFrom,
-    bytes calldata data
+    address _adapter,
+    address _positionAddress,
+    uint256 _amount, // [wad]
+    bool _transferFrom,
+    bytes calldata _data
   ) public {
-    address collateralToken = address(IGenericTokenAdapter(adapter).collateralToken());
+    address _collateralToken = address(IGenericTokenAdapter(_adapter).collateralToken());
 
     // Only executes for tokens that have approval/transferFrom implementation
-    if (transferFrom) {
+    if (_transferFrom) {
       // Gets token from the user's wallet
-      collateralToken.safeTransferFrom(msg.sender, address(this), amount);
+      _collateralToken.safeTransferFrom(msg.sender, address(this), _amount);
       // Approves adapter to take the token amount
-      collateralToken.safeApprove(adapter, amount);
+      _collateralToken.safeApprove(_adapter, _amount);
     }
     // Deposits token collateral into the bookKeeper
-    IGenericTokenAdapter(adapter).deposit(positionAddress, amount, data);
+    IGenericTokenAdapter(_adapter).deposit(_positionAddress, _amount, _data);
   }
 
-  function whitelist(address bookKeeper, address usr) external {
-    IBookKeeper(bookKeeper).whitelist(usr);
+  function whitelist(address _bookKeeper, address _usr) external {
+    IBookKeeper(_bookKeeper).whitelist(_usr);
   }
 
-  function blacklist(address bookKeeper, address usr) external {
-    IBookKeeper(bookKeeper).blacklist(usr);
+  function blacklist(address _bookKeeper, address _usr) external {
+    IBookKeeper(_bookKeeper).blacklist(_usr);
   }
 
   function open(
-    address manager,
-    bytes32 collateralPoolId,
-    address usr
-  ) public returns (uint256 positionId) {
-    positionId = IManager(manager).open(collateralPoolId, usr);
+    address _manager,
+    bytes32 _collateralPoolId,
+    address _usr
+  ) public returns (uint256 _positionId) {
+    _positionId = IManager(_manager).open(_collateralPoolId, _usr);
   }
 
   function transferOwnership(
-    address manager,
-    uint256 positionId,
-    address usr
+    address _manager,
+    uint256 _positionId,
+    address _usr
   ) public {
-    IManager(manager).give(positionId, usr);
+    IManager(_manager).give(_positionId, _usr);
   }
 
   function transferOwnershipToProxy(
-    address proxyRegistry,
-    address manager,
-    uint256 positionId,
-    address dst
+    address _proxyRegistry,
+    address _manager,
+    uint256 _positionId,
+    address _dst
   ) external {
     // Gets actual proxy address
-    address proxy = IProxyRegistry(proxyRegistry).proxies(dst);
+    address _proxy = IProxyRegistry(_proxyRegistry).proxies(_dst);
     // Checks if the proxy address already existed and dst address is still the owner
-    if (proxy == address(0) || IProxy(proxy).owner() != dst) {
-      uint256 codeSize;
+    if (_proxy == address(0) || IProxy(_proxy).owner() != _dst) {
+      uint256 _codeSize;
       assembly {
-        codeSize := extcodesize(dst)
+        _codeSize := extcodesize(_dst)
       }
       // We want to avoid creating a proxy for a contract address that might not be able to handle proxies, then losing the CDP
-      require(codeSize == 0, "Dst-is-a-contract");
+      require(_codeSize == 0, "Dst-is-a-contract");
       // Creates the proxy for the dst address
-      proxy = IProxyRegistry(proxyRegistry).build(dst);
+      _proxy = IProxyRegistry(_proxyRegistry).build(_dst);
     }
     // Transfers position to the dst proxy
-    transferOwnership(manager, positionId, proxy);
+    transferOwnership(_manager, _positionId, _proxy);
   }
 
   /// @dev Allow/Disallow a user to manage the position
-  /// @param manager The PositionManager address
-  /// @param user The user address that msg.sender would like to allow to manage his position
-  /// @param ok The ok flag to allow/disallow
+  /// @param _manager The PositionManager address
+  /// @param _user The user address that msg.sender would like to allow to manage his position
+  /// @param _ok The ok flag to allow/disallow
   function allowManagePosition(
-    address manager,
-    uint256 positionId,
-    address user,
-    uint256 ok
+    address _manager,
+    uint256 _positionId,
+    address _user,
+    uint256 _ok
   ) external {
-    IManager(manager).allowManagePosition(positionId, user, ok);
+    IManager(_manager).allowManagePosition(_positionId, _user, _ok);
   }
 
   /// @dev Allow/Disallow a user to import/export position from/to msg.sender
-  /// @param manager The PositionManager address
-  /// @param user The user address that msg.sender would like to allow to import/export position from/to
-  /// @param ok The ok flag to allow/disallow
+  /// @param _manager The PositionManager address
+  /// @param _user The user address that msg.sender would like to allow to import/export position from/to
+  /// @param _ok The ok flag to allow/disallow
   function allowMigratePosition(
-    address manager,
-    address user,
-    uint256 ok
+    address _manager,
+    address _user,
+    uint256 _ok
   ) external {
-    IManager(manager).allowMigratePosition(user, ok);
+    IManager(_manager).allowMigratePosition(_user, _ok);
   }
 
   function moveCollateral(
-    address manager,
-    uint256 positionId,
-    address dst,
-    uint256 collateralAmount,
-    address adapter,
-    bytes calldata data
+    address _manager,
+    uint256 _positionId,
+    address _dst,
+    uint256 _collateralAmount,
+    address _adapter,
+    bytes calldata _data
   ) public {
-    IManager(manager).moveCollateral(positionId, dst, collateralAmount, adapter, data);
+    IManager(_manager).moveCollateral(_positionId, _dst, _collateralAmount, _adapter, _data);
   }
 
   function moveStablecoin(
-    address manager,
-    uint256 positionId,
-    address dst,
-    uint256 stablecoinValue // [rad]
+    address _manager,
+    uint256 _positionId,
+    address _dst,
+    uint256 _stablecoinValue // [rad]
   ) public {
-    IManager(manager).moveStablecoin(positionId, dst, stablecoinValue);
+    IManager(_manager).moveStablecoin(_positionId, _dst, _stablecoinValue);
   }
 
   function adjustPosition(
-    address manager,
-    uint256 positionId,
-    int256 collateralValue,
-    int256 debtShare, // [wad]
-    address adapter,
-    bytes calldata data
+    address _manager,
+    uint256 _positionId,
+    int256 _collateralValue,
+    int256 _debtShare, // [wad]
+    address _adapter,
+    bytes calldata _data
   ) public {
-    IManager(manager).adjustPosition(positionId, collateralValue, debtShare, adapter, data);
+    IManager(_manager).adjustPosition(_positionId, _collateralValue, _debtShare, _adapter, _data);
   }
 
   function exportPosition(
-    address manager,
-    uint256 positionId,
-    address destination
+    address _manager,
+    uint256 _positionId,
+    address _destination
   ) external {
-    IManager(manager).exportPosition(positionId, destination);
+    IManager(_manager).exportPosition(_positionId, _destination);
   }
 
   function importPosition(
-    address manager,
-    address source,
-    uint256 positionId
+    address _manager,
+    address _source,
+    uint256 _positionId
   ) external {
-    IManager(manager).importPosition(source, positionId);
+    IManager(_manager).importPosition(_source, _positionId);
   }
 
   function movePosition(
-    address manager,
-    uint256 source,
-    uint256 destination
+    address _manager,
+    uint256 _source,
+    uint256 _destination
   ) external {
-    IManager(manager).movePosition(source, destination);
+    IManager(_manager).movePosition(_source, _destination);
   }
 
   function bnbToIbBNB(
-    address vault,
-    uint256 amount // [wad]
+    address _vault,
+    uint256 _amount // [wad]
   ) public payable returns (uint256) {
-    SafeToken.safeApprove(address(IAlpacaVault(vault).token()), address(vault), amount);
-    uint256 ibBNBBefore = vault.balanceOf(address(this));
-    IAlpacaVault(vault).deposit{ value: msg.value }(msg.value);
-    uint256 ibBNBAfter = vault.balanceOf(address(this));
-    SafeToken.safeApprove(address(IAlpacaVault(vault).token()), address(vault), 0);
-    uint256 backIbBNB = _safeSub(ibBNBAfter, ibBNBBefore);
-    address(vault).safeTransfer(msg.sender, backIbBNB);
-    return backIbBNB;
+    SafeToken.safeApprove(address(IAlpacaVault(_vault).token()), address(_vault), _amount);
+    uint256 _ibBNBBefore = _vault.balanceOf(address(this));
+    IAlpacaVault(_vault).deposit{ value: msg.value }(msg.value);
+    uint256 _ibBNBAfter = _vault.balanceOf(address(this));
+    SafeToken.safeApprove(address(IAlpacaVault(_vault).token()), address(_vault), 0);
+    uint256 _backIbBNB = _safeSub(_ibBNBAfter, _ibBNBBefore);
+    address(_vault).safeTransfer(msg.sender, _backIbBNB);
+    return _backIbBNB;
   }
 
   function ibBNBToBNB(
-    address vault,
-    uint256 amount // [wad]
+    address _vault,
+    uint256 _amount // [wad]
   ) public payable {
     // user requires to approve the proxy wallet before calling this function
-    address(vault).safeTransferFrom(msg.sender, address(this), amount);
-    uint256 bnbBefore = address(this).balance;
-    IAlpacaVault(vault).withdraw(amount);
-    uint256 bnbAfter = address(this).balance;
-    SafeToken.safeTransferETH(msg.sender, _safeSub(bnbAfter, bnbBefore));
+    address(_vault).safeTransferFrom(msg.sender, address(this), _amount);
+    uint256 _bnbBefore = address(this).balance;
+    IAlpacaVault(_vault).withdraw(_amount);
+    uint256 _bnbAfter = address(this).balance;
+    SafeToken.safeTransferETH(msg.sender, _safeSub(_bnbAfter, _bnbBefore));
   }
 
   function tokenToIbToken(
-    address vault,
-    uint256 amount // [wad]
+    address _vault,
+    uint256 _amount // [wad]
   ) public returns (uint256) {
     // user requires to approve the proxy wallet before calling this function
-    address(IAlpacaVault(vault).token()).safeTransferFrom(msg.sender, address(this), amount);
-    SafeToken.safeApprove(address(IAlpacaVault(vault).token()), address(vault), amount);
-    uint256 collateralTokenBefore = vault.balanceOf(address(this));
-    IAlpacaVault(vault).deposit(amount);
-    uint256 collateralTokenAfter = vault.balanceOf(address(this));
-    SafeToken.safeApprove(address(IAlpacaVault(vault).token()), address(vault), 0);
-    uint256 backCollateralToken = _safeSub(collateralTokenAfter, collateralTokenBefore);
-    address(vault).safeTransfer(msg.sender, backCollateralToken);
-    return backCollateralToken;
+    address(IAlpacaVault(_vault).token()).safeTransferFrom(msg.sender, address(this), _amount);
+    SafeToken.safeApprove(address(IAlpacaVault(_vault).token()), address(_vault), _amount);
+    uint256 _collateralTokenBefore = _vault.balanceOf(address(this));
+    IAlpacaVault(_vault).deposit(_amount);
+    uint256 _collateralTokenAfter = _vault.balanceOf(address(this));
+    SafeToken.safeApprove(address(IAlpacaVault(_vault).token()), address(_vault), 0);
+    uint256 _backCollateralToken = _safeSub(_collateralTokenAfter, _collateralTokenBefore);
+    address(_vault).safeTransfer(msg.sender, _backCollateralToken);
+    return _backCollateralToken;
   }
 
   function ibTokenToToken(
-    address vault,
-    uint256 amount // [wad]
+    address _vault,
+    uint256 _amount // [wad]
   ) public {
     // user requires to approve the proxy wallet before calling this function
-    address(vault).safeTransferFrom(msg.sender, address(this), amount);
-    uint256 baseTokenBefore = IAlpacaVault(vault).token().balanceOf(address(this));
-    IAlpacaVault(vault).withdraw(amount);
-    uint256 baseTokenAfter = IAlpacaVault(vault).token().balanceOf(address(this));
-    address(IAlpacaVault(vault).token()).safeTransfer(msg.sender, _safeSub(baseTokenAfter, baseTokenBefore));
+    address(_vault).safeTransferFrom(msg.sender, address(this), _amount);
+    uint256 _baseTokenBefore = IAlpacaVault(_vault).token().balanceOf(address(this));
+    IAlpacaVault(_vault).withdraw(_amount);
+    uint256 _baseTokenAfter = IAlpacaVault(_vault).token().balanceOf(address(this));
+    address(IAlpacaVault(_vault).token()).safeTransfer(msg.sender, _safeSub(_baseTokenAfter, _baseTokenBefore));
   }
 
   function lockBNB(
-    address manager,
-    address bnbAdapter,
-    uint256 positionId,
-    bytes calldata data
+    address _manager,
+    address _bnbAdapter,
+    uint256 _positionId,
+    bytes calldata _data
   ) public payable {
-    address positionAddress = IManager(manager).positions(positionId);
+    address _positionAddress = IManager(_manager).positions(_positionId);
     // Receives BNB amount, converts it to WBNB and joins it into the bookKeeper
-    bnbAdapterDeposit(bnbAdapter, positionAddress, data);
+    bnbAdapterDeposit(_bnbAdapter, _positionAddress, _data);
     // Locks WBNB amount into the CDP
-    adjustPosition(manager, positionId, _safeToInt(msg.value), 0, bnbAdapter, data);
+    adjustPosition(_manager, _positionId, _safeToInt(msg.value), 0, _bnbAdapter, _data);
   }
 
   function safeLockBNB(
-    address manager,
-    address bnbAdapter,
-    uint256 positionId,
-    address owner,
-    bytes calldata data
+    address _manager,
+    address _bnbAdapter,
+    uint256 _positionId,
+    address _owner,
+    bytes calldata _data
   ) external payable {
-    require(IManager(manager).owners(positionId) == owner, "!owner");
-    lockBNB(manager, bnbAdapter, positionId, data);
+    require(IManager(_manager).owners(_positionId) == _owner, "!owner");
+    lockBNB(_manager, _bnbAdapter, _positionId, _data);
   }
 
   function lockToken(
-    address manager,
-    address tokenAdapter,
-    uint256 positionId,
-    uint256 amount, // [in token decimal]
-    bool transferFrom,
-    bytes calldata data
+    address _manager,
+    address _tokenAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [in token decimal]
+    bool _transferFrom,
+    bytes calldata _data
   ) public {
-    address positionAddress = IManager(manager).positions(positionId);
+    address _positionAddress = IManager(_manager).positions(_positionId);
 
     // Takes token amount from user's wallet and joins into the bookKeeper
-    tokenAdapterDeposit(tokenAdapter, positionAddress, amount, transferFrom, data);
+    tokenAdapterDeposit(_tokenAdapter, _positionAddress, _amount, _transferFrom, _data);
     // Locks token amount into the position manager
-    adjustPosition(manager, positionId, _safeToInt(convertTo18(tokenAdapter, amount)), 0, tokenAdapter, data);
+    adjustPosition(_manager, _positionId, _safeToInt(convertTo18(_tokenAdapter, _amount)), 0, _tokenAdapter, _data);
   }
 
   function safeLockToken(
-    address manager,
-    address tokenAdapter,
-    uint256 positionId,
-    uint256 amount, // [wad]
-    bool transferFrom,
-    address owner,
-    bytes calldata data
+    address _manager,
+    address _tokenAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [wad]
+    bool _transferFrom,
+    address _owner,
+    bytes calldata _data
   ) external {
-    require(IManager(manager).owners(positionId) == owner, "!owner");
-    lockToken(manager, tokenAdapter, positionId, amount, transferFrom, data);
+    require(IManager(_manager).owners(_positionId) == _owner, "!owner");
+    lockToken(_manager, _tokenAdapter, _positionId, _amount, _transferFrom, _data);
   }
 
   function unlockBNB(
-    address manager,
-    address bnbAdapter,
-    uint256 positionId,
-    uint256 amount, // [wad]
-    bytes calldata data
+    address _manager,
+    address _bnbAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [wad]
+    bytes calldata _data
   ) public {
     // Unlocks WBNB amount from the CDP
-    adjustPosition(manager, positionId, -_safeToInt(amount), 0, bnbAdapter, data);
+    adjustPosition(_manager, _positionId, -_safeToInt(_amount), 0, _bnbAdapter, _data);
     // Moves the amount from the CDP positionAddress to proxy's address
-    moveCollateral(manager, positionId, address(this), amount, bnbAdapter, data);
+    moveCollateral(_manager, _positionId, address(this), _amount, _bnbAdapter, _data);
     // Withdraws WBNB amount to proxy address as a token
-    IGenericTokenAdapter(bnbAdapter).withdraw(address(this), amount, data);
+    IGenericTokenAdapter(_bnbAdapter).withdraw(address(this), _amount, _data);
     // Converts WBNB to BNB
-    IWBNB(address(IGenericTokenAdapter(bnbAdapter).collateralToken())).withdraw(amount);
+    IWBNB(address(IGenericTokenAdapter(_bnbAdapter).collateralToken())).withdraw(_amount);
     // Sends BNB back to the user's wallet
-    SafeToken.safeTransferETH(msg.sender, amount);
+    SafeToken.safeTransferETH(msg.sender, _amount);
   }
 
   function unlockToken(
-    address manager,
-    address tokenAdapter,
-    uint256 positionId,
-    uint256 amount, // [in token decimal]
-    bytes calldata data
+    address _manager,
+    address _tokenAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [in token decimal]
+    bytes calldata _data
   ) public {
-    uint256 amountInWad = convertTo18(tokenAdapter, amount);
+    uint256 _amountInWad = convertTo18(_tokenAdapter, _amount);
     // Unlocks token amount from the position
-    adjustPosition(manager, positionId, -_safeToInt(amountInWad), 0, tokenAdapter, data);
+    adjustPosition(_manager, _positionId, -_safeToInt(_amountInWad), 0, _tokenAdapter, _data);
     // Moves the amount from the position to proxy's address
-    moveCollateral(manager, positionId, address(this), amountInWad, tokenAdapter, data);
+    moveCollateral(_manager, _positionId, address(this), _amountInWad, _tokenAdapter, _data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(tokenAdapter).withdraw(address(this), amount, data);
+    IGenericTokenAdapter(_tokenAdapter).withdraw(address(this), _amount, _data);
   }
 
   function withdrawBNB(
-    address manager,
-    address bnbAdapter,
-    uint256 positionId,
-    uint256 amount, // [wad]
-    bytes calldata data
+    address _manager,
+    address _bnbAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [wad]
+    bytes calldata _data
   ) external {
     // Moves the amount from the position to proxy's address
-    moveCollateral(manager, positionId, address(this), amount, bnbAdapter, data);
+    moveCollateral(_manager, _positionId, address(this), _amount, _bnbAdapter, _data);
 
     // Withdraws WBNB amount to proxy address as a token
-    IGenericTokenAdapter(bnbAdapter).withdraw(address(this), amount, data);
+    IGenericTokenAdapter(_bnbAdapter).withdraw(address(this), _amount, _data);
     // Converts WBNB to BNB
-    IWBNB(address(IGenericTokenAdapter(bnbAdapter).collateralToken())).withdraw(amount);
+    IWBNB(address(IGenericTokenAdapter(_bnbAdapter).collateralToken())).withdraw(_amount);
     // Sends BNB back to the user's wallet
-    SafeToken.safeTransferETH(msg.sender, amount);
+    SafeToken.safeTransferETH(msg.sender, _amount);
   }
 
   function withdrawToken(
-    address manager,
-    address tokenAdapter,
-    uint256 positionId,
-    uint256 amount, // [in token decimal]
-    bytes calldata data
+    address _manager,
+    address _tokenAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [in token decimal]
+    bytes calldata _data
   ) external {
     // Moves the amount from the position to proxy's address
-    moveCollateral(manager, positionId, address(this), convertTo18(tokenAdapter, amount), tokenAdapter, data);
+    moveCollateral(_manager, _positionId, address(this), convertTo18(_tokenAdapter, _amount), _tokenAdapter, _data);
 
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(tokenAdapter).withdraw(msg.sender, amount, data);
+    IGenericTokenAdapter(_tokenAdapter).withdraw(msg.sender, _amount, _data);
   }
 
   function draw(
-    address manager,
-    address stabilityFeeCollector,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 amount, // [wad]
-    bytes calldata data
+    address _manager,
+    address _stabilityFeeCollector,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [wad]
+    bytes calldata _data
   ) external {
-    address positionAddress = IManager(manager).positions(positionId);
-    address bookKeeper = IManager(manager).bookKeeper();
-    bytes32 collateralPoolId = IManager(manager).collateralPools(positionId);
+    address _positionAddress = IManager(_manager).positions(_positionId);
+    address _bookKeeper = IManager(_manager).bookKeeper();
+    bytes32 _collateralPoolId = IManager(_manager).collateralPools(_positionId);
     // Generates debt in the CDP
     adjustPosition(
-      manager,
-      positionId,
+      _manager,
+      _positionId,
       0,
-      _getDrawDebtShare(bookKeeper, stabilityFeeCollector, positionAddress, collateralPoolId, amount),
-      tokenAdapter,
-      data
+      _getDrawDebtShare(_bookKeeper, _stabilityFeeCollector, _positionAddress, _collateralPoolId, _amount),
+      _tokenAdapter,
+      _data
     );
     // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
-    moveStablecoin(manager, positionId, address(this), _toRad(amount));
+    moveStablecoin(_manager, _positionId, address(this), _toRad(_amount));
     // Allows adapter to access to proxy's Alpaca Stablecoin balance in the bookKeeper
-    if (IBookKeeper(bookKeeper).positionWhitelist(address(this), address(stablecoinAdapter)) == 0) {
-      IBookKeeper(bookKeeper).whitelist(stablecoinAdapter);
+    if (IBookKeeper(_bookKeeper).positionWhitelist(address(this), address(_stablecoinAdapter)) == 0) {
+      IBookKeeper(_bookKeeper).whitelist(_stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
-    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, amount, data);
+    IStablecoinAdapter(_stablecoinAdapter).withdraw(msg.sender, _amount, _data);
   }
 
   function wipe(
-    address manager,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 amount, // [wad]
-    bytes calldata data
+    address _manager,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [wad]
+    bytes calldata _data
   ) public {
-    address bookKeeper = IManager(manager).bookKeeper();
-    address positionAddress = IManager(manager).positions(positionId);
-    bytes32 collateralPoolId = IManager(manager).collateralPools(positionId);
+    address _bookKeeper = IManager(_manager).bookKeeper();
+    address _positionAddress = IManager(_manager).positions(_positionId);
+    bytes32 _collateralPoolId = IManager(_manager).collateralPools(_positionId);
 
-    address owner = IManager(manager).owners(positionId);
-    if (owner == address(this) || IManager(manager).ownerWhitelist(owner, positionId, address(this)) == 1) {
+    address owner = IManager(_manager).owners(_positionId);
+    if (owner == address(this) || IManager(_manager).ownerWhitelist(owner, _positionId, address(this)) == 1) {
       // Deposits Alpaca Stablecoin amount into the bookKeeper
-      stablecoinAdapterDeposit(stablecoinAdapter, positionAddress, amount, data);
+      stablecoinAdapterDeposit(_stablecoinAdapter, _positionAddress, _amount, _data);
       // Paybacks debt to the CDP
       adjustPosition(
-        manager,
-        positionId,
+        _manager,
+        _positionId,
         0,
         _getWipeDebtShare(
-          bookKeeper,
-          IBookKeeper(bookKeeper).stablecoin(positionAddress),
-          positionAddress,
-          collateralPoolId
+          _bookKeeper,
+          IBookKeeper(_bookKeeper).stablecoin(_positionAddress),
+          _positionAddress,
+          _collateralPoolId
         ),
-        tokenAdapter,
-        data
+        _tokenAdapter,
+        _data
       );
     } else {
       // Deposits Alpaca Stablecoin amount into the bookKeeper
-      stablecoinAdapterDeposit(stablecoinAdapter, address(this), amount, data);
+      stablecoinAdapterDeposit(_stablecoinAdapter, address(this), _amount, _data);
       // Paybacks debt to the position
-      int256 wipeDebtShare = _getWipeDebtShare(bookKeeper, amount * RAY, positionAddress, collateralPoolId);
-      IBookKeeper(bookKeeper).adjustPosition(
-        collateralPoolId,
-        positionAddress,
+      int256 _wipeDebtShare = _getWipeDebtShare(_bookKeeper, _amount * RAY, _positionAddress, _collateralPoolId);
+      IBookKeeper(_bookKeeper).adjustPosition(
+        _collateralPoolId,
+        _positionAddress,
         address(this),
         address(this),
         0,
-        wipeDebtShare
+        _wipeDebtShare
       );
     }
   }
 
   function safeWipe(
-    address manager,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 amount, // [wad]
-    address owner,
-    bytes calldata data
+    address _manager,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [wad]
+    address _owner,
+    bytes calldata _data
   ) external {
-    require(IManager(manager).owners(positionId) == owner, "!owner");
-    wipe(manager, tokenAdapter, stablecoinAdapter, positionId, amount, data);
+    require(IManager(_manager).owners(_positionId) == _owner, "!owner");
+    wipe(_manager, _tokenAdapter, _stablecoinAdapter, _positionId, _amount, _data);
   }
 
   function wipeAll(
-    address manager,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    bytes calldata data
+    address _manager,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    bytes calldata _data
   ) public {
-    address bookKeeper = IManager(manager).bookKeeper();
-    address positionAddress = IManager(manager).positions(positionId);
-    bytes32 collateralPoolId = IManager(manager).collateralPools(positionId);
-    (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress); // [wad]
+    address _bookKeeper = IManager(_manager).bookKeeper();
+    address _positionAddress = IManager(_manager).positions(_positionId);
+    bytes32 _collateralPoolId = IManager(_manager).collateralPools(_positionId);
+    (, uint256 _debtShare) = IBookKeeper(_bookKeeper).positions(_collateralPoolId, _positionAddress); // [wad]
 
-    address owner = IManager(manager).owners(positionId);
-    if (owner == address(this) || IManager(manager).ownerWhitelist(owner, positionId, address(this)) == 1) {
+    address _owner = IManager(_manager).owners(_positionId);
+    if (_owner == address(this) || IManager(_manager).ownerWhitelist(_owner, _positionId, address(this)) == 1) {
       // Deposits Alpaca Stablecoin amount into the bookKeeper
       stablecoinAdapterDeposit(
-        stablecoinAdapter,
-        positionAddress,
-        _getWipeAllStablecoinAmount(bookKeeper, positionAddress, positionAddress, collateralPoolId),
-        data
+        _stablecoinAdapter,
+        _positionAddress,
+        _getWipeAllStablecoinAmount(_bookKeeper, _positionAddress, _positionAddress, _collateralPoolId),
+        _data
       );
       // Paybacks debt to the CDP
-      adjustPosition(manager, positionId, 0, -int256(debtShare), tokenAdapter, data);
+      adjustPosition(_manager, _positionId, 0, -int256(_debtShare), _tokenAdapter, _data);
     } else {
       // Deposits Alpaca Stablecoin amount into the bookKeeper
       stablecoinAdapterDeposit(
-        stablecoinAdapter,
+        _stablecoinAdapter,
         address(this),
-        _getWipeAllStablecoinAmount(bookKeeper, address(this), positionAddress, collateralPoolId),
-        data
+        _getWipeAllStablecoinAmount(_bookKeeper, address(this), _positionAddress, _collateralPoolId),
+        _data
       );
       // Paybacks debt to the position
-      IBookKeeper(bookKeeper).adjustPosition(
-        collateralPoolId,
-        positionAddress,
+      IBookKeeper(_bookKeeper).adjustPosition(
+        _collateralPoolId,
+        _positionAddress,
         address(this),
         address(this),
         0,
-        -int256(debtShare)
+        -int256(_debtShare)
       );
     }
   }
 
   function safeWipeAll(
-    address manager,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    address owner,
-    bytes calldata data
+    address _manager,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    address _owner,
+    bytes calldata _data
   ) external {
-    require(IManager(manager).owners(positionId) == owner, "!owner");
-    wipeAll(manager, tokenAdapter, stablecoinAdapter, positionId, data);
+    require(IManager(_manager).owners(_positionId) == _owner, "!owner");
+    wipeAll(_manager, _tokenAdapter, _stablecoinAdapter, _positionId, _data);
   }
 
   function lockBNBAndDraw(
-    address manager,
-    address stabilityFeeCollector,
-    address bnbAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 stablecoinAmount, // [wad]
-    bytes calldata data
+    address _manager,
+    address _stabilityFeeCollector,
+    address _bnbAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _stablecoinAmount, // [wad]
+    bytes calldata _data
   ) public payable {
-    address positionAddress = IManager(manager).positions(positionId);
-    address bookKeeper = IManager(manager).bookKeeper();
-    bytes32 collateralPoolId = IManager(manager).collateralPools(positionId);
+    address _positionAddress = IManager(_manager).positions(_positionId);
+    address _bookKeeper = IManager(_manager).bookKeeper();
+    bytes32 _collateralPoolId = IManager(_manager).collateralPools(_positionId);
     // Receives BNB amount, converts it to WBNB and joins it into the bookKeeper
-    bnbAdapterDeposit(bnbAdapter, positionAddress, data);
+    bnbAdapterDeposit(_bnbAdapter, _positionAddress, _data);
     // Locks WBNB amount into the CDP and generates debt
     adjustPosition(
-      manager,
-      positionId,
+      _manager,
+      _positionId,
       _safeToInt(msg.value),
-      _getDrawDebtShare(bookKeeper, stabilityFeeCollector, positionAddress, collateralPoolId, stablecoinAmount),
-      bnbAdapter,
-      data
+      _getDrawDebtShare(_bookKeeper, _stabilityFeeCollector, _positionAddress, _collateralPoolId, _stablecoinAmount),
+      _bnbAdapter,
+      _data
     );
     // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
-    moveStablecoin(manager, positionId, address(this), _toRad(stablecoinAmount));
+    moveStablecoin(_manager, _positionId, address(this), _toRad(_stablecoinAmount));
     // Allows adapter to access to proxy's Alpaca Stablecoin balance in the bookKeeper
-    if (IBookKeeper(bookKeeper).positionWhitelist(address(this), address(stablecoinAdapter)) == 0) {
-      IBookKeeper(bookKeeper).whitelist(stablecoinAdapter);
+    if (IBookKeeper(_bookKeeper).positionWhitelist(address(this), address(_stablecoinAdapter)) == 0) {
+      IBookKeeper(_bookKeeper).whitelist(_stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
-    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, stablecoinAmount, data);
+    IStablecoinAdapter(_stablecoinAdapter).withdraw(msg.sender, _stablecoinAmount, _data);
   }
 
   /// @notice
   function openLockBNBAndDraw(
-    address manager,
-    address stabilityFeeCollector,
-    address bnbAdapter,
-    address stablecoinAdapter,
-    bytes32 collateralPoolId,
-    uint256 stablecoinAmount, // [wad]
-    bytes calldata data
-  ) external payable returns (uint256 positionId) {
-    positionId = open(manager, collateralPoolId, address(this));
-    lockBNBAndDraw(manager, stabilityFeeCollector, bnbAdapter, stablecoinAdapter, positionId, stablecoinAmount, data);
+    address _manager,
+    address _stabilityFeeCollector,
+    address _bnbAdapter,
+    address _stablecoinAdapter,
+    bytes32 _collateralPoolId,
+    uint256 _stablecoinAmount, // [wad]
+    bytes calldata _data
+  ) external payable returns (uint256 _positionId) {
+    _positionId = open(_manager, _collateralPoolId, address(this));
+    lockBNBAndDraw(
+      _manager,
+      _stabilityFeeCollector,
+      _bnbAdapter,
+      _stablecoinAdapter,
+      _positionId,
+      _stablecoinAmount,
+      _data
+    );
   }
 
   function lockTokenAndDraw(
-    IManager manager,
-    address stabilityFeeCollector,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 collateralAmount, // [in token decimal]
-    uint256 stablecoinAmount, // [wad]
-    bool transferFrom,
-    bytes calldata data
+    IManager _manager,
+    address _stabilityFeeCollector,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _collateralAmount, // [in token decimal]
+    uint256 _stablecoinAmount, // [wad]
+    bool _transferFrom,
+    bytes calldata _data
   ) public {
-    bytes32 collateralPoolId = manager.collateralPools(positionId);
+    bytes32 _collateralPoolId = _manager.collateralPools(_positionId);
     // Takes token amount from user's wallet and joins into the bookKeeper
-    tokenAdapterDeposit(tokenAdapter, manager.positions(positionId), collateralAmount, transferFrom, data);
+    tokenAdapterDeposit(_tokenAdapter, _manager.positions(_positionId), _collateralAmount, _transferFrom, _data);
     // Locks token amount into the position and generates debt
-    int256 collateralAmountInWad = _safeToInt(convertTo18(tokenAdapter, collateralAmount));
-    int256 drawDebtShare = _getDrawDebtShare(
-      manager.bookKeeper(),
-      stabilityFeeCollector,
-      manager.positions(positionId),
-      collateralPoolId,
-      stablecoinAmount
+    int256 _collateralAmountInWad = _safeToInt(convertTo18(_tokenAdapter, _collateralAmount));
+    int256 _drawDebtShare = _getDrawDebtShare(
+      _manager.bookKeeper(),
+      _stabilityFeeCollector,
+      _manager.positions(_positionId),
+      _collateralPoolId,
+      _stablecoinAmount
     ); // [wad]
-    adjustPosition(address(manager), positionId, collateralAmountInWad, drawDebtShare, tokenAdapter, data);
+    adjustPosition(address(_manager), _positionId, _collateralAmountInWad, _drawDebtShare, _tokenAdapter, _data);
     // Moves the Alpaca Stablecoin amount (balance in the bookKeeper in rad) to proxy's address
-    moveStablecoin(address(manager), positionId, address(this), _toRad(stablecoinAmount));
+    moveStablecoin(address(_manager), _positionId, address(this), _toRad(_stablecoinAmount));
     // Allows adapter to access to proxy's Alpaca Stablecoin balance in the bookKeeper
-    if (IBookKeeper(manager.bookKeeper()).positionWhitelist(address(this), address(stablecoinAdapter)) == 0) {
-      IBookKeeper(manager.bookKeeper()).whitelist(stablecoinAdapter);
+    if (IBookKeeper(_manager.bookKeeper()).positionWhitelist(address(this), address(_stablecoinAdapter)) == 0) {
+      IBookKeeper(_manager.bookKeeper()).whitelist(_stablecoinAdapter);
     }
     // Withdraws Alpaca Stablecoin to the user's wallet as a token
-    IStablecoinAdapter(stablecoinAdapter).withdraw(msg.sender, stablecoinAmount, data);
+    IStablecoinAdapter(_stablecoinAdapter).withdraw(msg.sender, _stablecoinAmount, _data);
   }
 
   function openLockTokenAndDraw(
-    address manager,
-    address stabilityFeeCollector,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    bytes32 collateralPoolId,
-    uint256 collateralAmount, // [in token decimal]
-    uint256 stablecoinAmount, // [wad]
-    bool transferFrom,
-    bytes calldata data
-  ) public returns (uint256 positionId) {
-    positionId = open(manager, collateralPoolId, address(this));
+    address _manager,
+    address _stabilityFeeCollector,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    bytes32 _collateralPoolId,
+    uint256 _collateralAmount, // [in token decimal]
+    uint256 _stablecoinAmount, // [wad]
+    bool _transferFrom,
+    bytes calldata _data
+  ) public returns (uint256 _positionId) {
+    _positionId = open(_manager, _collateralPoolId, address(this));
     lockTokenAndDraw(
-      IManager(manager),
-      stabilityFeeCollector,
-      tokenAdapter,
-      stablecoinAdapter,
-      positionId,
-      collateralAmount,
-      stablecoinAmount,
-      transferFrom,
-      data
+      IManager(_manager),
+      _stabilityFeeCollector,
+      _tokenAdapter,
+      _stablecoinAdapter,
+      _positionId,
+      _collateralAmount,
+      _stablecoinAmount,
+      _transferFrom,
+      _data
     );
   }
 
   function convertBNBOpenLockTokenAndDraw(
-    address vault,
-    address manager,
-    address stabilityFeeCollector,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    bytes32 collateralPoolId,
-    uint256 stablecoinAmount, // [wad]
-    bool transferFrom,
-    bytes calldata data
+    address _vault,
+    address _manager,
+    address _stabilityFeeCollector,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    bytes32 _collateralPoolId,
+    uint256 _stablecoinAmount, // [wad]
+    bool _transferFrom,
+    bytes calldata _data
   ) external payable returns (uint256 positionId) {
-    uint256 collateralAmount = bnbToIbBNB(vault, msg.value);
+    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value);
     return
       openLockTokenAndDraw(
-        manager,
-        stabilityFeeCollector,
-        tokenAdapter,
-        stablecoinAdapter,
-        collateralPoolId,
-        collateralAmount,
-        stablecoinAmount,
-        transferFrom,
-        data
+        _manager,
+        _stabilityFeeCollector,
+        _tokenAdapter,
+        _stablecoinAdapter,
+        _collateralPoolId,
+        _collateralAmount,
+        _stablecoinAmount,
+        _transferFrom,
+        _data
       );
   }
 
   function convertOpenLockTokenAndDraw(
-    address vault,
-    address manager,
-    address stabilityFeeCollector,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    bytes32 collateralPoolId,
-    uint256 tokenAmount, // [in token decimal]
-    uint256 stablecoinAmount, // [wad]
-    bool transferFrom,
-    bytes calldata data
+    address _vault,
+    address _manager,
+    address _stabilityFeeCollector,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    bytes32 _collateralPoolId,
+    uint256 _tokenAmount, // [in token decimal]
+    uint256 _stablecoinAmount, // [wad]
+    bool _transferFrom,
+    bytes calldata _data
   ) external returns (uint256 positionId) {
-    uint256 collateralAmount = tokenToIbToken(vault, convertTo18(tokenAdapter, tokenAmount));
+    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _tokenAmount));
     return
       openLockTokenAndDraw(
-        manager,
-        stabilityFeeCollector,
-        tokenAdapter,
-        stablecoinAdapter,
-        collateralPoolId,
-        collateralAmount,
-        stablecoinAmount,
-        transferFrom,
-        data
+        _manager,
+        _stabilityFeeCollector,
+        _tokenAdapter,
+        _stablecoinAdapter,
+        _collateralPoolId,
+        _collateralAmount,
+        _stablecoinAmount,
+        _transferFrom,
+        _data
       );
   }
 
   function wipeAndUnlockBNB(
-    address manager,
-    address bnbAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 collateralAmount, // [wad]
-    uint256 stablecoinAmount, // [wad]
-    bytes calldata data
+    address _manager,
+    address _bnbAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _collateralAmount, // [wad]
+    uint256 _stablecoinAmount, // [wad]
+    bytes calldata _data
   ) external {
-    address positionAddress = IManager(manager).positions(positionId);
+    address _positionAddress = IManager(_manager).positions(_positionId);
     // Deposits Alpaca Stablecoin amount into the bookKeeper
-    stablecoinAdapterDeposit(stablecoinAdapter, positionAddress, stablecoinAmount, data);
+    stablecoinAdapterDeposit(_stablecoinAdapter, _positionAddress, _stablecoinAmount, _data);
     // Paybacks debt to the position and unlocks WBNB amount from it
-    int256 wipeDebtShare = _getWipeDebtShare(
-      IManager(manager).bookKeeper(),
-      IBookKeeper(IManager(manager).bookKeeper()).stablecoin(positionAddress),
-      positionAddress,
-      IManager(manager).collateralPools(positionId)
+    int256 _wipeDebtShare = _getWipeDebtShare(
+      IManager(_manager).bookKeeper(),
+      IBookKeeper(IManager(_manager).bookKeeper()).stablecoin(_positionAddress),
+      _positionAddress,
+      IManager(_manager).collateralPools(_positionId)
     ); // [wad]
-    adjustPosition(manager, positionId, -_safeToInt(collateralAmount), wipeDebtShare, bnbAdapter, data);
+    adjustPosition(_manager, _positionId, -_safeToInt(_collateralAmount), _wipeDebtShare, _bnbAdapter, _data);
     // Moves the amount from the position to proxy's address
-    moveCollateral(manager, positionId, address(this), collateralAmount, bnbAdapter, data);
+    moveCollateral(_manager, _positionId, address(this), _collateralAmount, _bnbAdapter, _data);
     // Withdraws WBNB amount to proxy address as a token
-    IGenericTokenAdapter(bnbAdapter).withdraw(address(this), collateralAmount, data);
+    IGenericTokenAdapter(_bnbAdapter).withdraw(address(this), _collateralAmount, _data);
     // Converts WBNB to BNB
-    IWBNB(address(IGenericTokenAdapter(bnbAdapter).collateralToken())).withdraw(collateralAmount);
+    IWBNB(address(IGenericTokenAdapter(_bnbAdapter).collateralToken())).withdraw(_collateralAmount);
     // Sends BNB back to the user's wallet
-    SafeToken.safeTransferETH(msg.sender, collateralAmount);
+    SafeToken.safeTransferETH(msg.sender, _collateralAmount);
   }
 
   function wipeAllAndUnlockBNB(
-    address manager,
-    address bnbAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 collateralAmount, // [wad]
-    bytes calldata data
+    address _manager,
+    address _bnbAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _collateralAmount, // [wad]
+    bytes calldata _data
   ) external {
-    address bookKeeper = IManager(manager).bookKeeper();
-    address positionAddress = IManager(manager).positions(positionId);
-    bytes32 collateralPoolId = IManager(manager).collateralPools(positionId);
-    (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress); // [wad]
+    address _bookKeeper = IManager(_manager).bookKeeper();
+    address _positionAddress = IManager(_manager).positions(_positionId);
+    bytes32 _collateralPoolId = IManager(_manager).collateralPools(_positionId);
+    (, uint256 _debtShare) = IBookKeeper(_bookKeeper).positions(_collateralPoolId, _positionAddress); // [wad]
 
     // Deposits Alpaca Stablecoin amount into the bookKeeper
     stablecoinAdapterDeposit(
-      stablecoinAdapter,
-      positionAddress,
-      _getWipeAllStablecoinAmount(bookKeeper, positionAddress, positionAddress, collateralPoolId),
-      data
+      _stablecoinAdapter,
+      _positionAddress,
+      _getWipeAllStablecoinAmount(_bookKeeper, _positionAddress, _positionAddress, _collateralPoolId),
+      _data
     );
     // Paybacks debt to the CDP and unlocks WBNB amount from it
-    adjustPosition(manager, positionId, -_safeToInt(collateralAmount), -int256(debtShare), bnbAdapter, data);
+    adjustPosition(_manager, _positionId, -_safeToInt(_collateralAmount), -int256(_debtShare), _bnbAdapter, _data);
     // Moves the amount from the CDP positionAddress to proxy's address
-    moveCollateral(manager, positionId, address(this), collateralAmount, bnbAdapter, data);
+    moveCollateral(_manager, _positionId, address(this), _collateralAmount, _bnbAdapter, _data);
     // Withdraws WBNB amount to proxy address as a token
-    IGenericTokenAdapter(bnbAdapter).withdraw(address(this), collateralAmount, data);
+    IGenericTokenAdapter(_bnbAdapter).withdraw(address(this), _collateralAmount, _data);
     // Converts WBNB to BNB
-    IWBNB(address(IGenericTokenAdapter(bnbAdapter).collateralToken())).withdraw(collateralAmount);
+    IWBNB(address(IGenericTokenAdapter(_bnbAdapter).collateralToken())).withdraw(_collateralAmount);
     // Sends BNB back to the user's wallet
-    SafeToken.safeTransferETH(msg.sender, collateralAmount);
+    SafeToken.safeTransferETH(msg.sender, _collateralAmount);
   }
 
   function wipeAndUnlockToken(
-    address manager,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 collateralAmount, // [in token decimal]
-    uint256 stablecoinAmount, // [wad]
-    bytes calldata data
+    address _manager,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _collateralAmount, // [in token decimal]
+    uint256 _stablecoinAmount, // [wad]
+    bytes calldata _data
   ) public {
-    address positionAddress = IManager(manager).positions(positionId);
+    address _positionAddress = IManager(_manager).positions(_positionId);
     // Deposits Alpaca Stablecoin amount into the bookKeeper
-    stablecoinAdapterDeposit(stablecoinAdapter, positionAddress, stablecoinAmount, data);
-    uint256 collateralAmountInWad = convertTo18(tokenAdapter, collateralAmount);
+    stablecoinAdapterDeposit(_stablecoinAdapter, _positionAddress, _stablecoinAmount, _data);
+    uint256 _collateralAmountInWad = convertTo18(_tokenAdapter, _collateralAmount);
     // Paybacks debt to the CDP and unlocks token amount from it
-    int256 wipeDebtShare = _getWipeDebtShare(
-      IManager(manager).bookKeeper(),
-      IBookKeeper(IManager(manager).bookKeeper()).stablecoin(positionAddress),
-      positionAddress,
-      IManager(manager).collateralPools(positionId)
+    int256 _wipeDebtShare = _getWipeDebtShare(
+      IManager(_manager).bookKeeper(),
+      IBookKeeper(IManager(_manager).bookKeeper()).stablecoin(_positionAddress),
+      _positionAddress,
+      IManager(_manager).collateralPools(_positionId)
     );
-    adjustPosition(manager, positionId, -_safeToInt(collateralAmountInWad), wipeDebtShare, tokenAdapter, data);
+    adjustPosition(_manager, _positionId, -_safeToInt(_collateralAmountInWad), _wipeDebtShare, _tokenAdapter, _data);
     // Moves the amount from the position to proxy's address
-    moveCollateral(manager, positionId, address(this), collateralAmountInWad, tokenAdapter, data);
+    moveCollateral(_manager, _positionId, address(this), _collateralAmountInWad, _tokenAdapter, _data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(tokenAdapter).withdraw(address(this), collateralAmount, data);
+    IGenericTokenAdapter(_tokenAdapter).withdraw(address(this), _collateralAmount, _data);
   }
 
   function wipeUnlockIbBNBAndCovertToBNB(
-    address vault,
-    address manager,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 collateralAmount, // [wad]
-    uint256 stablecoinAmount, // [wad]
-    bytes calldata data
+    address _vault,
+    address _manager,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _collateralAmount, // [wad]
+    uint256 _stablecoinAmount, // [wad]
+    bytes calldata _data
   ) external {
-    wipeAndUnlockToken(manager, tokenAdapter, stablecoinAdapter, positionId, collateralAmount, stablecoinAmount, data);
-    ibBNBToBNB(vault, collateralAmount);
+    wipeAndUnlockToken(
+      _manager,
+      _tokenAdapter,
+      _stablecoinAdapter,
+      _positionId,
+      _collateralAmount,
+      _stablecoinAmount,
+      _data
+    );
+    ibBNBToBNB(_vault, _collateralAmount);
   }
 
   function wipeUnlockTokenAndConvert(
-    address vault,
-    address manager,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 collateralAmount, // [token decimal]
-    uint256 stablecoinAmount, // [wad]
-    bytes calldata data
+    address _vault,
+    address _manager,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _collateralAmount, // [token decimal]
+    uint256 _stablecoinAmount, // [wad]
+    bytes calldata _data
   ) external {
-    wipeAndUnlockToken(manager, tokenAdapter, stablecoinAdapter, positionId, collateralAmount, stablecoinAmount, data);
-    ibTokenToToken(vault, convertTo18(tokenAdapter, collateralAmount));
+    wipeAndUnlockToken(
+      _manager,
+      _tokenAdapter,
+      _stablecoinAdapter,
+      _positionId,
+      _collateralAmount,
+      _stablecoinAmount,
+      _data
+    );
+    ibTokenToToken(_vault, convertTo18(_tokenAdapter, _collateralAmount));
   }
 
   function wipeAllAndUnlockToken(
-    address manager,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 collateralAmount, // [token decimal]
-    bytes calldata data
+    address _manager,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _collateralAmount, // [token decimal]
+    bytes calldata _data
   ) public {
-    address bookKeeper = IManager(manager).bookKeeper();
-    address positionAddress = IManager(manager).positions(positionId);
-    bytes32 collateralPoolId = IManager(manager).collateralPools(positionId);
-    (, uint256 debtShare) = IBookKeeper(bookKeeper).positions(collateralPoolId, positionAddress);
+    address _bookKeeper = IManager(_manager).bookKeeper();
+    address _positionAddress = IManager(_manager).positions(_positionId);
+    bytes32 _collateralPoolId = IManager(_manager).collateralPools(_positionId);
+    (, uint256 _debtShare) = IBookKeeper(_bookKeeper).positions(_collateralPoolId, _positionAddress);
 
     // Deposits Alpaca Stablecoin amount into the bookKeeper
     stablecoinAdapterDeposit(
-      stablecoinAdapter,
-      positionAddress,
-      _getWipeAllStablecoinAmount(bookKeeper, positionAddress, positionAddress, collateralPoolId),
-      data
+      _stablecoinAdapter,
+      _positionAddress,
+      _getWipeAllStablecoinAmount(_bookKeeper, _positionAddress, _positionAddress, _collateralPoolId),
+      _data
     );
-    uint256 collateralAmountInWad = convertTo18(tokenAdapter, collateralAmount);
+    uint256 _collateralAmountInWad = convertTo18(_tokenAdapter, _collateralAmount);
     // Paybacks debt to the position and unlocks token amount from it
-    adjustPosition(manager, positionId, -_safeToInt(collateralAmountInWad), -int256(debtShare), tokenAdapter, data);
+    adjustPosition(
+      _manager,
+      _positionId,
+      -_safeToInt(_collateralAmountInWad),
+      -int256(_debtShare),
+      _tokenAdapter,
+      _data
+    );
     // Moves the amount from the position to proxy's address
-    moveCollateral(manager, positionId, address(this), collateralAmountInWad, tokenAdapter, data);
+    moveCollateral(_manager, _positionId, address(this), _collateralAmountInWad, _tokenAdapter, _data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(tokenAdapter).withdraw(address(this), collateralAmount, data);
+    IGenericTokenAdapter(_tokenAdapter).withdraw(address(this), _collateralAmount, _data);
   }
 
   function wipeAllUnlockIbBNBAndConvertToBNB(
-    address vault,
-    address manager,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 collateralAmount, // [wad]
-    bytes calldata data
+    address _vault,
+    address _manager,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _collateralAmount, // [wad]
+    bytes calldata _data
   ) external {
-    wipeAllAndUnlockToken(manager, tokenAdapter, stablecoinAdapter, positionId, collateralAmount, data);
-    ibBNBToBNB(vault, collateralAmount);
+    wipeAllAndUnlockToken(_manager, _tokenAdapter, _stablecoinAdapter, _positionId, _collateralAmount, _data);
+    ibBNBToBNB(_vault, _collateralAmount);
   }
 
   function wipeAllUnlockTokenAndConvert(
-    address vault,
-    address manager,
-    address tokenAdapter,
-    address stablecoinAdapter,
-    uint256 positionId,
-    uint256 collateralAmount, // [in token decimal]
-    bytes calldata data
+    address _vault,
+    address _manager,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _collateralAmount, // [in token decimal]
+    bytes calldata _data
   ) external {
-    wipeAllAndUnlockToken(manager, tokenAdapter, stablecoinAdapter, positionId, collateralAmount, data);
-    ibTokenToToken(vault, convertTo18(tokenAdapter, collateralAmount));
+    wipeAllAndUnlockToken(_manager, _tokenAdapter, _stablecoinAdapter, _positionId, _collateralAmount, _data);
+    ibTokenToToken(_vault, convertTo18(_tokenAdapter, _collateralAmount));
   }
 
   function harvest(
-    address manager,
-    address tokenAdapter,
-    uint256 positionId,
-    address harvestTo,
-    address harvestToken
+    address _manager,
+    address _tokenAdapter,
+    uint256 _positionId,
+    address _harvestTo,
+    address _harvestToken
   ) external {
-    address positionAddress = IManager(manager).positions(positionId);
-    IGenericTokenAdapter(tokenAdapter).deposit(positionAddress, 0, abi.encode(harvestTo));
-    transfer(harvestToken, msg.sender, harvestToken.myBalance());
+    address _positionAddress = IManager(_manager).positions(_positionId);
+    IGenericTokenAdapter(_tokenAdapter).deposit(_positionAddress, 0, abi.encode(_harvestTo));
+    transfer(_harvestToken, msg.sender, _harvestToken.myBalance());
   }
 
   function redeemLockedCollateral(
-    address manager,
-    uint256 positionId,
-    address tokenAdapter,
-    bytes calldata data
+    address _manager,
+    uint256 _positionId,
+    address _tokenAdapter,
+    bytes calldata _data
   ) external {
-    IManager(manager).redeemLockedCollateral(positionId, tokenAdapter, address(this), data);
+    IManager(_manager).redeemLockedCollateral(_positionId, _tokenAdapter, address(this), _data);
   }
 }

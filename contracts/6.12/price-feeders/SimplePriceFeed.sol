@@ -1,13 +1,27 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
+
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import "../interfaces/IPriceFeed.sol";
+import "../interfaces/IAccessControlConfig.sol";
 
 // SimplePriceFeed is intended to be used for unit test only
 contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPriceFeed {
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  IAccessControlConfig public accessControlConfig;
 
   uint256 public price;
   uint256 public lastUpdate;
@@ -15,34 +29,32 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
   uint256 public priceLife;
 
   // --- Init ---
-  function initialize() external initializer {
+  function initialize(address _accessControlConfig) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
 
     priceLife = 1 days; // [seconds] how old the price is considered stale, default 1 day
 
-    // Grant the contract deployer OWNER role: it will be able
-    // to grant and revoke any roles afterward
-    _setupRole(OWNER_ROLE, msg.sender);
+    accessControlConfig = IAccessControlConfig(_accessControlConfig);
   }
 
   modifier onlyOwner() {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    require(accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     _;
   }
 
-  event SetPrice(address indexed caller, uint256 price, uint256 indexed lastUpdate);
-  event SetPriceLife(address indexed caller, uint256 second);
+  event LogSetPrice(address indexed _caller, uint256 _price, uint256 indexed _lastUpdate);
+  event LogSetPriceLife(address indexed _caller, uint256 _second);
 
   function setPrice(uint256 _price) external onlyOwner {
     price = _price;
     lastUpdate = now;
-    emit SetPrice(msg.sender, price, lastUpdate);
+    emit LogSetPrice(msg.sender, price, lastUpdate);
   }
 
   function setPriceLife(uint256 _second) external onlyOwner {
     priceLife = _second;
-    emit SetPriceLife(msg.sender, _second);
+    emit LogSetPriceLife(msg.sender, _second);
   }
 
   function pause() external onlyOwner {

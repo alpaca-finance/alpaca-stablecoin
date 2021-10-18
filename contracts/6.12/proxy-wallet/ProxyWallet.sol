@@ -1,19 +1,15 @@
-// ProxyWallet.sol - execute actions atomically through the proxy's identity
-
-// Copyright (C) 2017  DappHub, LLC
-
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+// SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
 
 pragma solidity 0.6.12;
 
@@ -39,34 +35,34 @@ contract ProxyWallet is AlpacaAuth, AlpacaNote {
   function execute(bytes memory _code, bytes memory _data)
     public
     payable
-    returns (address target, bytes memory response)
+    returns (address _target, bytes memory _response)
   {
-    target = cache.read(_code);
-    if (target == address(0)) {
+    _target = cache.read(_code);
+    if (_target == address(0)) {
       // deploy contract & store its address in cache
-      target = cache.write(_code);
+      _target = cache.write(_code);
     }
 
-    response = execute(target, _data);
+    _response = execute(_target, _data);
   }
 
-  function execute(address _target, bytes memory _data) public payable auth note returns (bytes memory response) {
+  function execute(address _target, bytes memory _data) public payable auth note returns (bytes memory _response) {
     require(_target != address(0), "proxy-wallet-target-address-required");
 
     // call contract in current context
     assembly {
-      let succeeded := delegatecall(sub(gas(), 5000), _target, add(_data, 0x20), mload(_data), 0, 0)
-      let size := returndatasize()
+      let _succeeded := delegatecall(sub(gas(), 5000), _target, add(_data, 0x20), mload(_data), 0, 0)
+      let _size := returndatasize()
 
-      response := mload(0x40)
-      mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
-      mstore(response, size)
-      returndatacopy(add(response, 0x20), 0, size)
+      _response := mload(0x40)
+      mstore(0x40, add(_response, and(add(add(_size, 0x20), 0x1f), not(0x1f))))
+      mstore(_response, _size)
+      returndatacopy(add(_response, 0x20), 0, _size)
 
-      switch iszero(succeeded)
+      switch iszero(_succeeded)
       case 1 {
         // throw if delegatecall failed
-        revert(add(response, 0x20), size)
+        revert(add(_response, 0x20), _size)
       }
     }
   }

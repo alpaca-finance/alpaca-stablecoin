@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
-/// systemDebtEngine.sol -- stablecoin settlement module
-
-// Copyright (C) 2018 Rain <rainbreak@riseup.net>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
 
 pragma solidity 0.6.12;
 
@@ -35,77 +29,68 @@ import "../interfaces/ICagable.sol";
     The stability fee will be accrued and kept within SystemDebtEngine. As it is the debtor, therefore SystemDebtEngine should be the holder of the surplus and use it to settle the bad debt.
 */
 
-contract SystemDebtEngine is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  ISystemDebtEngine,
-  ICagable
-{
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
-
+contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, ISystemDebtEngine, ICagable {
   // --- Data ---
   IBookKeeper public bookKeeper; // CDP Engine
-  uint256 public surplusBuffer; // Surplus buffer         [rad]
+  uint256 public override surplusBuffer; // Surplus buffer         [rad]
   uint256 public live; // Active Flag
 
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
     live = 1;
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
-  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x + y) >= x);
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x);
   }
 
-  function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x - y) <= x);
+  function sub(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x - _y) <= _x);
   }
 
-  function min(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    return x <= y ? x : y;
+  function min(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    return _x <= _y ? _x : _y;
   }
 
   // --- withdraw surplus ---
-  /// @param amount The amount of collateral. [wad]
+  /// @param _amount The amount of collateral. [wad]
   function withdrawCollateralSurplus(
-    bytes32 collateralPoolId,
-    IGenericTokenAdapter adapter,
-    address to,
-    uint256 amount // [wad]
+    bytes32 _collateralPoolId,
+    IGenericTokenAdapter _adapter,
+    address _to,
+    uint256 _amount // [wad]
   ) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
-    bookKeeper.moveCollateral(collateralPoolId, address(this), to, amount);
-    adapter.onMoveCollateral(address(this), to, amount, abi.encode(to));
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    bookKeeper.moveCollateral(_collateralPoolId, address(this), _to, _amount);
+    _adapter.onMoveCollateral(address(this), _to, _amount, abi.encode(_to));
   }
 
-  /// @param value The value of collateral. [rad]
-  function withdrawStablecoinSurplus(address to, uint256 value) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+  /// @param _value The value of collateral. [rad]
+  function withdrawStablecoinSurplus(address _to, uint256 _value) external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(bookKeeper.systemBadDebt(address(this)) == 0, "SystemDebtEngine/system-bad-debt-remaining");
-    require(sub(bookKeeper.stablecoin(address(this)), value) >= surplusBuffer, "SystemDebtEngine/insufficient-surplus");
-    bookKeeper.moveStablecoin(address(this), to, value);
+    require(
+      sub(bookKeeper.stablecoin(address(this)), _value) >= surplusBuffer,
+      "SystemDebtEngine/insufficient-surplus"
+    );
+    bookKeeper.moveStablecoin(address(this), _to, _value);
   }
 
   // --- Administration ---
-  event SetSurplusBuffer(address indexed caller, uint256 data);
+  event LogSetSurplusBuffer(address indexed _caller, uint256 _data);
 
-  function setSurplusBuffer(uint256 _data) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+  function setSurplusBuffer(uint256 _data) external whenNotPaused {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     surplusBuffer = _data;
-    emit SetSurplusBuffer(msg.sender, _data);
+    emit LogSetSurplusBuffer(msg.sender, _data);
   }
 
   // Debt settlement
@@ -113,42 +98,56 @@ contract SystemDebtEngine is
       This function could be called by anyone to settle the system bad debt when there is available surplus.
       The stablecoin held by SystemDebtEngine (which is the surplus) will be deducted to compensate the incurred bad debt.
   */
-  /// @param value The value of bad debt to be settled. [rad]
-  function settleSystemBadDebt(uint256 value) external override whenNotPaused nonReentrant {
-    require(value <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
-    require(value <= bookKeeper.systemBadDebt(address(this)), "SystemDebtEngine/insufficient-debt");
-    bookKeeper.settleSystemBadDebt(value);
+  /// @param _value The value of bad debt to be settled. [rad]
+  function settleSystemBadDebt(uint256 _value) external override whenNotPaused nonReentrant {
+    require(_value <= bookKeeper.stablecoin(address(this)), "SystemDebtEngine/insufficient-surplus");
+    require(_value <= bookKeeper.systemBadDebt(address(this)), "SystemDebtEngine/insufficient-debt");
+    bookKeeper.settleSystemBadDebt(_value);
   }
 
   function cage() external override {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "SystemDebtEngine/not-live");
     live = 0;
     bookKeeper.settleSystemBadDebt(min(bookKeeper.stablecoin(address(this)), bookKeeper.systemBadDebt(address(this))));
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "SystemDebtEngine/not-caged");
     live = 1;
-    emit Uncage();
+    emit LogUncage();
   }
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _unpause();
   }
 }

@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
-/// jug.sol -- Dai Lending Rate
-
-// Copyright (C) 2018 Rain <rainbreak@riseup.net>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
 
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
@@ -34,15 +28,7 @@ import "../interfaces/IStabilityFeeCollector.sol";
     The stability fee will be accumulated in the system as a surplus to settle any bad debt.
 */
 
-contract StabilityFeeCollector is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  IStabilityFeeCollector
-{
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-
+contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeable, IStabilityFeeCollector {
   // --- Data ---
   struct CollateralPool {
     uint256 stabilityFeeRate; // Collateral-specific, per-second stability fee debtAccumulatedRate or mint interest debtAccumulatedRate [ray]
@@ -56,14 +42,9 @@ contract StabilityFeeCollector is
   // --- Init ---
   function initialize(address _bookKeeper) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
-
-    // Grant the contract deployer the default admin role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
@@ -124,36 +105,38 @@ contract StabilityFeeCollector is
 
   uint256 constant RAY = 10**27;
 
-  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = x + y;
-    require(z >= x);
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = _x + _y;
+    require(_z >= _x);
   }
 
-  function diff(uint256 x, uint256 y) internal pure returns (int256 z) {
-    z = int256(x) - int256(y);
-    require(int256(x) >= 0 && int256(y) >= 0);
+  function diff(uint256 _x, uint256 _y) internal pure returns (int256 _z) {
+    _z = int256(_x) - int256(_y);
+    require(int256(_x) >= 0 && int256(_y) >= 0);
   }
 
-  function rmul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = x * y;
-    require(y == 0 || z / y == x);
-    z = z / RAY;
+  function rmul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = _x * _y;
+    require(_y == 0 || _z / _y == _x);
+    _z = _z / RAY;
   }
 
   // --- Administration ---
-  event LogSetGlobalStabilityFeeRate(address indexed caller, uint256 data);
-  event LogSetSystemDebtEngine(address indexed caller, address data);
+  event LogSetGlobalStabilityFeeRate(address indexed _caller, uint256 _data);
+  event LogSetSystemDebtEngine(address indexed _caller, address _data);
 
   /// @dev Set the global stability fee debtAccumulatedRate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
   /// @param _globalStabilityFeeRate Global stability fee debtAccumulatedRate [ray]
   function setGlobalStabilityFeeRate(uint256 _globalStabilityFeeRate) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     globalStabilityFeeRate = _globalStabilityFeeRate;
     emit LogSetGlobalStabilityFeeRate(msg.sender, _globalStabilityFeeRate);
   }
 
   function setSystemDebtEngine(address _systemDebtEngine) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     systemDebtEngine = _systemDebtEngine;
     emit LogSetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
@@ -164,27 +147,26 @@ contract StabilityFeeCollector is
       It will update the `debtAccumulatedRate` of the specified collateral pool according to
       the global and per-pool stability fee rates with respect to the last block that `collect` was called.
   */
-  /// @param collateralPool Collateral pool id
-  function collect(bytes32 collateralPool)
+  /// @param _collateralPool Collateral pool id
+  function collect(bytes32 _collateralPool)
     external
     override
     whenNotPaused
     nonReentrant
-    returns (uint256 debtAccumulatedRate)
+    returns (uint256 _debtAccumulatedRate)
   {
-    debtAccumulatedRate = _collect(collateralPool);
+    _debtAccumulatedRate = _collect(_collateralPool);
   }
 
   function _collect(bytes32 _collateralPoolId) internal returns (uint256 _debtAccumulatedRate) {
-    uint256 _previousDebtAccumulatedRate = bookKeeper
-      .collateralPoolConfig()
-      .collateralPools(_collateralPoolId)
-      .debtAccumulatedRate;
-    uint256 _stabilityFeeRate = bookKeeper.collateralPoolConfig().collateralPools(_collateralPoolId).stabilityFeeRate;
-    uint256 _lastAccumulationTime = bookKeeper
-      .collateralPoolConfig()
-      .collateralPools(_collateralPoolId)
-      .lastAccumulationTime;
+    uint256 _previousDebtAccumulatedRate = ICollateralPoolConfig(bookKeeper.collateralPoolConfig())
+      .getDebtAccumulatedRate(_collateralPoolId);
+    uint256 _stabilityFeeRate = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getStabilityFeeRate(
+      _collateralPoolId
+    );
+    uint256 _lastAccumulationTime = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getLastAccumulationTime(
+      _collateralPoolId
+    );
     require(now >= _lastAccumulationTime, "StabilityFeeCollector/invalid-now");
 
     // debtAccumulatedRate [ray]
@@ -197,17 +179,27 @@ contract StabilityFeeCollector is
       systemDebtEngine,
       diff(_debtAccumulatedRate, _previousDebtAccumulatedRate)
     );
-    bookKeeper.collateralPoolConfig().updateLastAccumulationTime(_collateralPoolId);
+    ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).updateLastAccumulationTime(_collateralPoolId);
   }
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!ownerRole or !govRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _unpause();
   }
 }

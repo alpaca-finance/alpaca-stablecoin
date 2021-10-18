@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (C) 2021 Dai Foundation
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
 
 pragma solidity 0.6.12;
 
@@ -31,15 +28,7 @@ import "../interfaces/IStableSwapModule.sol";
 // Allows anyone to go between AUSD and the Token by pooling the liquidity
 // An optional fee is charged for incoming and outgoing transfers
 
-contract StableSwapModule is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  IStableSwapModule
-{
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
-
+contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IStableSwapModule {
   IBookKeeper public bookKeeper;
   IAuthTokenAdapter public override authTokenAdapter;
   IStablecoin public stablecoin;
@@ -53,10 +42,10 @@ contract StableSwapModule is
   uint256 public feeOut; // fee out [wad]
 
   // --- Events ---
-  event SetFeeIn(address indexed _caller, uint256 _feeIn);
-  event SetFeeOut(address indexed _caller, uint256 _feeOut);
-  event SwapTokenToStablecoin(address indexed owner, uint256 value, uint256 fee);
-  event SwapStablecoinToToken(address indexed owner, uint256 value, uint256 fee);
+  event LogSetFeeIn(address indexed _caller, uint256 _feeIn);
+  event LogSetFeeOut(address indexed _caller, uint256 _feeOut);
+  event LogSwapTokenToStablecoin(address indexed _owner, uint256 _value, uint256 _fee);
+  event LogSwapStablecoinToToken(address indexed _owner, uint256 _value, uint256 _fee);
 
   // --- Init ---
   function initialize(
@@ -65,7 +54,6 @@ contract StableSwapModule is
     address _systemDebtEngine
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     IAuthTokenAdapter __authTokenAdapter = authTokenAdapter = IAuthTokenAdapter(_authTokenAdapter);
@@ -77,51 +65,51 @@ contract StableSwapModule is
     to18ConversionFactor = 10**(18 - __authTokenAdapter.decimals());
     _stablecoin.approve(_stablecoinAdapter, uint256(-1));
     _bookKeeper.whitelist(_stablecoinAdapter);
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   // --- Math ---
   uint256 constant WAD = 10**18;
   uint256 constant RAY = 10**27;
 
-  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x + y) >= x);
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x);
   }
 
-  function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x - y) <= x);
+  function sub(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x - _y) <= _x);
   }
 
-  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y == 0 || (z = x * y) / y == x);
+  function mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x);
   }
 
   function setFeeIn(uint256 _feeIn) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(_feeIn <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeIn is 0.5 Ethers or 50%
     feeIn = _feeIn;
-    emit SetFeeIn(msg.sender, _feeIn);
+    emit LogSetFeeIn(msg.sender, _feeIn);
   }
 
   function setFeeOut(uint256 _feeOut) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     require(_feeOut <= 5 * 1e17, "StableSwapModule/invalid-fee-in"); // Max feeOut is 0.5 Ethers or 50%
     feeOut = _feeOut;
-    emit SetFeeOut(msg.sender, _feeOut);
+    emit LogSetFeeOut(msg.sender, _feeOut);
   }
 
   // hope can be used to transfer control of the PSM vault to another contract
   // This can be used to upgrade the contract
   function whitelist(address _usr) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     bookKeeper.whitelist(_usr);
   }
 
   function blacklist(address _usr) external {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     bookKeeper.blacklist(_usr);
   }
 
@@ -147,7 +135,7 @@ contract StableSwapModule is
     bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(_fee, RAY));
     stablecoinAdapter.withdraw(_usr, _stablecoinAmount, abi.encode(0));
 
-    emit SwapTokenToStablecoin(_usr, _tokenAmount, _fee);
+    emit LogSwapTokenToStablecoin(_usr, _tokenAmount, _fee);
   }
 
   /**
@@ -172,17 +160,27 @@ contract StableSwapModule is
     authTokenAdapter.withdraw(_usr, _tokenAmount);
     bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(_fee, RAY));
 
-    emit SwapStablecoinToToken(_usr, _tokenAmount, _fee);
+    emit LogSwapStablecoinToToken(_usr, _tokenAmount, _fee);
   }
 
   // --- pause ---
   function pause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _pause();
   }
 
   function unpause() external {
-    require(hasRole(OWNER_ROLE, msg.sender) || hasRole(GOV_ROLE, msg.sender), "!(ownerRole or govRole)");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
     _unpause();
   }
 }

@@ -20,10 +20,16 @@ type fixture = {
   mockMyFashLoan: MockContract
   mockBookKeeper: MockContract
   mockStablecoinAdapter: MockContract
+  mockedAccessControlConfig: MockContract
+  mockedCollateralPoolConfig: MockContract
 }
 
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
+
+  const mockedAccessControlConfig = await smockit(await ethers.getContractFactory("AccessControlConfig", deployer))
+
+  const mockedCollateralPoolConfig = await smockit(await ethers.getContractFactory("CollateralPoolConfig", deployer))
 
   // Deploy mocked BookKeeper
   const mockBookKeeper = await smockit(await ethers.getContractFactory("BookKeeper", deployer))
@@ -52,7 +58,16 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     mockSystemDebtEngine.address,
   ])) as FlashMintModule
 
-  return { flashMintModule, mockAlpacaStablecoin, mockMyFashLoan, mockERC20, mockBookKeeper, mockStablecoinAdapter }
+  return {
+    flashMintModule,
+    mockAlpacaStablecoin,
+    mockMyFashLoan,
+    mockERC20,
+    mockBookKeeper,
+    mockStablecoinAdapter,
+    mockedCollateralPoolConfig,
+    mockedAccessControlConfig,
+  }
 }
 
 describe("FlashMintModule", () => {
@@ -70,13 +85,23 @@ describe("FlashMintModule", () => {
   let mockMyFashLoan: MockContract
   let mockBookKeeper: MockContract
   let mockStablecoinAdapter: MockContract
+  let mockedAccessControlConfig: MockContract
+  let mockedCollateralPoolConfig: MockContract
 
   let flashMintModule: FlashMintModule
   let flashMintModuleAsAlice: FlashMintModule
 
   beforeEach(async () => {
-    ;({ flashMintModule, mockAlpacaStablecoin, mockMyFashLoan, mockERC20, mockBookKeeper, mockStablecoinAdapter } =
-      await waffle.loadFixture(loadFixtureHandler))
+    ;({
+      flashMintModule,
+      mockAlpacaStablecoin,
+      mockMyFashLoan,
+      mockERC20,
+      mockBookKeeper,
+      mockStablecoinAdapter,
+      mockedCollateralPoolConfig,
+      mockedAccessControlConfig,
+    } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress] = await Promise.all([deployer.getAddress(), alice.getAddress()])
 
@@ -85,16 +110,24 @@ describe("FlashMintModule", () => {
   describe("#setMax", () => {
     context("when the caller is not the owner", () => {
       it("should be revert", async () => {
+        mockBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
+
         await expect(flashMintModuleAsAlice.setMax(WeiPerWad.mul(100))).to.be.revertedWith("!ownerRole")
       })
     })
     context("when the caller is the owner", () => {
       it("should be able setMax", async () => {
+        mockBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
         const maxBefore = await flashMintModule.max()
         expect(maxBefore).to.be.equal(0)
 
         await expect(flashMintModule.setMax(WeiPerWad.mul(100)))
-          .to.be.emit(flashMintModule, "SetMax")
+          .to.be.emit(flashMintModule, "LogSetMax")
           .withArgs(WeiPerWad.mul(100))
 
         const maxAfter = await flashMintModule.max()
@@ -105,16 +138,24 @@ describe("FlashMintModule", () => {
   describe("#setFeeRate", () => {
     context("when the caller is not the owner", () => {
       it("should be revert", async () => {
+        mockBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
+
         await expect(flashMintModuleAsAlice.setFeeRate(WeiPerWad.div(10))).to.be.revertedWith("!ownerRole")
       })
     })
     context("when the caller is the owner", () => {
       it("should be able setFeeRate", async () => {
+        mockBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
+        mockBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
         const maxBefore = await flashMintModule.feeRate()
         expect(maxBefore).to.be.equal(0)
 
         await expect(flashMintModule.setFeeRate(WeiPerWad.div(10)))
-          .to.be.emit(flashMintModule, "SetFeeRate")
+          .to.be.emit(flashMintModule, "LogSetFeeRate")
           .withArgs(WeiPerWad.div(10))
 
         const maxAfter = await flashMintModule.feeRate()
@@ -189,13 +230,13 @@ describe("FlashMintModule", () => {
             WeiPerWad.mul(10),
             formatBytes32String("")
           )
-        ).to.be.emit(flashMintModule, "FlashLoan")
+        ).to.be.emit(flashMintModule, "LogFlashLoan")
 
         const { calls: bookKeeperMinUnbackStablecoinCalls } = mockBookKeeper.smocked.mintUnbackedStablecoin
         expect(bookKeeperMinUnbackStablecoinCalls.length).to.be.equal(1)
-        expect(bookKeeperMinUnbackStablecoinCalls[0].from).to.be.equal(flashMintModule.address)
-        expect(bookKeeperMinUnbackStablecoinCalls[0].to).to.be.equal(flashMintModule.address)
-        expect(bookKeeperMinUnbackStablecoinCalls[0].value).to.be.equal(WeiPerRad.mul(10))
+        expect(bookKeeperMinUnbackStablecoinCalls[0]._from).to.be.equal(flashMintModule.address)
+        expect(bookKeeperMinUnbackStablecoinCalls[0]._to).to.be.equal(flashMintModule.address)
+        expect(bookKeeperMinUnbackStablecoinCalls[0]._value).to.be.equal(WeiPerRad.mul(10))
 
         const { calls: stablecoinAdapterWithdrawCalls } = mockStablecoinAdapter.smocked.withdraw
         expect(stablecoinAdapterWithdrawCalls.length).to.be.equal(1)
@@ -204,9 +245,9 @@ describe("FlashMintModule", () => {
 
         const { calls: stablecoinTranferFromCalls } = mockAlpacaStablecoin.smocked.transferFrom
         expect(stablecoinTranferFromCalls.length).to.be.equal(1)
-        expect(stablecoinTranferFromCalls[0].src).to.be.equal(mockMyFashLoan.address)
-        expect(stablecoinTranferFromCalls[0].dst).to.be.equal(flashMintModule.address)
-        expect(stablecoinTranferFromCalls[0].wad).to.be.equal(WeiPerWad.mul(11))
+        expect(stablecoinTranferFromCalls[0]._src).to.be.equal(mockMyFashLoan.address)
+        expect(stablecoinTranferFromCalls[0]._dst).to.be.equal(flashMintModule.address)
+        expect(stablecoinTranferFromCalls[0]._wad).to.be.equal(WeiPerWad.mul(11))
 
         const { calls: stablecoinAdapterDepositCalls } = mockStablecoinAdapter.smocked.deposit
         expect(stablecoinAdapterDepositCalls.length).to.be.equal(1)
@@ -215,7 +256,7 @@ describe("FlashMintModule", () => {
 
         const { calls: bookKeeperSettleSystemBadDebtCalls } = mockBookKeeper.smocked.settleSystemBadDebt
         expect(bookKeeperSettleSystemBadDebtCalls.length).to.be.equal(1)
-        expect(bookKeeperSettleSystemBadDebtCalls[0].value).to.be.equal(WeiPerRad.mul(10))
+        expect(bookKeeperSettleSystemBadDebtCalls[0]._value).to.be.equal(WeiPerRad.mul(10))
       })
     })
   })
@@ -257,17 +298,17 @@ describe("FlashMintModule", () => {
         )
         await expect(
           flashMintModule.bookKeeperFlashLoan(mockMyFashLoan.address, WeiPerRad.mul(10), formatBytes32String(""))
-        ).to.be.emit(flashMintModule, "BookKeeperFlashLoan")
+        ).to.be.emit(flashMintModule, "LogBookKeeperFlashLoan")
 
         const { calls: bookKeeperMinUnbackStablecoinCalls } = mockBookKeeper.smocked.mintUnbackedStablecoin
         expect(bookKeeperMinUnbackStablecoinCalls.length).to.be.equal(1)
-        expect(bookKeeperMinUnbackStablecoinCalls[0].from).to.be.equal(flashMintModule.address)
-        expect(bookKeeperMinUnbackStablecoinCalls[0].to).to.be.equal(mockMyFashLoan.address)
-        expect(bookKeeperMinUnbackStablecoinCalls[0].value).to.be.equal(WeiPerRad.mul(10))
+        expect(bookKeeperMinUnbackStablecoinCalls[0]._from).to.be.equal(flashMintModule.address)
+        expect(bookKeeperMinUnbackStablecoinCalls[0]._to).to.be.equal(mockMyFashLoan.address)
+        expect(bookKeeperMinUnbackStablecoinCalls[0]._value).to.be.equal(WeiPerRad.mul(10))
 
         const { calls: bookKeeperSettleSystemBadDebtCalls } = mockBookKeeper.smocked.settleSystemBadDebt
         expect(bookKeeperSettleSystemBadDebtCalls.length).to.be.equal(1)
-        expect(bookKeeperSettleSystemBadDebtCalls[0].value).to.be.equal(WeiPerRad.mul(10))
+        expect(bookKeeperSettleSystemBadDebtCalls[0]._value).to.be.equal(WeiPerRad.mul(10))
       })
     })
   })
