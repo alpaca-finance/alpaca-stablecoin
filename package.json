@@ -1,8 +1,11 @@
 {
   "name": "@alpaca-finance/alpaca-stablecoin",
-  "version": "0.0.1",
+  "version": "0.0.1-alpha",
   "scripts": {
     "hardhat": "hardhat",
+    "prepublish": "yarn build",
+    "build": "yarn run build:cjs",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
     "compile": "hardhat typechain --config hardhat.config.ts",
     "mainnet": "hardhat console --no-compile --network mainnet",
     "test:case": "mocha --require hardhat/register --extension ts -g",
