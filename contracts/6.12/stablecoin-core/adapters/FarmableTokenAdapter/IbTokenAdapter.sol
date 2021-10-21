@@ -347,14 +347,14 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
       require(int256(_share) > 0, "IbTokenAdapter/share-overflow");
-      require(stake[_positionAddress] >= _share, "IbTokenAdapter/insufficient staked amount");
+      require(stake[msg.sender] >= _share, "IbTokenAdapter/insufficient staked amount");
 
       address(collateralToken).safeTransfer(_user, _amount);
-      bookKeeper.addCollateral(collateralPoolId, _positionAddress, -int256(_share));
+      bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_share));
       totalShare = sub(totalShare, _share);
-      stake[_positionAddress] = sub(stake[_positionAddress], _share);
+      stake[msg.sender] = sub(stake[msg.sender], _share);
     }
-    rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
+    rewardDebts[msg.sender] = rmulup(stake[msg.sender], accRewardPerShare);
     emit LogWithdraw(_amount);
   }
 
