@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const LIQUIDATION_ENGINE_ADDR = ""
+  const LIQUIDATION_ENGINE_ADDR = "0x4E4d4775889f25f3CdCa0fA4917D8C7907289049"
 
   const config = ConfigEntity.getConfig()
 
@@ -23,7 +23,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     config.AccessControlConfig.address,
     (await ethers.getSigners())[0]
   )
-  console.log(">> Grant LIQUIDATION_ENGINE_ROLE")
+  console.log(`>> Grant LIQUIDATION_ENGINE_ROLE address: ${LIQUIDATION_ENGINE_ADDR}`)
   await accessContralConfig.grantRole(await accessContralConfig.LIQUIDATION_ENGINE_ROLE(), LIQUIDATION_ENGINE_ADDR)
   console.log("✅ Done")
 }
