@@ -17,6 +17,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import "@alpaca-finance/alpaca-contract/contracts/6/protocol/apis/pancake/IPancakeRouter02.sol";
 
@@ -154,7 +155,7 @@ contract LPTokenAutoDebtRepayAdapter is
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     // 2. Sanity checks
-    (IERC20 _stakeToken, , , ) = IPancakeMasterChef(_masterChef).poolInfo(_pid);
+    (IERC20Upgradeable _stakeToken, , , ) = IPancakeMasterChef(_masterChef).poolInfo(_pid);
     require(address(_stakeToken) == _collateralToken, "LPTokenAutoCompoundAdapter/collateralToken-not-match");
 
     masterChef = IPancakeMasterChef(_masterChef);
