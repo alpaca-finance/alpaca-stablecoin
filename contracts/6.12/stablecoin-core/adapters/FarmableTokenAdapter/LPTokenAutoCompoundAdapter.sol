@@ -154,7 +154,10 @@ contract LPTokenAutoCompoundAdapter is
     // 2. Sanity checks
     (IERC20Upgradeable _stakeToken, , , ) = IPancakeMasterChef(_masterChef).poolInfo(_pid);
     require(address(_stakeToken) == _collateralToken, "LPTokenAutoCompoundAdapter/collateralToken-not-match");
-
+    require(
+      IPancakeMasterChef(_masterChef).cake() == _rewardToken,
+      "LPTokenAutoCompoundAdapter/reward-token-not-match"
+    );
     masterChef = IPancakeMasterChef(_masterChef);
     pid = _pid;
 

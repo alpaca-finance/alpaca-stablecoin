@@ -44,9 +44,11 @@ import {
   WETH,
   PancakeMasterChef__factory,
   CakeToken__factory,
+  CakeToken,
   SyrupBar__factory,
   PancakeswapV2RestrictedStrategyAddBaseTokenOnly,
   PancakeswapV2RestrictedStrategyAddBaseTokenOnly__factory,
+  PancakeMasterChef,
 } from "@alpaca-finance/alpaca-contract/typechain"
 import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../../../helper/unit"
@@ -67,6 +69,12 @@ type fixture = {
   simplePriceFeed: SimplePriceFeed
   systemDebtEngine: SystemDebtEngine
   collateralPoolConfig: CollateralPoolConfig
+  cake: CakeToken
+  masterChef: PancakeMasterChef
+  router: PancakeRouterV2
+  addStrat: PancakeswapV2RestrictedStrategyAddBaseTokenOnly
+  lpToken: PancakePair
+  lpTokenAutoCompoundAdapter: LPTokenAutoCompoundAdapter
 }
 
 const COLLATERAL_POOL_ID = formatBytes32String("BUSD-AUSD PCS")
@@ -163,16 +171,13 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   )
   await lpToken.deployed()
 
-  const CakeToken = (await ethers.getContractFactory("CakeToken", deployer)) as CakeToken__factory
+  const CakeToken = new CakeToken__factory(deployer)
   const cake = await CakeToken.deploy()
-  const SyrupBar = (await ethers.getContractFactory("SyrupBar", deployer)) as SyrupBar__factory
+  const SyrupBar = new SyrupBar__factory(deployer)
   const syrup = await SyrupBar.deploy(cake.address)
 
   /// Setup MasterChef
-  const PancakeMasterChef = (await ethers.getContractFactory(
-    "PancakeMasterChef",
-    deployer
-  )) as PancakeMasterChef__factory
+  const PancakeMasterChef = new PancakeMasterChef__factory(deployer)
   const masterChef = await PancakeMasterChef.deploy(
     cake.address,
     syrup.address,
@@ -180,6 +185,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     CAKE_REWARD_PER_BLOCK,
     0
   )
+  await masterChef.add(1, lpToken.address, true)
 
   const PancakeswapV2RestrictedStrategyAddBaseTokenOnly = (await ethers.getContractFactory(
     "PancakeswapV2RestrictedStrategyAddBaseTokenOnly",
@@ -200,7 +206,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     lpToken.address,
     cake.address,
     masterChef.address,
-    0,
+    1,
     TREASURY_FEE_BPS,
     deployer.address,
     positionManager.address,
@@ -210,6 +216,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   ])) as LPTokenAutoCompoundAdapter
   await lpTokenAutoCompoundAdapter.deployed()
   await addStrat.setWorkersOk([lpTokenAutoCompoundAdapter.address], true)
+  console.log("lpTokenAutoCompoundAdapter")
 
   await collateralPoolConfig.initCollateralPool(
     COLLATERAL_POOL_ID,
@@ -257,6 +264,12 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     simplePriceFeed,
     systemDebtEngine,
     collateralPoolConfig,
+    cake,
+    masterChef,
+    router,
+    addStrat,
+    lpToken,
+    lpTokenAutoCompoundAdapter,
   }
 }
 
@@ -284,18 +297,18 @@ describe("LPTokenAutoCompoundAdapter", () => {
 
   let stablecoinAdapter: StablecoinAdapter
   let bookKeeper: BookKeeper
-
   let positionManager: PositionManager
-
   let alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions
-
   let alpacaStablecoin: AlpacaStablecoin
-
   let simplePriceFeed: SimplePriceFeed
-
   let systemDebtEngine: SystemDebtEngine
-
   let collateralPoolConfig: CollateralPoolConfig
+  let cake: CakeToken
+  let masterChef: PancakeMasterChef
+  let router: PancakeRouterV2
+  let addStrat: PancakeswapV2RestrictedStrategyAddBaseTokenOnly
+  let lpToken: PancakePair
+  let lpTokenAutoCompoundAdapter: LPTokenAutoCompoundAdapter
 
   // Signer
 
@@ -316,6 +329,12 @@ describe("LPTokenAutoCompoundAdapter", () => {
       simplePriceFeed,
       systemDebtEngine,
       collateralPoolConfig,
+      cake,
+      router,
+      addStrat,
+      masterChef,
+      lpToken,
+      lpTokenAutoCompoundAdapter,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
@@ -326,5 +345,71 @@ describe("LPTokenAutoCompoundAdapter", () => {
     ])
     proxyWalletRegistryAsAlice = ProxyWalletRegistry__factory.connect(proxyWalletRegistry.address, alice)
     proxyWalletRegistryAsBob = ProxyWalletRegistry__factory.connect(proxyWalletRegistry.address, bob)
+  })
+
+  describe("#initialize", async () => {
+    context("when collateralToken not match with FairLaunch", async () => {
+      it("should revert", async () => {
+        const LPTokenAutoCompoundAdapter = (await ethers.getContractFactory(
+          "LPTokenAutoCompoundAdapter",
+          deployer
+        )) as LPTokenAutoCompoundAdapter__factory
+        await expect(
+          upgrades.deployProxy(LPTokenAutoCompoundAdapter, [
+            bookKeeper.address,
+            COLLATERAL_POOL_ID,
+            cake.address,
+            cake.address,
+            masterChef.address,
+            1,
+            BigNumber.from(1000),
+            deployerAddress,
+            positionManager.address,
+            router.address,
+            cake.address,
+            addStrat.address,
+          ])
+        ).to.be.revertedWith("LPTokenAutoCompoundAdapter/collateralToken-not-match")
+      })
+    })
+
+    context("when rewardToken not match with FairLaunch", async () => {
+      it("should revert", async () => {
+        const LPTokenAutoCompoundAdapter = (await ethers.getContractFactory(
+          "LPTokenAutoCompoundAdapter",
+          deployer
+        )) as LPTokenAutoCompoundAdapter__factory
+        await expect(
+          upgrades.deployProxy(LPTokenAutoCompoundAdapter, [
+            bookKeeper.address,
+            COLLATERAL_POOL_ID,
+            lpToken.address,
+            lpToken.address,
+            masterChef.address,
+            1,
+            BigNumber.from(1000),
+            deployerAddress,
+            positionManager.address,
+            router.address,
+            cake.address,
+            addStrat.address,
+          ])
+        ).to.be.revertedWith("LPTokenAutoCompoundAdapter/reward-token-not-match")
+      })
+    })
+
+    context("when all assumptions are correct", async () => {
+      it("should initalized correctly", async () => {
+        expect(await lpTokenAutoCompoundAdapter.bookKeeper()).to.be.eq(bookKeeper.address)
+        expect(await lpTokenAutoCompoundAdapter.collateralPoolId()).to.be.eq(COLLATERAL_POOL_ID)
+        expect(await lpTokenAutoCompoundAdapter.collateralToken()).to.be.eq(lpToken.address)
+        expect(await lpTokenAutoCompoundAdapter.masterChef()).to.be.eq(masterChef.address)
+        expect(await lpTokenAutoCompoundAdapter.pid()).to.be.eq(1)
+        expect(await lpTokenAutoCompoundAdapter.decimals()).to.be.eq(18)
+        expect(await lpTokenAutoCompoundAdapter.router()).to.be.eq(router.address)
+        expect(await lpTokenAutoCompoundAdapter.baseToken()).to.be.eq(alpacaStablecoin.address)
+        expect(await lpTokenAutoCompoundAdapter.addStrat()).to.be.eq(addStrat.address)
+      })
+    })
   })
 })
