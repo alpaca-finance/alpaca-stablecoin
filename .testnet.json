@@ -1,15 +1,92 @@
 {
     "Timelock": "",
-    "CollateralPoolConfig": {
-        "address": ""
+    "ProxyWalletFactory": {
+        "address": "0xd065FD43827dc3289F089767397aaE13C77826f8"
+    },
+    "ProxyWalletRegistry": {
+        "address": "0x0407b60E295C3Cf197ec4ec3901eC87Cc220694a"
+    },
+    "AlpacaStablecoinProxyActions": {
+        "address": "0x3D43b54E0A11df2a374f69035C523B7E3a8ed3bF"
     },
     "AccessControlConfig": {
-        "address": ""
+        "address": "0xAa672FD36f2323a2bA10CD43F4F7D55De27B33Be"
+    },
+    "AlpacaStablecoin": {
+        "AUSD": {
+            "address": "0x64c12ac760463FF3B6849FC1ab22Fe8D1c6e06de"
+        }
+    },
+    "CollateralPoolConfig": {
+        "address": "0xB63D363B9010e0cA047AC66740D2313493D36EBb",
+        "collateralPools": [
+            {
+                "collateralPoolId": "ibBUSD",
+                "debtCeiling": "1000000000000000000000000000000000000000000000000",
+                "debtFloor": "1000000000000000000000000000000000000000000000",
+                "priceFeed": {
+                    "address": "0xf8210Fd8a21752aEa1FeE8F64c2BBaf9e304A37a"
+                },
+                "liquidationRatio": "1000000000000000000000000000",
+                "stabilityFeeRate": "1000000000000000000000000000",
+                "adapter": {
+                    "address": "0xF4ecba29De9Cb7c127E2fB870d560B35CEC73A5c"
+                },
+                "closeFactorBps": "5000",
+                "liquidatorIncentiveBps": "10250",
+                "treasuryFeeBps": "5000",
+                "strategy": "0x4E4d4775889f25f3CdCa0fA4917D8C7907289049"
+              }
+        ]
     },
     "BookKeeper": {
-        "address": ""
+        "address": "0xA2724038a28E59e57f98cE9cB31Be858a571ddA9"
     },
     "FlashMintModule": {
         "address": ""
+    },
+    "ShowStopper": {
+        "address": "0x90b66Eb2519D1CEd7Be665a707A2Ee181FC97c84"
+    },
+    "PositionManager": {
+        "address": "0xDd2059159736A585c534d2Af1cb3221A41A7177a"
+    },
+    "GetPositions": {
+        "address": ""
+    },
+    "StabilityFeeCollector": {
+        "address": "0x1893518Ca56DE75b7021e83eDff2eB511e021a36"
+    },
+    "PriceOracle": {
+        "address": "0x674684fa12041e0Fe8C5fC60B2591EfE121118D5"
+    },
+    "IbTokenAdapters": [
+        {
+            "address": "0xF4ecba29De9Cb7c127E2fB870d560B35CEC73A5c",
+            "collateralToken": "0xe5ed8148fE4915cE857FC648b9BdEF8Bb9491Fa5",
+            "rewardToken": "0x354b3a11D5Ea2DA89405173977E271F58bE2897D",
+            "treasuryFeeBps": "1000",
+            "treasuryAccount": "0xa96F122f567Df5f4A9978E1e5731acF2f2Fe2ab6"
+        }
+    ],
+    "StablecoinAdapter": [
+        {
+            "address": "0xea1FBaA5C061CF829Da88B3d711f7C2E4C09B9DC",
+            "alpacaStablecoin": "0x64c12ac760463FF3B6849FC1ab22Fe8D1c6e06de"
+        }
+    ],
+    "PriceFeed": [
+        {
+            "address": "0xf8210Fd8a21752aEa1FeE8F64c2BBaf9e304A37a"
+        }
+    ],
+    "SystemDebtEngine": {
+        "address": "0xe5306bb04AC6e32661c6f5E115734158EfD8E558"
+    },
+    "LiquidationEngine": {
+        "address": "0x258FB4237aeefc54a66e0C83373A5Dd0A495eB07"
+    },
+    "Strategies": {
+        "FixedSpreadLiquidationStrategy": "0x4E4d4775889f25f3CdCa0fA4917D8C7907289049"
     }
 }

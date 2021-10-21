@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, upgrades } from "hardhat"
 import { LiquidationEngine__factory } from "../../../../typechain"
+import { ConfigEntity } from "../../../entities"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -14,8 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const BOOK_KEEPER_ADDR = ""
-  const SYSTEM_DEBT_ENGINE_ADDR = ""
+  const config = ConfigEntity.getConfig()
 
   console.log(">> Deploying an upgradable LiquidationEngine contract")
   const LiquidationEngine = (await ethers.getContractFactory(
@@ -24,7 +24,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       await ethers.getSigners()
     )[0]
   )) as LiquidationEngine__factory
-  const liquidationEngine = await upgrades.deployProxy(LiquidationEngine, [BOOK_KEEPER_ADDR, SYSTEM_DEBT_ENGINE_ADDR])
+  const liquidationEngine = await upgrades.deployProxy(LiquidationEngine, [
+    config.BookKeeper.address,
+    config.SystemDebtEngine.address,
+  ])
   await liquidationEngine.deployed()
   console.log(`>> Deployed at ${liquidationEngine.address}`)
 }

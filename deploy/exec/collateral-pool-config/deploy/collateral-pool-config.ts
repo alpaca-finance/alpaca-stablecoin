@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, upgrades } from "hardhat"
 import { CollateralPoolConfig__factory } from "../../../../typechain"
+import { ConfigEntity } from "../../../entities"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -14,6 +15,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
+  const config = ConfigEntity.getConfig()
+
   console.log(">> Deploying an upgradable CollateralPoolConfig contract")
   const CollateralPoolConfig = (await ethers.getContractFactory(
     "CollateralPoolConfig",
@@ -21,7 +24,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       await ethers.getSigners()
     )[0]
   )) as CollateralPoolConfig__factory
-  const collateralPoolConfig = await upgrades.deployProxy(CollateralPoolConfig)
+  const collateralPoolConfig = await upgrades.deployProxy(CollateralPoolConfig, [config.AccessControlConfig.address])
   await collateralPoolConfig.deployed()
   console.log(`>> Deployed at ${collateralPoolConfig.address}`)
 }

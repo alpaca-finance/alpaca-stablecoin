@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, upgrades } from "hardhat"
 import { BookKeeper__factory } from "../../../../typechain"
+import { ConfigEntity } from "../../../entities"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -14,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const COLLATERAL_POOL_CONFIG_ADDR = ""
+  const config = ConfigEntity.getConfig()
 
   console.log(">> Deploying an upgradable BookKeeper contract")
   const BookKeeper = (await ethers.getContractFactory(
@@ -23,7 +24,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       await ethers.getSigners()
     )[0]
   )) as BookKeeper__factory
-  const bookKeeper = await upgrades.deployProxy(BookKeeper, [COLLATERAL_POOL_CONFIG_ADDR])
+  const bookKeeper = await upgrades.deployProxy(BookKeeper, [
+    config.CollateralPoolConfig.address,
+    config.AccessControlConfig.address,
+  ])
   await bookKeeper.deployed()
   console.log(`>> Deployed at ${bookKeeper.address}`)
 }

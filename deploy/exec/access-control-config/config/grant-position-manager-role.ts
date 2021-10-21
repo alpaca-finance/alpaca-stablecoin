@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const POSITION_MANAGER_ADDR = ""
+  const POSITION_MANAGER_ADDR = "0xDd2059159736A585c534d2Af1cb3221A41A7177a"
 
   const config = ConfigEntity.getConfig()
 
@@ -23,7 +23,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     config.AccessControlConfig.address,
     (await ethers.getSigners())[0]
   )
-  console.log(">> Grant POSITION_MANAGER_ROLE")
+  console.log(`>> Grant POSITION_MANAGER_ROLE address: ${POSITION_MANAGER_ADDR}`)
   await accessContralConfig.grantRole(await accessContralConfig.POSITION_MANAGER_ROLE(), POSITION_MANAGER_ADDR)
   console.log("✅ Done")
 }

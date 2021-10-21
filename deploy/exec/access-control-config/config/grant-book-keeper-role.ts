@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const BOOK_KEEPER_ADDR = ""
+  const BOOK_KEEPER_ADDR = "0xA2724038a28E59e57f98cE9cB31Be858a571ddA9"
 
   const config = ConfigEntity.getConfig()
 
@@ -23,7 +23,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     config.AccessControlConfig.address,
     (await ethers.getSigners())[0]
   )
-  console.log(">> Grant BOOK_KEEPER_ROLE")
+  console.log(`>> Grant BOOK_KEEPER_ROLE address: ${BOOK_KEEPER_ADDR}`)
   await accessContralConfig.grantRole(await accessContralConfig.BOOK_KEEPER_ROLE(), BOOK_KEEPER_ADDR)
   console.log("✅ Done")
 }

@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, upgrades } from "hardhat"
 import { AlpacaStablecoinProxyActions__factory } from "../../../../../typechain"
+import { ConfigEntity } from "../../../../entities"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -15,16 +16,16 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
 
   console.log(">> Deploying an upgradable AlpacaStablecoinProxyAction contract")
-  const AlpacaStablecoinProxyAction = (await ethers.getContractFactory(
-    "AlpacaStablecoinProxyAction",
+  const AlpacaStablecoinProxyActions = (await ethers.getContractFactory(
+    "AlpacaStablecoinProxyActions",
     (
       await ethers.getSigners()
     )[0]
   )) as AlpacaStablecoinProxyActions__factory
-  const alpacaStablecoinProxyAction = await AlpacaStablecoinProxyAction.deploy()
-  await alpacaStablecoinProxyAction.deployed()
-  console.log(`>> Deployed at ${alpacaStablecoinProxyAction.address}`)
+  const alpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
+  await alpacaStablecoinProxyActions.deployed()
+  console.log(`>> Deployed at ${alpacaStablecoinProxyActions.address}`)
 }
 
 export default func
-func.tags = ["AlpacaStablecoinProxyAction"]
+func.tags = ["AlpacaStablecoinProxyActions"]

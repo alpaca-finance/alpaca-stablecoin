@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, upgrades } from "hardhat"
 import { ProxyWalletRegistry__factory } from "../../../../../typechain"
+import { ConfigEntity } from "../../../../entities"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -14,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const PROXY_WALLET_FACTORY_ADDR = ""
+  const config = ConfigEntity.getConfig()
 
   console.log(">> Deploying an upgradable ProxyWalletRegistry contract")
   const ProxyWalletRegistry = (await ethers.getContractFactory(
@@ -23,7 +24,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       await ethers.getSigners()
     )[0]
   )) as ProxyWalletRegistry__factory
-  const proxyWalletRegistry = await upgrades.deployProxy(ProxyWalletRegistry, [PROXY_WALLET_FACTORY_ADDR])
+  const proxyWalletRegistry = await upgrades.deployProxy(ProxyWalletRegistry, [config.ProxyWalletFactory.address])
   await proxyWalletRegistry.deployed()
   console.log(`>> Deployed at ${proxyWalletRegistry.address}`)
 }

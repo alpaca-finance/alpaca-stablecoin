@@ -2,6 +2,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, upgrades } from "hardhat"
 import { PriceOracle__factory } from "../../../../typechain"
+import { ConfigEntity } from "../../../entities"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -14,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const BOOK_KEEPER_ADDR = ""
+  const config = ConfigEntity.getConfig()
 
   console.log(">> Deploying an upgradable PriceOracle contract")
   const PriceOracle = (await ethers.getContractFactory(
@@ -23,7 +24,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       await ethers.getSigners()
     )[0]
   )) as PriceOracle__factory
-  const priceOracle = await upgrades.deployProxy(PriceOracle, [BOOK_KEEPER_ADDR])
+  const priceOracle = await upgrades.deployProxy(PriceOracle, [config.BookKeeper.address])
   await priceOracle.deployed()
   console.log(`>> Deployed at ${priceOracle.address}`)
 }

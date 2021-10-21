@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const STABILITY_FEE_COLLECTOR_ADDR = ""
+  const STABILITY_FEE_COLLECTOR_ADDR = "0x1893518Ca56DE75b7021e83eDff2eB511e021a36"
 
   const config = ConfigEntity.getConfig()
 
@@ -23,7 +23,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     config.AccessControlConfig.address,
     (await ethers.getSigners())[0]
   )
-  console.log(">> Grant STABILITY_FEE_COLLECTOR_ROLE")
+  console.log(`>> Grant STABILITY_FEE_COLLECTOR_ROLE address: ${STABILITY_FEE_COLLECTOR_ADDR}`)
   await accessContralConfig.grantRole(
     await accessContralConfig.STABILITY_FEE_COLLECTOR_ROLE(),
     STABILITY_FEE_COLLECTOR_ADDR

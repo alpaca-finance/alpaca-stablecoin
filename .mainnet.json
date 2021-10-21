@@ -1,15 +1,48 @@
 {
     "Timelock": "",
-    "CollateralPoolConfig": {
+    "ProxyWalletFactory": {
+        "address": ""
+    },
+    "ProxyWalletRegistry": {
+        "address": ""
+    },
+    "AlpacaStablecoinProxyActions": {
         "address": ""
     },
     "AccessControlConfig": {
+        "address": ""
+    },
+    "AlpacaStablecoin": {
+        "AUSD": {
+            "address": ""
+        }
+    },
+    "CollateralPoolConfig": {
         "address": ""
     },
     "BookKeeper": {
         "address": ""
     },
     "FlashMintModule": {
+        "address": ""
+    },
+    "ShowStopper": {
+        "address": ""
+    },
+    "PositionManager": {
+        "address": ""
+    },
+    "GetPositions": {
+        "address": ""
+    },
+    "PriceOracle": {
+        "address": ""
+    },
+    "Adapters": [],
+    "SystemDebtEngine": {
+        "address": ""
+    },
+    "LiquidationEngine": {
         "address": ""
     }
 }
