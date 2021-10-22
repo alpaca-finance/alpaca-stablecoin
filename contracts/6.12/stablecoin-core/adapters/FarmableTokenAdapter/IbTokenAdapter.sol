@@ -213,8 +213,9 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   function _harvest() internal returns (uint256) {
     if (live == 1) {
       // Withdraw all rewards
+      (, , uint256 _lastRewardBlock, , ) = fairlaunch.poolInfo(pid);
       (uint256 _stakedBalance, , , ) = fairlaunch.userInfo(pid, address(this));
-      if (_stakedBalance > 0) fairlaunch.withdraw(address(this), pid, 0);
+      if (_stakedBalance > 0 && block.number > _lastRewardBlock) fairlaunch.withdraw(address(this), pid, 0);
     }
     return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
   }
@@ -300,7 +301,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     }
     rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
 
-    fairlaunch.deposit(address(this), pid, _amount);
+    if (_amount > 0) fairlaunch.deposit(address(this), pid, _amount);
 
     emit LogDeposit(_amount);
   }
@@ -314,7 +315,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     bytes calldata /* _data */
   ) external override nonReentrant whenNotPaused {
     if (live == 1) {
-      fairlaunch.withdraw(address(this), pid, _amount);
+      if (_amount > 0) fairlaunch.withdraw(address(this), pid, _amount);
     }
     _withdraw(_usr, _amount);
   }
