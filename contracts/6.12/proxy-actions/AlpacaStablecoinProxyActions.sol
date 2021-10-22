@@ -456,13 +456,17 @@ contract AlpacaStablecoinProxyActions {
     uint256 _amount, // [in token decimal]
     bytes calldata _data
   ) public {
+    // Try to decode user address for harvested rewards from calldata
+    // if the user address is not passed, then send zero address to `harvest` and let it handle
+    address _user = address(0);
+    if (_data.length > 0) _user = abi.decode(_data, (address));
     uint256 _amountInWad = convertTo18(_tokenAdapter, _amount);
     // Unlocks token amount from the position
     adjustPosition(_manager, _positionId, -_safeToInt(_amountInWad), 0, _tokenAdapter, _data);
     // Moves the amount from the position to proxy's address
     moveCollateral(_manager, _positionId, address(this), _amountInWad, _tokenAdapter, _data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(_tokenAdapter).withdraw(address(this), _amount, _data);
+    IGenericTokenAdapter(_tokenAdapter).withdraw(msg.sender, _amount, _data);
   }
 
   function withdrawBNB(
@@ -895,7 +899,7 @@ contract AlpacaStablecoinProxyActions {
     // Moves the amount from the position to proxy's address
     moveCollateral(_manager, _positionId, address(this), _collateralAmountInWad, _tokenAdapter, _data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(_tokenAdapter).withdraw(address(this), _collateralAmount, _data);
+    IGenericTokenAdapter(_tokenAdapter).withdraw(msg.sender, _collateralAmount, _data);
   }
 
   function wipeUnlockIbBNBAndCovertToBNB(
@@ -975,7 +979,7 @@ contract AlpacaStablecoinProxyActions {
     // Moves the amount from the position to proxy's address
     moveCollateral(_manager, _positionId, address(this), _collateralAmountInWad, _tokenAdapter, _data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(_tokenAdapter).withdraw(address(this), _collateralAmount, _data);
+    IGenericTokenAdapter(_tokenAdapter).withdraw(msg.sender, _collateralAmount, _data);
   }
 
   function wipeAllUnlockIbBNBAndConvertToBNB(
