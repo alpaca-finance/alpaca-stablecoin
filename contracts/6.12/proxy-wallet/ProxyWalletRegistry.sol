@@ -14,22 +14,18 @@ Alpaca Fin Corporation
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import "./ProxyWallet.sol";
 import "./ProxyWalletFactory.sol";
 
 // This Registry deploys new proxy instances through ProxyWalletFactory.build(address) and keeps a registry of owner => proxy
-contract ProxyWalletRegistry is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract ProxyWalletRegistry is OwnableUpgradeable {
   mapping(address => ProxyWallet) public proxies;
   ProxyWalletFactory factory;
 
   // --- Init ---
   function initialize(address _factory) external initializer {
     OwnableUpgradeable.__Ownable_init();
-    PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
 
     factory = ProxyWalletFactory(_factory);
   }
