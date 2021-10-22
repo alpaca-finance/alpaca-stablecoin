@@ -58,7 +58,6 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
   ILiquidationEngine public liquidationEngine; // Liquidation module
   ISystemDebtEngine public systemDebtEngine; // Recipient of dai raised in auctions
   IPriceOracle public priceOracle; // Collateral price module
-  IManager public positionManager;
 
   uint256 public flashLendingEnabled;
 
@@ -84,7 +83,6 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     uint256 _treasuryFees
   );
 
-  event LogSetPositionManager(address indexed caller, address _positionManager);
   event LogSetFlashLendingEnabled(address indexed caller, uint256 _flashLendingEnabled);
 
   // --- Init ---
@@ -92,8 +90,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     address _bookKeeper,
     address _priceOracle,
     address _liquidationEngine,
-    address _systemDebtEngine,
-    address _positionManager
+    address _systemDebtEngine
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
@@ -109,9 +106,6 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
     ISystemDebtEngine(_systemDebtEngine).surplusBuffer(); // Sanity Check Call
     systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
-
-    IManager(_positionManager).positions(1); // Sanity Check Call
-    positionManager = IManager(_positionManager);
   }
 
   // --- Math ---
@@ -129,13 +123,6 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
   }
 
   // --- Setter ---
-  function setPositionManager(address _positionManager) external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
-    positionManager = IManager(_positionManager);
-    emit LogSetPositionManager(msg.sender, _positionManager);
-  }
-
   function setFlashLendingEnabled(uint256 _flashLendingEnabled) external {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
@@ -307,17 +294,10 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
       -int256(info.collateralAmountToBeLiquidated),
       -int256(info.actualDebtShareToBeLiquidated)
     );
-    address _positionOwnerAddress = positionManager.mapPositionHandlerToOwner(_positionAddress);
-    if (_positionOwnerAddress == address(0)) _positionOwnerAddress = _positionAddress;
     IGenericTokenAdapter _adapter = IGenericTokenAdapter(
       ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getAdapter(_collateralPoolId)
     );
-    _adapter.onMoveCollateral(
-      _positionAddress,
-      address(this),
-      info.collateralAmountToBeLiquidated,
-      abi.encode(_positionOwnerAddress)
-    );
+    _adapter.onMoveCollateral(_positionAddress, address(this), info.collateralAmountToBeLiquidated, abi.encode(0));
 
     // 5. Give the collateral to the collateralRecipient
     bookKeeper.moveCollateral(
@@ -330,18 +310,13 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
       address(this),
       _collateralRecipient,
       info.collateralAmountToBeLiquidated.sub(info.treasuryFees),
-      abi.encode(_positionOwnerAddress)
+      abi.encode(0)
     );
 
     // 6. Give the treasury fees to System Debt Engine to be stored as system surplus
     if (info.treasuryFees > 0) {
       bookKeeper.moveCollateral(_collateralPoolId, address(this), address(systemDebtEngine), info.treasuryFees);
-      _adapter.onMoveCollateral(
-        address(this),
-        address(systemDebtEngine),
-        info.treasuryFees,
-        abi.encode(_positionOwnerAddress)
-      );
+      _adapter.onMoveCollateral(address(this), address(systemDebtEngine), info.treasuryFees, abi.encode(0));
     }
 
     // 7. Do external call (if data is defined) but to be

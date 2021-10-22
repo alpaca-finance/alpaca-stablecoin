@@ -269,7 +269,6 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     priceOracle.address,
     liquidationEngine.address,
     systemDebtEngine.address,
-    positionManager.address,
   ])) as FixedSpreadLiquidationStrategy
   await collateralPoolConfig.setStrategy(COLLATERAL_POOL_ID, fixedSpreadLiquidationStrategy.address)
   await accessControlConfig.grantRole(await accessControlConfig.LIQUIDATION_ENGINE_ROLE(), liquidationEngine.address)
