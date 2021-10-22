@@ -162,6 +162,11 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
   const BUSD = await BEP20.deploy("BUSD", "BUSD")
   await BUSD.deployed()
+  await BUSD.mint(alice.address, ethers.utils.parseEther("100"))
+
+  const TUSD = await BEP20.deploy("TUSD", "TUSD")
+  await TUSD.deployed()
+  await TUSD.mint(alice.address, ethers.utils.parseEther("100"))
 
   /// Setup BUSD-AUSD pair on Pancakeswap
   await factoryV2.createPair(BUSD.address, alpacaStablecoin.address)
@@ -310,6 +315,15 @@ describe("LPTokenAutoCompoundAdapter", () => {
   let lpToken: PancakePair
   let lpTokenAutoCompoundAdapter: LPTokenAutoCompoundAdapter
 
+  let lpTokenAsAlice: PancakePair
+  let lpTokenAsBob: PancakePair
+
+  let lpTokenAutoCompoundAdapterAsAlice: LPTokenAutoCompoundAdapter
+  let lpTokenAutoCompoundAdapterAsBob: LPTokenAutoCompoundAdapter
+
+  let routerAsAlice: PancakeRouterV2
+  let routerAsBob: PancakeRouterV2
+
   // Signer
 
   before(async () => {
@@ -345,6 +359,21 @@ describe("LPTokenAutoCompoundAdapter", () => {
     ])
     proxyWalletRegistryAsAlice = ProxyWalletRegistry__factory.connect(proxyWalletRegistry.address, alice)
     proxyWalletRegistryAsBob = ProxyWalletRegistry__factory.connect(proxyWalletRegistry.address, bob)
+
+    lpTokenAsAlice = PancakePair__factory.connect(lpToken.address, alice)
+    lpTokenAsBob = PancakePair__factory.connect(lpToken.address, bob)
+
+    lpTokenAutoCompoundAdapterAsAlice = LPTokenAutoCompoundAdapter__factory.connect(
+      lpTokenAutoCompoundAdapter.address,
+      alice
+    )
+    lpTokenAutoCompoundAdapterAsBob = LPTokenAutoCompoundAdapter__factory.connect(
+      lpTokenAutoCompoundAdapter.address,
+      bob
+    )
+
+    routerAsAlice = PancakeRouterV2__factory.connect(router.address, alice)
+    routerAsBob = PancakeRouterV2__factory.connect(router.address, bob)
   })
 
   describe("#initialize", async () => {
@@ -411,5 +440,64 @@ describe("LPTokenAutoCompoundAdapter", () => {
         expect(await lpTokenAutoCompoundAdapter.addStrat()).to.be.eq(addStrat.address)
       })
     })
+  })
+
+  describe("#netAssetValuation", async () => {
+    context("when all collateral tokens are deposited by deposit function", async () => {
+      it("should return the correct net asset valuation", async () => {
+        const tokenA = await lpToken.token0()
+        const tokenB = await lpToken.token1()
+        await routerAsAlice.addLiquidity(
+          tokenA,
+          tokenB,
+          ethers.utils.parseEther("100"),
+          ethers.utils.parseEther("100"),
+          0,
+          0,
+          aliceAddress,
+          await TimeHelpers.latest()
+        )
+        await lpTokenAsAlice.approve(lpTokenAutoCompoundAdapter.address, ethers.utils.parseEther("1"))
+        await lpTokenAutoCompoundAdapterAsAlice.deposit(
+          aliceAddress,
+          ethers.utils.parseEther("1"),
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+        )
+
+        expect(await lpTokenAutoCompoundAdapter.netAssetValuation()).to.be.eq(ethers.utils.parseEther("1"))
+
+        await lpTokenAutoCompoundAdapterAsAlice.withdraw(
+          aliceAddress,
+          ethers.utils.parseEther("1"),
+          ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+        )
+        expect(await lpTokenAutoCompoundAdapter.netAssetValuation()).to.be.eq(0)
+      })
+    })
+
+    // context("when some one directly transfer collateral tokens to IbTokenAdapter", async () => {
+    //   it("should only recognized collateral tokens from deposit function", async () => {
+    //     await ibDUMMYasAlice.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+    //     await ibTokenAdapterAsAlice.deposit(
+    //       aliceAddress,
+    //       ethers.utils.parseEther("1"),
+    //       ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+    //     )
+
+    //     await ibDUMMYasBob.transfer(ibTokenAdapter.address, ethers.utils.parseEther("88"))
+
+    //     expect(await ibDUMMY.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("88"))
+    //     expect(await ibTokenAdapter.netAssetValuation()).to.be.eq(ethers.utils.parseEther("1"))
+
+    //     await ibTokenAdapterAsAlice.withdraw(
+    //       aliceAddress,
+    //       ethers.utils.parseEther("1"),
+    //       ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+    //     )
+
+    //     expect(await ibDUMMY.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("88"))
+    //     expect(await ibTokenAdapter.netAssetValuation()).to.be.eq(0)
+    //   })
+    // })
   })
 })
