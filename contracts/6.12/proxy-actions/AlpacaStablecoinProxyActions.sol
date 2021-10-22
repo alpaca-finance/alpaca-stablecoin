@@ -15,6 +15,7 @@ pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "../interfaces/IAlpacaVault.sol";
+import "../interfaces/IAlpacaVaultConfig.sol";
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IWBNB.sol";
 import "../interfaces/IToken.sol";
@@ -26,6 +27,7 @@ import "../interfaces/IStabilityFeeCollector.sol";
 import "../interfaces/IProxyRegistry.sol";
 import "../interfaces/IProxy.sol";
 import "../utils/SafeToken.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 
 /// ==============================
 /// @notice WARNING: These functions meant to be used as a a library for a Proxy.
@@ -35,6 +37,7 @@ import "../utils/SafeToken.sol";
 
 contract AlpacaStablecoinProxyActions {
   using SafeToken for address;
+  using SafeMath for uint256;
 
   uint256 internal constant RAY = 10**27;
 
@@ -904,10 +907,12 @@ contract AlpacaStablecoinProxyActions {
     address _tokenAdapter,
     address _stablecoinAdapter,
     uint256 _positionId,
-    uint256 _collateralAmount, // [wad]
+    uint256 _baseTokenAmount, // [wad]
     uint256 _stablecoinAmount, // [wad]
     bytes calldata _data
   ) external {
+    uint256 _collateralAmount = baseAmountToIbAmount(_baseTokenAmount, _vault);
+
     wipeAndUnlockToken(
       _manager,
       _tokenAdapter,
@@ -926,10 +931,12 @@ contract AlpacaStablecoinProxyActions {
     address _tokenAdapter,
     address _stablecoinAdapter,
     uint256 _positionId,
-    uint256 _collateralAmount, // [token decimal]
+    uint256 _baseTokenAmount, // [wad]
     uint256 _stablecoinAmount, // [wad]
     bytes calldata _data
   ) external {
+    uint256 _collateralAmount = baseAmountToIbAmount(_baseTokenAmount, _vault);
+
     wipeAndUnlockToken(
       _manager,
       _tokenAdapter,
@@ -984,9 +991,11 @@ contract AlpacaStablecoinProxyActions {
     address _tokenAdapter,
     address _stablecoinAdapter,
     uint256 _positionId,
-    uint256 _collateralAmount, // [wad]
+    uint256 _baseTokenAmount, // [wad]
     bytes calldata _data
   ) external {
+    uint256 _collateralAmount = baseAmountToIbAmount(_baseTokenAmount, _vault);
+
     wipeAllAndUnlockToken(_manager, _tokenAdapter, _stablecoinAdapter, _positionId, _collateralAmount, _data);
     ibBNBToBNB(_vault, _collateralAmount);
   }
@@ -997,9 +1006,11 @@ contract AlpacaStablecoinProxyActions {
     address _tokenAdapter,
     address _stablecoinAdapter,
     uint256 _positionId,
-    uint256 _collateralAmount, // [in token decimal]
+    uint256 _baseTokenAmount, // [wad]
     bytes calldata _data
   ) external {
+    uint256 _collateralAmount = baseAmountToIbAmount(_baseTokenAmount, _vault);
+
     wipeAllAndUnlockToken(_manager, _tokenAdapter, _stablecoinAdapter, _positionId, _collateralAmount, _data);
     ibTokenToToken(_vault, convertTo18(_tokenAdapter, _collateralAmount));
   }
@@ -1023,5 +1034,25 @@ contract AlpacaStablecoinProxyActions {
     bytes calldata _data
   ) external {
     IManager(_manager).redeemLockedCollateral(_positionId, _tokenAdapter, address(this), _data);
+  }
+
+  function alpacaVaultTotalToken(address _vault) internal view returns (uint256) {
+    IAlpacaVault alpacaVault = IAlpacaVault(_vault);
+
+    uint256 reservePool = alpacaVault.reservePool();
+    uint256 vaultDebtVal = alpacaVault.vaultDebtVal();
+    if (now > alpacaVault.lastAccrueTime()) {
+      uint256 interest = alpacaVault.pendingInterest(0);
+      uint256 toReserve = interest.mul(IAlpacaVaultConfig(alpacaVault.config()).getReservePoolBps()).div(10000);
+      reservePool = reservePool.add(toReserve);
+      vaultDebtVal = vaultDebtVal.add(interest);
+    }
+    return alpacaVault.token().balanceOf(address(alpacaVault)).add(vaultDebtVal).sub(reservePool);
+  }
+
+  function baseAmountToIbAmount(uint256 _baseAmount, address _vault) internal view returns (uint256) {
+    IAlpacaVault alpacaVault = IAlpacaVault(_vault);
+
+    return _baseAmount.mul(alpacaVault.totalSupply()).div(alpacaVaultTotalToken(_vault));
   }
 }

@@ -36,4 +36,12 @@ interface IAlpacaVault {
   function token() external view returns (address);
 
   function approve(address spender, uint256 amount) external virtual returns (bool);
+
+  function reservePool() external view returns (uint256);
+
+  function vaultDebtVal() external view returns (uint256);
+
+  function lastAccrueTime() external view returns (uint256);
+
+  function pendingInterest(uint256 value) external view returns (uint256);
 }
