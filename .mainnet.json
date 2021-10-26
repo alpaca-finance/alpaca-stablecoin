@@ -1,48 +1,107 @@
 {
-    "Timelock": "",
-    "ProxyWalletFactory": {
-        "address": ""
-    },
-    "ProxyWalletRegistry": {
-        "address": ""
-    },
-    "AlpacaStablecoinProxyActions": {
-        "address": ""
-    },
-    "AccessControlConfig": {
-        "address": ""
-    },
-    "AlpacaStablecoin": {
-        "AUSD": {
-            "address": ""
-        }
-    },
-    "CollateralPoolConfig": {
-        "address": ""
-    },
-    "BookKeeper": {
-        "address": ""
-    },
-    "FlashMintModule": {
-        "address": ""
-    },
-    "ShowStopper": {
-        "address": ""
-    },
-    "PositionManager": {
-        "address": ""
-    },
-    "GetPositions": {
-        "address": ""
-    },
-    "PriceOracle": {
-        "address": ""
-    },
-    "Adapters": [],
-    "SystemDebtEngine": {
-        "address": ""
-    },
-    "LiquidationEngine": {
-        "address": ""
+  "Timelock": "",
+  "ProxyWalletFactory": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "ProxyWalletRegistry": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "AlpacaStablecoinProxyActions": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "AccessControlConfig": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "AlpacaStablecoin": {
+    "AUSD": {
+      "address": "",
+      "deployedBlock": 0
     }
+  },
+  "CollateralPoolConfig": {
+    "address": "",
+    "deployedBlock": 0,
+    "collateralPools": [
+      {
+        "collateralPoolId": "",
+        "debtCeiling": "",
+        "debtFloor": "",
+        "priceFeed": {
+          "address": ""
+        },
+        "liquidationRatio": "",
+        "stabilityFeeRate": "",
+        "adapter": {
+          "address": ""
+        },
+        "closeFactorBps": "",
+        "liquidatorIncentiveBps": "",
+        "treasuryFeeBps": "",
+        "strategy": ""
+      }
+    ]
+  },
+  "BookKeeper": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "FlashMintModule": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "ShowStopper": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "PositionManager": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "GetPositions": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "StabilityFeeCollector": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "IbTokenAdapters": [
+    {
+      "address": "",
+      "deployedBlock": 0,
+      "collateralToken": "",
+      "rewardToken": "",
+      "treasuryFeeBps": "",
+      "treasuryAccount": ""
+    }
+  ],
+  "StablecoinAdapter": [
+    {
+      "address": "",
+      "deployedBlock": 0,
+      "alpacaStablecoin": ""
+    }
+  ],
+  "PriceOracle": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "PriceFeed": [
+    {
+      "address": ""
+    }
+  ],
+  "SystemDebtEngine": {
+    "address": ""
+  },
+  "LiquidationEngine": {
+    "address": ""
+  },
+  "Strategies": {
+    "FixedSpreadLiquidationStrategy": ""
+  }
 }
