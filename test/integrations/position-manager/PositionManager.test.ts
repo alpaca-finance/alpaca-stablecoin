@@ -718,6 +718,8 @@ describe("position manager", () => {
               alpacaStablecoinProxyActions.address,
               convertOpenLockTokenAndDrawCall
             )
+            const txReceipt = await convertOpenLockTokenAndDrawTx.wait()
+            console.log("convertOpenLockTokenAndDrawTx gas used", txReceipt.gasUsed.toString())
 
             const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
             const positionAddress = await positionManager.positions(positionId)
