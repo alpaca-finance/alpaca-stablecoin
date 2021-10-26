@@ -14,7 +14,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  console.log(">> Deploying an upgradable ProxyWalletFactory contract")
+  console.log(">> Deploying a ProxyWalletFactory contract")
   const ProxyWalletFactory = (await ethers.getContractFactory(
     "ProxyWalletFactory",
     (

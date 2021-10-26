@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  console.log(">> Deploying an upgradable AlpacaStablecoinProxyAction contract")
+  console.log(">> Deploying an AlpacaStablecoinProxyAction contract")
   const AlpacaStablecoinProxyActions = (await ethers.getContractFactory(
     "AlpacaStablecoinProxyActions",
     (
