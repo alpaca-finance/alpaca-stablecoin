@@ -9,7 +9,7 @@
     "deployedBlock": 0
   },
   "AlpacaStablecoinProxyActions": {
-    "address": "0x3D43b54E0A11df2a374f69035C523B7E3a8ed3bF",
+    "address": "0x1Fdfc30645A4566793619ad44F49D69c11ef6588",
     "deployedBlock": 0
   },
   "AccessControlConfig": {
@@ -36,12 +36,12 @@
         "liquidationRatio": "1000000000000000000000000000",
         "stabilityFeeRate": "1000000000000000000000000000",
         "adapter": {
-          "address": "0xF4ecba29De9Cb7c127E2fB870d560B35CEC73A5c"
+          "address": "0x9017e71E1acEC97c0b0b58b34936834E38F8C63C"
         },
         "closeFactorBps": "5000",
         "liquidatorIncentiveBps": "10250",
         "treasuryFeeBps": "5000",
-        "strategy": "0x4E4d4775889f25f3CdCa0fA4917D8C7907289049"
+        "strategy": "0xf0b7Caa2955df11156690E8f7ad85Cb33B957EDF"
       }
     ]
   },
@@ -71,7 +71,7 @@
   },
   "IbTokenAdapters": [
     {
-      "address": "0xF4ecba29De9Cb7c127E2fB870d560B35CEC73A5c",
+      "address": "0x9017e71E1acEC97c0b0b58b34936834E38F8C63C",
       "deployedBlock": 0,
       "collateralToken": "0xe5ed8148fE4915cE857FC648b9BdEF8Bb9491Fa5",
       "rewardToken": "0x354b3a11D5Ea2DA89405173977E271F58bE2897D",
@@ -102,6 +102,6 @@
     "address": "0x258FB4237aeefc54a66e0C83373A5Dd0A495eB07"
   },
   "Strategies": {
-    "FixedSpreadLiquidationStrategy": "0x4E4d4775889f25f3CdCa0fA4917D8C7907289049"
+    "FixedSpreadLiquidationStrategy": "0xf0b7Caa2955df11156690E8f7ad85Cb33B957EDF"
   }
 }

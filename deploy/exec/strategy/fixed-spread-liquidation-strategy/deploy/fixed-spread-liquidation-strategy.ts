@@ -31,7 +31,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     config.PriceOracle.address,
     config.LiquidationEngine.address,
     config.SystemDebtEngine.address,
-    config.PositionManager.address,
   ])
   await fixedSpreadLiquidationStrategy.deployed()
   console.log(`>> Deployed at ${fixedSpreadLiquidationStrategy.address}`)
