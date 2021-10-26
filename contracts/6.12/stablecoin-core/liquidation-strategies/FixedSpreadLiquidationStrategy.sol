@@ -20,7 +20,6 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
 import "../../interfaces/IBookKeeper.sol";
-import "../../interfaces/IAuctioneer.sol";
 import "../../interfaces/IPriceFeed.sol";
 import "../../interfaces/IPriceOracle.sol";
 import "../../interfaces/ILiquidationEngine.sol";

@@ -60,7 +60,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @dev The token that will get after collateral has been staked
   IToken public rewardToken;
 
-  IManager positionManager;
+  IManager public positionManager;
 
   /// @dev Rewards per collateralToken in RAY
   uint256 public accRewardPerShare;
