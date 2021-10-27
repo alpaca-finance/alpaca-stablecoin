@@ -1781,6 +1781,133 @@ describe("position manager", () => {
         })
       })
     })
+    describe("user adjust position", () => {
+      context("alice convert and lock collateral", () => {
+        it("should be able to adjust position", async () => {
+          // 1.
+          //  a. convert BUSD to ibBUSD
+          //  b. open a new position
+          //  c. lock ibBUSD
+          //  d. mint AUSD
+          const convertOpenLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertOpenLockTokenAndDraw",
+            [
+              vault.address,
+              positionManager.address,
+              stabilityFeeCollector.address,
+              ibTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ibBUSD"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(5),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const convertOpenLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            convertOpenLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const [lockCaollateralBefore, debtShareBefor] = await bookKeeper.positions(
+            ethers.utils.formatBytes32String("ibBUSD"),
+            positionAddress
+          )
+          expect(lockCaollateralBefore).to.be.equal(WeiPerWad.mul(10))
+
+          // 2.
+          //  a. conver BUSD to ibBUSD
+          //  b. lock ibBUSD
+          const convertAndLockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertAndLockToken",
+            [vault.address, positionManager.address, ibTokenAdapter.address, positionId, WeiPerWad.mul(10), true, "0x"]
+          )
+          const convertAndLockTokenTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            convertAndLockTokenCall
+          )
+
+          const [lockCaollateralAfter, debtShareAfter] = await bookKeeper.positions(
+            ethers.utils.formatBytes32String("ibBUSD"),
+            positionAddress
+          )
+          expect(lockCaollateralAfter).to.be.equal(WeiPerWad.mul(20))
+        })
+      })
+      context("alice convert and lock collateral and mint AUSD", () => {
+        it("should be able to adjust position", async () => {
+          // 1.
+          //  a. convert BUSD to ibBUSD
+          //  b. open a new position
+          //  c. lock ibBUSD
+          //  d. mint AUSD
+          const convertOpenLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertOpenLockTokenAndDraw",
+            [
+              vault.address,
+              positionManager.address,
+              stabilityFeeCollector.address,
+              ibTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ibBUSD"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(5),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const convertOpenLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            convertOpenLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const [lockCaollateralBefore, debtShareBefor] = await bookKeeper.positions(
+            ethers.utils.formatBytes32String("ibBUSD"),
+            positionAddress
+          )
+          expect(lockCaollateralBefore).to.be.equal(WeiPerWad.mul(10))
+          expect(debtShareBefor).to.be.equal(WeiPerWad.mul(5))
+
+          // 2.
+          //  a. conver BUSD to ibBUSD
+          //  b. lock ibBUSD
+          //  c. mint AUSD
+
+          const convertLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertLockTokenAndDraw",
+            [
+              vault.address,
+              positionManager.address,
+              stabilityFeeCollector.address,
+              ibTokenAdapter.address,
+              stablecoinAdapter.address,
+              positionId,
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(5),
+              true,
+              "0x",
+            ]
+          )
+          const convertLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            convertLockTokenAndDrawCall
+          )
+
+          const [lockCaollateralAfter, debtShareAfter] = await bookKeeper.positions(
+            ethers.utils.formatBytes32String("ibBUSD"),
+            positionAddress
+          )
+          expect(lockCaollateralAfter).to.be.equal(WeiPerWad.mul(20))
+          expect(debtShareAfter).to.be.equal(WeiPerWad.mul(10))
+        })
+      })
+    })
   })
 
   describe("BNB collateral pool", () => {
