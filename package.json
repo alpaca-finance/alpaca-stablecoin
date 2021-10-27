@@ -104,6 +104,8 @@
     "test:integrations:stableswapmodule": "hardhat test --no-compile ./test/integrations/stablecoin-core/StableSwapModule.test.ts",
     "test:integrations:flashmintmodule": "hardhat test --no-compile ./test/integrations/flash-mint/FlashMintModule.test.ts",
     "test:integrations:flashliquidation": "hardhat test --no-compile ./test/units/stablecoin-core/FlashLiquidation.test.ts",
+    "script:testnet:validate-config": "hardhat --network testnet run --no-compile ./scripts/validate-config.ts",
+    "script:mainnet:validate-config": "hardhat --network mainnet run --no-compile ./scripts/validate-config.ts",
     "coverage": "hardhat coverage",
     "solhint": "./node_modules/.bin/solhint -f table contracts/**/*.sol",
     "prettier:solidity": "./node_modules/.bin/prettier --write contracts/**/*.sol"

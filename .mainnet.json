@@ -30,17 +30,13 @@
         "collateralPoolId": "",
         "debtCeiling": "",
         "debtFloor": "",
-        "priceFeed": {
-          "address": ""
-        },
+        "priceFeed": "",
         "liquidationRatio": "",
         "stabilityFeeRate": "",
-        "adapter": {
-          "address": ""
-        },
-        "closeFactorBps": "",
-        "liquidatorIncentiveBps": "",
-        "treasuryFeeBps": "",
+        "adapter": "",
+        "closeFactorBps": 0,
+        "liquidatorIncentiveBps": 0,
+        "treasuryFeesBps": 0,
         "strategy": ""
       }
     ]
@@ -79,7 +75,7 @@
       "treasuryAccount": ""
     }
   ],
-  "StablecoinAdapter": [
+  "StablecoinAdapters": [
     {
       "address": "",
       "deployedBlock": 0,
@@ -92,16 +88,20 @@
   },
   "PriceFeed": [
     {
-      "address": ""
+      "address": "",
+      "deployedBlock": 0
     }
   ],
   "SystemDebtEngine": {
-    "address": ""
+    "address": "",
+    "deployedBlock": 0
   },
   "LiquidationEngine": {
-    "address": ""
+    "address": "",
+    "deployedBlock": 0
   },
   "Strategies": {
-    "FixedSpreadLiquidationStrategy": ""
+    "FixedSpreadLiquidationStrategy": "",
+    "deployedBlock": 0
   }
 }

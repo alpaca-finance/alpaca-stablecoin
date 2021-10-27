@@ -30,17 +30,13 @@
         "collateralPoolId": "ibBUSD",
         "debtCeiling": "1000000000000000000000000000000000000000000000000",
         "debtFloor": "1000000000000000000000000000000000000000000000",
-        "priceFeed": {
-          "address": "0xf8210Fd8a21752aEa1FeE8F64c2BBaf9e304A37a"
-        },
+        "priceFeed": "0xf8210Fd8a21752aEa1FeE8F64c2BBaf9e304A37a",
         "liquidationRatio": "1000000000000000000000000000",
         "stabilityFeeRate": "1000000000000000000000000000",
-        "adapter": {
-          "address": "0x9017e71E1acEC97c0b0b58b34936834E38F8C63C"
-        },
-        "closeFactorBps": "5000",
-        "liquidatorIncentiveBps": "10250",
-        "treasuryFeeBps": "5000",
+        "adapter": "0x9017e71E1acEC97c0b0b58b34936834E38F8C63C",
+        "closeFactorBps": 5000,
+        "liquidatorIncentiveBps": 10250,
+        "treasuryFeesBps": 5000,
         "strategy": "0xf0b7Caa2955df11156690E8f7ad85Cb33B957EDF"
       }
     ]
@@ -79,7 +75,7 @@
       "treasuryAccount": "0xa96F122f567Df5f4A9978E1e5731acF2f2Fe2ab6"
     }
   ],
-  "StablecoinAdapter": [
+  "StablecoinAdapters": [
     {
       "address": "0xea1FBaA5C061CF829Da88B3d711f7C2E4C09B9DC",
       "deployedBlock": 0,
@@ -90,18 +86,59 @@
     "address": "0x674684fa12041e0Fe8C5fC60B2591EfE121118D5",
     "deployedBlock": 0
   },
-  "PriceFeed": [
-    {
-      "address": "0xf8210Fd8a21752aEa1FeE8F64c2BBaf9e304A37a"
+  "PriceFeed": {
+    "AlpacaPriceOraclePriceFeed": [
+      {
+        "address": "",
+        "deployedBlock": 0,
+        "alpacaOracle": "",
+        "token0": "",
+        "token1": ""
+      }
+    ],
+    "StrictAlpacaPriceOraclePriceFeed": [
+      {
+        "address": "",
+        "deployedBlock": 0,
+        "primarySoure": "",
+        "secondary": "",
+        "token0": "",
+        "token1": ""
+      }
+    ],
+    "IbTokenPriceFeed": [
+      {
+        "address": "0xf8210Fd8a21752aEa1FeE8F64c2BBaf9e304A37a",
+        "deployedBlock": 0,
+        "AlpacaPriceOraclePriceFeed": "",
+        "StrictAlpacaPriceOraclePriceFeed": ""
+      }
+    ]
+  },
+  "Oracle": {
+    "ChainLinkOracle": { 
+      "address": "", 
+      "deployedBlock": 0 
+    },
+    "SimpleOracle": { 
+      "address": "", 
+      "deployedBlock": 0 
+    },
+    "DexPriceOracle": {
+      "address": "", 
+      "deployedBlock": 0 
     }
-  ],
+  },
   "SystemDebtEngine": {
-    "address": "0xe5306bb04AC6e32661c6f5E115734158EfD8E558"
+    "address": "0xe5306bb04AC6e32661c6f5E115734158EfD8E558",
+    "deployedBlock": 0
   },
   "LiquidationEngine": {
-    "address": "0x258FB4237aeefc54a66e0C83373A5Dd0A495eB07"
+    "address": "0x258FB4237aeefc54a66e0C83373A5Dd0A495eB07",
+    "deployedBlock": 0
   },
   "Strategies": {
-    "FixedSpreadLiquidationStrategy": "0xf0b7Caa2955df11156690E8f7ad85Cb33B957EDF"
+    "FixedSpreadLiquidationStrategy": "0xf0b7Caa2955df11156690E8f7ad85Cb33B957EDF",
+    "deployedBlock": 0
   }
 }
