@@ -51,6 +51,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   ])
   await ibTokenAdapter.deployed()
   console.log(`>> Deployed at ${ibTokenAdapter.address}`)
+  const tx = await ibTokenAdapter.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

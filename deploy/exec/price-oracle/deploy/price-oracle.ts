@@ -27,6 +27,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const priceOracle = await upgrades.deployProxy(PriceOracle, [config.BookKeeper.address])
   await priceOracle.deployed()
   console.log(`>> Deployed at ${priceOracle.address}`)
+  const tx = await priceOracle.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

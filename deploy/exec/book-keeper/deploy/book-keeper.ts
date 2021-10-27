@@ -30,6 +30,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   ])
   await bookKeeper.deployed()
   console.log(`>> Deployed at ${bookKeeper.address}`)
+  const tx = await bookKeeper.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

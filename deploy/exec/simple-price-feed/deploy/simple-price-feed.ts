@@ -27,6 +27,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const simplePriceFeed = await upgrades.deployProxy(SimplePriceFeed, [config.AccessControlConfig.address])
   await simplePriceFeed.deployed()
   console.log(`>> Deployed at ${simplePriceFeed.address}`)
+  const tx = await simplePriceFeed.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

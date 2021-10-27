@@ -34,6 +34,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   ])
   await fixedSpreadLiquidationStrategy.deployed()
   console.log(`>> Deployed at ${fixedSpreadLiquidationStrategy.address}`)
+  const tx = await fixedSpreadLiquidationStrategy.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

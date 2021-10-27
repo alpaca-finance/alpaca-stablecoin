@@ -27,6 +27,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const getPositions = await upgrades.deployProxy(GetPositions)
   await getPositions.deployed()
   console.log(`>> Deployed at ${getPositions.address}`)
+  const tx = await getPositions.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

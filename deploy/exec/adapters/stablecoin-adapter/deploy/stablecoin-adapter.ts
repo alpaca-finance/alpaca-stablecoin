@@ -29,6 +29,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const stablecoinAdapter = await upgrades.deployProxy(StablecoinAdapter, [config.BookKeeper.address, STABLECOIN_ADDR])
   await stablecoinAdapter.deployed()
   console.log(`>> Deployed at ${stablecoinAdapter.address}`)
+  const tx = await stablecoinAdapter.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

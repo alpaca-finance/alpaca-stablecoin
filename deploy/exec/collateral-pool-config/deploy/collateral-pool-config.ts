@@ -27,6 +27,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const collateralPoolConfig = await upgrades.deployProxy(CollateralPoolConfig, [config.AccessControlConfig.address])
   await collateralPoolConfig.deployed()
   console.log(`>> Deployed at ${collateralPoolConfig.address}`)
+  const tx = await collateralPoolConfig.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

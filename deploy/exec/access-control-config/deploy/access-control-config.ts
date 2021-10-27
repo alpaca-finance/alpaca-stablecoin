@@ -25,6 +25,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const accessControlConfig = await upgrades.deployProxy(AccessControlConfig)
   await accessControlConfig.deployed()
   console.log(`>> Deployed at ${accessControlConfig.address}`)
+  const tx = await accessControlConfig.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

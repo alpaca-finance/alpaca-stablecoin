@@ -40,6 +40,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   ])
   await strictAlpacaOraclePriceFeed.deployed()
   console.log(`>> Deployed at ${strictAlpacaOraclePriceFeed.address}`)
+  const tx = await strictAlpacaOraclePriceFeed.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

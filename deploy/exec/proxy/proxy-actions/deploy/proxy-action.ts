@@ -25,6 +25,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const alpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
   await alpacaStablecoinProxyActions.deployed()
   console.log(`>> Deployed at ${alpacaStablecoinProxyActions.address}`)
+  const tx = await alpacaStablecoinProxyActions.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

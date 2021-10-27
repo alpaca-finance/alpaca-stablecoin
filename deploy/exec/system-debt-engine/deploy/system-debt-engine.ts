@@ -27,6 +27,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const systemDebtEngine = await upgrades.deployProxy(SystemDebtEngine, [config.BookKeeper.address])
   await systemDebtEngine.deployed()
   console.log(`>> Deployed at ${systemDebtEngine.address}`)
+  const tx = await systemDebtEngine.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

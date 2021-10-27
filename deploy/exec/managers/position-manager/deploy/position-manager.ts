@@ -30,6 +30,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   ])
   await positionManager.deployed()
   console.log(`>> Deployed at ${positionManager.address}`)
+  const tx = await positionManager.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

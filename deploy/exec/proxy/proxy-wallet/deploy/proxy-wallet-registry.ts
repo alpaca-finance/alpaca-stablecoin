@@ -27,6 +27,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const proxyWalletRegistry = await upgrades.deployProxy(ProxyWalletRegistry, [config.ProxyWalletFactory.address])
   await proxyWalletRegistry.deployed()
   console.log(`>> Deployed at ${proxyWalletRegistry.address}`)
+  const tx = await proxyWalletRegistry.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

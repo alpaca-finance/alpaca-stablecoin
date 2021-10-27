@@ -30,6 +30,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   ])
   await liquidationEngine.deployed()
   console.log(`>> Deployed at ${liquidationEngine.address}`)
+  const tx = await liquidationEngine.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

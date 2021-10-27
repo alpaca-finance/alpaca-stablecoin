@@ -27,6 +27,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const showStopper = await upgrades.deployProxy(ShowStopper, [config.BookKeeper.address])
   await showStopper.deployed()
   console.log(`>> Deployed at ${showStopper.address}`)
+  const tx = await showStopper.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

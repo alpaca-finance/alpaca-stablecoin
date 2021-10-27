@@ -26,6 +26,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const dexPriceOracle = await upgrades.deployProxy(DexPriceOracle, [DEX_FACTORY_ADDR])
   await dexPriceOracle.deployed()
   console.log(`>> Deployed at ${dexPriceOracle.address}`)
+  const tx = await dexPriceOracle.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func

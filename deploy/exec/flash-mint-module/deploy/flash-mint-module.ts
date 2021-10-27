@@ -30,6 +30,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   ])
   await flashMintModule.deployed()
   console.log(`>> Deployed at ${flashMintModule.address}`)
+  const tx = await flashMintModule.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func
