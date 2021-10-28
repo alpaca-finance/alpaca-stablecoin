@@ -76,13 +76,11 @@
     }
   ],
   "StablecoinAdapters": {
-    "AUSD": [
-      {
-        "address": "",
-        "deployedBlock": 0,
-        "alpacaStablecoin": ""
-      }
-    ]
+    "AUSD": {
+      "address": "",
+      "deployedBlock": 0,
+      "alpacaStablecoin": ""
+    }
   },
   "PriceOracle": {
     "address": "",

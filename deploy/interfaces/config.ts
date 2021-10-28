@@ -96,7 +96,7 @@ export interface StablecoinAdapter {
   alpacaStablecoin: string
 }
 export interface StablecoinAdapters {
-  AUSD: StablecoinAdapter[]
+  AUSD: StablecoinAdapter
 }
 export interface SystemDebtEngine {
   address: string

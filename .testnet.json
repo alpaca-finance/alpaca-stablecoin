@@ -76,13 +76,11 @@
     }
   ],
   "StablecoinAdapters": {
-    "AUSD": [
-      {
-        "address": "0xea1FBaA5C061CF829Da88B3d711f7C2E4C09B9DC",
-        "deployedBlock": 0,
-        "alpacaStablecoin": "0x64c12ac760463FF3B6849FC1ab22Fe8D1c6e06de"
-      }
-    ]
+    "AUSD": {
+      "address": "0xea1FBaA5C061CF829Da88B3d711f7C2E4C09B9DC",
+      "deployedBlock": 0,
+      "alpacaStablecoin": "0x64c12ac760463FF3B6849FC1ab22Fe8D1c6e06de"
+    }
   },
   "PriceOracle": {
     "address": "0x674684fa12041e0Fe8C5fC60B2591EfE121118D5",
@@ -118,17 +116,17 @@
     ]
   },
   "Oracle": {
-    "ChainLinkOracle": { 
-      "address": "", 
-      "deployedBlock": 0 
+    "ChainLinkOracle": {
+      "address": "",
+      "deployedBlock": 0
     },
-    "SimpleOracle": { 
-      "address": "", 
-      "deployedBlock": 0 
+    "SimpleOracle": {
+      "address": "",
+      "deployedBlock": 0
     },
     "DexPriceOracle": {
-      "address": "", 
-      "deployedBlock": 0 
+      "address": "",
+      "deployedBlock": 0
     }
   },
   "SystemDebtEngine": {
