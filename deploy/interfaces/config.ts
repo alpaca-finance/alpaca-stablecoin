@@ -12,7 +12,7 @@ export interface Config {
   PositionManager: PositionManager
   GetPositions: GetPositions
   IbTokenAdapters: IbTokenAdapter[]
-  StablecoinAdapters: StablecoinAdapter[]
+  StablecoinAdapters: StablecoinAdapters
   PriceOracle: PriceOracle
   SystemDebtEngine: SystemDebtEngine
   LiquidationEngine: LiquidationEngine
@@ -94,6 +94,9 @@ export interface StablecoinAdapter {
   address: string
   deployedBlock: number
   alpacaStablecoin: string
+}
+export interface StablecoinAdapters {
+  AUSD: StablecoinAdapter[]
 }
 export interface SystemDebtEngine {
   address: string

@@ -75,13 +75,15 @@
       "treasuryAccount": "0xa96F122f567Df5f4A9978E1e5731acF2f2Fe2ab6"
     }
   ],
-  "StablecoinAdapters": [
-    {
-      "address": "0xea1FBaA5C061CF829Da88B3d711f7C2E4C09B9DC",
-      "deployedBlock": 0,
-      "alpacaStablecoin": "0x64c12ac760463FF3B6849FC1ab22Fe8D1c6e06de"
-    }
-  ],
+  "StablecoinAdapters": {
+    "AUSD": [
+      {
+        "address": "0xea1FBaA5C061CF829Da88B3d711f7C2E4C09B9DC",
+        "deployedBlock": 0,
+        "alpacaStablecoin": "0x64c12ac760463FF3B6849FC1ab22Fe8D1c6e06de"
+      }
+    ]
+  },
   "PriceOracle": {
     "address": "0x674684fa12041e0Fe8C5fC60B2591EfE121118D5",
     "deployedBlock": 0

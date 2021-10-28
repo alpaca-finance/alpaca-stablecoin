@@ -75,13 +75,15 @@
       "treasuryAccount": ""
     }
   ],
-  "StablecoinAdapters": [
-    {
-      "address": "",
-      "deployedBlock": 0,
-      "alpacaStablecoin": ""
-    }
-  ],
+  "StablecoinAdapters": {
+    "AUSD": [
+      {
+        "address": "",
+        "deployedBlock": 0,
+        "alpacaStablecoin": ""
+      }
+    ]
+  },
   "PriceOracle": {
     "address": "",
     "deployedBlock": 0
