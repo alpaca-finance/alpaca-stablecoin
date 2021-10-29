@@ -760,6 +760,82 @@ contract AlpacaStablecoinProxyActions {
     );
   }
 
+  function convertAndLockToken(
+    address _vault,
+    address _manager,
+    address _tokenAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [wad]
+    bool _transferFrom,
+    bytes calldata _data
+  ) public {
+    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _amount));
+    lockToken(_manager, _tokenAdapter, _positionId, _collateralAmount, _transferFrom, _data);
+  }
+
+  function convertLockTokenAndDraw(
+    address _vault,
+    IManager _manager,
+    address _stabilityFeeCollector,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [in token decimal]
+    uint256 _stablecoinAmount, // [wad]
+    bool _transferFrom,
+    bytes calldata _data
+  ) public {
+    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _amount));
+    lockTokenAndDraw(
+      IManager(_manager),
+      _stabilityFeeCollector,
+      _tokenAdapter,
+      _stablecoinAdapter,
+      _positionId,
+      _collateralAmount,
+      _stablecoinAmount,
+      _transferFrom,
+      _data
+    );
+  }
+
+  function convertBNBAndLockToken(
+    address _vault,
+    address _manager,
+    address _tokenAdapter,
+    uint256 _positionId,
+    bool _transferFrom,
+    bytes calldata _data
+  ) public payable {
+    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value);
+    lockToken(_manager, _tokenAdapter, _positionId, _collateralAmount, _transferFrom, _data);
+  }
+
+  function convertBNBLockTokenAndDraw(
+    address _vault,
+    IManager _manager,
+    address _stabilityFeeCollector,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _stablecoinAmount, // [wad]
+    bool _transferFrom,
+    bytes calldata _data
+  ) public payable {
+    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value);
+    lockTokenAndDraw(
+      IManager(_manager),
+      _stabilityFeeCollector,
+      _tokenAdapter,
+      _stablecoinAdapter,
+      _positionId,
+      _collateralAmount,
+      _stablecoinAmount,
+      _transferFrom,
+      _data
+    );
+  }
+
   function convertBNBOpenLockTokenAndDraw(
     address _vault,
     address _manager,
