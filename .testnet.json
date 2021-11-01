@@ -58,7 +58,7 @@
     "deployedBlock": 0
   },
   "GetPositions": {
-    "address": "",
+    "address": "0x768284031dEE9E2D23900a28E5929E590Fc2e329",
     "deployedBlock": 0
   },
   "StabilityFeeCollector": {
