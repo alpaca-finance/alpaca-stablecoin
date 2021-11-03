@@ -1,5 +1,5 @@
-import { ethers, network, upgrades, waffle } from "hardhat"
-import { BigNumber, Contract, ContractReceipt, Event, EventFilter, Signer } from "ethers"
+import { ethers, network, upgrades } from "hardhat"
+import { BigNumber, Signer } from "ethers"
 
 import {
   ProxyWallet,
@@ -54,6 +54,7 @@ import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 import * as TimeHelpers from "../../helper/time"
 import * as AssertHelpers from "../../helper/assert"
 import { AddressZero } from "../../helper/address"
+import { TransactionReceipt } from "@ethersproject/abstract-provider"
 
 type Fixture = {
   positionManager: PositionManager
@@ -740,7 +741,6 @@ describe("position manager", () => {
               positionManager.address,
               ibTokenAdapter.address,
               1,
-              aliceAddress,
               alpacaToken.address,
             ])
             await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestCall)
@@ -1905,6 +1905,106 @@ describe("position manager", () => {
           )
           expect(lockCaollateralAfter).to.be.equal(WeiPerWad.mul(20))
           expect(debtShareAfter).to.be.equal(WeiPerWad.mul(10))
+        })
+      })
+    })
+
+    describe("user openAndLock multiple positions", () => {
+      context("alice openAndLock multiple position and want to claim ALPACA rewards", () => {
+        const open = async (): Promise<TransactionReceipt> => {
+          const convertOpenLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertOpenLockTokenAndDraw",
+            [
+              vault.address,
+              positionManager.address,
+              stabilityFeeCollector.address,
+              ibTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ibBUSD"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(5),
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const convertOpenLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            convertOpenLockTokenAndDrawCall
+          )
+          const txReceipt = await convertOpenLockTokenAndDrawTx.wait()
+          return txReceipt
+        }
+        it("should revert when harvest invalid position id", async () => {
+          const harvestCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("harvest", [
+            positionManager.address,
+            ibTokenAdapter.address,
+            999,
+            alpacaToken.address,
+          ])
+
+          await expect(
+            aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestCall)
+          ).to.be.revertedWith("IbTokenAdapter/harvest-to-address-zero")
+
+          const harvestMultipleCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("harvestMultiple", [
+            positionManager.address,
+            ibTokenAdapter.address,
+            [888, 999],
+            alpacaToken.address,
+          ])
+
+          await expect(
+            aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestMultipleCall)
+          ).to.be.revertedWith("IbTokenAdapter/harvest-to-address-zero")
+        })
+        it("alice should be able to harvest reward one position at a time", async () => {
+          await open()
+
+          // Harvest ALPACA from the position
+          const aliceAlpacaBefore = await alpacaToken.balanceOf(aliceAddress)
+          const proxyWalletAlpacaBefore = await alpacaToken.balanceOf(aliceProxyWallet.address)
+
+          const harvestCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("harvest", [
+            positionManager.address,
+            ibTokenAdapter.address,
+            1,
+            alpacaToken.address,
+          ])
+
+          await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestCall)
+          const aliceAlpacaAfter = await alpacaToken.balanceOf(aliceAddress)
+          const proxyWalletAlpacaAfter = await alpacaToken.balanceOf(aliceProxyWallet.address)
+
+          expect(aliceAlpacaBefore).to.be.equal(ethers.utils.parseEther("100"))
+          expect(aliceAlpacaAfter).to.be.equal(ethers.utils.parseEther("4600"))
+          expect(proxyWalletAlpacaBefore).to.be.equal(0)
+          expect(proxyWalletAlpacaAfter).to.be.equal(0)
+        })
+        it("alice should be able to harvest reward multiple positions at a time", async () => {
+          await open()
+          await open()
+          await open()
+          await open()
+
+          // Harvest ALPACA from the position
+          const aliceAlpacaBefore = await alpacaToken.balanceOf(aliceAddress)
+          const proxyWalletAlpacaBefore = await alpacaToken.balanceOf(aliceProxyWallet.address)
+
+          const harvestMultipleCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("harvestMultiple", [
+            positionManager.address,
+            ibTokenAdapter.address,
+            [1, 2, 3, 4],
+            alpacaToken.address,
+          ])
+
+          await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestMultipleCall)
+          const aliceAlpacaAfter = await alpacaToken.balanceOf(aliceAddress)
+          const proxyWalletAlpacaAfter = await alpacaToken.balanceOf(aliceProxyWallet.address)
+
+          expect(aliceAlpacaBefore).to.be.equal(ethers.utils.parseEther("100"))
+          expect(aliceAlpacaAfter).to.be.equal(ethers.utils.parseEther("18099.999999999982000000"))
+          expect(proxyWalletAlpacaBefore).to.be.equal(0)
+          expect(proxyWalletAlpacaAfter).to.be.equal(0)
         })
       })
     })

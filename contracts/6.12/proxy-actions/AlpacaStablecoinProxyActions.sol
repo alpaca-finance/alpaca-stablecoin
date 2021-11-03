@@ -1088,11 +1088,24 @@ contract AlpacaStablecoinProxyActions {
     address _manager,
     address _tokenAdapter,
     uint256 _positionId,
-    address _harvestTo,
     address _harvestToken
   ) external {
     address _positionAddress = IManager(_manager).positions(_positionId);
-    IGenericTokenAdapter(_tokenAdapter).deposit(_positionAddress, 0, abi.encode(_harvestTo));
+    IGenericTokenAdapter(_tokenAdapter).deposit(_positionAddress, 0, abi.encode());
+    transfer(_harvestToken, msg.sender, _harvestToken.myBalance());
+  }
+
+  function harvestMultiple(
+    address _manager,
+    address _tokenAdapter,
+    uint256[] memory _positionIds,
+    address _harvestToken
+  ) external {
+    for (uint256 i = 0; i < _positionIds.length; i++) {
+      address _positionAddress = IManager(_manager).positions(_positionIds[i]);
+      IGenericTokenAdapter(_tokenAdapter).deposit(_positionAddress, 0, abi.encode());
+    }
+
     transfer(_harvestToken, msg.sender, _harvestToken.myBalance());
   }
 

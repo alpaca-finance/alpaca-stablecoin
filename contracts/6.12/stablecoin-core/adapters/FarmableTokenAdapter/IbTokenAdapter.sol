@@ -226,10 +226,8 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     // 1. Define the address to receive the harvested rewards
     // Give the rewards to the proxy wallet that owns this position address if there is any
     address _harvestTo = positionManager.mapPositionHandlerToOwner(_positionAddress);
-    // if the position owner is not recognized by the position manager,
-    // check if the msg.sender is the owner of this position and harvest to msg.sender.
-    // or else, harvest to _positionAddress
-    if (_harvestTo == address(0)) _harvestTo = msg.sender == _positionAddress ? msg.sender : _positionAddress;
+    // defeault _harvestTo as _positionAddress if not properly defined
+    if (_harvestTo == address(0)) _harvestTo = _positionAddress;
     require(_harvestTo != address(0), "IbTokenAdapter/harvest-to-address-zero");
     // 2. Perform actual harvest. Calculate the new accRewardPerShare.
     if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvest(), totalShare));
