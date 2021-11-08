@@ -33,11 +33,13 @@ contract BandPriceOracle is IAlpacaOracle, Initializable {
     uint64 lastUpdate;
   }
 
-  function initialize(address _stdReferenceProxy) external initializer {
+  function initialize(address _stdReferenceProxy, address _accessControlConfig) external initializer {
     stdReferenceProxy = IStdReference(_stdReferenceProxy);
 
     // sanity check
     stdReferenceProxy.getReferenceData("BUSD", "USD");
+
+    accessControlConfig = IAccessControlConfig(_accessControlConfig);
   }
 
   modifier onlyOwner() {
@@ -54,14 +56,14 @@ contract BandPriceOracle is IAlpacaOracle, Initializable {
 
   /// @dev Return the wad price of token0/token1, multiplied by 1e18
   /// NOTE: (if you have 1 token0 how much you can sell it for token1)
-  function getPrice(address token0, address token1) external view override returns (uint256, uint256) {
-    // solhint-disable not-rely-on-time
-    if (token0 == token1) return (1e18, now);
+  function getPrice(address _token0, address _token1) external view override returns (uint256, uint256) {
+    string memory symbol0 = tokenSymbols[_token0];
+    string memory symbol1 = tokenSymbols[_token1];
 
-    IStdReference.ReferenceData memory priceData = stdReferenceProxy.getReferenceData(
-      tokenSymbols[token0],
-      tokenSymbols[token1]
-    );
+    require(keccak256(bytes(symbol0)) != keccak256(bytes("")), "BandPriceOracle/unknown-token0");
+    require(keccak256(bytes(symbol1)) != keccak256(bytes("")), "BandPriceOracle/unknown-token1");
+
+    IStdReference.ReferenceData memory priceData = stdReferenceProxy.getReferenceData(symbol0, symbol1);
 
     // find min lasteUpdate
     uint256 lastUpdate = priceData.lastUpdatedBase < priceData.lastUpdatedQuote
