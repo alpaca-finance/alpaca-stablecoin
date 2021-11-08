@@ -127,6 +127,14 @@
     "DexPriceOracle": {
       "address": "",
       "deployedBlock": 0
+    },
+    "BandPriceOracle": {
+      "address": "",
+      "deployedBlock": 0,
+      "StdReferenceProxy": {
+        "address": "0xDA7a001b254CD22e46d3eAB04d937489c93174C3",
+        "deployedBlock": 2165210
+      }
     }
   },
   "SystemDebtEngine": {
