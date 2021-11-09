@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
-  ∩~~~~∩ 
-  ξ ･×･ ξ 
-  ξ　~　ξ 
-  ξ　　 ξ 
-  ξ　　 “~～~～〇 
-  ξ　　　　　　 ξ 
-  ξ ξ ξ~～~ξ ξ ξ 
+  ∩~~~~∩
+  ξ ･×･ ξ
+  ξ　~　ξ
+  ξ　　 ξ
+  ξ　　 “~～~～〇
+  ξ　　　　　　 ξ
+  ξ ξ ξ~～~ξ ξ ξ
 　 ξ_ξξ_ξ　ξ_ξξ_ξ
 Alpaca Fin Corporation
 */
@@ -213,9 +213,9 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   function _harvest() internal returns (uint256) {
     if (live == 1) {
       // Withdraw all rewards
-      (, , uint256 _lastRewardBlock, , ) = fairlaunch.poolInfo(pid);
+      uint256 _pendingAlpaca = fairlaunch.pendingAlpaca(pid, address(this));
       (uint256 _stakedBalance, , , ) = fairlaunch.userInfo(pid, address(this));
-      if (_stakedBalance > 0 && block.number > _lastRewardBlock) fairlaunch.withdraw(address(this), pid, 0);
+      if (_stakedBalance > 0 && _pendingAlpaca > 0) fairlaunch.withdraw(address(this), pid, 0);
     }
     return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
   }
@@ -252,6 +252,12 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     return _pendingRewards(_positionAddress, fairlaunch.pendingAlpaca(pid, address(this)));
   }
 
+  /// @dev Like pendingRewards, but it is pending rewards after deduected with treasury fee
+  /// @param _positionAddress The address that you want to check pending ALPACA
+  function netPendingRewards(address _positionAddress) external view returns (uint256) {
+    return _netPendingRewards(_positionAddress, fairlaunch.pendingAlpaca(pid, address(this)));
+  }
+
   /// @dev Return the amount of rewards to be harvested for a giving position address
   /// @param _positionAddress The position address
   /// @param _pending The pending rewards from staking contract
@@ -259,7 +265,17 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     if (totalShare == 0) return 0;
     uint256 _toBeHarvested = sub(add(_pending, rewardToken.balanceOf(address(this))), accRewardBalance);
     uint256 _pendingAccRewardPerShare = add(accRewardPerShare, rdiv(_toBeHarvested, totalShare));
-    return sub(rmul(stake[_positionAddress], _pendingAccRewardPerShare), rewardDebts[_positionAddress]);
+    return sub(rmulup(stake[_positionAddress], _pendingAccRewardPerShare), rewardDebts[_positionAddress]);
+  }
+
+  /// @dev Return the amount of rewards to be harvested for a giving position address, and deducted with treasury fee
+  /// @param _positionAddress The position address
+  /// @param _pending The pending rewards from staking contract
+  function _netPendingRewards(address _positionAddress, uint256 _pending) internal view returns (uint256) {
+    uint256 _pendingReward = _pendingRewards(_positionAddress, _pending);
+    uint256 _treasuryFee = div(mul(_pendingReward, treasuryFeeBps), 10000);
+
+    return sub(_pendingReward, _treasuryFee);
   }
 
   /// @dev Harvest and deposit received ibToken to FairLaunch

@@ -26,6 +26,7 @@ import "../interfaces/IStabilityFeeCollector.sol";
 import "../interfaces/IProxyRegistry.sol";
 import "../interfaces/IProxy.sol";
 import "../utils/SafeToken.sol";
+import "hardhat/console.sol";
 
 /// ==============================
 /// @notice WARNING: These functions meant to be used as a a library for a Proxy.
@@ -1097,13 +1098,15 @@ contract AlpacaStablecoinProxyActions {
 
   function harvestMultiple(
     address _manager,
-    address _tokenAdapter,
+    address[] memory _tokenAdapters,
     uint256[] memory _positionIds,
     address _harvestToken
   ) external {
+    require(_tokenAdapters.length == _positionIds.length, "tokenAdapters and positionIds length mismatch");
+
     for (uint256 i = 0; i < _positionIds.length; i++) {
       address _positionAddress = IManager(_manager).positions(_positionIds[i]);
-      IGenericTokenAdapter(_tokenAdapter).deposit(_positionAddress, 0, abi.encode());
+      IGenericTokenAdapter(_tokenAdapters[i]).deposit(_positionAddress, 0, abi.encode());
     }
 
     transfer(_harvestToken, msg.sender, _harvestToken.myBalance());
