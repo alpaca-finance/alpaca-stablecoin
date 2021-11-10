@@ -436,7 +436,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 _positionId,
     uint256 _amount, // [wad]
     bytes calldata _data
-  ) public {
+  ) external {
     // Unlocks WBNB amount from the CDP
     adjustPosition(_manager, _positionId, -_safeToInt(_amount), 0, _bnbAdapter, _data);
     // Moves the amount from the CDP positionAddress to proxy's address
@@ -455,7 +455,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 _positionId,
     uint256 _amount, // [in token decimal]
     bytes calldata _data
-  ) public {
+  ) external {
     // Try to decode user address for harvested rewards from calldata
     // if the user address is not passed, then send zero address to `harvest` and let it handle
     address _user = address(0);
@@ -768,7 +768,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 _amount, // [wad]
     bool _transferFrom,
     bytes calldata _data
-  ) public {
+  ) external {
     uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _amount));
     lockToken(_manager, _tokenAdapter, _positionId, _collateralAmount, _transferFrom, _data);
   }
@@ -784,7 +784,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 _stablecoinAmount, // [wad]
     bool _transferFrom,
     bytes calldata _data
-  ) public {
+  ) external {
     uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _amount));
     lockTokenAndDraw(
       IManager(_manager),
@@ -806,7 +806,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 _positionId,
     bool _transferFrom,
     bytes calldata _data
-  ) public payable {
+  ) external payable {
     uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value);
     lockToken(_manager, _tokenAdapter, _positionId, _collateralAmount, _transferFrom, _data);
   }
@@ -821,7 +821,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 _stablecoinAmount, // [wad]
     bool _transferFrom,
     bytes calldata _data
-  ) public payable {
+  ) external payable {
     uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value);
     lockTokenAndDraw(
       IManager(_manager),
