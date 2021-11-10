@@ -358,7 +358,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   }
 
   /// @dev EMERGENCY ONLY. Withdraw ibToken from FairLaunch with invoking "_harvest"
-  function emergencyWithdraw(address _to) external nonReentrant whenNotPaused {
+  function emergencyWithdraw(address _to) external nonReentrant {
     if (live == 1) {
       uint256 _amount = bookKeeper.collateralToken(collateralPoolId, msg.sender);
       fairlaunch.withdraw(address(this), pid, _amount);
