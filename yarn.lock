@@ -1629,12 +1629,17 @@
     find-up "^4.1.0"
     fs-extra "^8.1.0"
 
+"@openzeppelin/contracts-ethereum-package@^3.0.0":
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts-ethereum-package/-/contracts-ethereum-package-3.0.0.tgz#d5db971a177c3b37733db2ee4ebdb79c67575d64"
+  integrity sha512-Xg33RtX7FGbSK/YnroLhcGNAvH30/C84NRW8KvbSdXXYiLA8YqM1bOA9sAeLjmQxXqYUn/YL4AUVTgDnG51NOw==
+
 "@openzeppelin/contracts-upgradeable@^3.4.0":
   version "3.4.2"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts-upgradeable/-/contracts-upgradeable-3.4.2.tgz#2c2a1b0fa748235a1f495b6489349776365c51b3"
   integrity sha512-mDlBS17ymb2wpaLcrqRYdnBAmP1EwqhOXMvqWk2c5Q1N1pm5TkiCtXM9Xzznh4bYsQBq0aIWEkFFE2+iLSN1Tw==
 
-"@openzeppelin/contracts@3.4":
+"@openzeppelin/contracts@3.4.2":
   version "3.4.2"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.4.2.tgz#d81f786fda2871d1eb8a8c5a73e455753ba53527"
   integrity sha512-z0zMCjyhhp4y7XKAcDAi3Vgms4T2PstwBdahiO0+9NaGICQKjynK3wduSRplTgk4LXmoO1yfDGO5RbjKYxtuxA==

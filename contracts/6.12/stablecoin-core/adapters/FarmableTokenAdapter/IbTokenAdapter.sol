@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
-  ∩~~~~∩ 
-  ξ ･×･ ξ 
-  ξ　~　ξ 
-  ξ　　 ξ 
-  ξ　　 “~～~～〇 
-  ξ　　　　　　 ξ 
-  ξ ξ ξ~～~ξ ξ ξ 
+  ∩~~~~∩
+  ξ ･×･ ξ
+  ξ　~　ξ
+  ξ　　 ξ
+  ξ　　 “~～~～〇
+  ξ　　　　　　 ξ
+  ξ ξ ξ~～~ξ ξ ξ
 　 ξ_ξξ_ξ　ξ_ξξ_ξ
 Alpaca Fin Corporation
 */
@@ -23,18 +23,13 @@ import "../../../interfaces/IFarmableTokenAdapter.sol";
 import "../../../interfaces/ITimeLock.sol";
 import "../../../interfaces/IShield.sol";
 import "../../../interfaces/ICagable.sol";
+import "../../../interfaces/IManager.sol";
 import "../../../utils/SafeToken.sol";
 
 /// @title IbTokenAdapter is the adapter that inherited BaseFarmableTokenAdapter.
 /// It receives Alpaca's ibTOKEN from users and deposit in Alpaca's FairLaunch.
 /// Hence, users will still earn ALPACA rewards while holding positions.
-contract IbTokenAdapter is
-  IFarmableTokenAdapter,
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  ICagable
-{
+contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, ReentrancyGuardUpgradeable, ICagable {
   using SafeToken for address;
 
   uint256 internal constant WAD = 10**18;
@@ -65,6 +60,8 @@ contract IbTokenAdapter is
   /// @dev The token that will get after collateral has been staked
   IToken public rewardToken;
 
+  IManager public positionManager;
+
   /// @dev Rewards per collateralToken in RAY
   uint256 public accRewardPerShare;
   /// @dev Total CollateralTokens that has been staked in WAD
@@ -81,16 +78,14 @@ contract IbTokenAdapter is
   uint256 internal toTokenConversionFactor;
 
   /// @notice Events
-  event Deposit(uint256 val);
-  event Withdraw(uint256 val);
-  event EmergencyWithdaraw();
-  event MoveStake(address indexed src, address indexed dst, uint256 wad);
-
-  // --- Auth ---
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
+  event LogDeposit(uint256 _val);
+  event LogWithdraw(uint256 _val);
+  event LogEmergencyWithdaraw();
+  event LogMoveStake(address indexed _src, address indexed _dst, uint256 _wad);
 
   modifier onlyOwner() {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     _;
   }
 
@@ -104,18 +99,16 @@ contract IbTokenAdapter is
     address _shield,
     address _timelock,
     uint256 _treasuryFeeBps,
-    address _treasuryAccount
+    address _treasuryAccount,
+    address _positionManager
   ) external initializer {
     // 1. Initialized all dependencies
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-    _setupRole(OWNER_ROLE, msg.sender);
-
     // 2. Sanity checks
-    (address stakeToken, , , , ) = IAlpacaFairLaunch(_fairlaunch).poolInfo(_pid);
-    require(stakeToken == _collateralToken, "IbTokenAdapter/collateralToken-not-match");
+    (address _stakeToken, , , , ) = IAlpacaFairLaunch(_fairlaunch).poolInfo(_pid);
+    require(_stakeToken == _collateralToken, "IbTokenAdapter/collateralToken-not-match");
     require(IAlpacaFairLaunch(_fairlaunch).alpaca() == _rewardToken, "IbTokenAdapter/reward-token-not-match");
     require(IAlpacaFairLaunch(_fairlaunch).owner() == _shield, "IbTokenAdapter/shield-not-match");
     require(IShield(_shield).owner() == _timelock, "IbTokenAdapter/timelock-not-match");
@@ -141,61 +134,59 @@ contract IbTokenAdapter is
     treasuryFeeBps = _treasuryFeeBps;
     treasuryAccount = _treasuryAccount;
 
+    positionManager = IManager(_positionManager);
+
     address(collateralToken).safeApprove(address(fairlaunch), uint256(-1));
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
-  function add(uint256 x, uint256 y) public pure returns (uint256 z) {
-    require((z = x + y) >= x, "ds-math-add-overflow");
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x, "ds-math-add-overflow");
   }
 
-  function sub(uint256 x, uint256 y) public pure returns (uint256 z) {
-    require((z = x - y) <= x, "ds-math-sub-underflow");
+  function sub(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x - _y) <= _x, "ds-math-sub-underflow");
   }
 
-  function mul(uint256 x, uint256 y) public pure returns (uint256 z) {
-    require(y == 0 || (z = x * y) / y == x, "ds-math-mul-overflow");
+  function mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x, "ds-math-mul-overflow");
   }
 
-  function div(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y > 0, "ds-math-div-by-zero");
-    z = x / y;
+  function div(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y > 0, "ds-math-div-by-zero");
+    _z = _x / _y;
   }
 
-  function divup(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    z = add(x, sub(y, 1)) / y;
+  function divup(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = add(_x, sub(_y, 1)) / _y;
   }
 
-  function wmul(uint256 x, uint256 y) public pure returns (uint256 z) {
-    z = mul(x, y) / WAD;
+  function wmul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = mul(_x, _y) / WAD;
   }
 
-  function wdiv(uint256 x, uint256 y) public pure returns (uint256 z) {
-    z = mul(x, WAD) / y;
+  function wdiv(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = mul(_x, WAD) / _y;
   }
 
-  function wdivup(uint256 x, uint256 y) public pure returns (uint256 z) {
-    z = divup(mul(x, WAD), y);
+  function wdivup(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = divup(mul(_x, WAD), _y);
   }
 
-  function rmul(uint256 x, uint256 y) public pure returns (uint256 z) {
-    z = mul(x, y) / RAY;
+  function rmul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = mul(_x, _y) / RAY;
   }
 
-  function rmulup(uint256 x, uint256 y) public pure returns (uint256 z) {
-    z = divup(mul(x, y), RAY);
+  function rmulup(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = divup(mul(_x, _y), RAY);
   }
 
-  function rdiv(uint256 x, uint256 y) public pure returns (uint256 z) {
-    z = mul(x, RAY) / y;
+  function rdiv(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    _z = mul(_x, RAY) / _y;
   }
 
   function setTreasuryFeeBps(uint256 _treasuryFeeBps) external onlyOwner {
     require(live == 1, "IbTokenAdapter/not-live");
-    require(treasuryFeeBps <= 5000, "IbTokenAdapter/bad treasury fee bps");
+    require(_treasuryFeeBps <= 5000, "IbTokenAdapter/bad treasury fee bps");
     treasuryFeeBps = _treasuryFeeBps;
   }
 
@@ -222,28 +213,33 @@ contract IbTokenAdapter is
   function _harvest() internal returns (uint256) {
     if (live == 1) {
       // Withdraw all rewards
-      (uint256 stakedBalance, , , ) = fairlaunch.userInfo(pid, address(this));
-      if (stakedBalance > 0) fairlaunch.withdraw(address(this), pid, 0);
+      uint256 _pendingAlpaca = fairlaunch.pendingAlpaca(pid, address(this));
+      (uint256 _stakedBalance, , , ) = fairlaunch.userInfo(pid, address(this));
+      if (_stakedBalance > 0 && _pendingAlpaca > 0) fairlaunch.withdraw(address(this), pid, 0);
     }
     return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
   }
 
-  /// @dev Harvest rewards for "from" and send to "to"
-  /// @param from The position address that is owned and staked the collateral tokens
-  /// @param to The address to receive the yields
-  function harvest(address from, address to) internal {
-    require(to != address(0), "IbTokenAdapter/harvest-to-address-zero");
-    // 1. Perform actual harvest. Calculate the new accRewardPerShare.
+  /// @dev Harvest rewards for "_positionAddress" and send to "to"
+  /// @param _positionAddress The position address that is owned and staked the collateral tokens
+  function harvest(address _positionAddress) internal {
+    // 1. Define the address to receive the harvested rewards
+    // Give the rewards to the proxy wallet that owns this position address if there is any
+    address _harvestTo = positionManager.mapPositionHandlerToOwner(_positionAddress);
+    // defeault _harvestTo as _positionAddress if not properly defined
+    if (_harvestTo == address(0)) _harvestTo = _positionAddress;
+    require(_harvestTo != address(0), "IbTokenAdapter/harvest-to-address-zero");
+    // 2. Perform actual harvest. Calculate the new accRewardPerShare.
     if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvest(), totalShare));
-    // 2. Calculate the rewards that "to" should get by:
-    // stake[from] * accRewardPerShare (rewards that each share should get) - rewardDebts (what already paid)
-    uint256 rewardDebt = rewardDebts[from];
-    uint256 rewards = rmul(stake[from], accRewardPerShare);
-    if (rewards > rewardDebt) {
-      uint256 back = sub(rewards, rewardDebt);
-      uint256 treasuryFee = div(mul(back, treasuryFeeBps), 10000);
-      address(rewardToken).safeTransfer(treasuryAccount, treasuryFee);
-      address(rewardToken).safeTransfer(to, sub(back, treasuryFee));
+    // 3. Calculate the rewards that "to" should get by:
+    // stake[_positionAddress] * accRewardPerShare (rewards that each share should get) - rewardDebts (what already paid)
+    uint256 _rewardDebt = rewardDebts[_positionAddress];
+    uint256 _rewards = rmul(stake[_positionAddress], accRewardPerShare);
+    if (_rewards > _rewardDebt) {
+      uint256 _back = sub(_rewards, _rewardDebt);
+      uint256 _treasuryFee = div(mul(_back, treasuryFeeBps), 10000);
+      address(rewardToken).safeTransfer(treasuryAccount, _treasuryFee);
+      address(rewardToken).safeTransfer(_harvestTo, sub(_back, _treasuryFee));
     }
 
     // 3. Update accRewardBalance
@@ -251,211 +247,259 @@ contract IbTokenAdapter is
   }
 
   /// @dev For FE to query pending rewards of a given positionAddress
-  /// @param positionAddress The address that you want to check pending ALPACA
-  function pendingRewards(address positionAddress) external view returns (uint256) {
-    return _pendingRewards(positionAddress, fairlaunch.pendingAlpaca(pid, address(this)));
+  /// @param _positionAddress The address that you want to check pending ALPACA
+  function pendingRewards(address _positionAddress) external view returns (uint256) {
+    return _pendingRewards(_positionAddress, fairlaunch.pendingAlpaca(pid, address(this)));
+  }
+
+  /// @dev Like pendingRewards, but it is pending rewards after deduected with treasury fee
+  /// @param _positionAddress The address that you want to check pending ALPACA
+  function netPendingRewards(address _positionAddress) external view returns (uint256) {
+    return _netPendingRewards(_positionAddress, fairlaunch.pendingAlpaca(pid, address(this)));
   }
 
   /// @dev Return the amount of rewards to be harvested for a giving position address
-  /// @param positionAddress The position address
-  /// @param pending The pending rewards from staking contract
-  function _pendingRewards(address positionAddress, uint256 pending) internal view returns (uint256) {
+  /// @param _positionAddress The position address
+  /// @param _pending The pending rewards from staking contract
+  function _pendingRewards(address _positionAddress, uint256 _pending) internal view returns (uint256) {
     if (totalShare == 0) return 0;
-    uint256 toBeHarvested = sub(add(pending, rewardToken.balanceOf(address(this))), accRewardBalance);
-    uint256 pendingAccRewardPerShare = add(accRewardPerShare, rdiv(toBeHarvested, totalShare));
-    return sub(rmul(stake[positionAddress], pendingAccRewardPerShare), rewardDebts[positionAddress]);
+    uint256 _toBeHarvested = sub(add(_pending, rewardToken.balanceOf(address(this))), accRewardBalance);
+    uint256 _pendingAccRewardPerShare = add(accRewardPerShare, rdiv(_toBeHarvested, totalShare));
+    return sub(rmulup(stake[_positionAddress], _pendingAccRewardPerShare), rewardDebts[_positionAddress]);
+  }
+
+  /// @dev Return the amount of rewards to be harvested for a giving position address, and deducted with treasury fee
+  /// @param _positionAddress The position address
+  /// @param _pending The pending rewards from staking contract
+  function _netPendingRewards(address _positionAddress, uint256 _pending) internal view returns (uint256) {
+    uint256 _pendingReward = _pendingRewards(_positionAddress, _pending);
+    uint256 _treasuryFee = div(mul(_pendingReward, treasuryFeeBps), 10000);
+
+    return sub(_pendingReward, _treasuryFee);
   }
 
   /// @dev Harvest and deposit received ibToken to FairLaunch
-  /// @param positionAddress The address that holding states of the position
-  /// @param amount The ibToken amount that being used as a collateral and to be deposited to FairLaunch
-  /// @param data The extra data that may needs to execute the deposit
+  /// @param _positionAddress The address that holding states of the position
+  /// @param _amount The ibToken amount that being used as a collateral and to be deposited to FairLaunch
+  /// @param _data The extra data that may needs to execute the deposit
   function deposit(
-    address positionAddress,
-    uint256 amount,
-    bytes calldata data
-  ) public payable override nonReentrant {
-    _deposit(positionAddress, amount, data);
+    address _positionAddress,
+    uint256 _amount,
+    bytes calldata _data
+  ) external payable override nonReentrant whenNotPaused {
+    _deposit(_positionAddress, _amount, _data);
   }
 
   /// @dev Harvest rewardTokens and distribute to user,
   /// deposit collateral tokens to staking contract, and update BookKeeper
-  /// @param positionAddress The position address to be updated
-  /// @param amount The amount to be deposited
-  /// @param data The extra data information pass along to this adapter
+  /// @param _positionAddress The position address to be updated
+  /// @param _amount The amount to be deposited
   function _deposit(
-    address positionAddress,
-    uint256 amount,
-    bytes calldata data
+    address _positionAddress,
+    uint256 _amount,
+    bytes calldata /* _data */
   ) private {
     require(live == 1, "IbTokenAdapter/not live");
-    address user = abi.decode(data, (address));
-    harvest(positionAddress, user);
-    if (amount > 0) {
-      uint256 share = wdiv(mul(amount, to18ConversionFactor), netAssetPerShare()); // [wad]
+
+    harvest(_positionAddress);
+
+    if (_amount > 0) {
+      uint256 _share = wdiv(mul(_amount, to18ConversionFactor), netAssetPerShare()); // [wad]
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
-      require(int256(share) > 0, "IbTokenAdapter/share-overflow");
-      address(collateralToken).safeTransferFrom(msg.sender, address(this), amount);
-      bookKeeper.addCollateral(collateralPoolId, positionAddress, int256(share));
-      totalShare = add(totalShare, share);
-      stake[positionAddress] = add(stake[positionAddress], share);
+      require(int256(_share) > 0, "IbTokenAdapter/share-overflow");
+      address(collateralToken).safeTransferFrom(msg.sender, address(this), _amount);
+      bookKeeper.addCollateral(collateralPoolId, _positionAddress, int256(_share));
+      totalShare = add(totalShare, _share);
+      stake[_positionAddress] = add(stake[_positionAddress], _share);
     }
-    rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
+    rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
 
-    fairlaunch.deposit(address(this), pid, amount);
+    if (_amount > 0) fairlaunch.deposit(address(this), pid, _amount);
 
-    emit Deposit(amount);
+    emit LogDeposit(_amount);
   }
 
   /// @dev Harvest and withdraw ibToken from FairLaunch
-  /// @param positionAddress The address that holding states of the position
-  /// @param amount The ibToken amount to be withdrawn from FairLaunch and return to user
-  /// @param data The extra data that may needs to execute the withdraw
+  /// @param _usr The address that holding states of the position
+  /// @param _amount The ibToken amount to be withdrawn from FairLaunch and return to user
   function withdraw(
-    address positionAddress,
-    uint256 amount,
-    bytes calldata data
-  ) public override nonReentrant {
+    address _usr,
+    uint256 _amount,
+    bytes calldata /* _data */
+  ) external override nonReentrant whenNotPaused {
     if (live == 1) {
-      fairlaunch.withdraw(address(this), pid, amount);
+      if (_amount > 0) fairlaunch.withdraw(address(this), pid, _amount);
     }
-    _withdraw(positionAddress, amount, data);
+    _withdraw(_usr, _amount);
   }
 
   /// @dev Harvest rewardTokens and distribute to user,
   /// withdraw collateral tokens from staking contract, and update BookKeeper
-  /// @param positionAddress The position address to be updated
-  /// @param amount The amount to be deposited
-  /// @param data The extra data information pass along to this adapter
-  function _withdraw(
-    address positionAddress,
-    uint256 amount,
-    bytes calldata data
-  ) private {
-    address user = abi.decode(data, (address));
-    harvest(positionAddress, user);
-    if (amount > 0) {
-      uint256 share = wdivup(mul(amount, to18ConversionFactor), netAssetPerShare()); // [wad]
+  /// @param _usr The position address to be updated
+  /// @param _amount The amount to be deposited
+  function _withdraw(address _usr, uint256 _amount) private {
+    harvest(msg.sender);
+
+    if (_amount > 0) {
+      uint256 _share = wdivup(mul(_amount, to18ConversionFactor), netAssetPerShare()); // [wad]
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
-      require(int256(share) > 0, "IbTokenAdapter/share-overflow");
-      require(stake[positionAddress] >= share, "IbTokenAdapter/insufficient staked amount");
+      require(int256(_share) > 0, "IbTokenAdapter/share-overflow");
+      require(stake[msg.sender] >= _share, "IbTokenAdapter/insufficient staked amount");
 
-      address(collateralToken).safeTransfer(user, amount);
-      bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(share));
-      totalShare = sub(totalShare, share);
-      stake[positionAddress] = sub(stake[positionAddress], share);
+      bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_share));
+      totalShare = sub(totalShare, _share);
+      stake[msg.sender] = sub(stake[msg.sender], _share);
+      address(collateralToken).safeTransfer(_usr, _amount);
     }
-    rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
-    emit Withdraw(amount);
+    rewardDebts[msg.sender] = rmulup(stake[msg.sender], accRewardPerShare);
+    emit LogWithdraw(_amount);
   }
 
   /// @dev EMERGENCY ONLY. Withdraw ibToken from FairLaunch with invoking "_harvest"
-  function emergencyWithdraw(address positionAddress, address to) public nonReentrant {
+  function emergencyWithdraw(address _to) external nonReentrant whenNotPaused {
     if (live == 1) {
-      uint256 amount = bookKeeper.collateralToken(collateralPoolId, positionAddress);
-      fairlaunch.withdraw(address(this), pid, amount);
+      uint256 _amount = bookKeeper.collateralToken(collateralPoolId, msg.sender);
+      fairlaunch.withdraw(address(this), pid, _amount);
     }
-    _emergencyWithdraw(positionAddress, to);
+    _emergencyWithdraw(_to);
   }
 
   /// @dev EMERGENCY ONLY. Withdraw collateralTokens from staking contract without invoking _harvest
-  /// @param positionAddress The positionAddress to do emergency withdraw
-  /// @param to The address to received collateralTokens
-  function _emergencyWithdraw(address positionAddress, address to) private {
-    uint256 share = bookKeeper.collateralToken(collateralPoolId, positionAddress); //[wad]
-    require(share <= 2**255, "IbTokenAdapter/share-overflow");
-    uint256 amount = wmul(wmul(share, netAssetPerShare()), toTokenConversionFactor);
-    address(collateralToken).safeTransfer(to, amount);
-    bookKeeper.addCollateral(collateralPoolId, positionAddress, -int256(share));
-    totalShare = sub(totalShare, share);
-    stake[positionAddress] = sub(stake[positionAddress], share);
-    rewardDebts[positionAddress] = rmulup(stake[positionAddress], accRewardPerShare);
-    emit EmergencyWithdaraw();
+  /// @param _to The address to received collateralTokens
+  function _emergencyWithdraw(address _to) private {
+    uint256 _share = bookKeeper.collateralToken(collateralPoolId, msg.sender); //[wad]
+    require(_share <= 2**255, "IbTokenAdapter/share-overflow");
+    uint256 _amount = wmul(wmul(_share, netAssetPerShare()), toTokenConversionFactor);
+    address(collateralToken).safeTransfer(_to, _amount);
+    bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_share));
+    totalShare = sub(totalShare, _share);
+    stake[msg.sender] = sub(stake[msg.sender], _share);
+    rewardDebts[msg.sender] = rmulup(stake[msg.sender], accRewardPerShare);
+    emit LogEmergencyWithdaraw();
+  }
+
+  function moveStake(
+    address _source,
+    address _destination,
+    uint256 _share,
+    bytes calldata _data
+  ) external override nonReentrant whenNotPaused {
+    _moveStake(_source, _destination, _share, _data);
   }
 
   /// @dev Move wad amount of staked balance from source to destination.
   /// Can only be moved if underlaying assets make sense.
-  /// @param source The address to be moved staked balance from
-  /// @param destination The address to be moved staked balance to
-  /// @param share The amount of staked balance to be moved
-  function moveStake(
-    address source,
-    address destination,
-    uint256 share,
+  /// @param _source The address to be moved staked balance from
+  /// @param _destination The address to be moved staked balance to
+  /// @param _share The amount of staked balance to be moved
+  function _moveStake(
+    address _source,
+    address _destination,
+    uint256 _share,
     bytes calldata /* data */
-  ) public override {
+  ) private {
     // 1. Update collateral tokens for source and destination
-    uint256 stakedAmount = stake[source];
-    stake[source] = sub(stakedAmount, share);
-    stake[destination] = add(stake[destination], share);
+    uint256 _stakedAmount = stake[_source];
+    stake[_source] = sub(_stakedAmount, _share);
+    stake[_destination] = add(stake[_destination], _share);
     // 2. Update source's rewardDebt due to collateral tokens have
     // moved from source to destination. Hence, rewardDebt should be updated.
     // rewardDebtDiff is how many rewards has been paid for that share.
-    uint256 rewardDebt = rewardDebts[source];
-    uint256 rewardDebtDiff = mul(rewardDebt, share) / stakedAmount;
+    uint256 _rewardDebt = rewardDebts[_source];
+    uint256 _rewardDebtDiff = mul(_rewardDebt, _share) / _stakedAmount;
     // 3. Update rewardDebts for both source and destination
     // Safe since rewardDebtDiff <= rewardDebts[source]
-    rewardDebts[source] = rewardDebt - rewardDebtDiff;
-    rewardDebts[destination] = add(rewardDebts[destination], rewardDebtDiff);
+    rewardDebts[_source] = _rewardDebt - _rewardDebtDiff;
+    rewardDebts[_destination] = add(rewardDebts[_destination], _rewardDebtDiff);
     // 4. Sanity check.
     // - stake[source] must more than or equal to collateral + lockedCollateral that source has
     // to prevent a case where someone try to steal stake from source
     // - stake[destination] must less than or eqal to collateral + lockedCollateral that destination has
     // to prevent destination from claim stake > actual collateral that he has
-    (uint256 lockedCollateral, ) = bookKeeper.positions(collateralPoolId, source);
+    (uint256 _lockedCollateral, ) = bookKeeper.positions(collateralPoolId, _source);
     require(
-      stake[source] >= add(bookKeeper.collateralToken(collateralPoolId, source), lockedCollateral),
+      stake[_source] >= add(bookKeeper.collateralToken(collateralPoolId, _source), _lockedCollateral),
       "IbTokenAdapter/stake[source] < collateralTokens + lockedCollateral"
     );
-    (lockedCollateral, ) = bookKeeper.positions(collateralPoolId, destination);
+    (_lockedCollateral, ) = bookKeeper.positions(collateralPoolId, _destination);
     require(
-      stake[destination] <= add(bookKeeper.collateralToken(collateralPoolId, destination), lockedCollateral),
+      stake[_destination] <= add(bookKeeper.collateralToken(collateralPoolId, _destination), _lockedCollateral),
       "IbTokenAdapter/stake[destination] > collateralTokens + lockedCollateral"
     );
-    emit MoveStake(source, destination, share);
+    emit LogMoveStake(_source, _destination, _share);
   }
 
   /// @dev Hook function when PositionManager adjust position.
   function onAdjustPosition(
-    address source,
-    address destination,
-    int256 collateralValue,
+    address _source,
+    address _destination,
+    int256 _collateralValue,
     int256, /* debtShare */
-    bytes calldata data
-  ) external override nonReentrant {
-    uint256 unsignedCollateralValue = collateralValue < 0 ? uint256(-collateralValue) : uint256(collateralValue);
-    moveStake(source, destination, unsignedCollateralValue, data);
+    bytes calldata _data
+  ) external override nonReentrant whenNotPaused {
+    uint256 _unsignedCollateralValue = _collateralValue < 0 ? uint256(-_collateralValue) : uint256(_collateralValue);
+    _moveStake(_source, _destination, _unsignedCollateralValue, _data);
   }
 
   function onMoveCollateral(
-    address source,
-    address destination,
-    uint256 share,
-    bytes calldata data
-  ) external override nonReentrant {
-    _deposit(source, 0, data);
-    moveStake(source, destination, share, data);
+    address _source,
+    address _destination,
+    uint256 _share,
+    bytes calldata _data
+  ) external override nonReentrant whenNotPaused {
+    _deposit(_source, 0, _data);
+    _moveStake(_source, _destination, _share, _data);
   }
 
   /// @dev Pause ibTokenAdapter when assumptions change
-  function cage() public override nonReentrant {
+  function cage() external override nonReentrant {
     // Allow caging if
     // - msg.sender is whitelisted to do so
     // - Shield's owner has been changed
-    require(hasRole(OWNER_ROLE, msg.sender) || shield.owner() != address(timelock), "IbTokenAdapter/not-authorized");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        shield.owner() != address(timelock),
+      "IbTokenAdapter/not-authorized"
+    );
     require(live == 1, "IbTokenAdapter/not-live");
     fairlaunch.emergencyWithdraw(pid);
     live = 0;
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
-    require(hasRole(OWNER_ROLE, msg.sender), "IbTokenAdapter/not-authorized");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender),
+      "IbTokenAdapter/not-authorized"
+    );
     require(live == 0, "IbTokenAdapter/not-caged");
     fairlaunch.deposit(address(this), pid, totalShare);
     live = 1;
-    emit Uncage();
+    emit LogUncage();
+  }
+
+  // --- pause ---
+  function pause() external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _pause();
+  }
+
+  function unpause() external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _unpause();
   }
 }

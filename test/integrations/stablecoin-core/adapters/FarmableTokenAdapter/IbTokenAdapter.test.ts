@@ -5,6 +5,7 @@ import { MockProvider, solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
 import {
   BookKeeper__factory,
+  PositionManager__factory,
   PositionManager,
   BookKeeper,
   BEP20__factory,
@@ -17,6 +18,10 @@ import {
   Shield,
   AlpacaToken,
   FairLaunch,
+  CollateralPoolConfig__factory,
+  CollateralPoolConfig,
+  AccessControlConfig__factory,
+  AccessControlConfig,
 } from "../../../../../typechain"
 import { smockit, MockContract } from "@eth-optimism/smock"
 import { WeiPerRad, WeiPerRay, WeiPerWad, weiToRay } from "../../../../helper/unit"
@@ -42,9 +47,26 @@ const COLLATERAL_POOL_ID = formatBytes32String("ibDUMMY")
 const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockProvider): Promise<fixture> => {
   const [deployer, alice, bob, dev] = await ethers.getSigners()
 
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const accessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [
+    accessControlConfig.address,
+  ])) as CollateralPoolConfig
+
   // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [
+    collateralPoolConfig.address,
+    accessControlConfig.address,
+  ])) as BookKeeper
   await bookKeeper.deployed()
 
   // Deploy mocked BEP20
@@ -61,7 +83,14 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   await alpacaToken.deployed()
 
   const FairLaunch = (await ethers.getContractFactory("FairLaunch", deployer)) as FairLaunch__factory
-  const fairLaunch = await FairLaunch.deploy(alpacaToken.address, await dev.getAddress(), ALPACA_PER_BLOCK, 0, 0, 0)
+  const fairLaunch = await FairLaunch.deploy(
+    alpacaToken.address,
+    await deployer.getAddress(),
+    ALPACA_PER_BLOCK,
+    0,
+    0,
+    0
+  )
   await fairLaunch.deployed()
 
   const Shield = (await ethers.getContractFactory("Shield", deployer)) as Shield__factory
@@ -75,6 +104,15 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   await shield.transferOwnership(await deployer.getAddress())
   await alpacaToken.transferOwnership(fairLaunch.address)
 
+  // Deploy PositionManager
+  const PositionManager = (await ethers.getContractFactory("PositionManager", deployer)) as PositionManager__factory
+  const positionManager = (await upgrades.deployProxy(PositionManager, [
+    bookKeeper.address,
+    bookKeeper.address,
+  ])) as PositionManager
+  await positionManager.deployed()
+  await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), positionManager.address)
+
   const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
   const ibTokenAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
     bookKeeper.address,
@@ -87,10 +125,14 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     await deployer.getAddress(),
     BigNumber.from(1000),
     await dev.getAddress(),
+    positionManager.address,
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
-  await bookKeeper.grantRole(ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]), ibTokenAdapter.address)
+  await accessControlConfig.grantRole(
+    ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]),
+    ibTokenAdapter.address
+  )
 
   return {
     ibTokenAdapter,
@@ -165,6 +207,7 @@ describe("IbTokenAdapter", () => {
             deployerAddress,
             BigNumber.from(1000),
             deployerAddress,
+            deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/collateralToken-not-match")
       })
@@ -184,6 +227,7 @@ describe("IbTokenAdapter", () => {
             shield.address,
             deployerAddress,
             BigNumber.from(1000),
+            deployerAddress,
             deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/reward-token-not-match")
@@ -205,6 +249,7 @@ describe("IbTokenAdapter", () => {
             deployerAddress,
             BigNumber.from(1000),
             deployerAddress,
+            deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/shield-not-match")
       })
@@ -224,6 +269,7 @@ describe("IbTokenAdapter", () => {
             shield.address,
             shield.address,
             BigNumber.from(1000),
+            deployerAddress,
             deployerAddress,
           ])
         ).to.be.revertedWith("IbTokenAdapter/timelock-not-match")
@@ -373,9 +419,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
 
-        console.log(await (await alpacaToken.balanceOf(devAddress)).toString())
-
-        // Now Alice harvest rewards. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA
+        // Now Alice harvest rewards. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA, treasury account should get 10 ALPACA.
         await ibTokenAdapterAsAlice.deposit(
           aliceAddress,
           0,
@@ -389,6 +433,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(ethers.utils.parseEther("0"))
         expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(ethers.utils.parseEther("100"))
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("10"))
 
         // Bob join the party! As 2 blocks moved. IbTokenAdapter earned 200 ALPACA
         await ibDUMMYasBob.approve(ibTokenAdapter.address, ethers.utils.parseEther("4"))
@@ -408,11 +453,12 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(ethers.utils.parseEther("100"))
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(ethers.utils.parseEther("4"))
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(ethers.utils.parseEther("1200"))
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("10"))
 
         // Bob harvest ALPACA. IbTokenAdapter earned another 100 ALPACA.
         // IbTokenAdapter has another 100 ALPACA from previous block. Hence,
         // balanceOf(address(this)) should return 300 ALPACA.
-        // Bob should get 72 (80 - 10%) ALPACA.
+        // Bob should get 72 (80 - 10%) ALPACA, treasury account should get 8 ALPACA.
         await ibTokenAdapterAsBob.deposit(bobAddress, 0, ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]))
 
         expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("220"))
@@ -425,6 +471,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(ethers.utils.parseEther("100"))
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(ethers.utils.parseEther("4"))
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(ethers.utils.parseEther("1280"))
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("18"))
       })
     })
   })
@@ -572,6 +619,7 @@ describe("IbTokenAdapter", () => {
         // - Bob pending rewards must be 0 ALPACA as all rewards after Bob deposited hasn't been harvested.
         // - Alice should get 180 (200 - 10%) ALPACA that is harvested before cage (when Bob deposited)
         // - Alice should get 1 ibDUMMY back.
+        // - treasury account should get 20 ALPACA.
         expect(await ibTokenAdapter.pendingRewards(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
         expect(await ibTokenAdapter.pendingRewards(bobAddress)).to.be.eq(0)
 
@@ -594,6 +642,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(ethers.utils.parseEther("4"))
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(ethers.utils.parseEther("800"))
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("20"))
 
         let bobIbDUMMYbefore = await ibDUMMY.balanceOf(bobAddress)
         await ibTokenAdapterAsBob.withdraw(
@@ -634,7 +683,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
 
-        // Now Alice withdraw her position. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA
+        // Now Alice withdraw her position. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA, treasury account should get 10 ALPACA.
         let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
         await ibTokenAdapterAsAlice.withdraw(
           aliceAddress,
@@ -651,6 +700,64 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
         expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("10"))
+      })
+    })
+    context("when bob withdraw collateral to alice", async () => {
+      context("when bob doesn't has collateral", () => {
+        it("should be revert", async () => {
+          // Assuming Alice is the first one to deposit hence no rewards to be harvested yet
+          await ibDUMMYasAlice.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+          await ibTokenAdapterAsAlice.deposit(
+            aliceAddress,
+            ethers.utils.parseEther("1"),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+          )
+
+          await expect(
+            ibTokenAdapterAsBob.withdraw(
+              aliceAddress,
+              ethers.utils.parseEther("1"),
+              ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress])
+            )
+          ).to.be.revertedWith("IbTokenAdapter/insufficient staked amount")
+        })
+      })
+      context("when bob has collateral", async () => {
+        it("should be able to call withdraw", async () => {
+          await ibDUMMYasAlice.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+          await ibTokenAdapterAsAlice.deposit(
+            aliceAddress,
+            ethers.utils.parseEther("1"),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+          )
+
+          expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
+          expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("1"))
+          expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(0)
+          expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
+          expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
+          expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
+
+          await ibDUMMYasBob.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+          await ibTokenAdapterAsBob.deposit(
+            bobAddress,
+            ethers.utils.parseEther("1"),
+            ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress])
+          )
+
+          let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
+          let bobIbDUMMYbefore = await ibDUMMY.balanceOf(bobAddress)
+          await ibTokenAdapterAsBob.withdraw(aliceAddress, ethers.utils.parseEther("1"), "0x")
+          let aliceIbDUMMYafter = await ibDUMMY.balanceOf(aliceAddress)
+          let bobIbDUMMYafter = await ibDUMMY.balanceOf(bobAddress)
+
+          expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
+          expect(bobIbDUMMYafter.sub(bobIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("0"))
+          expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("250"))
+          expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq("0")
+          expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(ethers.utils.parseEther("45"))
+        })
       })
     })
   })
@@ -715,7 +822,7 @@ describe("IbTokenAdapter", () => {
         // - Alice should not get any ALPACA as she decided to do exit via emergency withdraw instead of withdraw
         // - Alice should get 1 ibDUMMY back.
         let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
-        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress, aliceAddress)
+        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress)
         let aliceIbDUMMYafter = await ibDUMMY.balanceOf(aliceAddress)
 
         expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
@@ -781,7 +888,7 @@ describe("IbTokenAdapter", () => {
         // - Alice shouldn't be paid by any ALPACA
         // - Alice's state should be reset
         let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
-        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress, aliceAddress)
+        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress)
         let aliceIbDUMMYafter = await ibDUMMY.balanceOf(aliceAddress)
 
         expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
@@ -1029,6 +1136,7 @@ describe("IbTokenAdapter", () => {
         // - Bob pending rewards must be 0 ALPACA as all rewards after Bob deposited hasn't been harvested.
         // - Alice should get 180 (200 - 10%) ALPACA that is harvested before cage (when Bob deposited)
         // - Alice should get 1 ibDUMMY back.
+        // - Treasury account should get 20 ALPACA.
         expect(await ibTokenAdapter.pendingRewards(aliceAddress)).to.be.eq(ethers.utils.parseEther("200"))
         expect(await ibTokenAdapter.pendingRewards(bobAddress)).to.be.eq(0)
 
@@ -1051,6 +1159,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(ethers.utils.parseEther("4"))
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(ethers.utils.parseEther("800"))
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("20"))
 
         await ibTokenAdapter.uncage()
         expect(await ibTokenAdapter.live()).to.be.eq(1)
@@ -1073,6 +1182,7 @@ describe("IbTokenAdapter", () => {
         // - Bob pending rewards must be 0 ALPACA as all rewards are harvested.
         // - Bob should get 4 ibDUMMY back.
         // - Alice's ALPACA should remain the same.
+        // - Treasury account should get 20 ALPACA.
         let bobIbDUMMYbefore = await ibDUMMY.balanceOf(bobAddress)
         await ibTokenAdapterAsBob.withdraw(
           bobAddress,
@@ -1093,6 +1203,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("40"))
       })
     })
   })
@@ -1140,6 +1251,7 @@ describe("IbTokenAdapter", () => {
         // - ibTokenAdapter should has 0 ALPACA as all harvested by Alice
         // - ibTokenAdapter should has 0 pending ALPACA as all harvested
         // - accRewardPershare, accRewardBalance, and rewardDebts must be updated correctly
+        // - Treasury account should get 35 ALPACA.
         await ibTokenAdapterAsAlice.withdraw(
           aliceAddress,
           0,
@@ -1155,6 +1267,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(ethers.utils.parseEther("350"))
         expect(await ibTokenAdapter.pendingRewards(aliceAddress)).to.be.eq(0)
         expect(await fairLaunch.pendingAlpaca(0, ibTokenAdapter.address)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("35"))
       })
     })
 
@@ -1217,7 +1330,7 @@ describe("IbTokenAdapter", () => {
         // - Alice should not get any ALPACA as she decided to do exit via emergency withdraw instead of withdraw
         // - Alice should get 1 ibDUMMY back.
         let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
-        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress, aliceAddress)
+        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress)
         let aliceIbDUMMYafter = await ibDUMMY.balanceOf(aliceAddress)
 
         expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
@@ -1248,6 +1361,7 @@ describe("IbTokenAdapter", () => {
         // - Bob should get his 4 ibDUMMY back
         // - Bob earn 90 (100 - 10%) ALPACA as block diff that Bob exit and uncage = 1 block
         // - IbTokenAdapter should still has 200 ALPACA that Alice dismissed
+        // - Treasury account should get 10 ALPACA.
         let bobIbDUMMYbefore = await ibDUMMY.balanceOf(bobAddress)
         await ibTokenAdapterAsBob.withdraw(
           bobAddress,
@@ -1268,6 +1382,7 @@ describe("IbTokenAdapter", () => {
         expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(0)
         expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(0)
+        expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("10"))
       })
     })
   })

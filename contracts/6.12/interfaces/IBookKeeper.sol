@@ -1,23 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
 
-/// IBookKeeper.sol
-
-// Copyright (C) 2018 Rain <rainbreak@riseup.net>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import "../interfaces/ICollateralPoolConfig.sol";
+import "../interfaces/IAccessControlConfig.sol";
 
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 interface IBookKeeper {
   function collateralToken(bytes32 collateralPoolId, address ownerAddress) external view returns (uint256);
@@ -46,8 +44,6 @@ interface IBookKeeper {
     int256 collateralValue,
     int256 debtShare
   ) external;
-
-  function setPriceWithSafetyMargin(bytes32 collateralPoolId, uint256 priceWithSafetyMargin) external;
 
   function stablecoin(address ownerAddress) external view returns (uint256);
 
@@ -89,17 +85,6 @@ interface IBookKeeper {
     uint256 value // [rad]
   ) external;
 
-  function collateralPools(bytes32 collateralPoolId)
-    external
-    view
-    returns (
-      uint256 totalDebtShare, // [wad]
-      uint256 debtAccumulatedRate, // [ray]
-      uint256 priceWithSafetyMargin, // [ray]
-      uint256 debtCeiling, // [rad]
-      uint256 debtFloor // [rad]
-    );
-
   function accrueStabilityFee(
     bytes32 collateralPoolId,
     address stabilityFeeRecipient,
@@ -113,4 +98,8 @@ interface IBookKeeper {
   function whitelist(address toBeWhitelistedAddress) external;
 
   function blacklist(address toBeBlacklistedAddress) external;
+
+  function collateralPoolConfig() external view returns (address);
+
+  function accessControlConfig() external view returns (address);
 }

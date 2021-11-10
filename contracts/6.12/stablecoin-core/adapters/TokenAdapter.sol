@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
-/// deposit.sol -- Basic token adapters
-
-// Copyright (C) 2018 Rain <rainbreak@riseup.net>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
 
 pragma solidity 0.6.12;
 
@@ -51,21 +45,12 @@ import "../../utils/SafeToken.sol";
 
 */
 
-contract TokenAdapter is
-  PausableUpgradeable,
-  AccessControlUpgradeable,
-  ReentrancyGuardUpgradeable,
-  IGenericTokenAdapter,
-  ICagable
-{
+contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGenericTokenAdapter, ICagable {
   using SafeToken for address;
 
-  // --- Auth ---
-  bytes32 public constant OWNER_ROLE = DEFAULT_ADMIN_ROLE;
-  bytes32 public constant SHOW_STOPPER_ROLE = keccak256("SHOW_STOPPER_ROLE");
-
   modifier onlyOwner() {
-    require(hasRole(OWNER_ROLE, msg.sender), "!ownerRole");
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
     _;
   }
 
@@ -81,40 +66,37 @@ contract TokenAdapter is
     address collateralToken_
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
-
-    _setupRole(OWNER_ROLE, msg.sender);
 
     live = 1;
     bookKeeper = IBookKeeper(_bookKeeper);
     collateralPoolId = collateralPoolId_;
     collateralToken = collateralToken_;
     decimals = IToken(collateralToken).decimals();
-
-    // Grant the contract deployer the owner role: it will be able
-    // to grant and revoke any roles
-    _setupRole(OWNER_ROLE, msg.sender);
   }
 
   function cage() external override {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 1, "TokenAdapter/not-live");
     live = 0;
-    emit Cage();
+    emit LogCage();
   }
 
   function uncage() external override {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
-      hasRole(OWNER_ROLE, msg.sender) || hasRole(SHOW_STOPPER_ROLE, msg.sender),
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
       "!(ownerRole or showStopperRole)"
     );
     require(live == 0, "TokenAdapter/not-caged");
     live = 1;
-    emit Uncage();
+    emit LogUncage();
   }
 
   /// @dev Deposit token into the system from the caller to be used as collateral
@@ -124,7 +106,7 @@ contract TokenAdapter is
     address usr,
     uint256 wad,
     bytes calldata /* data */
-  ) external payable override nonReentrant {
+  ) external payable override nonReentrant whenNotPaused {
     require(live == 1, "TokenAdapter/not-live");
     require(int256(wad) >= 0, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, usr, int256(wad));
@@ -140,7 +122,7 @@ contract TokenAdapter is
     address usr,
     uint256 wad,
     bytes calldata /* data */
-  ) external override nonReentrant {
+  ) external override nonReentrant whenNotPaused {
     require(wad <= 2**255, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
 
@@ -162,4 +144,25 @@ contract TokenAdapter is
     uint256 wad,
     bytes calldata data
   ) external override nonReentrant {}
+
+  // --- pause ---
+  function pause() external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _pause();
+  }
+
+  function unpause() external {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _unpause();
+  }
 }

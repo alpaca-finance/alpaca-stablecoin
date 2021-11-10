@@ -1,3 +1,16 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
+
 pragma solidity 0.6.12;
 
 import "./ProxyWallet.sol";
@@ -7,7 +20,7 @@ import "./ProxyWalletCache.sol";
 // This factory deploys new proxy instances through build()
 // Deployed proxy addresses are logged
 contract ProxyWalletFactory {
-  event Created(address indexed sender, address indexed owner, address proxy, address cache);
+  event LogCreated(address indexed _sender, address indexed _owner, address _proxy, address _cache);
   mapping(address => bool) public isProxy;
   ProxyWalletCache public cache;
 
@@ -17,16 +30,16 @@ contract ProxyWalletFactory {
 
   // deploys a new proxy instance
   // sets owner of proxy to caller
-  function build() public returns (address payable proxy) {
-    proxy = build(msg.sender);
+  function build() public returns (address payable _proxy) {
+    _proxy = build(msg.sender);
   }
 
   // deploys a new proxy instance
   // sets custom owner of proxy
-  function build(address owner) public returns (address payable proxy) {
-    proxy = address(new ProxyWallet(address(cache)));
-    emit Created(msg.sender, owner, address(proxy), address(cache));
-    ProxyWallet(proxy).setOwner(owner);
-    isProxy[proxy] = true;
+  function build(address _owner) public returns (address payable _proxy) {
+    _proxy = address(new ProxyWallet(address(cache)));
+    emit LogCreated(msg.sender, _owner, address(_proxy), address(cache));
+    ProxyWallet(_proxy).setOwner(_owner);
+    isProxy[_proxy] = true;
   }
 }

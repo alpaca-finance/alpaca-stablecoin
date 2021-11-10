@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (C) 2021 Dai Foundation
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
 
 pragma solidity 0.6.12;
 
@@ -35,26 +32,26 @@ abstract contract FlashLoanReceiverBase is IBookKeeperFlashBorrower, IERC3156Fla
   // --- Math ---
   uint256 constant RAY = 10**27;
 
-  function rad(uint256 wad) internal pure returns (uint256) {
-    return mul(wad, RAY);
+  function rad(uint256 _wad) internal pure returns (uint256) {
+    return mul(_wad, RAY);
   }
 
-  function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require((z = x + y) >= x);
+  function add(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require((_z = _x + _y) >= _x);
   }
 
-  function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
-    require(y == 0 || (z = x * y) / y == x);
+  function mul(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    require(_y == 0 || (_z = _x * _y) / _y == _x);
   }
 
   // --- Helper Functions ---
-  function approvePayback(uint256 amount) internal {
+  function approvePayback(uint256 _amount) internal {
     // Lender takes back the stablecoin as per ERC 3156 spec
-    flash.stablecoin().approve(address(flash), amount);
+    flash.stablecoin().approve(address(flash), _amount);
   }
 
-  function payBackBookKeeper(uint256 amount) internal {
+  function payBackBookKeeper(uint256 _amount) internal {
     // Lender takes back the stablecoin as per ERC 3156 spec
-    flash.bookKeeper().moveStablecoin(address(this), address(flash), amount);
+    flash.bookKeeper().moveStablecoin(address(this), address(flash), _amount);
   }
 }

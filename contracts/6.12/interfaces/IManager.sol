@@ -1,4 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
+
 pragma solidity 0.6.12;
 
 interface IManager {
@@ -57,4 +69,11 @@ interface IManager {
   function importPosition(address, uint256) external;
 
   function movePosition(uint256, uint256) external;
+
+  function redeemLockedCollateral(
+    uint256,
+    address,
+    address,
+    bytes calldata
+  ) external;
 }

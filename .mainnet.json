@@ -1,0 +1,107 @@
+{
+  "Timelock": "",
+  "ProxyWalletFactory": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "ProxyWalletRegistry": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "AlpacaStablecoinProxyActions": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "AccessControlConfig": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "AlpacaStablecoin": {
+    "AUSD": {
+      "address": "",
+      "deployedBlock": 0
+    }
+  },
+  "CollateralPoolConfig": {
+    "address": "",
+    "deployedBlock": 0,
+    "collateralPools": [
+      {
+        "collateralPoolId": "",
+        "debtCeiling": "",
+        "debtFloor": "",
+        "priceFeed": "",
+        "liquidationRatio": "",
+        "stabilityFeeRate": "",
+        "adapter": "",
+        "closeFactorBps": 0,
+        "liquidatorIncentiveBps": 0,
+        "treasuryFeesBps": 0,
+        "strategy": ""
+      }
+    ]
+  },
+  "BookKeeper": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "FlashMintModule": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "ShowStopper": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "PositionManager": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "GetPositions": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "StabilityFeeCollector": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "IbTokenAdapters": [
+    {
+      "address": "",
+      "deployedBlock": 0,
+      "collateralToken": "",
+      "rewardToken": "",
+      "treasuryFeeBps": "",
+      "treasuryAccount": ""
+    }
+  ],
+  "StablecoinAdapters": {
+    "AUSD": {
+      "address": "",
+      "deployedBlock": 0,
+      "alpacaStablecoin": ""
+    }
+  },
+  "PriceOracle": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "PriceFeed": [
+    {
+      "address": "",
+      "deployedBlock": 0
+    }
+  ],
+  "SystemDebtEngine": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "LiquidationEngine": {
+    "address": "",
+    "deployedBlock": 0
+  },
+  "Strategies": {
+    "FixedSpreadLiquidationStrategy": "",
+    "deployedBlock": 0
+  }
+}

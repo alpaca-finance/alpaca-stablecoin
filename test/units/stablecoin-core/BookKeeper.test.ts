@@ -3,26 +3,74 @@ import { Signer } from "ethers"
 import chai from "chai"
 import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
-import { BookKeeper__factory, BookKeeper } from "../../../typechain"
+import {
+  BookKeeper__factory,
+  BookKeeper,
+  CollateralPoolConfig__factory,
+  CollateralPoolConfig,
+  SimplePriceFeed__factory,
+  SimplePriceFeed,
+  TokenAdapter__factory,
+  TokenAdapter,
+  BEP20__factory,
+  BEP20,
+  AccessControlConfig__factory,
+  AccessControlConfig,
+} from "../../../typechain"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
+import { MockContract, smockit } from "@eth-optimism/smock"
 
 chai.use(solidity)
 const { expect } = chai
 const { formatBytes32String } = ethers.utils
+const { AddressZero } = ethers.constants
 
 type fixture = {
   bookKeeper: BookKeeper
+  mockedCollateralPoolConfig: MockContract
+  mockedSimplePriceFeed: MockContract
+  mockedTokenAdapter: MockContract
+  mockedAccessControlConfig: MockContract
 }
 
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
 
+  const AccessControlConfig = (await ethers.getContractFactory(
+    "AccessControlConfig",
+    deployer
+  )) as AccessControlConfig__factory
+  const accessControlConfig = (await upgrades.deployProxy(AccessControlConfig, [])) as AccessControlConfig
+  const mockedAccessControlConfig = await smockit(accessControlConfig)
+
+  const CollateralPoolConfig = (await ethers.getContractFactory(
+    "CollateralPoolConfig",
+    deployer
+  )) as CollateralPoolConfig__factory
+  const collateralPoolConfig = (await upgrades.deployProxy(CollateralPoolConfig, [
+    accessControlConfig.address,
+  ])) as CollateralPoolConfig
+  const mockedCollateralPoolConfig = await smockit(collateralPoolConfig)
+
   // Deploy mocked BookKeeper
   const BookKeeper = (await ethers.getContractFactory("BookKeeper", deployer)) as BookKeeper__factory
-  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [])) as BookKeeper
+  const bookKeeper = (await upgrades.deployProxy(BookKeeper, [
+    mockedCollateralPoolConfig.address,
+    mockedAccessControlConfig.address,
+  ])) as BookKeeper
   await bookKeeper.deployed()
 
-  return { bookKeeper }
+  const mockedSimplePriceFeed = await smockit(await ethers.getContractFactory("SimplePriceFeed", deployer))
+
+  const mockedTokenAdapter = await smockit(await ethers.getContractFactory("TokenAdapter", deployer))
+
+  return {
+    bookKeeper,
+    mockedCollateralPoolConfig,
+    mockedAccessControlConfig,
+    mockedSimplePriceFeed,
+    mockedTokenAdapter,
+  }
 }
 
 describe("BookKeeper", () => {
@@ -42,8 +90,14 @@ describe("BookKeeper", () => {
   let bookKeeperAsAlice: BookKeeper
   let bookKeeperAsBob: BookKeeper
 
+  let mockedCollateralPoolConfig: MockContract
+  let mockedSimplePriceFeed: MockContract
+  let mockedTokenAdapter: MockContract
+  let mockedAccessControlConfig: MockContract
+
   beforeEach(async () => {
-    ;({ bookKeeper } = await waffle.loadFixture(loadFixtureHandler))
+    ;({ bookKeeper, mockedCollateralPoolConfig, mockedAccessControlConfig, mockedSimplePriceFeed, mockedTokenAdapter } =
+      await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress] = await Promise.all([
       deployer.getAddress(),
@@ -55,47 +109,11 @@ describe("BookKeeper", () => {
     bookKeeperAsBob = BookKeeper__factory.connect(bookKeeper.address, bob) as BookKeeper
   })
 
-  describe("#init", () => {
-    context("when the caller is not the owner", () => {
-      it("should revert", async () => {
-        await expect(bookKeeperAsAlice.init(formatBytes32String("BNB"))).to.be.revertedWith("!ownerRole")
-      })
-    })
-
-    context("when the caller is the owner", () => {
-      context("when initialize BNB collateral pool", async () => {
-        it("should be success", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.init(formatBytes32String("BNB"))
-          const pool = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-          expect(pool.debtAccumulatedRate).equal(WeiPerRay)
-        })
-      })
-
-      context("when collateral pool already init", () => {
-        it("should be revert", async () => {
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          // first initialize BNB colleteral pool
-          await bookKeeper.init(formatBytes32String("BNB"))
-          // second initialize BNB colleteral pool
-          await expect(bookKeeper.init(formatBytes32String("BNB"))).to.be.revertedWith(
-            "BookKeeper/collateral-pool-already-init"
-          )
-        })
-      })
-
-      context("when role can't authentication", () => {
-        it("should be revert", async () => {
-          await expect(bookKeeperAsAlice.init(formatBytes32String("BNB"))).to.be.revertedWith("!ownerRole")
-        })
-      })
-    })
-  })
-
   describe("#addCollateral", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
+
         await expect(
           bookKeeperAsAlice.addCollateral(formatBytes32String("BNB"), deployerAddress, WeiPerWad)
         ).to.be.revertedWith("!adapterRole")
@@ -105,11 +123,10 @@ describe("BookKeeper", () => {
     context("when the caller is the owner", async () => {
       context("when collateral to add is positive", () => {
         it("should be able to call addCollateral", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
           // init BNB collateral pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          mockedCollateralPoolConfig.smocked.getStabilityFeeRate.will.return.with(WeiPerRay)
 
           const collateralTokenBefore = await bookKeeper.collateralToken(formatBytes32String("BNB"), deployerAddress)
           expect(collateralTokenBefore).to.be.equal(0)
@@ -123,13 +140,10 @@ describe("BookKeeper", () => {
 
       context("when collateral to add is negative", () => {
         it("should be able to call addCollateral", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           // init BNB collateral pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          mockedCollateralPoolConfig.smocked.getStabilityFeeRate.will.return.with(WeiPerRay)
 
           // add collateral 1 BNB
           await bookKeeper.addCollateral(formatBytes32String("BNB"), deployerAddress, WeiPerWad)
@@ -158,8 +172,7 @@ describe("BookKeeper", () => {
 
       context("when alice allow bob to move collateral", () => {
         it("should be able to call moveCollateral", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           // add collateral 1 BNB to alice
           await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad)
@@ -194,9 +207,7 @@ describe("BookKeeper", () => {
       })
       context("when alice has enough collateral", () => {
         it("should be able to call moveCollateral", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           // add collateral 1 BNB to alice
           await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad)
@@ -229,8 +240,7 @@ describe("BookKeeper", () => {
 
       context("when alice allow bob to move collateral", () => {
         it("should be able to call moveStablecoin", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           // mint 1 rad to alice
           await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
@@ -263,8 +273,7 @@ describe("BookKeeper", () => {
       })
       context("when alice has enough stablecoin", () => {
         it("should be able to call moveStablecoin", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           // mint 1 rad to alice
           await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
@@ -290,10 +299,9 @@ describe("BookKeeper", () => {
     context("when bookkeeper does not live", () => {
       it("should be revert", async () => {
         // grant role access
-        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-        bookKeeper.cage()
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+        await bookKeeper.cage()
 
-        await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
         await expect(
           bookKeeper.adjustPosition(
             formatBytes32String("BNB"),
@@ -309,7 +317,7 @@ describe("BookKeeper", () => {
 
     context("when collateral pool not init", () => {
       it("should be revert", async () => {
-        await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
         await expect(
           bookKeeper.adjustPosition(
             formatBytes32String("BNB"),
@@ -322,17 +330,19 @@ describe("BookKeeper", () => {
         ).to.be.revertedWith("BookKeeper/collateralPool-not-init")
       })
     })
-
     context("when call adjustPosition(lock, free)", () => {
       context("when call adjustPosition(lock)", () => {
         context("when alice call but bob is collateral owner", () => {
           it("should be revert", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
+            mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10000))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
+
             await expect(
               bookKeeperAsAlice.adjustPosition(
                 formatBytes32String("BNB"),
@@ -347,12 +357,14 @@ describe("BookKeeper", () => {
           context("when bob allow alice to move collateral", () => {
             context("when bob doesn't have enough collateral", () => {
               it("should be revert", async () => {
-                // grant role access
-                await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-                await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+                mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-                // initialize BNB colleteral pool
-                await bookKeeper.init(formatBytes32String("BNB"))
+                mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+                mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+                mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+                mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10000))
+                mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+                mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
                 // alice allow bob to move stablecoin
                 await bookKeeperAsBob.whitelist(aliceAddress)
@@ -372,13 +384,14 @@ describe("BookKeeper", () => {
 
             context("when bob has enough collateral", () => {
               it("should be able to call adjustPosition(lock)", async () => {
-                // grant role access
-                await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-                await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-                await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+                mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-                // initialize BNB colleteral pool
-                await bookKeeper.init(formatBytes32String("BNB"))
+                mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+                mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+                mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+                mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10000))
+                mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+                mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
                 // add collateral to bob 10 BNB
                 await bookKeeper.addCollateral(formatBytes32String("BNB"), bobAddress, WeiPerWad.mul(10))
@@ -408,12 +421,14 @@ describe("BookKeeper", () => {
         context("when alice call and alice is collateral owner", () => {
           context("when alice doesn't have enough collateral", () => {
             it("should be revert", async () => {
-              // grant role access
-              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+              mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-              // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10000))
+              mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
               await expect(
                 bookKeeperAsAlice.adjustPosition(
@@ -430,13 +445,14 @@ describe("BookKeeper", () => {
 
           context("when alice has enough collateral", () => {
             it("should be able to call adjustPosition(lock)", async () => {
-              // grant role access
-              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+              mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-              // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10000))
+              mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
               // add collateral to bob 10 BNB
               await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -464,12 +480,14 @@ describe("BookKeeper", () => {
         context("when alice call and alice is collateral owner", () => {
           context("when alice doesn't have enough lock collateral in position", () => {
             it("should be revert", async () => {
-              // grant role access
-              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+              mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-              // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10000))
+              mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
               // free collateral
               await expect(
@@ -486,14 +504,14 @@ describe("BookKeeper", () => {
           })
           context("when alice has enough lock collateral in position", () => {
             it("should be able to call adjustPosition(free)", async () => {
-              // grant role access
-              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+              mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-              // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10000))
+              mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
               // add collateral to alice 10 BNB
               await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -539,12 +557,14 @@ describe("BookKeeper", () => {
         context("when alice call but bob is collateral owner", () => {
           context("when alice doesn't have enough lock collateral in position", () => {
             it("should be revert", async () => {
-              // grant role access
-              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+              mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-              // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10000))
+              mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
               // free collateral
               await expect(
@@ -561,13 +581,14 @@ describe("BookKeeper", () => {
           })
           context("when alice has enough lock collateral in position", () => {
             it("should be able to call adjustPosition(free)", async () => {
-              // grant role access
-              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+              mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-              // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
+              mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10000))
+              mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
               // add collateral to alice 10 BNB
               await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
@@ -605,20 +626,72 @@ describe("BookKeeper", () => {
           })
         })
       })
-    })
 
-    context("when call adjustPosition(draw, wipe)", () => {
-      context("when debt ceilings are exceeded", () => {
-        context("when pool debt ceiling are exceeded", () => {
+      context("when call adjustPosition(draw, wipe)", () => {
+        context("when debt ceilings are exceeded", () => {
+          context("when pool debt ceiling are exceeded", () => {
+            it("should be revert", async () => {
+              mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
+              mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad)
+              mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
+
+              // set total debt ceiling 10 rad
+              await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
+
+              await expect(
+                bookKeeper.adjustPosition(
+                  formatBytes32String("BNB"),
+                  deployerAddress,
+                  deployerAddress,
+                  deployerAddress,
+                  0,
+                  WeiPerWad.mul(10)
+                )
+              ).to.be.revertedWith("BookKeeper/ceiling-exceeded")
+            })
+          })
+          context("when total debt ceiling are exceeded", () => {
+            it("should be revert", async () => {
+              mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
+              mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+              mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
+
+              // set total debt ceiling 1 rad
+              await bookKeeper.setTotalDebtCeiling(WeiPerRad)
+
+              await expect(
+                bookKeeper.adjustPosition(
+                  formatBytes32String("BNB"),
+                  deployerAddress,
+                  deployerAddress,
+                  deployerAddress,
+                  0,
+                  WeiPerWad.mul(10)
+                )
+              ).to.be.revertedWith("BookKeeper/ceiling-exceeded")
+            })
+          })
+        })
+        context("when position is not safe", () => {
           it("should be revert", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
+            mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 1 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -632,123 +705,20 @@ describe("BookKeeper", () => {
                 0,
                 WeiPerWad.mul(10)
               )
-            ).to.be.revertedWith("BookKeeper/ceiling-exceeded")
+            ).to.be.revertedWith("BookKeeper/not-safe")
           })
         })
-        context("when total debt ceiling are exceeded", () => {
-          it("should be revert", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
+        context("when call adjustPosition(draw)", () => {
+          context("when alice call but bob is position owner", () => {
+            it("should be revert", async () => {
+              mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-            // set total debt ceiling 1 rad
-            await bookKeeper.setTotalDebtCeiling(WeiPerRad)
-
-            await expect(
-              bookKeeper.adjustPosition(
-                formatBytes32String("BNB"),
-                deployerAddress,
-                deployerAddress,
-                deployerAddress,
-                0,
-                WeiPerWad.mul(10)
-              )
-            ).to.be.revertedWith("BookKeeper/ceiling-exceeded")
-          })
-        })
-      })
-      context("when position is not safe", () => {
-        it("should be revert", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
-          // initialize BNB colleteral pool
-          await bookKeeper.init(formatBytes32String("BNB"))
-          // set pool debt ceiling 10 rad
-          await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-          // set price with safety margin 1 ray
-          await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-
-          // set total debt ceiling 10 rad
-          await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
-
-          await expect(
-            bookKeeper.adjustPosition(
-              formatBytes32String("BNB"),
-              deployerAddress,
-              deployerAddress,
-              deployerAddress,
-              0,
-              WeiPerWad.mul(10)
-            )
-          ).to.be.revertedWith("BookKeeper/not-safe")
-        })
-      })
-      context("when call adjustPosition(draw)", () => {
-        context("when alice call but bob is position owner", () => {
-          it("should be revert", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), bobAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
-
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-
-            // set total debt ceiling 10 rad
-            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
-
-            // add collateral to 10 BNB
-            await bookKeeper.addCollateral(formatBytes32String("BNB"), bobAddress, WeiPerWad.mul(10))
-
-            // bob lock collateral 10 BNB
-            await bookKeeperAsBob.adjustPosition(
-              formatBytes32String("BNB"),
-              bobAddress,
-              bobAddress,
-              bobAddress,
-              WeiPerWad.mul(10),
-              0
-            )
-
-            await expect(
-              bookKeeperAsAlice.adjustPosition(
-                formatBytes32String("BNB"),
-                bobAddress,
-                bobAddress,
-                bobAddress,
-                0,
-                WeiPerWad.mul(10)
-              )
-            ).to.be.revertedWith("BookKeeper/not-allowed-position-address")
-          })
-          context("when bob allow alice to manage position", () => {
-            it("should be able to call adjustPosition(draw)", async () => {
-              // grant role access
-              await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), bobAddress)
-              await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
-
-              // initialize BNB colleteral pool
-              await bookKeeper.init(formatBytes32String("BNB"))
-              // set pool debt ceiling 10 rad
-              await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-              // set price with safety margin 1 ray
-              await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+              mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
               // set total debt ceiling 10 rad
               await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -766,258 +736,278 @@ describe("BookKeeper", () => {
                 0
               )
 
-              // bob allow alice
-              await bookKeeperAsBob.whitelist(aliceAddress)
+              await expect(
+                bookKeeperAsAlice.adjustPosition(
+                  formatBytes32String("BNB"),
+                  bobAddress,
+                  bobAddress,
+                  bobAddress,
+                  0,
+                  WeiPerWad.mul(10)
+                )
+              ).to.be.revertedWith("BookKeeper/not-allowed-position-address")
+            })
 
-              const positionBobBefore = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
-              expect(positionBobBefore.debtShare).to.be.equal(0)
-              const BNBPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-              expect(BNBPoolBefore.totalDebtShare).to.be.equal(0)
+            context("when bob allow alice to manage position", () => {
+              it("should be able to call adjustPosition(draw)", async () => {
+                mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
+                mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+                mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+                mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+                mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+                mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+                mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
+
+                // set total debt ceiling 10 rad
+                await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
+
+                // add collateral to 10 BNB
+                await bookKeeper.addCollateral(formatBytes32String("BNB"), bobAddress, WeiPerWad.mul(10))
+
+                // bob lock collateral 10 BNB
+                await bookKeeperAsBob.adjustPosition(
+                  formatBytes32String("BNB"),
+                  bobAddress,
+                  bobAddress,
+                  bobAddress,
+                  WeiPerWad.mul(10),
+                  0
+                )
+
+                const { calls: setTotalDebtShare } = mockedCollateralPoolConfig.smocked.setTotalDebtShare
+                expect(setTotalDebtShare.length).to.be.equal(1)
+                expect(setTotalDebtShare[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+                expect(setTotalDebtShare[0]._totalDebtShare).to.be.equal(0)
+
+                const positionBobBefore = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
+                expect(positionBobBefore.debtShare).to.be.equal(0)
+
+                const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
+                expect(stablecoinAliceBefore).to.be.equal(0)
+
+                // bob allow alice
+                await bookKeeperAsBob.whitelist(aliceAddress)
+
+                // alice draw
+                await bookKeeperAsAlice.adjustPosition(
+                  formatBytes32String("BNB"),
+                  bobAddress,
+                  bobAddress,
+                  aliceAddress,
+                  0,
+                  WeiPerWad.mul(10)
+                )
+
+                const { calls: setTotalDebtShare2 } = mockedCollateralPoolConfig.smocked.setTotalDebtShare
+                expect(setTotalDebtShare2.length).to.be.equal(1)
+                expect(setTotalDebtShare2[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+                expect(setTotalDebtShare2[0]._totalDebtShare).to.be.equal(WeiPerWad.mul(10))
+
+                const positionBobAfter = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
+                expect(positionBobAfter.debtShare).to.be.equal(WeiPerWad.mul(10))
+
+                const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
+                expect(stablecoinAliceAfter).to.be.equal(WeiPerRad.mul(10))
+              })
+            })
+          })
+          context("when alice call and alice is position owner", () => {
+            it("should be able to call adjustPosition(draw)", async () => {
+              mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
+              mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+              mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
+
+              // set total debt ceiling 10 rad
+              await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
+
+              // add collateral to 10 BNB
+              await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
+
+              // alice lock collateral 10 BNB
+              await bookKeeperAsAlice.adjustPosition(
+                formatBytes32String("BNB"),
+                aliceAddress,
+                aliceAddress,
+                aliceAddress,
+                WeiPerWad.mul(10),
+                0
+              )
+
+              const { calls: setTotalDebtShare } = mockedCollateralPoolConfig.smocked.setTotalDebtShare
+              expect(setTotalDebtShare.length).to.be.equal(1)
+              expect(setTotalDebtShare[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
+              expect(setTotalDebtShare[0]._totalDebtShare).to.be.equal(0)
+
+              const positionaliceBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
+              expect(positionaliceBefore.debtShare).to.be.equal(0)
+
               const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
               expect(stablecoinAliceBefore).to.be.equal(0)
 
               // alice draw
               await bookKeeperAsAlice.adjustPosition(
                 formatBytes32String("BNB"),
-                bobAddress,
-                bobAddress,
+                aliceAddress,
+                aliceAddress,
                 aliceAddress,
                 0,
                 WeiPerWad.mul(10)
               )
 
-              const positionBobAfter = await bookKeeper.positions(formatBytes32String("BNB"), bobAddress)
-              expect(positionBobAfter.debtShare).to.be.equal(WeiPerWad.mul(10))
-              const BNBPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-              expect(BNBPoolAfter.totalDebtShare).to.be.equal(WeiPerWad.mul(10))
+              const positionaliceAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
+              expect(positionaliceAfter.debtShare).to.be.equal(WeiPerWad.mul(10))
               const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
               expect(stablecoinAliceAfter).to.be.equal(WeiPerRad.mul(10))
             })
           })
-        })
-        context("when alice call and alice is position owner", () => {
-          it("should be able to call adjustPosition(draw)", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+          context("when position debt value < debt floor", () => {
+            it("should be revert", async () => {
+              mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+              mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+              mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(20))
+              mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+              mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+              // set total debt ceiling 10 rad
+              await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
-            // set total debt ceiling 10 rad
-            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
+              // add collateral to 10 BNB
+              await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
 
-            // add collateral to 10 BNB
-            await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
-
-            // alice lock collateral 10 BNB
-            await bookKeeperAsAlice.adjustPosition(
-              formatBytes32String("BNB"),
-              aliceAddress,
-              aliceAddress,
-              aliceAddress,
-              WeiPerWad.mul(10),
-              0
-            )
-
-            const positionaliceBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
-            expect(positionaliceBefore.debtShare).to.be.equal(0)
-            const BNBPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-            expect(BNBPoolBefore.totalDebtShare).to.be.equal(0)
-            const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
-            expect(stablecoinAliceBefore).to.be.equal(0)
-
-            // alice draw
-            await bookKeeperAsAlice.adjustPosition(
-              formatBytes32String("BNB"),
-              aliceAddress,
-              aliceAddress,
-              aliceAddress,
-              0,
-              WeiPerWad.mul(10)
-            )
-
-            const positionaliceAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
-            expect(positionaliceAfter.debtShare).to.be.equal(WeiPerWad.mul(10))
-            const BNBPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-            expect(BNBPoolAfter.totalDebtShare).to.be.equal(WeiPerWad.mul(10))
-            const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
-            expect(stablecoinAliceAfter).to.be.equal(WeiPerRad.mul(10))
-          })
-        })
-        context("when position debt value < debt floor", () => {
-          it("should be revert", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
-
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-            // set position debt floor 20 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(20))
-
-            // set total debt ceiling 10 rad
-            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
-
-            // add collateral to 10 BNB
-            await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
-
-            // alice lock collateral 10 BNB
-            await bookKeeperAsAlice.adjustPosition(
-              formatBytes32String("BNB"),
-              aliceAddress,
-              aliceAddress,
-              aliceAddress,
-              WeiPerWad.mul(10),
-              0
-            )
-
-            // alice draw
-            await expect(
-              bookKeeperAsAlice.adjustPosition(
+              // alice lock collateral 10 BNB
+              await bookKeeperAsAlice.adjustPosition(
                 formatBytes32String("BNB"),
                 aliceAddress,
                 aliceAddress,
                 aliceAddress,
-                0,
-                WeiPerWad.mul(10)
+                WeiPerWad.mul(10),
+                0
               )
-            ).to.be.revertedWith("BookKeeper/debt-floor")
+
+              // alice draw
+              await expect(
+                bookKeeperAsAlice.adjustPosition(
+                  formatBytes32String("BNB"),
+                  aliceAddress,
+                  aliceAddress,
+                  aliceAddress,
+                  0,
+                  WeiPerWad.mul(10)
+                )
+              ).to.be.revertedWith("BookKeeper/debt-floor")
+            })
           })
-        })
-      })
-      context("when call adjustPosition(wipe)", () => {
-        context("when alice call and alice is position owner", () => {
-          it("should be able to call adjustPosition(wipe)", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
 
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
+          context("when call adjustPosition(wipe)", () => {
+            context("when alice call and alice is position owner", () => {
+              it("should be able to call adjustPosition(wipe)", async () => {
+                mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+                mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+                mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(1))
+                mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+                mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
-            // set total debt ceiling 10 rad
-            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
+                // set total debt ceiling 10 rad
+                await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
-            // add collateral to 10 BNB
-            await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
+                // add collateral to 10 BNB
+                await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
 
-            // alice lock collateral 10 BNB
-            await bookKeeperAsAlice.adjustPosition(
-              formatBytes32String("BNB"),
-              aliceAddress,
-              aliceAddress,
-              aliceAddress,
-              WeiPerWad.mul(10),
-              0
-            )
+                // alice lock collateral 10 BNB
+                await bookKeeperAsAlice.adjustPosition(
+                  formatBytes32String("BNB"),
+                  aliceAddress,
+                  aliceAddress,
+                  aliceAddress,
+                  WeiPerWad.mul(10),
+                  0
+                )
 
-            // alice draw
-            await bookKeeperAsAlice.adjustPosition(
-              formatBytes32String("BNB"),
-              aliceAddress,
-              aliceAddress,
-              aliceAddress,
-              0,
-              WeiPerWad.mul(10)
-            )
+                // alice draw
+                await bookKeeperAsAlice.adjustPosition(
+                  formatBytes32String("BNB"),
+                  aliceAddress,
+                  aliceAddress,
+                  aliceAddress,
+                  0,
+                  WeiPerWad.mul(10)
+                )
 
-            const positionaliceBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
-            expect(positionaliceBefore.debtShare).to.be.equal(WeiPerWad.mul(10))
-            const BNBPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-            expect(BNBPoolBefore.totalDebtShare).to.be.equal(WeiPerWad.mul(10))
-            const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
-            expect(stablecoinAliceBefore).to.be.equal(WeiPerRad.mul(10))
+                const positionaliceBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
+                expect(positionaliceBefore.debtShare).to.be.equal(WeiPerWad.mul(10))
+                const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
+                expect(stablecoinAliceBefore).to.be.equal(WeiPerRad.mul(10))
+                mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(WeiPerWad.mul(10))
+                // alice wipe
+                await bookKeeperAsAlice.adjustPosition(
+                  formatBytes32String("BNB"),
+                  aliceAddress,
+                  aliceAddress,
+                  aliceAddress,
+                  0,
+                  WeiPerWad.mul(-10)
+                )
 
-            // alice wipe
-            await bookKeeperAsAlice.adjustPosition(
-              formatBytes32String("BNB"),
-              aliceAddress,
-              aliceAddress,
-              aliceAddress,
-              0,
-              WeiPerWad.mul(-10)
-            )
+                const positionaliceAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
+                expect(positionaliceAfter.debtShare).to.be.equal(0)
 
-            const positionaliceAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
-            expect(positionaliceAfter.debtShare).to.be.equal(0)
-            const BNBPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-            expect(BNBPoolAfter.totalDebtShare).to.be.equal(0)
-            const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
-            expect(stablecoinAliceAfter).to.be.equal(0)
-          })
-        })
-        context("when position debt value < debt floor", () => {
-          it("should be revert", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+                const stablecoinAliceAfter = await bookKeeper.stablecoin(aliceAddress)
+                expect(stablecoinAliceAfter).to.be.equal(0)
+              })
+            })
+            context("when position debt value < debt floor", () => {
+              it("should be revert", async () => {
+                mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+                mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+                mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(5))
+                mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+                mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-            // set position debt floor 5 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(5))
-            // set total debt ceiling 10 rad
-            await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
+                // set total debt ceiling 10 rad
+                await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
-            // add collateral to 10 BNB
-            await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
+                // add collateral to 10 BNB
+                await bookKeeper.addCollateral(formatBytes32String("BNB"), aliceAddress, WeiPerWad.mul(10))
 
-            // alice lock collateral 10 BNB
-            await bookKeeperAsAlice.adjustPosition(
-              formatBytes32String("BNB"),
-              aliceAddress,
-              aliceAddress,
-              aliceAddress,
-              WeiPerWad.mul(10),
-              0
-            )
+                // alice lock collateral 10 BNB
+                await bookKeeperAsAlice.adjustPosition(
+                  formatBytes32String("BNB"),
+                  aliceAddress,
+                  aliceAddress,
+                  aliceAddress,
+                  WeiPerWad.mul(10),
+                  0
+                )
 
-            // alice draw
-            await bookKeeperAsAlice.adjustPosition(
-              formatBytes32String("BNB"),
-              aliceAddress,
-              aliceAddress,
-              aliceAddress,
-              0,
-              WeiPerWad.mul(10)
-            )
-
-            // alice wipe
-            await expect(
-              bookKeeperAsAlice.adjustPosition(
-                formatBytes32String("BNB"),
-                aliceAddress,
-                aliceAddress,
-                aliceAddress,
-                0,
-                WeiPerWad.mul(-9)
-              )
-            ).to.be.revertedWith("BookKeeper/debt-floor")
+                // alice draw
+                await bookKeeperAsAlice.adjustPosition(
+                  formatBytes32String("BNB"),
+                  aliceAddress,
+                  aliceAddress,
+                  aliceAddress,
+                  0,
+                  WeiPerWad.mul(10)
+                )
+                mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(WeiPerWad.mul(10))
+                // alice wipe
+                await expect(
+                  bookKeeperAsAlice.adjustPosition(
+                    formatBytes32String("BNB"),
+                    aliceAddress,
+                    aliceAddress,
+                    aliceAddress,
+                    0,
+                    WeiPerWad.mul(-9)
+                  )
+                ).to.be.revertedWith("BookKeeper/debt-floor")
+              })
+            })
           })
         })
       })
@@ -1028,20 +1018,12 @@ describe("BookKeeper", () => {
     context("when alice move position to bob", () => {
       context("when alice and bob don't allow anyone else to manage the position", () => {
         it("should be revert", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+          mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+          mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+          mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(1))
+          mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+          mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
-          // initialize BNB colleteral pool
-          await bookKeeper.init(formatBytes32String("BNB"))
-          // set pool debt ceiling 10 rad
-          await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-          // set price with safety margin 1 ray
-          await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-          // set position debt floor 1 rad
-          await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
           // set total debt ceiling 10 rad
           await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1072,20 +1054,12 @@ describe("BookKeeper", () => {
       context("when bob allow alice to manage a position", () => {
         context("when after moving alice position was not safe", () => {
           it("should be revert", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(1))
+            mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-            // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1118,20 +1092,12 @@ describe("BookKeeper", () => {
         })
         context("when after moving bob position was not safe", () => {
           it("should be revert", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(1))
+            mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-            // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1164,20 +1130,12 @@ describe("BookKeeper", () => {
         })
         context("when after moving alice position was not enough debt", () => {
           it("should be revert", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(2))
+            mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-            // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(2))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1210,20 +1168,12 @@ describe("BookKeeper", () => {
         })
         context("when after moving bob position was not enough debt", () => {
           it("should be revert", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(2))
+            mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-            // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(2))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1256,20 +1206,12 @@ describe("BookKeeper", () => {
         })
         context("when alice and bob positions are safe", () => {
           it("should be able to call movePosition", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(1))
+            mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
-            // initialize BNB colleteral pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-            // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1321,6 +1263,7 @@ describe("BookKeeper", () => {
   describe("#confiscatePosition", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
         await expect(
           bookKeeperAsAlice.confiscatePosition(
             formatBytes32String("BNB"),
@@ -1337,21 +1280,13 @@ describe("BookKeeper", () => {
       context("when start liquidation", () => {
         context("when liquidating all in position", () => {
           it("should be able to call confiscatePosition", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(1))
+            mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+            mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-            // init BNB pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-            // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
             // set total debt ceiling 1 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad)
 
@@ -1370,8 +1305,6 @@ describe("BookKeeper", () => {
             const positionBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionBefore.lockedCollateral).to.be.equal(WeiPerWad)
             expect(positionBefore.debtShare).to.be.equal(WeiPerWad)
-            const collateralPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-            expect(collateralPoolBefore.totalDebtShare).to.be.equal(WeiPerWad)
             const collateralTokenCreditorBefore = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
               deployerAddress
@@ -1381,7 +1314,7 @@ describe("BookKeeper", () => {
             expect(systemBadDebtDebtorBefore).to.be.equal(0)
             const totalUnbackedStablecoinBefore = await bookKeeper.totalUnbackedStablecoin()
             expect(totalUnbackedStablecoinBefore).to.be.equal(0)
-
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(WeiPerWad.mul(1))
             // confiscate position
             await bookKeeper.confiscatePosition(
               formatBytes32String("BNB"),
@@ -1395,8 +1328,6 @@ describe("BookKeeper", () => {
             const positionAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionAfter.lockedCollateral).to.be.equal(0)
             expect(positionAfter.debtShare).to.be.equal(0)
-            const collateralPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-            expect(collateralPoolAfter.totalDebtShare).to.be.equal(0)
             const collateralTokenCreditorAfter = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
               deployerAddress
@@ -1410,20 +1341,13 @@ describe("BookKeeper", () => {
         })
         context("when liquidating some in position", () => {
           it("should be able to call confiscatePosition", async () => {
-            // grant role access
-            await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.LIQUIDATION_ENGINE_ROLE(), deployerAddress)
-            await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), aliceAddress)
-            // init BNB pool
-            await bookKeeper.init(formatBytes32String("BNB"))
-            // set pool debt ceiling 10 rad
-            await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-            // set price with safety margin 1 ray
-            await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-            // set position debt floor 1 rad
-            await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
+            mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+            mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(1))
+            mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+            mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+            mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1442,8 +1366,6 @@ describe("BookKeeper", () => {
             const positionBefore = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionBefore.lockedCollateral).to.be.equal(WeiPerWad.mul(2))
             expect(positionBefore.debtShare).to.be.equal(WeiPerWad.mul(2))
-            const collateralPoolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-            expect(collateralPoolBefore.totalDebtShare).to.be.equal(WeiPerWad.mul(2))
             const collateralTokenCreditorBefore = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
               deployerAddress
@@ -1453,7 +1375,7 @@ describe("BookKeeper", () => {
             expect(systemBadDebtDebtorBefore).to.be.equal(0)
             const totalUnbackedStablecoinBefore = await bookKeeper.totalUnbackedStablecoin()
             expect(totalUnbackedStablecoinBefore).to.be.equal(0)
-
+            mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(WeiPerWad.mul(2))
             // confiscate position
             await bookKeeper.confiscatePosition(
               formatBytes32String("BNB"),
@@ -1467,8 +1389,6 @@ describe("BookKeeper", () => {
             const positionAfter = await bookKeeper.positions(formatBytes32String("BNB"), aliceAddress)
             expect(positionAfter.lockedCollateral).to.be.equal(WeiPerWad)
             expect(positionAfter.debtShare).to.be.equal(WeiPerWad)
-            const collateralPoolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-            expect(collateralPoolAfter.totalDebtShare).to.be.equal(WeiPerWad)
             const collateralTokenCreditorAfter = await bookKeeper.collateralToken(
               formatBytes32String("BNB"),
               deployerAddress
@@ -1487,6 +1407,7 @@ describe("BookKeeper", () => {
   describe("#mintUnbackedStablecoin", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
         await expect(
           bookKeeperAsAlice.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
         ).to.be.revertedWith("!mintableRole")
@@ -1504,8 +1425,7 @@ describe("BookKeeper", () => {
           const totalStablecoinIssuedBefore = await bookKeeper.totalStablecoinIssued()
           expect(totalStablecoinIssuedBefore).to.be.equal(0)
 
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
           //  mint 1 rad to alice
           await bookKeeper.mintUnbackedStablecoin(deployerAddress, aliceAddress, WeiPerRad)
@@ -1526,8 +1446,7 @@ describe("BookKeeper", () => {
   describe("#settleSystemBadDebt", () => {
     context("when settle system bad debt", () => {
       it("should be able to call settleSystemBadDebt", async () => {
-        // grant role access
-        await bookKeeper.grantRole(await bookKeeper.MINTABLE_ROLE(), deployerAddress)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
         //  mint 1 rad to deployer
         await bookKeeper.mintUnbackedStablecoin(deployerAddress, deployerAddress, WeiPerRad)
@@ -1559,6 +1478,8 @@ describe("BookKeeper", () => {
   describe("#accrueStabilityFee", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
+
         await expect(
           bookKeeperAsAlice.accrueStabilityFee(formatBytes32String("BNB"), deployerAddress, WeiPerRay)
         ).to.be.revertedWith("!stabilityFeeCollectorRole")
@@ -1567,11 +1488,9 @@ describe("BookKeeper", () => {
     context("when the caller is the owner", async () => {
       context("when bookkeeper does not live", () => {
         it("should be revert", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.STABILITY_FEE_COLLECTOR_ROLE(), deployerAddress)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-          bookKeeper.cage()
+          await bookKeeper.cage()
 
           await expect(
             bookKeeper.accrueStabilityFee(formatBytes32String("BNB"), deployerAddress, WeiPerRay)
@@ -1580,20 +1499,13 @@ describe("BookKeeper", () => {
       })
       context("when bookkeeper is live", () => {
         it("should be able to call accrueStabilityFee", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.ADAPTER_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.STABILITY_FEE_COLLECTOR_ROLE(), deployerAddress)
-          await bookKeeper.grantRole(await bookKeeper.POSITION_MANAGER_ROLE(), deployerAddress)
-          // init BNB pool
-          await bookKeeper.init(formatBytes32String("BNB"))
-          // set pool debt ceiling 10 rad
-          await bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRad.mul(10))
-          // set price with safety margin 1 ray
-          await bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-          // set position debt floor 1 rad
-          await bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRad.mul(1))
+          mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+          mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(0)
+          mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(1))
+          mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
+          mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
+
           // set total debt ceiling 1 rad
           await bookKeeper.setTotalDebtCeiling(WeiPerRad)
 
@@ -1609,17 +1521,15 @@ describe("BookKeeper", () => {
             WeiPerWad
           )
 
-          const poolBefore = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-          expect(poolBefore.debtAccumulatedRate).to.be.equal(WeiPerRay)
           const stablecoinDeployerBefore = await bookKeeper.stablecoin(deployerAddress)
           expect(stablecoinDeployerBefore).to.be.equal(WeiPerRad)
           const totalStablecoinIssuedBefore = await bookKeeper.totalStablecoinIssued()
           expect(totalStablecoinIssuedBefore).to.be.equal(WeiPerRad)
 
+          mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(WeiPerWad.mul(1))
+
           await bookKeeper.accrueStabilityFee(formatBytes32String("BNB"), deployerAddress, WeiPerRay)
 
-          const poolAfter = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-          expect(poolAfter.debtAccumulatedRate).to.be.equal(WeiPerRay.mul(2))
           const stablecoinDeployerAfter = await bookKeeper.stablecoin(deployerAddress)
           expect(stablecoinDeployerAfter).to.be.equal(WeiPerRad.mul(2))
           const totalStablecoinIssuedAfter = await bookKeeper.totalStablecoinIssued()
@@ -1632,6 +1542,7 @@ describe("BookKeeper", () => {
   describe("#setTotalDebtCeiling", () => {
     context("when the caller is not the owner", async () => {
       it("should revert", async () => {
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
         await expect(bookKeeperAsAlice.setTotalDebtCeiling(WeiPerRad)).to.be.revertedWith("!ownerRole")
       })
     })
@@ -1639,9 +1550,9 @@ describe("BookKeeper", () => {
       context("when bookkeeper does not live", () => {
         it("should be revert", async () => {
           // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-          bookKeeper.cage()
+          await bookKeeper.cage()
 
           await expect(bookKeeper.setTotalDebtCeiling(WeiPerRad)).to.be.revertedWith("BookKeeper/not-live")
         })
@@ -1649,122 +1560,11 @@ describe("BookKeeper", () => {
       context("when bookkeeper is live", () => {
         it("should be able to call setTotalDebtCeiling", async () => {
           // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          // init BNB pool
-          await bookKeeper.init(formatBytes32String("BNB"))
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
           // set total debt ceiling 1 rad
           await expect(bookKeeper.setTotalDebtCeiling(WeiPerRad))
-            .to.emit(bookKeeper, "SetTotalDebtCeiling")
+            .to.emit(bookKeeper, "LogSetTotalDebtCeiling")
             .withArgs(deployerAddress, WeiPerRad)
-        })
-      })
-    })
-  })
-
-  describe("#setPriceWithSafetyMargin", () => {
-    context("when role can't access", async () => {
-      it("should revert", async () => {
-        await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-        await expect(
-          bookKeeperAsAlice.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)
-        ).to.be.revertedWith("!priceOracleRole")
-      })
-    })
-    context("when role can access", async () => {
-      context("when bookkeeper does not live", () => {
-        it("should be revert", async () => {
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          await bookKeeper.cage()
-
-          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-          await expect(bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-            "BookKeeper/not-live"
-          )
-        })
-      })
-      context("when bookkeeper is live", () => {
-        it("should be able to call setPriceWithSafetyMargin", async () => {
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          // init BNB pool
-          await bookKeeper.init(formatBytes32String("BNB"))
-
-          await bookKeeper.grantRole(await bookKeeper.PRICE_ORACLE_ROLE(), deployerAddress)
-          // set total debt ceiling 1 rad
-          await expect(bookKeeper.setPriceWithSafetyMargin(formatBytes32String("BNB"), WeiPerRay))
-            .to.emit(bookKeeper, "SetPriceWithSafetyMargin")
-            .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
-        })
-      })
-    })
-  })
-
-  describe("#setDebtCeiling", () => {
-    context("when the caller is not the owner", async () => {
-      it("should revert", async () => {
-        await expect(bookKeeperAsAlice.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-          "!ownerRole"
-        )
-      })
-    })
-    context("when the caller is the owner", async () => {
-      context("when bookkeeper does not live", () => {
-        it("should be revert", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-
-          bookKeeper.cage()
-
-          await expect(bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-            "BookKeeper/not-live"
-          )
-        })
-      })
-      context("when bookkeeper is live", () => {
-        it("should be able to call setDebtCeiling", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          // init BNB pool
-          await bookKeeper.init(formatBytes32String("BNB"))
-          // set total debt ceiling 1 rad
-          await expect(bookKeeper.setDebtCeiling(formatBytes32String("BNB"), WeiPerRay))
-            .to.emit(bookKeeper, "SetDebtCeiling")
-            .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
-        })
-      })
-    })
-  })
-
-  describe("#setDebtFloor", () => {
-    context("when the caller is not the owner", async () => {
-      it("should revert", async () => {
-        await expect(bookKeeperAsAlice.setDebtFloor(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-          "!ownerRole"
-        )
-      })
-    })
-    context("when the caller is the owner", async () => {
-      context("when bookkeeper does not live", () => {
-        it("should be revert", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-
-          bookKeeper.cage()
-
-          await expect(bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRay)).to.be.revertedWith(
-            "BookKeeper/not-live"
-          )
-        })
-      })
-      context("when bookkeeper is live", () => {
-        it("should be able to call setDebtFloor", async () => {
-          // grant role access
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-          // init BNB pool
-          await bookKeeper.init(formatBytes32String("BNB"))
-          // set total debt ceiling 1 rad
-          await expect(bookKeeper.setDebtFloor(formatBytes32String("BNB"), WeiPerRay))
-            .to.emit(bookKeeper, "SetDebtFloor")
-            .withArgs(deployerAddress, formatBytes32String("BNB"), WeiPerRay)
         })
       })
     })
@@ -1773,6 +1573,7 @@ describe("BookKeeper", () => {
   describe("#pause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
         await expect(bookKeeperAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
@@ -1780,25 +1581,9 @@ describe("BookKeeper", () => {
     context("when role can access", () => {
       context("and role is owner role", () => {
         it("should be success", async () => {
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
           await bookKeeper.pause()
         })
-      })
-
-      context("and role is gov role", () => {
-        it("should be success", async () => {
-          await bookKeeper.grantRole(await bookKeeper.GOV_ROLE(), deployerAddress)
-          await bookKeeper.pause()
-        })
-      })
-    })
-
-    context("when pause contract", () => {
-      it("should be success", async () => {
-        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-        await bookKeeper.pause()
-
-        await expect(bookKeeper.init(formatBytes32String("BNB"))).to.be.revertedWith("Pausable: paused")
       })
     })
   })
@@ -1806,6 +1591,7 @@ describe("BookKeeper", () => {
   describe("#unpause", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
         await expect(bookKeeperAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
@@ -1813,34 +1599,10 @@ describe("BookKeeper", () => {
     context("when role can access", () => {
       context("and role is owner role", () => {
         it("should be success", async () => {
-          await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
+          mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
           await bookKeeper.pause()
           await bookKeeper.unpause()
         })
-      })
-
-      context("and role is gov role", () => {
-        it("should be success", async () => {
-          await bookKeeper.grantRole(await bookKeeper.GOV_ROLE(), deployerAddress)
-          await bookKeeper.pause()
-          await bookKeeper.unpause()
-        })
-      })
-    })
-
-    context("when unpause contract", () => {
-      it("should be success", async () => {
-        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), deployerAddress)
-
-        // pause contract
-        await bookKeeper.pause()
-
-        // unpause contract
-        await bookKeeper.unpause()
-
-        await bookKeeper.init(formatBytes32String("BNB"))
-        const pool = await bookKeeper.collateralPools(formatBytes32String("BNB"))
-        expect(pool.debtAccumulatedRate).equal(WeiPerRay)
       })
     })
   })
@@ -1848,6 +1610,7 @@ describe("BookKeeper", () => {
   describe("#cage", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
         await expect(bookKeeperAsAlice.cage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
@@ -1855,24 +1618,11 @@ describe("BookKeeper", () => {
     context("when owner role can access", () => {
       it("should be success", async () => {
         // grant role access
-        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), aliceAddress)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
         expect(await bookKeeperAsAlice.live()).to.be.equal(1)
 
-        await expect(bookKeeperAsAlice.cage()).to.emit(bookKeeperAsAlice, "Cage").withArgs()
-
-        expect(await bookKeeperAsAlice.live()).to.be.equal(0)
-      })
-    })
-
-    context("when show stopper role can access", () => {
-      it("should be success", async () => {
-        // grant role access
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), aliceAddress)
-
-        expect(await bookKeeperAsAlice.live()).to.be.equal(1)
-
-        await expect(bookKeeperAsAlice.cage()).to.emit(bookKeeperAsAlice, "Cage").withArgs()
+        await expect(bookKeeperAsAlice.cage()).to.emit(bookKeeperAsAlice, "LogCage").withArgs()
 
         expect(await bookKeeperAsAlice.live()).to.be.equal(0)
       })
@@ -1882,6 +1632,7 @@ describe("BookKeeper", () => {
   describe("#uncage", () => {
     context("when role can't access", () => {
       it("should revert", async () => {
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
         await expect(bookKeeperAsAlice.uncage()).to.be.revertedWith("!(ownerRole or showStopperRole)")
       })
     })
@@ -1889,7 +1640,7 @@ describe("BookKeeper", () => {
     context("when owner role can access", () => {
       it("should be success", async () => {
         // grant role access
-        await bookKeeper.grantRole(await bookKeeper.OWNER_ROLE(), aliceAddress)
+        mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
         expect(await bookKeeperAsAlice.live()).to.be.equal(1)
 
@@ -1897,24 +1648,7 @@ describe("BookKeeper", () => {
 
         expect(await bookKeeperAsAlice.live()).to.be.equal(0)
 
-        await expect(bookKeeperAsAlice.uncage()).to.emit(bookKeeperAsAlice, "Uncage").withArgs()
-
-        expect(await bookKeeperAsAlice.live()).to.be.equal(1)
-      })
-    })
-
-    context("when show stopper role can access", () => {
-      it("should be success", async () => {
-        // grant role access
-        await bookKeeper.grantRole(await bookKeeper.SHOW_STOPPER_ROLE(), aliceAddress)
-
-        expect(await bookKeeperAsAlice.live()).to.be.equal(1)
-
-        await bookKeeperAsAlice.cage()
-
-        expect(await bookKeeperAsAlice.live()).to.be.equal(0)
-
-        await expect(bookKeeperAsAlice.uncage()).to.emit(bookKeeperAsAlice, "Uncage").withArgs()
+        await expect(bookKeeperAsAlice.uncage()).to.emit(bookKeeperAsAlice, "LogUncage").withArgs()
 
         expect(await bookKeeperAsAlice.live()).to.be.equal(1)
       })

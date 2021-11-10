@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
 import "./PositionManager.sol";
 import "../interfaces/IBookKeeper.sol";
+import "../interfaces/ICollateralPoolConfig.sol";
 
 contract GetPositions is Initializable {
   using SafeMathUpgradeable for uint256;
@@ -18,53 +20,119 @@ contract GetPositions is Initializable {
   // --- Init ---
   function initialize() external initializer {}
 
-  function getPostionsAsc(address manager, address user)
+  function getAllPositionsAsc(address _manager, address _user)
     external
     view
     returns (
-      uint256[] memory ids,
-      address[] memory positions,
-      bytes32[] memory collateralPools
+      uint256[] memory _ids,
+      address[] memory _positions,
+      bytes32[] memory _collateralPools
     )
   {
-    uint256 count = PositionManager(manager).ownerPositionCount(user);
-    ids = new uint256[](count);
-    positions = new address[](count);
-    collateralPools = new bytes32[](count);
-    uint256 i = 0;
-    uint256 id = PositionManager(manager).ownerFirstPositionId(user);
+    uint256 _count = PositionManager(_manager).ownerPositionCount(_user);
+    uint256 _id = PositionManager(_manager).ownerFirstPositionId(_user);
+    return _getPositionsAsc(_manager, _id, _count);
+  }
 
-    while (id > 0) {
-      ids[i] = id;
-      positions[i] = PositionManager(manager).positions(id);
-      collateralPools[i] = PositionManager(manager).collateralPools(id);
-      (, id) = PositionManager(manager).list(id);
-      i++;
+  function getPositionsAsc(
+    address _manager,
+    uint256 _fromId,
+    uint256 _size
+  )
+    external
+    view
+    returns (
+      uint256[] memory _ids,
+      address[] memory _positions,
+      bytes32[] memory _collateralPools
+    )
+  {
+    return _getPositionsAsc(_manager, _fromId, _size);
+  }
+
+  function _getPositionsAsc(
+    address _manager,
+    uint256 _fromId,
+    uint256 _size
+  )
+    internal
+    view
+    returns (
+      uint256[] memory _ids,
+      address[] memory _positions,
+      bytes32[] memory _collateralPools
+    )
+  {
+    _ids = new uint256[](_size);
+    _positions = new address[](_size);
+    _collateralPools = new bytes32[](_size);
+    uint256 _i = 0;
+    uint256 _id = _fromId;
+
+    while (_id > 0 && _i < _size) {
+      _ids[_i] = _id;
+      _positions[_i] = PositionManager(_manager).positions(_id);
+      _collateralPools[_i] = PositionManager(_manager).collateralPools(_id);
+      (, _id) = PositionManager(_manager).list(_id);
+      _i++;
     }
   }
 
-  function getPositionsDesc(address manager, address user)
+  function getAllPositionsDesc(address _manager, address _user)
     external
     view
     returns (
-      uint256[] memory ids,
-      address[] memory positions,
-      bytes32[] memory collateralPools
+      uint256[] memory,
+      address[] memory,
+      bytes32[] memory
     )
   {
-    uint256 count = PositionManager(manager).ownerPositionCount(user);
-    ids = new uint256[](count);
-    positions = new address[](count);
-    collateralPools = new bytes32[](count);
-    uint256 i = 0;
-    uint256 id = PositionManager(manager).ownerLastPositionId(user);
+    uint256 _count = PositionManager(_manager).ownerPositionCount(_user);
+    uint256 _id = PositionManager(_manager).ownerLastPositionId(_user);
+    return _getPositionsDesc(_manager, _id, _count);
+  }
 
-    while (id > 0) {
-      ids[i] = id;
-      positions[i] = PositionManager(manager).positions(id);
-      collateralPools[i] = PositionManager(manager).collateralPools(id);
-      (id, ) = PositionManager(manager).list(id);
-      i++;
+  function getPositionsDesc(
+    address _manager,
+    uint256 _fromId,
+    uint256 _size
+  )
+    external
+    view
+    returns (
+      uint256[] memory,
+      address[] memory,
+      bytes32[] memory
+    )
+  {
+    return _getPositionsDesc(_manager, _fromId, _size);
+  }
+
+  function _getPositionsDesc(
+    address _manager,
+    uint256 _fromId,
+    uint256 _size
+  )
+    internal
+    view
+    returns (
+      uint256[] memory _ids,
+      address[] memory _positions,
+      bytes32[] memory _collateralPools
+    )
+  {
+    _ids = new uint256[](_size);
+    _positions = new address[](_size);
+    _collateralPools = new bytes32[](_size);
+    uint256 _i = 0;
+    uint256 _id = _fromId;
+
+    while (_id > 0 && _i < _size) {
+      _ids[_i] = _id;
+      _positions[_i] = PositionManager(_manager).positions(_id);
+      _collateralPools[_i] = PositionManager(_manager).collateralPools(_id);
+      (_id, ) = PositionManager(_manager).list(_id);
+      _i++;
     }
   }
 
@@ -76,40 +144,40 @@ contract GetPositions is Initializable {
     external
     view
     returns (
-      address[] memory positions,
-      uint256[] memory debtShares,
-      uint256[] memory safetyBuffers
+      address[] memory _positions,
+      uint256[] memory _debtShares,
+      uint256[] memory _safetyBuffers
     )
   {
     if (_startIndex.add(_offset) > PositionManager(_manager).lastPositionId())
       _offset = PositionManager(_manager).lastPositionId().sub(_startIndex).add(1);
 
-    IBookKeeper bookKeeper = IBookKeeper(PositionManager(_manager).bookKeeper());
-    positions = new address[](_offset);
-    debtShares = new uint256[](_offset);
-    safetyBuffers = new uint256[](_offset);
+    IBookKeeper _bookKeeper = IBookKeeper(PositionManager(_manager).bookKeeper());
+    _positions = new address[](_offset);
+    _debtShares = new uint256[](_offset);
+    _safetyBuffers = new uint256[](_offset);
     uint256 _resultIndex = 0;
     for (uint256 _positionIndex = _startIndex; _positionIndex < _startIndex.add(_offset); _positionIndex++) {
       if (PositionManager(_manager).positions(_positionIndex) == address(0)) break;
-      positions[_resultIndex] = PositionManager(_manager).positions(_positionIndex);
+      _positions[_resultIndex] = PositionManager(_manager).positions(_positionIndex);
 
-      (uint256 _lockedCollateral, uint256 _debtShare) = bookKeeper.positions(
-        PositionManager(_manager).collateralPools(_positionIndex),
-        positions[_resultIndex]
+      bytes32 _collateralPoolId = PositionManager(_manager).collateralPools(_positionIndex);
+      (uint256 _lockedCollateral, uint256 _debtShare) = _bookKeeper.positions(
+        _collateralPoolId,
+        _positions[_resultIndex]
       );
 
-      (, uint256 _debtAccumulatedRate, uint256 _priceWithSafetyMargin, , ) = bookKeeper.collateralPools(
-        PositionManager(_manager).collateralPools(_positionIndex)
-      );
+      ICollateralPoolConfig collateralPoolConfig = ICollateralPoolConfig(_bookKeeper.collateralPoolConfig());
 
-      uint256 safetyBuffer = calculateSafetyBuffer(
+      uint256 _safetyBuffer = calculateSafetyBuffer(
         _debtShare,
-        _debtAccumulatedRate,
+        collateralPoolConfig.getDebtAccumulatedRate(_collateralPoolId),
         _lockedCollateral,
-        _priceWithSafetyMargin
+        collateralPoolConfig.getPriceWithSafetyMargin(_collateralPoolId)
       );
-      safetyBuffers[_resultIndex] = safetyBuffer;
-      debtShares[_resultIndex] = _debtShare;
+
+      _safetyBuffers[_resultIndex] = _safetyBuffer;
+      _debtShares[_resultIndex] = _debtShare;
       _resultIndex++;
     }
   }
@@ -126,8 +194,8 @@ contract GetPositions is Initializable {
       uint256 _safetyBuffer // [rad]
     )
   {
-    uint256 collateralValue = _lockedCollateral.mul(_priceWithSafetyMargin);
-    uint256 debtValue = _debtShare.mul(_debtAccumulatedRate);
-    _safetyBuffer = collateralValue >= debtValue ? collateralValue.sub(debtValue) : 0;
+    uint256 _collateralValue = _lockedCollateral.mul(_priceWithSafetyMargin);
+    uint256 _debtValue = _debtShare.mul(_debtAccumulatedRate);
+    _safetyBuffer = _collateralValue >= _debtValue ? _collateralValue.sub(_debtValue) : 0;
   }
 }

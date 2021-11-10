@@ -1,24 +1,23 @@
-// SPDX-License-Identifier: GNU-3
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+// SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+  ∩~~~~∩ 
+  ξ ･×･ ξ 
+  ξ　~　ξ 
+  ξ　　 ξ 
+  ξ　　 “~～~～〇 
+  ξ　　　　　　 ξ 
+  ξ ξ ξ~～~ξ ξ ξ 
+　 ξ_ξξ_ξ　ξ_ξξ_ξ
+Alpaca Fin Corporation
+*/
 
 pragma solidity 0.6.12;
 
 import "../interfaces/IAuth.sol";
 
 contract AlpacaAuthEvents {
-  event LogSetAuthority(address indexed authority);
-  event LogSetOwner(address indexed owner);
+  event LogSetAuthority(address indexed _authority);
+  event LogSetOwner(address indexed _owner);
 }
 
 contract AlpacaAuth is AlpacaAuthEvents {
@@ -30,13 +29,13 @@ contract AlpacaAuth is AlpacaAuthEvents {
     emit LogSetOwner(msg.sender);
   }
 
-  function setOwner(address owner_) public auth {
-    owner = owner_;
+  function setOwner(address _owner) public auth {
+    owner = _owner;
     emit LogSetOwner(owner);
   }
 
-  function setAuthority(IAuthority authority_) public auth {
-    authority = authority_;
+  function setAuthority(IAuthority _authority) public auth {
+    authority = _authority;
     emit LogSetAuthority(address(authority));
   }
 
@@ -45,15 +44,15 @@ contract AlpacaAuth is AlpacaAuthEvents {
     _;
   }
 
-  function isAuthorized(address src, bytes4 sig) internal view returns (bool) {
-    if (src == address(this)) {
+  function isAuthorized(address _src, bytes4 _sig) internal view returns (bool) {
+    if (_src == address(this)) {
       return true;
-    } else if (src == owner) {
+    } else if (_src == owner) {
       return true;
     } else if (address(authority) == address(0)) {
       return false;
     } else {
-      return authority.canCall(src, address(this), sig);
+      return authority.canCall(_src, address(this), _sig);
     }
   }
 }
