@@ -13,14 +13,13 @@ Alpaca Fin Corporation
 
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
 import "@alpaca-finance/alpaca-contract/contracts/6/protocol/apis/pancakeV2/PancakeLibraryV2.sol";
 import "../interfaces/IAlpacaOracle.sol";
 
-contract DexPriceOracle is PausableUpgradeable, IAlpacaOracle {
+contract DexPriceOracle is Initializable, IAlpacaOracle {
   using SafeMathUpgradeable for uint256;
   address public dexFactory;
 
