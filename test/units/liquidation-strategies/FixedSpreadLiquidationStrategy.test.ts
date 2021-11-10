@@ -72,7 +72,6 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     mockedPriceOracle.address,
     mockedLiquidationEngine.address,
     mockedSystemDebtEngine.address,
-    mockedPositionManager.address,
   ])) as FixedSpreadLiquidationStrategy
 
   return {
