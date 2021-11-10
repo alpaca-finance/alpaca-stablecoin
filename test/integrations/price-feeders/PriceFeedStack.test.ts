@@ -1,4 +1,6 @@
 /*
+For any ibBASE pool (except BUSD)
+
 ┌─────────────────┐         ┌──────────────────────────┐
 │SimplePriceOracle├────────►│AlpacaPriceOraclePriceFeed├──────────┐
 └──ib/base────────┘         └───ib/base────────────────┘          ▼
@@ -12,7 +14,24 @@
 ┌───────────────┐             ▲
 │BandPriceOracle├─────────────┘
 └──base/BUSD────┘
+*/
 
+/*
+For any ibBUSD pool
+(** USD will be treated as 0xfff...fff)
+┌─────────────────┐         ┌──────────────────────────┐
+│SimplePriceOracle├────────►│AlpacaPriceOraclePriceFeed├──────────┐
+└──ibBUSD/BUSD────┘         └──ibBUSD/BUSD─────────────┘          ▼
+                                                                ┌────────────────┐
+┌────────────────────┐                                          │IbTokenPriceFeed│
+│ChainLinkPriceOracle├───────┐                                  └──ibBUSD/BUSD───┘
+└──BUSD/USD-─────────┘       ▼                                    ▲
+                            ┌────────────────────────────────┐    │
+                            │StrictAlpacaPriceOraclePriceFeed├────┘
+                            └───BUSD/USD-────────────────────┘
+┌───────────────┐             ▲
+│BandPriceOracle├─────────────┘
+└──BUSD/USD────┘
 */
 
 import { PancakeFactory__factory, PancakePair__factory } from "@alpaca-finance/alpaca-contract/typechain"
