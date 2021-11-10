@@ -12,7 +12,7 @@ import "../interfaces/IStableSwapModule.sol";
 import "../interfaces/IStablecoinAdapter.sol";
 import "../utils/SafeToken.sol";
 
-contract AlpacaStablecoinFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
+contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   using SafeToken for address;
   using SafeMathUpgradeable for uint256;
 
@@ -48,8 +48,8 @@ contract AlpacaStablecoinFlashLiquidator is OwnableUpgradeable, IFlashLendingCal
       IGenericTokenAdapter _tokenAdapter,
       address _vaultAddress,
       IPancakeRouter02 _router,
-      IStableSwapModule _stableSwapModule
-    ) = abi.decode(data, (address, IGenericTokenAdapter, address, IPancakeRouter02, IStableSwapModule));
+      address[] memory _path
+    ) = abi.decode(data, (address, IGenericTokenAdapter, address, IPancakeRouter02, address[]));
 
     // Retrieve collateral token
     (address _token, uint256 _actualCollateralAmount) = _retrieveCollateral(
@@ -58,11 +58,11 @@ contract AlpacaStablecoinFlashLiquidator is OwnableUpgradeable, IFlashLendingCal
       _collateralAmountToLiquidate
     );
 
-    // Dump collateral token to DEX for BUSD
-    // Swap BUSD to AUSD
-    uint256 _alpacaStablecoinBalance = _sellCollateral(_token, _stableSwapModule, _router, _actualCollateralAmount);
-
-    require(_debtValueToRepay.div(RAY) <= _alpacaStablecoinBalance, "not enough to repay debt");
+    // Swap token to AUSD
+    require(
+      _debtValueToRepay.div(RAY) <= _sellCollateral(_token, _path, _router, _actualCollateralAmount, _debtValueToRepay),
+      "not enough to repay debt"
+    );
 
     // Deposit Alpaca Stablecoin for liquidatorAddress
     _depositAlpacaStablecoin(_debtValueToRepay.div(RAY), _liquidatorAddress);
@@ -88,20 +88,17 @@ contract AlpacaStablecoinFlashLiquidator is OwnableUpgradeable, IFlashLendingCal
 
   function _sellCollateral(
     address _token,
-    IStableSwapModule _stableSwapModule,
+    address[] memory _path,
     IPancakeRouter02 _router,
-    uint256 _amount
+    uint256 _amount,
+    uint256 _minAmountOut
   ) internal returns (uint256 receivedAmount) {
-    address _stableSwapToken;
-    address[] memory path = new address[](2);
-    path[0] = _token;
-    path[1] = _stableSwapToken = address(_stableSwapModule.authTokenAdapter().token());
+    uint256 _alpacaStablecoinBalanceBefore = alpacaStablecoin.myBalance();
     _token.safeApprove(address(_router), uint256(-1));
-    uint256 _stableSwapTokenBalanceBefore = _stableSwapToken.myBalance();
-    _router.swapExactTokensForTokens(_amount, 0, path, address(this), now);
-    uint256 _stableSwapTokenBalanceAfter = _stableSwapToken.myBalance();
+    _router.swapExactTokensForTokens(_amount, _minAmountOut, _path, address(this), now);
     _token.safeApprove(address(_router), 0);
-    receivedAmount = _stableSwapTokenBalanceAfter.sub(_stableSwapTokenBalanceBefore);
+    uint256 _alpacaStablecoinBalanceAfter = alpacaStablecoin.myBalance();
+    receivedAmount = _alpacaStablecoinBalanceAfter.sub(_alpacaStablecoinBalanceBefore);
   }
 
   function _depositAlpacaStablecoin(uint256 _amount, address _liquidatorAddress) internal {
