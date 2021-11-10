@@ -159,8 +159,8 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
 
   function setAccessControlConfig(address _accessControlConfig) external {
     require(
-      IAccessControlConfig(_accessControlConfig).hasRole(
-        IAccessControlConfig(_accessControlConfig).OWNER_ROLE(),
+      IAccessControlConfig(accessControlConfig).hasRole(
+        IAccessControlConfig(accessControlConfig).OWNER_ROLE(),
         msg.sender
       ),
       "!ownerRole"
