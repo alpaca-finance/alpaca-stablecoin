@@ -131,6 +131,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     rewardToken = IToken(_rewardToken);
 
     require(_treasuryAccount != address(0), "IbTokenAdapter/bad treasury account");
+    require(_treasuryFeeBps <= 5000, "IbTokenAdapter/bad treasury fee bps");
     treasuryFeeBps = _treasuryFeeBps;
     treasuryAccount = _treasuryAccount;
 
