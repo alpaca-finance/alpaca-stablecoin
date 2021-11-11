@@ -1373,6 +1373,10 @@ describe("PositionPermissions", () => {
                   alpacaStablecoinBalancefinal,
                   "Alice should receive 2 AUSD from drawing 2 AUSD, because Alice drew 2 times"
                 ).to.be.equal(WeiPerWad.mul(2))
+                const alicePosition1Stake = await ibTokenAdapter.stake(alicePositionAddress)
+                expect(alicePosition1Stake, "Stake must be correctly updated after movePosition").to.be.equal(
+                  WeiPerWad.mul(2)
+                )
               })
             }
           )
@@ -3606,6 +3610,8 @@ describe("PositionPermissions", () => {
           alicePositionWalletPositionAfterExport.debtShare,
           "debtShare should be 0 AUSD, because Alice export"
         ).to.be.equal(0)
+        const aliceAddressStake = await ibTokenAdapter.stake(aliceAddress)
+        expect(aliceAddressStake, "Stake must be correctly updated after exportPosition").to.be.equal(WeiPerWad)
 
         //6. alice import position back
         const importPosition = alpacaStablecoinProxyActions.interface.encodeFunctionData("importPosition", [
@@ -3632,6 +3638,8 @@ describe("PositionPermissions", () => {
           alicePositionWalletPositionAfterImport.debtShare,
           "debtShare should be 1 AUSD, because Alice Import"
         ).to.be.equal(WeiPerWad)
+        const alicePositionStake = await ibTokenAdapter.stake(alicePositionAddress)
+        expect(alicePositionStake, "Stake must be correctly updated after importPosition").to.be.equal(WeiPerWad)
       })
     })
   })
