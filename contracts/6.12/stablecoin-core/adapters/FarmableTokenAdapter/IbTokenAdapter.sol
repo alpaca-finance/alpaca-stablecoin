@@ -373,11 +373,11 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     uint256 _share = bookKeeper.collateralToken(collateralPoolId, msg.sender); //[wad]
     require(_share < 2**255, "IbTokenAdapter/share-overflow");
     uint256 _amount = wmul(wmul(_share, netAssetPerShare()), toTokenConversionFactor);
-    address(collateralToken).safeTransfer(_to, _amount);
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_share));
     totalShare = sub(totalShare, _share);
     stake[msg.sender] = sub(stake[msg.sender], _share);
     rewardDebts[msg.sender] = rmulup(stake[msg.sender], accRewardPerShare);
+    address(collateralToken).safeTransfer(_to, _amount);
     emit LogEmergencyWithdaraw();
   }
 
