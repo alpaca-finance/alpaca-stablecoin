@@ -123,7 +123,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     uint256 wad,
     bytes calldata /* data */
   ) external override nonReentrant whenNotPaused {
-    require(wad <= 2**255, "TokenAdapter/overflow");
+    require(wad < 2**255, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
 
     // Move the actual token

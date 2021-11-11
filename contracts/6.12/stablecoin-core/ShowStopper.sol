@@ -329,7 +329,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     // accumulate bad debt in badDebtAccumulator (if there is any)
     badDebtAccumulator[_collateralPoolId] = add(badDebtAccumulator[_collateralPoolId], sub(_debtAmount, _amount));
 
-    require(_amount <= 2**255 && _debtShare <= 2**255, "ShowStopper/overflow");
+    require(_amount < 2**255 && _debtShare < 2**255, "ShowStopper/overflow");
 
     // force close the position with the best amount we could achieve
     bookKeeper.confiscatePosition(
@@ -363,7 +363,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     );
     (uint256 _lockedCollateralAmount, uint256 _debtShare) = bookKeeper.positions(_collateralPoolId, _positionAddress);
     require(_debtShare == 0, "ShowStopper/debtShare-not-zero");
-    require(_lockedCollateralAmount <= 2**255, "ShowStopper/overflow");
+    require(_lockedCollateralAmount < 2**255, "ShowStopper/overflow");
     bookKeeper.confiscatePosition(
       _collateralPoolId,
       _positionAddress,

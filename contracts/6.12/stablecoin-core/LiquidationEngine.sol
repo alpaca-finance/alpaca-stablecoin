@@ -146,7 +146,7 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     // If collateral has been depleted from liquidation whilst there is remaining debt in the position
     if (_vars.newPositionLockedCollateral == 0 && _vars.newPositionDebtShare > 0) {
       // Overflow check
-      require(_vars.newPositionDebtShare <= 2**255, "LiquidationEngine/overflow");
+      require(_vars.newPositionDebtShare < 2**255, "LiquidationEngine/overflow");
       // Record the bad debt to the system and close the position
       bookKeeper.confiscatePosition(
         _collateralPoolId,

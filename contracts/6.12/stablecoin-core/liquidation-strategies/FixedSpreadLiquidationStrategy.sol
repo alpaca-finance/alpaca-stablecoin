@@ -282,7 +282,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     );
     // Overflow check
     require(
-      info.collateralAmountToBeLiquidated <= 2**255 && info.actualDebtShareToBeLiquidated <= 2**255,
+      info.collateralAmountToBeLiquidated < 2**255 && info.actualDebtShareToBeLiquidated < 2**255,
       "FixedSpreadLiquidationStrategy/overflow"
     );
     bookKeeper.confiscatePosition(

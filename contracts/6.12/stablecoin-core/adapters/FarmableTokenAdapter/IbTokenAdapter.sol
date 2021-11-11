@@ -371,7 +371,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @param _to The address to received collateralTokens
   function _emergencyWithdraw(address _to) private {
     uint256 _share = bookKeeper.collateralToken(collateralPoolId, msg.sender); //[wad]
-    require(_share <= 2**255, "IbTokenAdapter/share-overflow");
+    require(_share < 2**255, "IbTokenAdapter/share-overflow");
     uint256 _amount = wmul(wmul(_share, netAssetPerShare()), toTokenConversionFactor);
     address(collateralToken).safeTransfer(_to, _amount);
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_share));
