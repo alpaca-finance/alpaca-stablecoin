@@ -217,12 +217,12 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
       ) {
         // Full Debt Liquidation
         info.actualDebtValueToBeLiquidated = _positionDebtValue; // [rad]
-        // actualDebtValueToBeLiquidated [rad] * liquidatorIncentiveBps [bps] / 10000 / _currentCollateralPrice [ray] /
 
+        // actualDebtValueToBeLiquidated [rad] * liquidatorIncentiveBps [bps] / 10000 / _currentCollateralPrice [ray] /
         info.collateralAmountToBeLiquidated = info
           .actualDebtValueToBeLiquidated
-          .div(10000)
           .mul(_vars.liquidatorIncentiveBps)
+          .div(10000)
           .div(_currentCollateralPrice); // [wad]
       } else {
         // Partial Liquidation
