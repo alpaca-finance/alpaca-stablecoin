@@ -22,6 +22,7 @@ import "../../interfaces/IBookKeeper.sol";
 import "../../interfaces/IToken.sol";
 import "../../interfaces/IAuthTokenAdapter.sol";
 import "../../interfaces/ICagable.sol";
+import "../../utils/SafeToken.sol";
 
 // Authed TokenAdapter for a token that has a lower precision than 18 and it has decimals (like USDC)
 
@@ -32,6 +33,8 @@ contract AuthTokenAdapter is
   IAuthTokenAdapter,
   ICagable
 {
+  using SafeToken for address;
+
   bytes32 public constant WHITELISTED = keccak256("WHITELISTED");
 
   IBookKeeper public override bookKeeper; // cdp engine
@@ -108,7 +111,7 @@ contract AuthTokenAdapter is
     uint256 _wad18 = mul(_wad, 10**(18 - decimals));
     require(int256(_wad18) >= 0, "AuthTokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, _urn, int256(_wad18));
-    require(token.transferFrom(_msgSender, address(this), _wad), "AuthTokenAdapter/failed-transfer");
+    address(token).safeTransferFrom(_msgSender, address(this), _wad);
     emit LogDeposit(_urn, _wad, _msgSender);
   }
 
@@ -121,7 +124,7 @@ contract AuthTokenAdapter is
     uint256 _wad18 = mul(_wad, 10**(18 - decimals));
     require(int256(_wad18) >= 0, "AuthTokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_wad18));
-    require(token.transfer(_guy, _wad), "AuthTokenAdapter/failed-transfer");
+    address(token).safeTransfer(_guy, _wad);
     emit LogWithdraw(_guy, _wad);
   }
 

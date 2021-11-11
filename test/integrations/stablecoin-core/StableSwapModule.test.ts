@@ -180,7 +180,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   }
 }
 
-describe("FlastMintModule", () => {
+describe("StableSwapModule", () => {
   // Accounts
   let deployer: Signer
   let alice: Signer
@@ -260,7 +260,7 @@ describe("FlastMintModule", () => {
         await BUSD.approve(authTokenAdapter.address, MaxUint256)
         await expect(
           stableSwapModule.swapTokenToStablecoin(deployerAddress, ethers.utils.parseEther("1001"))
-        ).to.be.revertedWith("ERC20: transfer amount exceeds balance")
+        ).to.be.revertedWith("!safeTransferFrom")
       })
     })
     context("swap BUSD to AUSD", async () => {
