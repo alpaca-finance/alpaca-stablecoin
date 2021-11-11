@@ -29,7 +29,7 @@ contract AlpacaStablecoin is IStablecoin, AccessControlUpgradeable {
   string public name; // Alpaca USD Stablecoin
   string public symbol; // AUSD
   string public constant version = "1";
-  uint256 public constant override decimals = 18;
+  uint8 public constant override decimals = 18;
   uint256 public totalSupply;
 
   mapping(address => uint256) public override balanceOf;
