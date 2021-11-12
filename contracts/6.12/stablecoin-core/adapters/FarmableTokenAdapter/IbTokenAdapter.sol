@@ -82,6 +82,8 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   event LogWithdraw(uint256 _val);
   event LogEmergencyWithdaraw();
   event LogMoveStake(address indexed _src, address indexed _dst, uint256 _wad);
+  event LogSetTreasuryAccount(address indexed _caller, address _treasuryAccount);
+  event LogSetTreasuryFeeBps(address indexed _caller, uint256 _treasuryFeeBps);
 
   modifier onlyOwner() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
@@ -189,12 +191,14 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     require(live == 1, "IbTokenAdapter/not-live");
     require(_treasuryFeeBps <= 5000, "IbTokenAdapter/bad treasury fee bps");
     treasuryFeeBps = _treasuryFeeBps;
+    emit LogSetTreasuryFeeBps(msg.sender, _treasuryFeeBps);
   }
 
   function setTreasuryAccount(address _treasuryAccount) external onlyOwner {
     require(live == 1, "IbTokenAdapter/not-live");
     require(_treasuryAccount != address(0), "IbTokenAdapter/bad treasury account");
     treasuryAccount = _treasuryAccount;
+    emit LogSetTreasuryAccount(msg.sender, _treasuryAccount);
   }
 
   /// @dev Ignore collateralTokens that have been directly transferred
