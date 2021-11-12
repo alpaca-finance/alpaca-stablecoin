@@ -816,6 +816,8 @@ describe("PositionManager", () => {
       it("should be able to call exportPosition()", async () => {
         mockedBookKeeper.smocked.collateralPoolConfig.will.return.with(mockedCollateralPoolConfig.address)
         mockedCollateralPoolConfig.smocked.getDebtAccumulatedRate.will.return.with(WeiPerRay)
+        mockedCollateralPoolConfig.smocked.getAdapter.will.return.with(mockedTokenAdapter.address)
+        mockedTokenAdapter.smocked.onMoveCollateral.will.return.with()
         mockedCollateralPoolConfig.smocked.collateralPools.will.return.with({
           totalDebtShare: 0,
           debtAccumulatedRate: WeiPerRay,

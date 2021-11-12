@@ -279,4 +279,17 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
   function getStrategy(bytes32 _collateralPoolId) external view override returns (address) {
     return _collateralPools[_collateralPoolId].strategy;
   }
+
+  function getCollateralPoolInfo(bytes32 _collateralPoolId)
+    external
+    view
+    override
+    returns (CollateralPoolInfo memory _info)
+  {
+    _info.debtAccumulatedRate = _collateralPools[_collateralPoolId].debtAccumulatedRate;
+    _info.totalDebtShare = _collateralPools[_collateralPoolId].totalDebtShare;
+    _info.debtCeiling = _collateralPools[_collateralPoolId].debtCeiling;
+    _info.priceWithSafetyMargin = _collateralPools[_collateralPoolId].priceWithSafetyMargin;
+    _info.debtFloor = _collateralPools[_collateralPoolId].debtFloor;
+  }
 }

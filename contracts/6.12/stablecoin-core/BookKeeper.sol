@@ -30,14 +30,6 @@ import "../interfaces/IAccessControlConfig.sol";
 */
 
 contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradeable, ICagable {
-  struct LocalVar {
-    uint256 debtAccumulatedRate; // [ray]
-    uint256 totalDebtShare; // [wad]
-    uint256 debtCeiling; // [rad]
-    uint256 priceWithSafetyMargin; // [ray]
-    uint256 debtFloor; // [rad]
-  }
-
   function pause() external {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(
@@ -292,14 +284,8 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
 
     Position memory position = positions[_collateralPoolId][_positionAddress];
 
-    LocalVar memory _vars;
-    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(_collateralPoolId); // [ray]
-    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(_collateralPoolId); // [wad]
-    _vars.debtCeiling = ICollateralPoolConfig(collateralPoolConfig).getDebtCeiling(_collateralPoolId); // [rad]
-    _vars.priceWithSafetyMargin = ICollateralPoolConfig(collateralPoolConfig).getPriceWithSafetyMargin(
-      _collateralPoolId
-    ); // [ray]
-    _vars.debtFloor = ICollateralPoolConfig(collateralPoolConfig).getDebtFloor(_collateralPoolId); // [rad]
+    ICollateralPoolConfig.CollateralPoolInfo memory _vars = ICollateralPoolConfig(collateralPoolConfig)
+      .getCollateralPoolInfo(_collateralPoolId);
 
     // collateralPool has been initialised
     require(_vars.debtAccumulatedRate != 0, "BookKeeper/collateralPool-not-init");
@@ -379,12 +365,8 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     Position storage _positionSrc = positions[_collateralPoolId][_src];
     Position storage _positionDst = positions[_collateralPoolId][_dst];
 
-    LocalVar memory _vars;
-    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(_collateralPoolId);
-    _vars.priceWithSafetyMargin = ICollateralPoolConfig(collateralPoolConfig).getPriceWithSafetyMargin(
-      _collateralPoolId
-    );
-    _vars.debtFloor = ICollateralPoolConfig(collateralPoolConfig).getDebtFloor(_collateralPoolId);
+    ICollateralPoolConfig.CollateralPoolInfo memory _vars = ICollateralPoolConfig(collateralPoolConfig)
+      .getCollateralPoolInfo(_collateralPoolId);
 
     _positionSrc.lockedCollateral = sub(_positionSrc.lockedCollateral, _collateralAmount);
     _positionSrc.debtShare = sub(_positionSrc.debtShare, _debtShare);
@@ -434,9 +416,8 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     );
 
     Position storage position = positions[_collateralPoolId][_positionAddress];
-    LocalVar memory _vars;
-    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(_collateralPoolId);
-    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(_collateralPoolId);
+    ICollateralPoolConfig.CollateralPoolInfo memory _vars = ICollateralPoolConfig(collateralPoolConfig)
+      .getCollateralPoolInfo(_collateralPoolId);
 
     position.lockedCollateral = add(position.lockedCollateral, _collateralAmount);
     position.debtShare = add(position.debtShare, _debtShare);
@@ -505,9 +486,8 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
       "!stabilityFeeCollectorRole"
     );
     require(live == 1, "BookKeeper/not-live");
-    LocalVar memory _vars;
-    _vars.debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(_collateralPoolId);
-    _vars.totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(_collateralPoolId);
+    ICollateralPoolConfig.CollateralPoolInfo memory _vars = ICollateralPoolConfig(collateralPoolConfig)
+      .getCollateralPoolInfo(_collateralPoolId);
 
     _vars.debtAccumulatedRate = add(_vars.debtAccumulatedRate, _debtAccumulatedRate);
     ICollateralPoolConfig(collateralPoolConfig).setDebtAccumulatedRate(_collateralPoolId, _vars.debtAccumulatedRate);
