@@ -95,7 +95,7 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   ) internal returns (uint256 receivedAmount) {
     uint256 _alpacaStablecoinBalanceBefore = alpacaStablecoin.myBalance();
     _token.safeApprove(address(_router), uint256(-1));
-    _router.swapExactTokensForTokens(_amount, _minAmountOut, _path, address(this), now);
+    _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY), _path, address(this), now);
     _token.safeApprove(address(_router), 0);
     uint256 _alpacaStablecoinBalanceAfter = alpacaStablecoin.myBalance();
     receivedAmount = _alpacaStablecoinBalanceAfter.sub(_alpacaStablecoinBalanceBefore);
@@ -105,5 +105,13 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     alpacaStablecoin.safeApprove(address(stablecoinAdapter), uint256(-1));
     stablecoinAdapter.deposit(_liquidatorAddress, _amount, abi.encode(0));
     alpacaStablecoin.safeApprove(address(stablecoinAdapter), 0);
+  }
+
+  function whitelist(address _toBeWhitelistedAddress) external onlyOwner {
+    bookKeeper.whitelist(_toBeWhitelistedAddress);
+  }
+
+  function withdrawToken(address _token, uint256 _amount) external onlyOwner {
+    _token.safeTransfer(msg.sender, _amount);
   }
 }

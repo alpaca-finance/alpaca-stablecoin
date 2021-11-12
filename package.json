@@ -106,7 +106,7 @@
     "test:integrations:flashmintmodule": "hardhat test --no-compile ./test/integrations/flash-mint/FlashMintModule.test.ts",
     "test:integrations:stableswapmodule": "hardhat test --no-compile ./test/integrations/stablecoin-core/StableSwapModule.test.ts",
     "test:integrations:positionpermissions": "hardhat test --no-compile ./test/integrations/PositionPermissions.test.ts",
-    "test:integrations:flashliquidation": "hardhat test --no-compile ./test/units/stablecoin-core/FlashLiquidation.test.ts",
+    "test:integrations:flashliquidation": "hardhat test --no-compile ./test/integrations/FlashLiquidation.test.ts",
     "test:integrations:pcsflashliquidator": "hardhat test --no-compile ./test/integrations/liquidator/PCSFlashLiquidator.test.ts",
     "script:testnet:validate-config": "hardhat --network testnet run --no-compile ./scripts/validate-config.ts",
     "script:mainnet:validate-config": "hardhat --network mainnet run --no-compile ./scripts/validate-config.ts",
