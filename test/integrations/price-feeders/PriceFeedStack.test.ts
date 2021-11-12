@@ -6,14 +6,20 @@ For any ibBASE pool (except BUSD)
 └──ib/base────────┘         └───ib/base────────────────┘          ▼
                                                                 ┌────────────────┐
 ┌────────────────────┐                                          │IbTokenPriceFeed│
-│ChainLinkPriceOracle├───────┐                                  └────ib/BUSD─────┘
+│ChainLinkPriceOracle├───────┐                                  └────ib/USD──────┘
 └──base/BUSD─────────┘       ▼                                    ▲
                             ┌────────────────────────────────┐    │
                             │StrictAlpacaPriceOraclePriceFeed├────┘
-                            └───base/BUSD────────────────────┘
+                            └───base/USD─────────────────────┘
 ┌───────────────┐             ▲
 │BandPriceOracle├─────────────┘
-└──base/BUSD────┘
+└──base/USD──-──┘
+
+StrictAlpacaPriceOraclePriceFeed config
+- primarySource token0 = base token address
+- primarySource token1 = BUSD address (BUSD is assumed to be USD on ChainLinkPriceOracle)
+- secondarySource token0 = base token address
+- secondarySource token1 = USD address (0xfff...fff)
 */
 
 /*
@@ -24,14 +30,21 @@ For any ibBUSD pool
 └──ibBUSD/BUSD────┘         └──ibBUSD/BUSD─────────────┘          ▼
                                                                 ┌────────────────┐
 ┌────────────────────┐                                          │IbTokenPriceFeed│
-│ChainLinkPriceOracle├───────┐                                  └──ibBUSD/BUSD───┘
+│ChainLinkPriceOracle├───────┐                                  └──ibBUSD/USD───┘
 └──BUSD/USD-─────────┘       ▼                                    ▲
                             ┌────────────────────────────────┐    │
                             │StrictAlpacaPriceOraclePriceFeed├────┘
                             └───BUSD/USD-────────────────────┘
 ┌───────────────┐             ▲
 │BandPriceOracle├─────────────┘
-└──BUSD/USD────┘
+└──BUSD/USD─────┘
+
+
+StrictAlpacaPriceOraclePriceFeed config
+- primarySource token0 = BUSD address
+- primarySource token1 = USD address (0xfff...fff)
+- secondarySource token0 = BUSD address
+- secondarySource token1 = USD address (0xfff...fff)
 */
 
 import { PancakeFactory__factory, PancakePair__factory } from "@alpaca-finance/alpaca-contract/typechain"
