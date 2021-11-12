@@ -115,7 +115,6 @@
   },
   "devDependencies": {
     "@alpaca-finance/alpaca-contract": "1.2.22",
-    "@chainlink/contracts": "^0.1.7",
     "@eth-optimism/smock": "^1.1.10",
     "@ethersproject/bignumber": "^5.0.14",
     "@nomiclabs/ethereumjs-vm": "^4",
@@ -129,6 +128,7 @@
     "@openzeppelin/test-helpers": "^0.5.10",
     "@pancakeswap-libs/pancake-swap-core": "^0.1.0",
     "@typechain/ethers-v5": "^8.0.2",
+    "@typechain/hardhat": "^3.0.0",
     "@types/chai": "^4.2.15",
     "@types/luxon": "^2.0.4",
     "@types/mocha": "^8.2.0",
@@ -142,7 +142,6 @@
     "ethers": "^5.0.31",
     "hardhat": "^2.0.10",
     "hardhat-deploy": "^0.7.0-beta.45",
-    "@typechain/hardhat": "^3.0.0",
     "luxon": "^2.0.2",
     "prettier": "^2.3.0",
     "prettier-plugin-solidity": "^1.0.0-beta.10",
