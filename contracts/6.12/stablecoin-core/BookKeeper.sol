@@ -148,6 +148,14 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
   event LogSetTotalDebtCeiling(address indexed _caller, uint256 _totalDebtCeiling);
   event LogSetAccessControlConfig(address indexed _caller, address _accessControlConfig);
   event LogSetCollateralPoolConfig(address indexed _caller, address _collateralPoolConfig);
+  event LogAdjustPosition(
+    address indexed _caller,
+    address _positionAddress,
+    uint256 _lockedCollateral,
+    uint256 _debtShare,
+    uint256 _addCollateral,
+    uint256 _addDebtShare
+  );
 
   function setTotalDebtCeiling(uint256 _totalDebtCeiling) external {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
@@ -354,6 +362,15 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     stablecoin[_stablecoinOwner] = add(stablecoin[_stablecoinOwner], _debtValue);
 
     positions[_collateralPoolId][_positionAddress] = position;
+
+    emit LogAdjustPosition(
+      msg.sender,
+      _positionAddress,
+      position.lockedCollateral,
+      position.debtShare,
+      uint256(_collateralValue),
+      uint256(_debtShare)
+    );
   }
 
   // --- CDP Fungibility ---
