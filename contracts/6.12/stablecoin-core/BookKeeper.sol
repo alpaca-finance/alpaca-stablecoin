@@ -148,6 +148,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
   event LogSetTotalDebtCeiling(address indexed _caller, uint256 _totalDebtCeiling);
   event LogSetAccessControlConfig(address indexed _caller, address _accessControlConfig);
   event LogSetCollateralPoolConfig(address indexed _caller, address _collateralPoolConfig);
+  event LogAddCollateral(address indexed _caller, address _usr, uint256 _amount);
   event LogAdjustPosition(
     address indexed _caller,
     address _positionAddress,
@@ -155,6 +156,13 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     uint256 _debtShare,
     uint256 _addCollateral,
     uint256 _addDebtShare
+  );
+  event LogMoveCollateral(
+    address indexed _caller,
+    address _sourceAddress,
+    address _destinationAddress,
+    uint256 _lockedCollateral,
+    uint256 _debtShare
   );
 
   function setTotalDebtCeiling(uint256 _totalDebtCeiling) external {
@@ -229,6 +237,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(_accessControlConfig.hasRole(_accessControlConfig.ADAPTER_ROLE(), msg.sender), "!adapterRole");
     collateralToken[_collateralPoolId][_usr] = add(collateralToken[_collateralPoolId][_usr], _amount);
+    emit LogAddCollateral(msg.sender, _usr, uint256(_amount));
   }
 
   /// @dev Move a balance of collateral token from a source address to a destination address within the accounting of the protocol
@@ -421,6 +430,8 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     // both sides non-debtFloory
     require(either(_utab >= _vars.debtFloor, _positionSrc.debtShare == 0), "BookKeeper/debt-floor-src");
     require(either(_vtab >= _vars.debtFloor, _positionDst.debtShare == 0), "BookKeeper/debt-floor-dst");
+
+    emit LogMoveCollateral(msg.sender, _src, _dst, uint256(_collateralAmount), uint256(_debtShare));
   }
 
   // --- CDP Confiscation ---
