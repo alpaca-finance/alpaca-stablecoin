@@ -41,7 +41,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     uint256 actualDebtShareToBeLiquidated; // [wad]
     uint256 collateralAmountToBeLiquidated; // [wad]
     uint256 treasuryFees; // [wad]
-    uint256 maxLiquidatableDebtShare; // [rad]
+    uint256 maxLiquidatableDebtShare; // [wad]
   }
 
   struct LocalVars {

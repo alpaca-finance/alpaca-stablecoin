@@ -74,7 +74,7 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     bytes32 _collateralPoolId,
     address _positionAddress,
     uint256 _debtShareToBeLiquidated, // [rad]
-    uint256 _maxDebtShareToBeLiquidated, // [rad]
+    uint256 _maxDebtShareToBeLiquidated, // [wad]
     address _collateralRecipient,
     bytes calldata _data
   ) external override nonReentrant whenNotPaused {
