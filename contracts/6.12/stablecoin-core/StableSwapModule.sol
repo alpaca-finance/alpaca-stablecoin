@@ -23,12 +23,15 @@ import "../interfaces/IStablecoin.sol";
 import "../interfaces/IBookKeeper.sol";
 import "../interfaces/IAuthTokenAdapter.sol";
 import "../interfaces/IStableSwapModule.sol";
+import "../utils/SafeToken.sol";
 
 // Stable Swap Module
 // Allows anyone to go between AUSD and the Token by pooling the liquidity
 // An optional fee is charged for incoming and outgoing transfers
 
 contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IStableSwapModule {
+  using SafeToken for address;
+
   IBookKeeper public bookKeeper;
   IAuthTokenAdapter public override authTokenAdapter;
   IStablecoin public stablecoin;
@@ -147,7 +150,7 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     uint256 _tokenAmount18 = mul(_tokenAmount, to18ConversionFactor);
     uint256 _fee = mul(_tokenAmount18, feeOut) / WAD;
     uint256 _stablecoinAmount = add(_tokenAmount18, _fee);
-    require(stablecoin.transferFrom(msg.sender, address(this), _stablecoinAmount), "StableSwapModule/failed-transfer");
+    address(stablecoin).safeTransferFrom(msg.sender, address(this), _stablecoinAmount);
     stablecoinAdapter.deposit(address(this), _stablecoinAmount, abi.encode(0));
     bookKeeper.adjustPosition(
       collateralPoolId,

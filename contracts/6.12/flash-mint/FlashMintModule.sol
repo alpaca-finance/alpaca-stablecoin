@@ -22,8 +22,11 @@ import "../interfaces/IBookKeeperFlashLender.sol";
 import "../interfaces/IStablecoin.sol";
 import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IBookKeeper.sol";
+import "../utils/SafeToken.sol";
 
 contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeeperFlashLender {
+  using SafeToken for address;
+
   modifier onlyOwner() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
@@ -134,7 +137,7 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
       "FlashMintModule/callback-failed"
     );
 
-    stablecoin.transferFrom(address(_receiver), address(this), _total); // The fee is also enforced here
+    address(stablecoin).safeTransferFrom(address(_receiver), address(this), _total); // The fee is also enforced here
     stablecoinAdapter.deposit(address(this), _total, abi.encode(0));
     bookKeeper.settleSystemBadDebt(_amt);
 
