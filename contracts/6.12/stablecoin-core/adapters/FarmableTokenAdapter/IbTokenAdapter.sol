@@ -270,7 +270,12 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     if (totalShare == 0) return 0;
     uint256 _toBeHarvested = sub(add(_pending, rewardToken.balanceOf(address(this))), accRewardBalance);
     uint256 _pendingAccRewardPerShare = add(accRewardPerShare, rdiv(_toBeHarvested, totalShare));
-    return sub(rmulup(stake[_positionAddress], _pendingAccRewardPerShare), rewardDebts[_positionAddress]);
+    uint256 _pendingAccReward = rmul(stake[_positionAddress], _pendingAccRewardPerShare);
+    if (_pendingAccReward > rewardDebts[_positionAddress]) {
+      return sub(_pendingAccReward, rewardDebts[_positionAddress]);
+    } else {
+      return 0;
+    }
   }
 
   /// @dev Return the amount of rewards to be harvested for a giving position address, and deducted with treasury fee
