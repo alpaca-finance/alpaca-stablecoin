@@ -64,9 +64,6 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     ISystemDebtEngine(_systemDebtEngine).surplusBuffer(); // Sanity Check Call
     systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
 
-    // Sanity check
-    bookKeeper.totalStablecoinIssued();
-
     live = 1;
   }
 
