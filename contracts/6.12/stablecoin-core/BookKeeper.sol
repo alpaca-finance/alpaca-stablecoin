@@ -148,22 +148,16 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
   event LogSetTotalDebtCeiling(address indexed _caller, uint256 _totalDebtCeiling);
   event LogSetAccessControlConfig(address indexed _caller, address _accessControlConfig);
   event LogSetCollateralPoolConfig(address indexed _caller, address _collateralPoolConfig);
-  event LogAddCollateral(address indexed _caller, address _usr, uint256 _amount);
   event LogAdjustPosition(
     address indexed _caller,
     address _positionAddress,
     uint256 _lockedCollateral,
     uint256 _debtShare,
-    uint256 _addCollateral,
-    uint256 _addDebtShare
+    int256 _addCollateral,
+    int256 _addDebtShare
   );
-  event LogMoveCollateral(
-    address indexed _caller,
-    address _sourceAddress,
-    address _destinationAddress,
-    uint256 _lockedCollateral,
-    uint256 _debtShare
-  );
+  event LogAddCollateral(address indexed _caller, address _usr, int256 _amount);
+  event LogMoveCollateral(address indexed _caller, address _src, address _dst, uint256 _amount);
 
   function setTotalDebtCeiling(uint256 _totalDebtCeiling) external {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
@@ -237,7 +231,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
     require(_accessControlConfig.hasRole(_accessControlConfig.ADAPTER_ROLE(), msg.sender), "!adapterRole");
     collateralToken[_collateralPoolId][_usr] = add(collateralToken[_collateralPoolId][_usr], _amount);
-    emit LogAddCollateral(msg.sender, _usr, uint256(_amount));
+    emit LogAddCollateral(msg.sender, _usr, _amount);
   }
 
   /// @dev Move a balance of collateral token from a source address to a destination address within the accounting of the protocol
@@ -254,6 +248,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     require(wish(_src, msg.sender), "BookKeeper/not-allowed");
     collateralToken[_collateralPoolId][_src] = sub(collateralToken[_collateralPoolId][_src], _amount);
     collateralToken[_collateralPoolId][_dst] = add(collateralToken[_collateralPoolId][_dst], _amount);
+    emit LogMoveCollateral(msg.sender, _src, _dst, _amount);
   }
 
   /// @dev Move a balance of stablecoin from a source address to a destination address within the accounting of the protocol
@@ -377,8 +372,8 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
       _positionAddress,
       position.lockedCollateral,
       position.debtShare,
-      uint256(_collateralValue),
-      uint256(_debtShare)
+      _collateralValue,
+      _debtShare
     );
   }
 
@@ -430,8 +425,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     // both sides non-debtFloory
     require(either(_utab >= _vars.debtFloor, _positionSrc.debtShare == 0), "BookKeeper/debt-floor-src");
     require(either(_vtab >= _vars.debtFloor, _positionDst.debtShare == 0), "BookKeeper/debt-floor-dst");
-
-    emit LogMoveCollateral(msg.sender, _src, _dst, uint256(_collateralAmount), uint256(_debtShare));
   }
 
   // --- CDP Confiscation ---
