@@ -66,7 +66,7 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     collateralPoolId = __authTokenAdapter.collateralPoolId();
     systemDebtEngine = _systemDebtEngine;
     to18ConversionFactor = 10**(18 - __authTokenAdapter.decimals());
-    _stablecoin.approve(_stablecoinAdapter, uint256(-1));
+    address(_stablecoin).safeApprove(_stablecoinAdapter, uint256(-1));
     _bookKeeper.whitelist(_stablecoinAdapter);
   }
 

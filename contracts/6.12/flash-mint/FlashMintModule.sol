@@ -71,7 +71,7 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
     systemDebtEngine = _systemDebtEngine;
 
     bookKeeper.whitelist(_stablecoinAdapter);
-    stablecoin.approve(_stablecoinAdapter, type(uint256).max);
+    address(stablecoin).safeApprove(_stablecoinAdapter, type(uint256).max);
   }
 
   // --- Math ---
