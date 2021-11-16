@@ -512,4 +512,8 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     );
     _unpause();
   }
+
+  function refreshApproval() external nonReentrant onlyOwner {
+    address(collateralToken).safeApprove(address(fairlaunch), uint256(-1));
+  }
 }

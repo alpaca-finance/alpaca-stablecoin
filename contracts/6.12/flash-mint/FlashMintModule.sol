@@ -178,4 +178,8 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
   function accrue() external lock {
     bookKeeper.moveStablecoin(address(this), systemDebtEngine, bookKeeper.stablecoin(address(this)));
   }
+
+  function refreshApproval() external lock onlyOwner {
+    address(stablecoin).safeApprove(address(stablecoinAdapter), type(uint256).max);
+  }
 }
