@@ -73,6 +73,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     collateralPoolId = collateralPoolId_;
     collateralToken = collateralToken_;
     decimals = IToken(collateralToken).decimals();
+    require(decimals == 18, "TokenAdapter/bad-token-decimals");
   }
 
   function cage() external override {
