@@ -34,6 +34,8 @@ import {
   AccessControlConfig,
   SimplePriceFeed__factory,
   SimplePriceFeed,
+  SystemDebtEngine,
+  SystemDebtEngine__factory,
 } from "../../../typechain"
 import { expect } from "chai"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
@@ -259,9 +261,13 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   ])) as StablecoinAdapter
 
   // Deploy StabilityFeeCollector
+  const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
+  const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
+
   const StabilityFeeCollector = new StabilityFeeCollector__factory(deployer)
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
+    systemDebtEngine.address,
   ])) as StabilityFeeCollector
 
   await accessControlConfig.grantRole(

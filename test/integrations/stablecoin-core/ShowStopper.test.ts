@@ -160,14 +160,15 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     alpacaStablecoin.address,
   ])) as StablecoinAdapter
 
+  const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
+  const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
+
   // Deploy StabilityFeeCollector
   const StabilityFeeCollector = new StabilityFeeCollector__factory(deployer)
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
+    systemDebtEngine.address,
   ])) as StabilityFeeCollector
-
-  const SystemDebtEngine = new SystemDebtEngine__factory(deployer)
-  const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
 
   const LiquidationEngine = new LiquidationEngine__factory(deployer)
   const liquidationEngine = (await upgrades.deployProxy(LiquidationEngine, [

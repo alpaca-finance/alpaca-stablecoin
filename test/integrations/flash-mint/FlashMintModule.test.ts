@@ -320,7 +320,7 @@ describe("FlastMintModule", () => {
               [routerV2.address, BUSD.address, stableSwapModule.address]
             )
           )
-        ).to.be.revertedWith("AlpacaStablecoin/insufficient-balance")
+        ).to.be.revertedWith("!safeTransferFrom")
       })
     })
 

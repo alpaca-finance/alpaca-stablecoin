@@ -32,6 +32,8 @@ import {
   SimplePriceFeed__factory,
   ShowStopper__factory,
   ShowStopper,
+  SystemDebtEngine,
+  SystemDebtEngine__factory,
 } from "../../../typechain"
 import { expect } from "chai"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
@@ -129,10 +131,14 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     alpacaStablecoin.address,
   ])) as StablecoinAdapter
 
+  const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
+  const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
+
   // Deploy StabilityFeeCollector
   const StabilityFeeCollector = new StabilityFeeCollector__factory(deployer)
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
+    systemDebtEngine.address,
   ])) as StabilityFeeCollector
 
   await stabilityFeeCollector.setSystemDebtEngine(await dev.getAddress())

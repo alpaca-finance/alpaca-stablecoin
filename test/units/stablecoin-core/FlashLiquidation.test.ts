@@ -235,6 +235,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   )) as StabilityFeeCollector__factory
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
+    systemDebtEngine.address,
   ])) as StabilityFeeCollector
   await stabilityFeeCollector.setSystemDebtEngine(systemDebtEngine.address)
   await accessControlConfig.grantRole(

@@ -47,6 +47,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const dummyToken = await BEP20.deploy("dummy", "DUMP")
   await dummyToken.deployed()
   const mockedDummyToken = await smockit(dummyToken)
+  mockedDummyToken.smocked.decimals.will.return.with(18)
 
   // Deploy mocked TokenAdapter
   const TokenAdapter = (await ethers.getContractFactory("TokenAdapter", deployer)) as TokenAdapter__factory
