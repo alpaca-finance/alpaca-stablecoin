@@ -40,11 +40,12 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   uint256 public globalStabilityFeeRate; // Global, per-second stability fee debtAccumulatedRate [ray]
 
   // --- Init ---
-  function initialize(address _bookKeeper) external initializer {
+  function initialize(address _bookKeeper, address _systemDebtEngine) external initializer {
     PausableUpgradeable.__Pausable_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
+    systemDebtEngine = _systemDebtEngine;
   }
 
   // --- Math ---
@@ -168,6 +169,7 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
       _collateralPoolId
     );
     require(now >= _lastAccumulationTime, "StabilityFeeCollector/invalid-now");
+    require(systemDebtEngine != address(0), "StabilityFeeCollector/system-debt-engine-not-set");
 
     // debtAccumulatedRate [ray]
     _debtAccumulatedRate = rmul(
