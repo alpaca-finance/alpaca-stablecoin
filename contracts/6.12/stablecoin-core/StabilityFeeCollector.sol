@@ -45,6 +45,7 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
+    require(_systemDebtEngine != address(0), "StabilityFeeCollector/bad-system-debt-engine-address");
     systemDebtEngine = _systemDebtEngine;
   }
 
@@ -138,6 +139,7 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   function setSystemDebtEngine(address _systemDebtEngine) external {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    require(_systemDebtEngine != address(0), "StabilityFeeCollector/bad-system-debt-engine-address");
     systemDebtEngine = _systemDebtEngine;
     emit LogSetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }

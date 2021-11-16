@@ -68,6 +68,7 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
     bookKeeper = IBookKeeper(IStablecoinAdapter(_stablecoinAdapter).bookKeeper());
     stablecoinAdapter = IStablecoinAdapter(_stablecoinAdapter);
     stablecoin = IStablecoin(IStablecoinAdapter(_stablecoinAdapter).stablecoin());
+    require(_systemDebtEngine != address(0), "FlashMintModule/bad-system-debt-engine-address");
     systemDebtEngine = _systemDebtEngine;
 
     bookKeeper.whitelist(_stablecoinAdapter);
