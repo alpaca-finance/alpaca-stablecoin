@@ -16,6 +16,14 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   using SafeToken for address;
   using SafeMathUpgradeable for uint256;
 
+  event LogFlashLiquidation(
+    address indexed liquidatorAddress,
+    uint256 debtValueToRepay,
+    uint256 collateralAmountToLiquidate,
+    uint256 liquidationProfit
+  );
+  event LogSellCollateral(uint256 amount, uint256 minAmountOut, uint256 actualAmountOut);
+
   // --- Math ---
   uint256 constant WAD = 10**18;
   uint256 constant RAY = 10**27;
@@ -65,7 +73,8 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     );
 
     // Deposit Alpaca Stablecoin for liquidatorAddress
-    _depositAlpacaStablecoin(_debtValueToRepay.div(RAY), _liquidatorAddress);
+    uint256 _liquidationProfit = _depositAlpacaStablecoin(_debtValueToRepay.div(RAY), _liquidatorAddress);
+    emit LogFlashLiquidation(_liquidatorAddress, _debtValueToRepay, _collateralAmountToLiquidate, _liquidationProfit);
   }
 
   function _retrieveCollateral(
@@ -99,12 +108,18 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     _token.safeApprove(address(_router), 0);
     uint256 _alpacaStablecoinBalanceAfter = alpacaStablecoin.myBalance();
     receivedAmount = _alpacaStablecoinBalanceAfter.sub(_alpacaStablecoinBalanceBefore);
+    emit LogSellCollateral(_amount, _minAmountOut, receivedAmount);
   }
 
-  function _depositAlpacaStablecoin(uint256 _amount, address _liquidatorAddress) internal {
+  function _depositAlpacaStablecoin(uint256 _amount, address _liquidatorAddress)
+    internal
+    returns (uint256 _liquidationProfit)
+  {
+    uint256 balanceBefore = alpacaStablecoin.myBalance();
     alpacaStablecoin.safeApprove(address(stablecoinAdapter), uint256(-1));
     stablecoinAdapter.deposit(_liquidatorAddress, _amount, abi.encode(0));
     alpacaStablecoin.safeApprove(address(stablecoinAdapter), 0);
+    _liquidationProfit = balanceBefore.sub(_amount);
   }
 
   function whitelist(address _toBeWhitelistedAddress) external onlyOwner {
