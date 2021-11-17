@@ -1,17 +1,50 @@
 /*
+For any ibBASE pool (except BUSD)
+
 ┌─────────────────┐         ┌──────────────────────────┐
 │SimplePriceOracle├────────►│AlpacaPriceOraclePriceFeed├──────────┐
 └──ib/base────────┘         └───ib/base────────────────┘          ▼
                                                                 ┌────────────────┐
 ┌────────────────────┐                                          │IbTokenPriceFeed│
-│ChainLinkPriceOracle├───────┐                                  └────ib/BUSD─────┘
+│ChainLinkPriceOracle├───────┐                                  └────ib/USD──────┘
 └──base/BUSD─────────┘       ▼                                    ▲
                             ┌────────────────────────────────┐    │
                             │StrictAlpacaPriceOraclePriceFeed├────┘
-                            └───base/BUSD────────────────────┘
-┌──────────────┐             ▲
-│DexPriceOracle├─────────────┘
-└──base/BUSD───┘
+                            └───base/USD─────────────────────┘
+┌───────────────┐             ▲
+│BandPriceOracle├─────────────┘
+└──base/USD──-──┘
+
+StrictAlpacaPriceOraclePriceFeed config
+- primarySource token0 = base token address
+- primarySource token1 = BUSD address (BUSD is assumed to be USD on ChainLinkPriceOracle)
+- secondarySource token0 = base token address
+- secondarySource token1 = USD address (0xfff...fff)
+*/
+
+/*
+For any ibBUSD pool
+(** USD will be treated as 0xfff...fff)
+┌─────────────────┐         ┌──────────────────────────┐
+│SimplePriceOracle├────────►│AlpacaPriceOraclePriceFeed├──────────┐
+└──ibBUSD/BUSD────┘         └──ibBUSD/BUSD─────────────┘          ▼
+                                                                ┌────────────────┐
+┌────────────────────┐                                          │IbTokenPriceFeed│
+│ChainLinkPriceOracle├───────┐                                  └──ibBUSD/USD───┘
+└──BUSD/USD-─────────┘       ▼                                    ▲
+                            ┌────────────────────────────────┐    │
+                            │StrictAlpacaPriceOraclePriceFeed├────┘
+                            └───BUSD/USD-────────────────────┘
+┌───────────────┐             ▲
+│BandPriceOracle├─────────────┘
+└──BUSD/USD─────┘
+
+
+StrictAlpacaPriceOraclePriceFeed config
+- primarySource token0 = BUSD address
+- primarySource token1 = USD address (0xfff...fff)
+- secondarySource token0 = BUSD address
+- secondarySource token1 = USD address (0xfff...fff)
 */
 
 import { PancakeFactory__factory, PancakePair__factory } from "@alpaca-finance/alpaca-contract/typechain"
@@ -36,19 +69,26 @@ import {
   IbTokenPriceFeed__factory,
   DexPriceOracle,
   DexPriceOracle__factory,
+  BandPriceOracle,
+  BandPriceOracle__factory,
+  MockStdReference__factory,
 } from "../../../typechain"
 import { AddressFour, AddressOne, AddressThree, AddressTwo, AddressZero } from "../../helper/address"
 
 type fixture = {
-  strictWbnbInBusdPriceFeed: StrictAlpacaOraclePriceFeed
+  strictWbnbInBusdPriceFeed1: StrictAlpacaOraclePriceFeed // Dex strict version
+  strictWbnbInBusdPriceFeed2: StrictAlpacaOraclePriceFeed // Band strict version
+  ibTokenPriceFeed1: IbTokenPriceFeed // Dex strict version
+  ibTokenPriceFeed2: IbTokenPriceFeed // Band strict version
   ibInWbnbPriceFeed: AlpacaOraclePriceFeed
-  dexPriceOracle: DexPriceOracle // use as base/busd price source actual (secondary source)
-  ibTokenPriceFeed: IbTokenPriceFeed
+  dexPriceOracle: DexPriceOracle // [Deperecated] use as base/busd price source actual (secondary source)
+  bandPriceOracle: BandPriceOracle // use as base/busd price source actual (secondary source)
   accessControlConfig: AccessControlConfig
   mockedSimpleOracle: MockContract // use as ib/base price source
   mockedChainLinkOracle: MockContract // use as base/busd price source actual (primary source)
   mockedPcsFactory: MockContract
   mockedPancakePair: MockContract
+  mockedStdReference: MockContract
 }
 
 const ibWBNBAddress = AddressOne
@@ -83,6 +123,11 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   await pcsFactory.deployed()
   const mockedPcsFactory = await smockit(pcsFactory)
 
+  // Deploy mocked StdReference
+  const mockStdReference = await new MockStdReference__factory(deployer).deploy()
+  await mockStdReference.deployed()
+  const mockedStdReference = await smockit(mockStdReference)
+
   // Deploy AccessControlConfig
   const AccessControlConfig = (await ethers.getContractFactory(
     "AccessControlConfig",
@@ -96,6 +141,19 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   mockedPcsFactory.smocked.getPair.will.return.with(mockedPancakePair.address)
   const dexPriceOracle = (await upgrades.deployProxy(DexPriceOracle, [mockedPcsFactory.address])) as DexPriceOracle
   await dexPriceOracle.deployed()
+
+  // Deploy BandPriceOracle
+  const BandPriceOracle = (await ethers.getContractFactory("BandPriceOracle", deployer)) as BandPriceOracle__factory
+  const bandPriceOracle = (await upgrades.deployProxy(BandPriceOracle, [
+    mockedStdReference.address,
+    accessControlConfig.address,
+  ])) as BandPriceOracle
+  await bandPriceOracle.deployed()
+
+  // setup token symbol for sanity check
+  await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployer.address)
+  await bandPriceOracle.setTokenSymbol(wbnbAddress, "BNB")
+  await bandPriceOracle.setTokenSymbol(busdAddress, "BUSD")
 
   // Deploy AlpacaOraclePriceFeed
   const AlpacaOraclePriceFeed = (await ethers.getContractFactory(
@@ -119,7 +177,9 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     "StrictAlpacaOraclePriceFeed",
     deployer
   )) as StrictAlpacaOraclePriceFeed__factory
-  const strictWbnbInBusdPriceFeed = (await upgrades.deployProxy(StrictAlpacaOraclePriceFeed, [
+
+  // use DexPriceOracle as secondary source
+  const strictWbnbInBusdPriceFeed1 = (await upgrades.deployProxy(StrictAlpacaOraclePriceFeed, [
     mockedChainLinkOracle.address,
     wbnbAddress,
     busdAddress,
@@ -128,31 +188,54 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     busdAddress,
     accessControlConfig.address,
   ])) as StrictAlpacaOraclePriceFeed
-  await strictWbnbInBusdPriceFeed.deployed()
+  await strictWbnbInBusdPriceFeed1.deployed()
+
+  // use BandPriceOracle as secondary source
+  const strictWbnbInBusdPriceFeed2 = (await upgrades.deployProxy(StrictAlpacaOraclePriceFeed, [
+    mockedChainLinkOracle.address,
+    wbnbAddress,
+    busdAddress,
+    bandPriceOracle.address,
+    wbnbAddress,
+    busdAddress,
+    accessControlConfig.address,
+  ])) as StrictAlpacaOraclePriceFeed
+  await strictWbnbInBusdPriceFeed2.deployed()
 
   // reset ocked for StrictAlpacaOraclePriceFeed sanity check
   mockedChainLinkOracle.smocked.getPrice.reset()
   mockedPancakePair.smocked.getReserves.reset()
 
-  // Deploy IbTokenPriceFeed
   const IbTokenPriceFeed = (await ethers.getContractFactory("IbTokenPriceFeed", deployer)) as IbTokenPriceFeed__factory
-  const ibTokenPriceFeed = (await upgrades.deployProxy(IbTokenPriceFeed, [
+  // Deploy IbTokenPriceFeed (Dex strict version)
+  const ibTokenPriceFeed1 = (await upgrades.deployProxy(IbTokenPriceFeed, [
     ibInWbnbPriceFeed.address,
-    strictWbnbInBusdPriceFeed.address,
+    strictWbnbInBusdPriceFeed1.address,
     accessControlConfig.address,
   ])) as IbTokenPriceFeed
-  await ibTokenPriceFeed.deployed()
+  await ibTokenPriceFeed1.deployed()
+  // Deploy IbTokenPriceFeed (Band strict version)
+  const ibTokenPriceFeed2 = (await upgrades.deployProxy(IbTokenPriceFeed, [
+    ibInWbnbPriceFeed.address,
+    strictWbnbInBusdPriceFeed2.address,
+    accessControlConfig.address,
+  ])) as IbTokenPriceFeed
+  await ibTokenPriceFeed2.deployed()
 
   return {
-    strictWbnbInBusdPriceFeed,
+    strictWbnbInBusdPriceFeed1,
+    strictWbnbInBusdPriceFeed2,
     ibInWbnbPriceFeed,
-    ibTokenPriceFeed,
+    ibTokenPriceFeed1,
+    ibTokenPriceFeed2,
     dexPriceOracle,
+    bandPriceOracle,
     mockedSimpleOracle,
     mockedChainLinkOracle,
     accessControlConfig,
     mockedPcsFactory,
     mockedPancakePair,
+    mockedStdReference,
   }
 }
 
@@ -169,27 +252,34 @@ describe("PriceFeedStack", () => {
   let bobAddress: string
   let devAddress: string
 
-  let strictWbnbInBusdPriceFeed: StrictAlpacaOraclePriceFeed
+  let strictWbnbInBusdPriceFeed1: StrictAlpacaOraclePriceFeed
+  let strictWbnbInBusdPriceFeed2: StrictAlpacaOraclePriceFeed
   let ibInWbnbPriceFeed: AlpacaOraclePriceFeed
-  let ibTokenPriceFeed: IbTokenPriceFeed
+  let ibTokenPriceFeed1: IbTokenPriceFeed
+  let ibTokenPriceFeed2: IbTokenPriceFeed
   let dexPriceOracle: DexPriceOracle
+  let bandPriceOracle: BandPriceOracle
   let accessControlConfig: AccessControlConfig
   let mockedSimpleOracle: MockContract
   let mockedChainLinkOracle: MockContract
   let mockedPcsFactory: MockContract
   let mockedPancakePair: MockContract
+  let mockedStdReference: MockContract
 
   beforeEach(async () => {
     ;({
-      strictWbnbInBusdPriceFeed,
+      strictWbnbInBusdPriceFeed1,
+      strictWbnbInBusdPriceFeed2,
       ibInWbnbPriceFeed,
-      ibTokenPriceFeed,
+      ibTokenPriceFeed1,
+      ibTokenPriceFeed2,
       dexPriceOracle,
       mockedSimpleOracle,
       mockedChainLinkOracle,
       accessControlConfig,
       mockedPcsFactory,
       mockedPancakePair,
+      mockedStdReference,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
@@ -202,7 +292,7 @@ describe("PriceFeedStack", () => {
 
   context("#ibTokenPriceFeed.peekPrice()", () => {
     context("when every component operates normally", () => {
-      it("should returns price with status ok=true", async () => {
+      it("ibTokenPriceFeed1 should returns price with status ok=true", async () => {
         const now = DateTime.now()
         // mock reserve 1 WBNB = 400 BUSD
         mockedPancakePair.smocked.getReserves.will.return.with([parseEther("400"), parseEther("1"), 0])
@@ -211,7 +301,7 @@ describe("PriceFeedStack", () => {
         // mock simple oracle to return 1 ibWBNB = 1.1 BNB
         mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
 
-        const [price, ok] = await ibTokenPriceFeed.peekPrice()
+        const [price, ok] = await ibTokenPriceFeed1.peekPrice()
         expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
         expect(ok).to.be.true
 
@@ -220,10 +310,42 @@ describe("PriceFeedStack", () => {
         expect(chainlinkCalls[0][0]).to.be.equal(wbnbAddress) // token0
         expect(chainlinkCalls[0][1]).to.be.equal(busdAddress) // token1
 
-        const { calls: simpleCalls } = mockedChainLinkOracle.smocked.getPrice
+        const { calls: simpleCalls } = mockedSimpleOracle.smocked.getPrice
         expect(simpleCalls.length).to.be.equal(1)
-        expect(simpleCalls[0][0]).to.be.equal(wbnbAddress) // token0
-        expect(simpleCalls[0][1]).to.be.equal(busdAddress) // token1
+        expect(simpleCalls[0][0]).to.be.equal(ibWBNBAddress) // token0
+        expect(simpleCalls[0][1]).to.be.equal(wbnbAddress) // token1
+      })
+      it("ibTokenPriceFeed2 should returns price with status ok=true", async () => {
+        const now = DateTime.now()
+        // mock chainlink oracle to return 1 WBNB = 401 BUSD
+        mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 1)])
+        // mock chainlink oracle to return 1 WBNB = 401 BUSD
+        mockedStdReference.smocked.getReferenceData.will.return.with({
+          rate: parseEther("401"),
+          lastUpdatedBase: nHoursAgoInSec(now, 1),
+          lastUpdatedQuote: nHoursAgoInSec(now, 1),
+        })
+        // mock simple oracle to return 1 ibWBNB = 1.1 BNB
+        mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
+
+        const [price, ok] = await ibTokenPriceFeed2.peekPrice()
+        expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
+        expect(ok).to.be.true
+
+        const { calls: chainlinkCalls } = mockedChainLinkOracle.smocked.getPrice
+        expect(chainlinkCalls.length).to.be.equal(1)
+        expect(chainlinkCalls[0][0]).to.be.equal(wbnbAddress) // token0
+        expect(chainlinkCalls[0][1]).to.be.equal(busdAddress) // token1
+
+        const { calls: simpleCalls } = mockedSimpleOracle.smocked.getPrice
+        expect(simpleCalls.length).to.be.equal(1)
+        expect(simpleCalls[0][0]).to.be.equal(ibWBNBAddress) // token0
+        expect(simpleCalls[0][1]).to.be.equal(wbnbAddress) // token1
+
+        const { calls: stdReferenceCalls } = mockedStdReference.smocked.getReferenceData
+        expect(stdReferenceCalls.length).to.be.equal(1)
+        expect(stdReferenceCalls[0][0]).to.be.equal("BNB") // token0
+        expect(stdReferenceCalls[0][1]).to.be.equal("BUSD") // token1
       })
     })
     context("when ibWBNB to WBNB price source (mockedSimpleOracle)...", () => {
@@ -234,7 +356,7 @@ describe("PriceFeedStack", () => {
           mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 1)])
           mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 25)])
 
-          const [price, ok] = await ibTokenPriceFeed.peekPrice()
+          const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
           expect(ok).to.be.false
         })
@@ -250,7 +372,7 @@ describe("PriceFeedStack", () => {
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
           await ibInWbnbPriceFeed.setPriceLife(26 * 60 * 60)
 
-          const [price, ok] = await ibTokenPriceFeed.peekPrice()
+          const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
           expect(ok).to.be.true
         })
@@ -265,7 +387,7 @@ describe("PriceFeedStack", () => {
           mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 25)])
           mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
 
-          const [price, ok] = await ibTokenPriceFeed.peekPrice()
+          const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
           expect(ok).to.be.false
         })
@@ -280,9 +402,9 @@ describe("PriceFeedStack", () => {
 
           // set price life to 26 hours
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
-          await strictWbnbInBusdPriceFeed.setPriceLife(26 * 60 * 60)
+          await strictWbnbInBusdPriceFeed1.setPriceLife(26 * 60 * 60)
 
-          const [price, ok] = await ibTokenPriceFeed.peekPrice()
+          const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
           expect(ok).to.be.true
         })
@@ -298,7 +420,7 @@ describe("PriceFeedStack", () => {
           ])
           mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
 
-          const [price, ok] = await ibTokenPriceFeed.peekPrice()
+          const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("462.000000000000000001")) // 420 * 1.1
           expect(ok).to.be.false
         })
@@ -311,7 +433,7 @@ describe("PriceFeedStack", () => {
           mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("380"), nHoursAgoInSec(now, 1)])
           mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
 
-          const [price, ok] = await ibTokenPriceFeed.peekPrice()
+          const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("418")) // 380 * 1.1
           expect(ok).to.be.false
         })
@@ -329,7 +451,7 @@ describe("PriceFeedStack", () => {
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
           await ibInWbnbPriceFeed.pause()
 
-          const [price, ok] = await ibTokenPriceFeed.peekPrice()
+          const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
           expect(ok).to.be.false
         })
@@ -345,9 +467,9 @@ describe("PriceFeedStack", () => {
 
           // pause
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
-          await strictWbnbInBusdPriceFeed.pause()
+          await strictWbnbInBusdPriceFeed1.pause()
 
-          const [price, ok] = await ibTokenPriceFeed.peekPrice()
+          const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
           expect(ok).to.be.false
         })
@@ -363,9 +485,9 @@ describe("PriceFeedStack", () => {
 
           // pause
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
-          await ibTokenPriceFeed.pause()
+          await ibTokenPriceFeed1.pause()
 
-          const [price, ok] = await ibTokenPriceFeed.peekPrice()
+          const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
           expect(ok).to.be.false
         })
