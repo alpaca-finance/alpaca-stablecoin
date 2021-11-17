@@ -80,7 +80,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @notice Events
   event LogDeposit(uint256 _val);
   event LogWithdraw(uint256 _val);
-  event LogEmergencyWithdaraw();
+  event LogEmergencyWithdraw(address indexed _caller, address _to);
   event LogMoveStake(address indexed _src, address indexed _dst, uint256 _wad);
   event LogSetTreasuryAccount(address indexed _caller, address _treasuryAccount);
   event LogSetTreasuryFeeBps(address indexed _caller, uint256 _treasuryFeeBps);
@@ -387,7 +387,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     stake[msg.sender] = sub(stake[msg.sender], _share);
     rewardDebts[msg.sender] = rmulup(stake[msg.sender], accRewardPerShare);
     address(collateralToken).safeTransfer(_to, _amount);
-    emit LogEmergencyWithdaraw();
+    emit LogEmergencyWithdraw(msg.sender, _to);
   }
 
   function moveStake(
