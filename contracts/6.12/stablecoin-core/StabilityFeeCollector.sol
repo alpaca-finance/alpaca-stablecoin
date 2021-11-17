@@ -132,6 +132,12 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   function setGlobalStabilityFeeRate(uint256 _globalStabilityFeeRate) external {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    require(_globalStabilityFeeRate >= RAY, "StabilityFeeCollector/invalid-stability-fee-rate");
+    // Maximum stability fee rate is 50% yearly
+    require(
+      _globalStabilityFeeRate <= 1000000012857214317438491659,
+      "StabilityFeeCollector/stability-fee-rate-too-large"
+    );
     globalStabilityFeeRate = _globalStabilityFeeRate;
     emit LogSetGlobalStabilityFeeRate(msg.sender, _globalStabilityFeeRate);
   }

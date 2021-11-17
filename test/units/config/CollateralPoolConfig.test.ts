@@ -299,6 +299,13 @@ describe("CollateralPoolConfig", () => {
         )
       })
     })
+    context("when stability fee rate too large", () => {
+      it("should be revert", async () => {
+        await expect(collateralPoolConfig.setStabilityFeeRate(COLLATERAL_POOL_ID, WeiPerRad)).to.be.revertedWith(
+          "CollateralPoolConfig/stability-fee-rate-too-large"
+        )
+      })
+    })
     context("when parameters are valid", () => {
       it("should success", async () => {
         await expect(collateralPoolConfig.setStabilityFeeRate(COLLATERAL_POOL_ID, WeiPerRay))
