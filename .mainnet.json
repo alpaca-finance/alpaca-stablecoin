@@ -86,12 +86,35 @@
     "address": "",
     "deployedBlock": 0
   },
-  "PriceFeed": [
-    {
-      "address": "",
-      "deployedBlock": 0
-    }
-  ],
+  "PriceFeed": {
+    "AlpacaOraclePriceFeed": [
+      {
+        "address": "",
+        "deployedBlock": 0,
+        "alpacaOracle": "",
+        "token0": "",
+        "token1": ""
+      }
+    ],
+    "StrictAlpacaPriceOraclePriceFeed": [
+      {
+        "address": "",
+        "deployedBlock": 0,
+        "primarySoure": "",
+        "secondary": "",
+        "token0": "",
+        "token1": ""
+      }
+    ],
+    "IbTokenPriceFeed": [
+      {
+        "address": "",
+        "deployedBlock": 0,
+        "AlpacaPriceOraclePriceFeed": "",
+        "StrictAlpacaPriceOraclePriceFeed": ""
+      }
+    ]
+  },
   "Oracle": {
     "ChainLinkOracle": {
       "address": "",

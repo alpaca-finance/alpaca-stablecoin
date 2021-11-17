@@ -154,6 +154,11 @@
       "address": "0x17F95DA692e6F578DE3Da184D10b6b3C6Ee49544",
       "txHash": "0x402e30a88cbd5e09679e174758c10453a95bee8a2eaa51ff032f4120b6d7a3fc",
       "kind": "transparent"
+    },
+    {
+      "address": "0xc818621a6cf76995b49FC11A224aDb2Ff424DeC7",
+      "txHash": "0xcee5d1de8d35a27deb102d985541462aa9436e25362c6de8787c58a9019bde3f",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -2531,6 +2536,97 @@
           },
           "t_bool": {
             "label": "bool"
+          }
+        }
+      }
+    },
+    "2efbfb594b14e0fb730e41a6d6b235dbb99da6e9007ba8cdec4c518da1d5ad22": {
+      "address": "0x9447014470Ce2390635Ba36D9aAD21ddd0CaE57d",
+      "txHash": "0x5ae7fa137c46a7d91c3b3017ad9c5f8fa37d3ad52a6bfdac02e6db6f342abf30",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:31"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:28"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:96"
+          },
+          {
+            "contract": "AlpacaOraclePriceFeed",
+            "label": "alpacaOracle",
+            "type": "t_contract(IAlpacaOracle)4075",
+            "src": "contracts/6.12/price-feeders/AlpacaOraclePriceFeed.sol:24"
+          },
+          {
+            "contract": "AlpacaOraclePriceFeed",
+            "label": "accessControlConfig",
+            "type": "t_contract(IAccessControlConfig)3985",
+            "src": "contracts/6.12/price-feeders/AlpacaOraclePriceFeed.sol:25"
+          },
+          {
+            "contract": "AlpacaOraclePriceFeed",
+            "label": "token0",
+            "type": "t_address",
+            "src": "contracts/6.12/price-feeders/AlpacaOraclePriceFeed.sol:27"
+          },
+          {
+            "contract": "AlpacaOraclePriceFeed",
+            "label": "token1",
+            "type": "t_address",
+            "src": "contracts/6.12/price-feeders/AlpacaOraclePriceFeed.sol:27"
+          },
+          {
+            "contract": "AlpacaOraclePriceFeed",
+            "label": "priceLife",
+            "type": "t_uint256",
+            "src": "contracts/6.12/price-feeders/AlpacaOraclePriceFeed.sol:27"
+          }
+        ],
+        "types": {
+          "t_contract(IAlpacaOracle)4075": {
+            "label": "contract IAlpacaOracle"
+          },
+          "t_contract(IAccessControlConfig)3985": {
+            "label": "contract IAccessControlConfig"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
           }
         }
       }
