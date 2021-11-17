@@ -149,9 +149,9 @@ describe("StabilityFeeCollector", () => {
         mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
         mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-        await expect(stabilityFeeCollector.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad))
+        await expect(stabilityFeeCollector.setGlobalStabilityFeeRate(UnitHelpers.WeiPerRay))
           .to.emit(stabilityFeeCollector, "LogSetGlobalStabilityFeeRate")
-          .withArgs(deployerAddress, UnitHelpers.WeiPerWad)
+          .withArgs(deployerAddress, UnitHelpers.WeiPerRay)
       })
     })
   })

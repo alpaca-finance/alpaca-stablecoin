@@ -109,7 +109,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     WeiPerRad.mul(100000000000000),
     0,
     simplePriceFeed.address,
-    0,
+    WeiPerRay,
     WeiPerRay,
     authTokenAdapter.address,
     CLOSE_FACTOR_BPS,
