@@ -129,7 +129,7 @@
       "deployedBlock": 0
     },
     "BandPriceOracle": {
-      "address": "",
+      "address": "0x17F95DA692e6F578DE3Da184D10b6b3C6Ee49544",
       "deployedBlock": 0,
       "StdReferenceProxy": {
         "address": "0xDA7a001b254CD22e46d3eAB04d937489c93174C3",

@@ -149,6 +149,11 @@
       "address": "0x768284031dEE9E2D23900a28E5929E590Fc2e329",
       "txHash": "0xddad1ce7fbd84f89f950913f6123d4187bec6b358cc72cd5b640358c9b3a6839",
       "kind": "transparent"
+    },
+    {
+      "address": "0x17F95DA692e6F578DE3Da184D10b6b3C6Ee49544",
+      "txHash": "0x402e30a88cbd5e09679e174758c10453a95bee8a2eaa51ff032f4120b6d7a3fc",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -2466,6 +2471,64 @@
           }
         ],
         "types": {
+          "t_bool": {
+            "label": "bool"
+          }
+        }
+      }
+    },
+    "107428d9bce47ba3eb73b63ff4d6fd185b7718fb16a5e4ff652a6b90ed9a95b0": {
+      "address": "0x2B3B820bBF5e6b7487A5010F108461e4b4799b87",
+      "txHash": "0x9e76000cf6f820e86a6e9c76de01e9e518a7daeabccfbcf98460aa7f7c58f071",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "BandPriceOracle",
+            "label": "stdReferenceProxy",
+            "type": "t_contract(IStdReference)5254",
+            "src": "contracts/6.12/price-oracles/BandPriceOracle.sol:25"
+          },
+          {
+            "contract": "BandPriceOracle",
+            "label": "accessControlConfig",
+            "type": "t_contract(IAccessControlConfig)3985",
+            "src": "contracts/6.12/price-oracles/BandPriceOracle.sol:27"
+          },
+          {
+            "contract": "BandPriceOracle",
+            "label": "tokenSymbols",
+            "type": "t_mapping(t_address,t_string_storage)",
+            "src": "contracts/6.12/price-oracles/BandPriceOracle.sol:32"
+          }
+        ],
+        "types": {
+          "t_contract(IStdReference)5254": {
+            "label": "contract IStdReference"
+          },
+          "t_contract(IAccessControlConfig)3985": {
+            "label": "contract IAccessControlConfig"
+          },
+          "t_mapping(t_address,t_string_storage)": {
+            "label": "mapping(address => string)"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_string_storage": {
+            "label": "string"
+          },
           "t_bool": {
             "label": "bool"
           }
