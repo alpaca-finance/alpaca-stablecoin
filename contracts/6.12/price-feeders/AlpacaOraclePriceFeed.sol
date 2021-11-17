@@ -38,6 +38,7 @@ contract AlpacaOraclePriceFeed is PausableUpgradeable, IPriceFeed {
     accessControlConfig = IAccessControlConfig(_accessControlConfig);
 
     alpacaOracle = IAlpacaOracle(_alpacaOracle);
+    require(_token0 != _token1, "AlpacaOraclePriceFeed/wrong-token0-token1");
     token0 = _token0;
     token1 = _token1;
     priceLife = 1 days;
