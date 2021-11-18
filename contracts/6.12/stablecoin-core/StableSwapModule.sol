@@ -159,7 +159,6 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     );
     authTokenAdapter.withdraw(_usr, _tokenAmount);
     bookKeeper.moveStablecoin(address(this), systemDebtEngine, mul(_fee, RAY));
-
     emit LogSwapStablecoinToToken(_usr, _tokenAmount, _fee);
   }
 

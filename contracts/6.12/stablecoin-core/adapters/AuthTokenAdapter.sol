@@ -36,7 +36,7 @@ contract AuthTokenAdapter is
 
   IBookKeeper public override bookKeeper; // cdp engine
   bytes32 public override collateralPoolId; // collateral pool id
-  IToken public token; // collateral token
+  IToken public override token; // collateral token
   uint256 public override decimals; // collateralToken decimals
   uint256 public live; // Access Flag
 
