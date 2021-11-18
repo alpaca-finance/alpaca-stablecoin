@@ -98,12 +98,12 @@
     ],
     "StrictAlpacaPriceOraclePriceFeed": [
       {
-        "address": "",
-        "deployedBlock": 0,
-        "primarySoure": "",
-        "secondary": "",
-        "token0": "",
-        "token1": ""
+        "address": "0x82fb9178a42f38915286F74035836809d249c6bc",
+        "deployedBlock": 14214961,
+        "primarySoure": "0xc4f3330dF77b0E925461ce5b5cfE0795114Cdf8E",
+        "secondary": "0x17F95DA692e6F578DE3Da184D10b6b3C6Ee49544",
+        "token0": "0x0266693F9Df932aD7dA8a9b44C2129Ce8a87E81f",
+        "token1": "0xffffffffffffffffffffffffffffffffffffffff"
       }
     ],
     "IbTokenPriceFeed": [

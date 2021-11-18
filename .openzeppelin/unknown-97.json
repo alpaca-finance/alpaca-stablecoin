@@ -159,6 +159,11 @@
       "address": "0xc818621a6cf76995b49FC11A224aDb2Ff424DeC7",
       "txHash": "0xcee5d1de8d35a27deb102d985541462aa9436e25362c6de8787c58a9019bde3f",
       "kind": "transparent"
+    },
+    {
+      "address": "0x82fb9178a42f38915286F74035836809d249c6bc",
+      "txHash": "0x74fb66a4dd9ea8faa9972dc0245b770ecb0b1c68e37f9236ce1b4a3ac93eefe5",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -2624,6 +2629,173 @@
           },
           "t_array(t_uint256)49_storage": {
             "label": "uint256[49]"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          }
+        }
+      }
+    },
+    "625563f0605dddebd0c3333af60e716f533da5cacb41bebc6b45a27385688ca4": {
+      "address": "0x07952dF84816b505B660dC573C595761DBbB8dA4",
+      "txHash": "0x6cdb916264f22f25a9290eefee82910732c5f33a3af6faaeb5393b62d62af719",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:31"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:28"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:96"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "_roles",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)1079_storage)",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:225"
+          },
+          {
+            "contract": "StrictAlpacaOraclePriceFeed",
+            "label": "primary",
+            "type": "t_struct(AlpacaOracleConfig)8586_storage",
+            "src": "contracts/6.12/price-feeders/StrictAlpacaOraclePriceFeed.sol:35"
+          },
+          {
+            "contract": "StrictAlpacaOraclePriceFeed",
+            "label": "secondary",
+            "type": "t_struct(AlpacaOracleConfig)8586_storage",
+            "src": "contracts/6.12/price-feeders/StrictAlpacaOraclePriceFeed.sol:38"
+          },
+          {
+            "contract": "StrictAlpacaOraclePriceFeed",
+            "label": "priceLife",
+            "type": "t_uint256",
+            "src": "contracts/6.12/price-feeders/StrictAlpacaOraclePriceFeed.sol:38"
+          },
+          {
+            "contract": "StrictAlpacaOraclePriceFeed",
+            "label": "maxPriceDiff",
+            "type": "t_uint256",
+            "src": "contracts/6.12/price-feeders/StrictAlpacaOraclePriceFeed.sol:39"
+          },
+          {
+            "contract": "StrictAlpacaOraclePriceFeed",
+            "label": "accessControlConfig",
+            "type": "t_contract(IAccessControlConfig)3985",
+            "src": "contracts/6.12/price-feeders/StrictAlpacaOraclePriceFeed.sol:44"
+          }
+        ],
+        "types": {
+          "t_struct(AlpacaOracleConfig)8586_storage": {
+            "label": "struct StrictAlpacaOraclePriceFeed.AlpacaOracleConfig",
+            "members": [
+              {
+                "label": "alpacaOracle",
+                "type": "t_contract(IAlpacaOracle)4075"
+              },
+              {
+                "label": "token0",
+                "type": "t_address"
+              },
+              {
+                "label": "token1",
+                "type": "t_address"
+              }
+            ]
+          },
+          "t_contract(IAlpacaOracle)4075": {
+            "label": "contract IAlpacaOracle"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_contract(IAccessControlConfig)3985": {
+            "label": "contract IAccessControlConfig"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)1079_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_struct(RoleData)1079_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_struct(AddressSet)2464_storage"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32"
+              }
+            ]
+          },
+          "t_struct(AddressSet)2464_storage": {
+            "label": "struct EnumerableSetUpgradeable.AddressSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)2199_storage"
+              }
+            ]
+          },
+          "t_struct(Set)2199_storage": {
+            "label": "struct EnumerableSetUpgradeable.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage"
+              },
+              {
+                "label": "_indexes",
+                "type": "t_mapping(t_bytes32,t_uint256)"
+              }
+            ]
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_bool": {
+            "label": "bool"
           },
           "t_array(t_uint256)50_storage": {
             "label": "uint256[50]"
