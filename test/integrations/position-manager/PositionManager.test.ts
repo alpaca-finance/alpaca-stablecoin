@@ -285,6 +285,10 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     positionManager.address
   )
   await accessControlConfig.grantRole(
+    ethers.utils.solidityKeccak256(["string"], ["COLLATERAL_MANAGER_ROLE"]),
+    positionManager.address
+  )
+  await accessControlConfig.grantRole(
     ethers.utils.solidityKeccak256(["string"], ["STABILITY_FEE_COLLECTOR_ROLE"]),
     stabilityFeeCollector.address
   )

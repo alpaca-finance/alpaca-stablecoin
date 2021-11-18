@@ -396,6 +396,11 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     uint256 _share,
     bytes calldata _data
   ) external override nonReentrant whenNotPaused {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.COLLATERAL_MANAGER_ROLE(), msg.sender),
+      "!collateralManagerRole"
+    );
     _moveStake(_source, _destination, _share, _data);
   }
 
@@ -449,6 +454,11 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     int256, /* debtShare */
     bytes calldata _data
   ) external override nonReentrant whenNotPaused {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.COLLATERAL_MANAGER_ROLE(), msg.sender),
+      "!collateralManagerRole"
+    );
     uint256 _unsignedCollateralValue = _collateralValue < 0 ? uint256(-_collateralValue) : uint256(_collateralValue);
     _moveStake(_source, _destination, _unsignedCollateralValue, _data);
   }
@@ -459,6 +469,11 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     uint256 _share,
     bytes calldata _data
   ) external override nonReentrant whenNotPaused {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.COLLATERAL_MANAGER_ROLE(), msg.sender),
+      "!collateralManagerRole"
+    );
     _deposit(_source, 0, _data);
     _moveStake(_source, _destination, _share, _data);
   }

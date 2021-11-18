@@ -152,6 +152,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await stableSwapModule.setFeeOut(ethers.utils.parseEther("0.001"))
   await authTokenAdapter.grantRole(await authTokenAdapter.WHITELISTED(), stableSwapModule.address)
   await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), stableSwapModule.address)
+  await accessControlConfig.grantRole(await accessControlConfig.COLLATERAL_MANAGER_ROLE(), stableSwapModule.address)
 
   const FlashMintModule = (await ethers.getContractFactory("FlashMintModule", deployer)) as FlashMintModule__factory
   const flashMintModule = (await upgrades.deployProxy(FlashMintModule, [

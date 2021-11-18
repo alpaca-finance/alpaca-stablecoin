@@ -156,6 +156,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   ])) as PositionManager
   await positionManager.deployed()
   await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), positionManager.address)
+  await accessControlConfig.grantRole(await accessControlConfig.COLLATERAL_MANAGER_ROLE(), positionManager.address)
 
   const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
   const ibTokenAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
@@ -271,6 +272,10 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await accessControlConfig.grantRole(await accessControlConfig.LIQUIDATION_ENGINE_ROLE(), liquidationEngine.address)
   await accessControlConfig.grantRole(
     await accessControlConfig.LIQUIDATION_ENGINE_ROLE(),
+    fixedSpreadLiquidationStrategy.address
+  )
+  await accessControlConfig.grantRole(
+    await accessControlConfig.COLLATERAL_MANAGER_ROLE(),
     fixedSpreadLiquidationStrategy.address
   )
 
