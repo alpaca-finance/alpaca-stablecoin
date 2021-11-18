@@ -463,7 +463,6 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
   */
   /// @param _value the value of stablecoin to be used to settle bad debt [rad]
   function settleSystemBadDebt(uint256 _value) external override nonReentrant whenNotPaused {
-    require(_value != 0, "BookKeeper/value-zero");
     systemBadDebt[msg.sender] = sub(systemBadDebt[msg.sender], _value);
     stablecoin[msg.sender] = sub(stablecoin[msg.sender], _value);
     totalUnbackedStablecoin = sub(totalUnbackedStablecoin, _value);
