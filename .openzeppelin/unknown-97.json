@@ -164,6 +164,16 @@
       "address": "0x82fb9178a42f38915286F74035836809d249c6bc",
       "txHash": "0x74fb66a4dd9ea8faa9972dc0245b770ecb0b1c68e37f9236ce1b4a3ac93eefe5",
       "kind": "transparent"
+    },
+    {
+      "address": "0x3dc065757af06B04c40b0778d956f0B102fA5831",
+      "txHash": "0xc0a695b99e1c7e62881245d3f88c8cf06b6e7a22b53395e259ed81cbb59299b9",
+      "kind": "transparent"
+    },
+    {
+      "address": "0xdB6C007c0bb8E81A1b0A490190E9C971D6003753",
+      "txHash": "0x6cee2f4b8d4f604eed7f8cee2480ee9c884f9668b6c0dac6f3a6fa77707857f0",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -2790,6 +2800,141 @@
           },
           "t_mapping(t_bytes32,t_uint256)": {
             "label": "mapping(bytes32 => uint256)"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          }
+        }
+      }
+    },
+    "a4ba3d318e83d65c88a6ac5bfa7cff157eb11c91c1bd807480864e70135f5610": {
+      "address": "0x7924D7c22d273f9742aCbEb34B2D01357EAfE66e",
+      "txHash": "0x66b675bc8f567cb9e81e8ae7c8e6bae476a2bffac22f9d92ced5db9d9e623f45",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:31"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:28"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:96"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "_roles",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)1079_storage)",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:225"
+          },
+          {
+            "contract": "IbTokenPriceFeed",
+            "label": "accessControlConfig",
+            "type": "t_contract(IAccessControlConfig)3985",
+            "src": "contracts/6.12/price-feeders/IbTokenPriceFeed.sol:29"
+          },
+          {
+            "contract": "IbTokenPriceFeed",
+            "label": "ibInBasePriceFeed",
+            "type": "t_contract(IPriceFeed)5064",
+            "src": "contracts/6.12/price-feeders/IbTokenPriceFeed.sol:30"
+          },
+          {
+            "contract": "IbTokenPriceFeed",
+            "label": "baseInUsdPriceFeed",
+            "type": "t_contract(IPriceFeed)5064",
+            "src": "contracts/6.12/price-feeders/IbTokenPriceFeed.sol:33"
+          }
+        ],
+        "types": {
+          "t_contract(IAccessControlConfig)3985": {
+            "label": "contract IAccessControlConfig"
+          },
+          "t_contract(IPriceFeed)5064": {
+            "label": "contract IPriceFeed"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)1079_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_struct(RoleData)1079_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_struct(AddressSet)2464_storage"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32"
+              }
+            ]
+          },
+          "t_struct(AddressSet)2464_storage": {
+            "label": "struct EnumerableSetUpgradeable.AddressSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)2199_storage"
+              }
+            ]
+          },
+          "t_struct(Set)2199_storage": {
+            "label": "struct EnumerableSetUpgradeable.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage"
+              },
+              {
+                "label": "_indexes",
+                "type": "t_mapping(t_bytes32,t_uint256)"
+              }
+            ]
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)"
+          },
+          "t_uint256": {
+            "label": "uint256"
           },
           "t_array(t_uint256)49_storage": {
             "label": "uint256[49]"

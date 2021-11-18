@@ -108,10 +108,10 @@
     ],
     "IbTokenPriceFeed": [
       {
-        "address": "0xf8210Fd8a21752aEa1FeE8F64c2BBaf9e304A37a",
-        "deployedBlock": 0,
-        "AlpacaPriceOraclePriceFeed": "",
-        "StrictAlpacaPriceOraclePriceFeed": ""
+        "address": "0xdB6C007c0bb8E81A1b0A490190E9C971D6003753",
+        "deployedBlock": 14215416,
+        "AlpacaPriceOraclePriceFeed": "0xc818621a6cf76995b49FC11A224aDb2Ff424DeC7",
+        "StrictAlpacaPriceOraclePriceFeed": "0x82fb9178a42f38915286F74035836809d249c6bc"
       }
     ]
   },
