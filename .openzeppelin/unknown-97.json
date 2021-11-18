@@ -2947,6 +2947,170 @@
           }
         }
       }
+    },
+    "ddf36cc5e5d472c0cc37e6f13a0533cb6bfe93e3b3740c0399031808804e92c7": {
+      "address": "0x9a449b51B2269CF9303ea2f8e9e68ee36a705E90",
+      "txHash": "0xa75f110f2e6593d4780d98f0a1703fb3e9995d567d82c98da0ce2890f50a9b3d",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:31"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:28"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:96"
+          },
+          {
+            "contract": "ReentrancyGuardUpgradeable",
+            "label": "_status",
+            "type": "t_uint256",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:37"
+          },
+          {
+            "contract": "ReentrancyGuardUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:67"
+          },
+          {
+            "contract": "BookKeeper",
+            "label": "positionWhitelist",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "src": "contracts/6.12/stablecoin-core/BookKeeper.sol:65"
+          },
+          {
+            "contract": "BookKeeper",
+            "label": "positions",
+            "type": "t_mapping(t_bytes32,t_mapping(t_address,t_struct(Position)13934_storage))",
+            "src": "contracts/6.12/stablecoin-core/BookKeeper.sol:92"
+          },
+          {
+            "contract": "BookKeeper",
+            "label": "collateralToken",
+            "type": "t_mapping(t_bytes32,t_mapping(t_address,t_uint256))",
+            "src": "contracts/6.12/stablecoin-core/BookKeeper.sol:93"
+          },
+          {
+            "contract": "BookKeeper",
+            "label": "stablecoin",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/6.12/stablecoin-core/BookKeeper.sol:94"
+          },
+          {
+            "contract": "BookKeeper",
+            "label": "systemBadDebt",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/6.12/stablecoin-core/BookKeeper.sol:95"
+          },
+          {
+            "contract": "BookKeeper",
+            "label": "totalStablecoinIssued",
+            "type": "t_uint256",
+            "src": "contracts/6.12/stablecoin-core/BookKeeper.sol:97"
+          },
+          {
+            "contract": "BookKeeper",
+            "label": "totalUnbackedStablecoin",
+            "type": "t_uint256",
+            "src": "contracts/6.12/stablecoin-core/BookKeeper.sol:98"
+          },
+          {
+            "contract": "BookKeeper",
+            "label": "totalDebtCeiling",
+            "type": "t_uint256",
+            "src": "contracts/6.12/stablecoin-core/BookKeeper.sol:100"
+          },
+          {
+            "contract": "BookKeeper",
+            "label": "live",
+            "type": "t_uint256",
+            "src": "contracts/6.12/stablecoin-core/BookKeeper.sol:101"
+          },
+          {
+            "contract": "BookKeeper",
+            "label": "collateralPoolConfig",
+            "type": "t_address",
+            "src": "contracts/6.12/stablecoin-core/BookKeeper.sol:102"
+          },
+          {
+            "contract": "BookKeeper",
+            "label": "accessControlConfig",
+            "type": "t_address",
+            "src": "contracts/6.12/stablecoin-core/BookKeeper.sol:105"
+          }
+        ],
+        "types": {
+          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(address => mapping(address => uint256))"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_mapping(t_bytes32,t_mapping(t_address,t_struct(Position)13934_storage))": {
+            "label": "mapping(bytes32 => mapping(address => struct BookKeeper.Position))"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_mapping(t_address,t_struct(Position)13934_storage)": {
+            "label": "mapping(address => struct BookKeeper.Position)"
+          },
+          "t_struct(Position)13934_storage": {
+            "label": "struct BookKeeper.Position",
+            "members": [
+              {
+                "label": "lockedCollateral",
+                "type": "t_uint256"
+              },
+              {
+                "label": "debtShare",
+                "type": "t_uint256"
+              }
+            ]
+          },
+          "t_mapping(t_bytes32,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(bytes32 => mapping(address => uint256))"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          }
+        }
+      }
     }
   }
 }
