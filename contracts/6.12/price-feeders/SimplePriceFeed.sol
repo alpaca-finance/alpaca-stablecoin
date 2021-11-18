@@ -53,6 +53,7 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
   }
 
   function setPriceLife(uint256 _second) external onlyOwner {
+    require(_second >= 1 hours && _second <= 1 days, "SimplePriceFeed/bad-price-life");
     priceLife = _second;
     emit LogSetPriceLife(msg.sender, _second);
   }

@@ -52,6 +52,7 @@ contract AlpacaOraclePriceFeed is PausableUpgradeable, IPriceFeed {
   event LogSetPriceLife(address indexed _caller, uint256 _second);
 
   function setPriceLife(uint256 _second) external onlyOwner {
+    require(_second >= 1 hours && _second <= 1 days, "AlpacaOraclePriceFeed/bad-price-life");
     priceLife = _second;
     emit LogSetPriceLife(msg.sender, _second);
   }

@@ -38,6 +38,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   mockAuthTokenAdapter.smocked.decimals.will.return.with(BigNumber.from(18))
   // Deploy mocked AlpacaStablecoin
   const mockAlpacaStablecoin = await smockit(await ethers.getContractFactory("AlpacaStablecoin", deployer))
+  mockAlpacaStablecoin.smocked.approve.will.return.with(true)
   // Deploy mocked Stablecoin
   const mockStablecoinAdapter = await smockit(await ethers.getContractFactory("StablecoinAdapter", deployer))
   mockStablecoinAdapter.smocked.stablecoin.will.return.with(mockAlpacaStablecoin.address)
@@ -146,7 +147,7 @@ describe("StableSwapModule", () => {
     context("when failed transfer", () => {
       it("should be revert", async () => {
         await expect(stableSwapModuleAsAlice.swapStablecoinToToken(aliceAddress, WeiPerWad.mul(10))).to.be.revertedWith(
-          "StableSwapModule/failed-transfer"
+          "!safeTransferFrom"
         )
       })
     })

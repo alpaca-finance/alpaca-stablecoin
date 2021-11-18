@@ -60,6 +60,7 @@ contract BandPriceOracle is IAlpacaOracle, Initializable {
     string memory symbol0 = tokenSymbols[_token0];
     string memory symbol1 = tokenSymbols[_token1];
 
+    require(keccak256(bytes(symbol0)) != keccak256(bytes(symbol1)), "BandPriceOracle/same-symbol");
     require(keccak256(bytes(symbol0)) != keccak256(bytes("")), "BandPriceOracle/unknown-token0");
     require(keccak256(bytes(symbol1)) != keccak256(bytes("")), "BandPriceOracle/unknown-token1");
 

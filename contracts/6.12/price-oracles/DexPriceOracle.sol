@@ -23,11 +23,6 @@ contract DexPriceOracle is Initializable, IAlpacaOracle {
   using SafeMathUpgradeable for uint256;
   address public dexFactory;
 
-  struct PriceData {
-    uint192 price;
-    uint64 lastUpdate;
-  }
-
   function initialize(address _dexFactory) external initializer {
     dexFactory = _dexFactory;
   }

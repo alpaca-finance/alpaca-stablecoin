@@ -1541,7 +1541,8 @@ describe("LiquidationEngine", () => {
         await bookKeeperAsBob.whitelist(fixedSpreadLiquidationStrategy.address)
         await bookKeeper.mintUnbackedStablecoin(deployerAddress, bobAddress, WeiPerRad.mul(100))
         const bobStablecoinBeforeLiquidation = await bookKeeper.stablecoin(bobAddress)
-        await simplePriceFeed.setPriceLife(0)
+        await simplePriceFeed.setPriceLife(60 * 60) // 1 hour
+        await TimeHelpers.increase(TimeHelpers.duration.seconds(ethers.BigNumber.from(60 * 60 * 2))) // move forward 2 hours
         await expect(
           liquidationEngineAsBob.liquidate(
             COLLATERAL_POOL_ID,

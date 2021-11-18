@@ -123,6 +123,7 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
    * @param _tokenAmount The Amount of token to sell
    */
   function swapTokenToStablecoin(address _usr, uint256 _tokenAmount) external override nonReentrant whenNotPaused {
+    require(_tokenAmount != 0, "StableSwapModule/amount-zero");
     uint256 _tokenAmount18 = mul(_tokenAmount, to18ConversionFactor);
     uint256 _fee = mul(_tokenAmount18, feeIn) / WAD;
     uint256 _stablecoinAmount = sub(_tokenAmount18, _fee);
@@ -147,6 +148,7 @@ contract StableSwapModule is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
    * @param _tokenAmount The Amount of token to buy
    */
   function swapStablecoinToToken(address _usr, uint256 _tokenAmount) external override nonReentrant whenNotPaused {
+    require(_tokenAmount != 0, "StableSwapModule/amount-zero");
     uint256 _tokenAmount18 = mul(_tokenAmount, to18ConversionFactor);
     uint256 _fee = mul(_tokenAmount18, feeOut) / WAD;
     uint256 _stablecoinAmount = add(_tokenAmount18, _fee);

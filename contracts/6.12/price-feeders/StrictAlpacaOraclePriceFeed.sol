@@ -88,6 +88,7 @@ contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgrad
   event LogSetMaxPriceDiff(address indexed caller, uint256 maxPriceDiff);
 
   function setPriceLife(uint256 _second) external onlyOwner {
+    require(_second >= 1 hours && _second <= 1 days, "StrictAlpacaOraclePriceFeed/bad-price-life");
     priceLife = _second;
     emit LogSetPriceLife(msg.sender, _second);
   }

@@ -215,7 +215,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @dev Harvest ALPACA from FairLaunch
   /// @dev Return the amount of rewards that is harvested.
   /// Expect that the adapter which inherited BaseFarmableTokenAdapter
-  function _harvest() internal returns (uint256) {
+  function _harvestFromFarm() internal returns (uint256) {
     if (live == 1) {
       // Withdraw all rewards
       uint256 _pendingAlpaca = fairlaunch.pendingAlpaca(pid, address(this));
@@ -227,7 +227,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
 
   /// @dev Harvest rewards for "_positionAddress" and send to "to"
   /// @param _positionAddress The position address that is owned and staked the collateral tokens
-  function harvest(address _positionAddress) internal {
+  function _harvest(address _positionAddress) internal {
     // 1. Define the address to receive the harvested rewards
     // Give the rewards to the proxy wallet that owns this position address if there is any
     address _harvestTo = positionManager.mapPositionHandlerToOwner(_positionAddress);
@@ -235,7 +235,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     if (_harvestTo == address(0)) _harvestTo = _positionAddress;
     require(_harvestTo != address(0), "IbTokenAdapter/harvest-to-address-zero");
     // 2. Perform actual harvest. Calculate the new accRewardPerShare.
-    if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvest(), totalShare));
+    if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvestFromFarm(), totalShare));
     // 3. Calculate the rewards that "to" should get by:
     // stake[_positionAddress] * accRewardPerShare (rewards that each share should get) - rewardDebts (what already paid)
     uint256 _rewardDebt = rewardDebts[_positionAddress];
@@ -311,7 +311,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   ) private {
     require(live == 1, "IbTokenAdapter/not live");
 
-    harvest(_positionAddress);
+    _harvest(_positionAddress);
 
     if (_amount > 0) {
       uint256 _share = wdiv(mul(_amount, to18ConversionFactor), netAssetPerShare()); // [wad]
@@ -349,7 +349,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @param _usr The position address to be updated
   /// @param _amount The amount to be deposited
   function _withdraw(address _usr, uint256 _amount) private {
-    harvest(msg.sender);
+    _harvest(msg.sender);
 
     if (_amount > 0) {
       uint256 _share = wdivup(mul(_amount, to18ConversionFactor), netAssetPerShare()); // [wad]
