@@ -290,6 +290,10 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     bookKeeper.address,
   ])) as MockFlashLendingCalleeMintable
   await accessControlConfig.grantRole(await accessControlConfig.MINTABLE_ROLE(), mockFlashLendingCalleeMintable.address)
+  await accessControlConfig.grantRole(
+    await accessControlConfig.COLLATERAL_MANAGER_ROLE(),
+    mockFlashLendingCalleeMintable.address
+  )
 
   const MockFlashLendingCallee = (await ethers.getContractFactory(
     "MockFlashLendingCallee",
