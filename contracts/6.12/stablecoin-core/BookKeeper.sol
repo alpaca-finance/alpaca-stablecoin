@@ -237,6 +237,11 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     address _dst,
     uint256 _amount
   ) external override nonReentrant whenNotPaused {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.COLLATERAL_MANAGER_ROLE(), msg.sender),
+      "!collateralManagerRole"
+    );
     require(wish(_src, msg.sender), "BookKeeper/not-allowed");
     collateralToken[_collateralPoolId][_src] = sub(collateralToken[_collateralPoolId][_src], _amount);
     collateralToken[_collateralPoolId][_dst] = add(collateralToken[_collateralPoolId][_dst], _amount);
