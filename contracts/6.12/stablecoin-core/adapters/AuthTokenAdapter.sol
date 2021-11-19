@@ -136,7 +136,6 @@ contract AuthTokenAdapter is
    * @dev Withdraw token from the system to guy
    * @param _guy The destination address to receive collateral token
    * @param _wad The amount of collateral to be withdraw [wad]
-   * @dev access: WHITELISTED
    */
   function withdraw(address _guy, uint256 _wad) external override nonReentrant whenNotPaused {
     uint256 _wad18 = mul(_wad, 10**(18 - decimals));
