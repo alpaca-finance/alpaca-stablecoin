@@ -53,12 +53,6 @@ contract StablecoinAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, I
   IStablecoin public override stablecoin; // Stablecoin Token
   uint256 public live; // Active Flag
 
-  modifier onlyOwner() {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
-    _;
-  }
-
   modifier onlyOwnerOrGov() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(

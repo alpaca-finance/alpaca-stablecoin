@@ -47,12 +47,6 @@ contract AuthTokenAdapter is
   event LogDeposit(address indexed urn, uint256 wad, address indexed msgSender);
   event LogWithdraw(address indexed guy, uint256 wad);
 
-  modifier onlyOwner() {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
-    _;
-  }
-
   modifier onlyOwnerOrGov() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
