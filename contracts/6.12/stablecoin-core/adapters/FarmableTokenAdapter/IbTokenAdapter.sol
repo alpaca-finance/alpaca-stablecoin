@@ -91,6 +91,25 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     _;
   }
 
+  modifier onlyOwnerOrGov() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _;
+  }
+
+  modifier onlyCollateralManager() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.COLLATERAL_MANAGER_ROLE(), msg.sender),
+      "!collateralManager"
+    );
+    _;
+  }
+
   function initialize(
     address _bookKeeper,
     bytes32 _collateralPoolId,
@@ -396,11 +415,6 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     uint256 _share,
     bytes calldata _data
   ) external override nonReentrant whenNotPaused {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.COLLATERAL_MANAGER_ROLE(), msg.sender),
-      "!collateralManagerRole"
-    );
     _moveStake(_source, _destination, _share, _data);
   }
 
@@ -409,12 +423,13 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @param _source The address to be moved staked balance from
   /// @param _destination The address to be moved staked balance to
   /// @param _share The amount of staked balance to be moved
+  /// @dev access: COLLATERAL_MANAGER_ROLE
   function _moveStake(
     address _source,
     address _destination,
     uint256 _share,
     bytes calldata /* data */
-  ) private {
+  ) private onlyCollateralManager {
     // 1. Update collateral tokens for source and destination
     uint256 _stakedAmount = stake[_source];
     stake[_source] = sub(_stakedAmount, _share);
@@ -454,11 +469,6 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     int256, /* debtShare */
     bytes calldata _data
   ) external override nonReentrant whenNotPaused {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.COLLATERAL_MANAGER_ROLE(), msg.sender),
-      "!collateralManagerRole"
-    );
     uint256 _unsignedCollateralValue = _collateralValue < 0 ? uint256(-_collateralValue) : uint256(_collateralValue);
     _moveStake(_source, _destination, _unsignedCollateralValue, _data);
   }
@@ -469,16 +479,12 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     uint256 _share,
     bytes calldata _data
   ) external override nonReentrant whenNotPaused {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.COLLATERAL_MANAGER_ROLE(), msg.sender),
-      "!collateralManagerRole"
-    );
     _deposit(_source, 0, _data);
     _moveStake(_source, _destination, _share, _data);
   }
 
   /// @dev Pause ibTokenAdapter when assumptions change
+  /// @dev access: OWNER_ROLE
   function cage() external override nonReentrant {
     // Allow caging if
     // - msg.sender is whitelisted to do so
@@ -495,12 +501,8 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     emit LogCage();
   }
 
-  function uncage() external override {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender),
-      "IbTokenAdapter/not-authorized"
-    );
+  /// @dev access: OWNER_ROLE
+  function uncage() external override onlyOwner {
     require(live == 0, "IbTokenAdapter/not-caged");
     fairlaunch.deposit(address(this), pid, totalShare);
     live = 1;
@@ -508,26 +510,17 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   }
 
   // --- pause ---
-  function pause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function unpause() external onlyOwnerOrGov {
     _unpause();
   }
 
+  /// @dev access: OWNER_ROLE
   function refreshApproval() external nonReentrant onlyOwner {
     address(collateralToken).safeApprove(address(fairlaunch), uint256(-1));
   }

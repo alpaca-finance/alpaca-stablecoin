@@ -43,26 +43,39 @@ contract SimplePriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPric
     _;
   }
 
+  modifier onlyOwnerOrGov() {
+    require(
+      accessControlConfig.hasRole(accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        accessControlConfig.hasRole(accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _;
+  }
+
   event LogSetPrice(address indexed _caller, uint256 _price, uint256 indexed _lastUpdate);
   event LogSetPriceLife(address indexed _caller, uint256 _second);
 
+  /// @dev access: OWNER_ROLE
   function setPrice(uint256 _price) external onlyOwner {
     price = _price;
     lastUpdate = now;
     emit LogSetPrice(msg.sender, price, lastUpdate);
   }
 
+  /// @dev access: OWNER_ROLE
   function setPriceLife(uint256 _second) external onlyOwner {
     require(_second >= 1 hours && _second <= 1 days, "SimplePriceFeed/bad-price-life");
     priceLife = _second;
     emit LogSetPriceLife(msg.sender, _second);
   }
 
-  function pause() external onlyOwner {
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external onlyOwner {
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function unpause() external onlyOwnerOrGov {
     _unpause();
   }
 

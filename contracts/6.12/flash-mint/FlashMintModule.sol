@@ -89,12 +89,14 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
   }
 
   // --- Administration ---
+  /// @dev access: OWNER_ROLE
   function setMax(uint256 _data) external onlyOwner {
     // Add an upper limit of 10^27 Stablecoin to avoid breaking technical assumptions of Stablecoin << 2^256 - 1
     require((max = _data) <= RAD, "FlashMintModule/ceiling-too-high");
     emit LogSetMax(_data);
   }
 
+  /// @dev access: OWNER_ROLE
   function setFeeRate(uint256 _data) external onlyOwner {
     feeRate = _data;
     emit LogSetFeeRate(_data);
@@ -179,6 +181,7 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
     bookKeeper.moveStablecoin(address(this), systemDebtEngine, bookKeeper.stablecoin(address(this)));
   }
 
+  /// @dev access: OWNER_ROLE
   function refreshApproval() external lock onlyOwner {
     address(stablecoin).safeApprove(address(stablecoinAdapter), type(uint256).max);
   }

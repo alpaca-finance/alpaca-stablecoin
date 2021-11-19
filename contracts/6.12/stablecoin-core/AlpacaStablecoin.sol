@@ -81,6 +81,7 @@ contract AlpacaStablecoin is IStablecoin, AccessControlUpgradeable {
     return true;
   }
 
+  /// @dev access: MINTER_ROLE
   function mint(address _usr, uint256 _wad) external override {
     require(hasRole(MINTER_ROLE, msg.sender), "!minterRole");
 
