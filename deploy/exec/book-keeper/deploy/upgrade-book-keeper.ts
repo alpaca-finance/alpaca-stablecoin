@@ -1,7 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, upgrades } from "hardhat"
-import { DexPriceOracle__factory, StrictAlpacaOraclePriceFeed__factory } from "../../../../typechain"
+import { BookKeeper__factory } from "../../../../typechain"
+import { ConfigEntity } from "../../../entities"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -14,35 +15,23 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const PRIMARY_ALPACA_ORACLE = "" // ChainLinkPriceOracle
-  const PRIMARY_TOKEN_0 = ""
-  const PRIMARY_TOKEN_1 = ""
-  const SECONDARY_ALPACA_ORACLE = "" // BandPriceOracle
-  const SECONDARY_TOKEN_0 = ""
-  const SECONDARY_TOKEN_1 = ""
-  const ACCESS_CONTROL_CONFIG = ""
+  const BOOK_KEEPER_ADDR = ""
 
-  console.log(">> Deploying an upgradable StrictAlpacaOraclePriceFeed contract")
-  const StrictAlpacaOraclePriceFeed = (await ethers.getContractFactory(
-    "StrictAlpacaOraclePriceFeed",
+  const config = ConfigEntity.getConfig()
+
+  console.log(">> Upgrading an upgradable BookKeeper contract")
+  const BookKeeper = (await ethers.getContractFactory(
+    "BookKeeper",
     (
       await ethers.getSigners()
     )[0]
-  )) as StrictAlpacaOraclePriceFeed__factory
-  const strictAlpacaOraclePriceFeed = await upgrades.deployProxy(StrictAlpacaOraclePriceFeed, [
-    PRIMARY_ALPACA_ORACLE,
-    PRIMARY_TOKEN_0,
-    PRIMARY_TOKEN_1,
-    SECONDARY_ALPACA_ORACLE,
-    SECONDARY_TOKEN_0,
-    SECONDARY_TOKEN_1,
-    ACCESS_CONTROL_CONFIG,
-  ])
-  await strictAlpacaOraclePriceFeed.deployed()
-  console.log(`>> Deployed at ${strictAlpacaOraclePriceFeed.address}`)
-  const tx = await strictAlpacaOraclePriceFeed.deployTransaction.wait()
-  console.log(`>> Deploy block ${tx.blockNumber}`)
+  )) as BookKeeper__factory
+  const bookKeeper = await upgrades.upgradeProxy(BOOK_KEEPER_ADDR, BookKeeper)
+  await bookKeeper.deployed()
+  console.log(`>> Upgrade at ${bookKeeper.address}`)
+  const tx = await bookKeeper.deployTransaction.wait()
+  console.log(`>> Upgrade block ${tx.blockNumber}`)
 }
 
 export default func
-func.tags = ["StrictAlpacaOraclePriceFeed"]
+func.tags = ["UpgradeBookKeeper"]
