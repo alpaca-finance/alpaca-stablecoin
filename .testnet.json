@@ -117,15 +117,11 @@
   },
   "Oracle": {
     "ChainLinkOracle": {
-      "address": "",
+      "address": "0xc4f3330dF77b0E925461ce5b5cfE0795114Cdf8E",
       "deployedBlock": 0
     },
     "SimpleOracle": {
-      "address": "",
-      "deployedBlock": 0
-    },
-    "DexPriceOracle": {
-      "address": "",
+      "address": "0xFb0645d38e35DA4C4Aa0079366B7d9905f162fCe",
       "deployedBlock": 0
     },
     "BandPriceOracle": {
@@ -146,7 +142,9 @@
     "deployedBlock": 0
   },
   "Strategies": {
-    "FixedSpreadLiquidationStrategy": "0xf0b7Caa2955df11156690E8f7ad85Cb33B957EDF",
-    "deployedBlock": 0
+    "FixedSpreadLiquidationStrategy":{
+      "address": "0xf0b7Caa2955df11156690E8f7ad85Cb33B957EDF",
+      "deployedBlock": 0
+    }
   }
 }

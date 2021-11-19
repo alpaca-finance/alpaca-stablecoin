@@ -15,9 +15,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const STABILITY_FEE_COLLECTOR_ADDR = "0x1893518Ca56DE75b7021e83eDff2eB511e021a36"
-
   const config = ConfigEntity.getConfig()
+
+  const STABILITY_FEE_COLLECTOR_ADDR = config.StabilityFeeCollector.address
 
   const accessContralConfig = AccessControlConfig__factory.connect(
     config.AccessControlConfig.address,

@@ -15,9 +15,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const PRICE_ORACLE_ADDR = "0x674684fa12041e0Fe8C5fC60B2591EfE121118D5"
-
   const config = ConfigEntity.getConfig()
+
+  const PRICE_ORACLE_ADDR = config.PriceOracle.address
 
   const accessContralConfig = AccessControlConfig__factory.connect(
     config.AccessControlConfig.address,

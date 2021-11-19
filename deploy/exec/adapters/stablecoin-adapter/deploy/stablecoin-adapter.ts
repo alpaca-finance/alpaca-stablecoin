@@ -15,8 +15,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const STABLECOIN_ADDR = "0x64c12ac760463FF3B6849FC1ab22Fe8D1c6e06de"
-
   const config = ConfigEntity.getConfig()
 
   console.log(">> Deploying an upgradable StablecoinAdapter contract")
@@ -26,7 +24,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       await ethers.getSigners()
     )[0]
   )) as StablecoinAdapter__factory
-  const stablecoinAdapter = await upgrades.deployProxy(StablecoinAdapter, [config.BookKeeper.address, STABLECOIN_ADDR])
+  const stablecoinAdapter = await upgrades.deployProxy(StablecoinAdapter, [
+    config.BookKeeper.address,
+    config.AlpacaStablecoin.AUSD.address,
+  ])
   await stablecoinAdapter.deployed()
   console.log(`>> Deployed at ${stablecoinAdapter.address}`)
   const tx = await stablecoinAdapter.deployTransaction.wait()

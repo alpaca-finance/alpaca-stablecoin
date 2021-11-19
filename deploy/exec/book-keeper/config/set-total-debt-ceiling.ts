@@ -6,6 +6,7 @@ import { BookKeeper__factory } from "../../../../typechain"
 import { WeiPerRad } from "../../../../test/helper/unit"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  const RAD = 45
   /*
   ░██╗░░░░░░░██╗░█████╗░██████╗░███╗░░██╗██╗███╗░░██╗░██████╗░
   ░██║░░██╗░░██║██╔══██╗██╔══██╗████╗░██║██║████╗░██║██╔════╝░
@@ -16,7 +17,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const TOTAL_DEBT_CEILING = WeiPerRad.mul(1000) // [RAD]
+  // 30,000,000 AUSD Total Debt Ceiling
+  const TOTAL_DEBT_CEILING = ethers.utils.parseUnits("30000000", RAD) // [RAD]
 
   const config = ConfigEntity.getConfig()
 

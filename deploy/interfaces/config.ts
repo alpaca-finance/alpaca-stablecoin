@@ -17,6 +17,8 @@ export interface Config {
   Oracle: Oracle
   SystemDebtEngine: SystemDebtEngine
   LiquidationEngine: LiquidationEngine
+  StabilityFeeCollector: StabilityFeeCollector
+  Strategies: LiquidationStrategy
 }
 export interface ProxyWalletFactory {
   address: string
@@ -117,11 +119,6 @@ export interface SimpleOracle {
   deployedBlock: number
 }
 
-export interface DexPriceOracle {
-  address: string
-  deployedBlock: number
-}
-
 export interface StdReferenceProxy {
   address: string
   deployedBlock: number
@@ -136,6 +133,19 @@ export interface BandPriceOracle {
 export interface Oracle {
   ChainLinkOracle: ChainLinkOracle
   SimpleOracle: SimpleOracle
-  DexPriceOracle: DexPriceOracle
   BandPriceOracle: BandPriceOracle
+}
+
+export interface StabilityFeeCollector {
+  address: string
+  deployedBlock: number
+}
+
+export interface LiquidationStrategy {
+  FixedSpreadLiquidationStrategy: FixedSpreadLiquidationStrategy
+}
+
+export interface FixedSpreadLiquidationStrategy {
+  address: string
+  deployedBlock: number
 }

@@ -15,9 +15,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const BOOK_KEEPER_ADDR = "0xA2724038a28E59e57f98cE9cB31Be858a571ddA9"
-
   const config = ConfigEntity.getConfig()
+
+  const BOOK_KEEPER_ADDR = config.BookKeeper.address
 
   const accessContralConfig = AccessControlConfig__factory.connect(
     config.AccessControlConfig.address,

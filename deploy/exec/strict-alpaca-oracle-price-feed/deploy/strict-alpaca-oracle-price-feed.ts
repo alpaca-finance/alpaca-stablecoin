@@ -1,7 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, upgrades } from "hardhat"
-import { DexPriceOracle__factory, StrictAlpacaOraclePriceFeed__factory } from "../../../../typechain"
+import { StrictAlpacaOraclePriceFeed__factory } from "../../../../typechain"
+import { ConfigEntity } from "../../../entities"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -14,13 +15,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const PRIMARY_ALPACA_ORACLE = "" // ChainLinkPriceOracle
-  const PRIMARY_TOKEN_0 = ""
-  const PRIMARY_TOKEN_1 = ""
-  const SECONDARY_ALPACA_ORACLE = "" // BandPriceOracle
-  const SECONDARY_TOKEN_0 = ""
-  const SECONDARY_TOKEN_1 = ""
-  const ACCESS_CONTROL_CONFIG = ""
+  const config = ConfigEntity.getConfig()
+
+  const PRIMARY_ALPACA_ORACLE = config.Oracle.ChainLinkOracle.address // ChainLinkPriceOracle
+  const PRIMARY_TOKEN_0 = "0xe9e7cea3dedca5984780bafc599bd69add087d56"
+  const PRIMARY_TOKEN_1 = "0xffffffffffffffffffffffffffffffffffffffff"
+  const SECONDARY_ALPACA_ORACLE = config.Oracle.BandPriceOracle.address // BandPriceOracle
+  const SECONDARY_TOKEN_0 = "0xe9e7cea3dedca5984780bafc599bd69add087d56"
+  const SECONDARY_TOKEN_1 = "0xffffffffffffffffffffffffffffffffffffffff"
+  const ACCESS_CONTROL_CONFIG = config.AccessControlConfig.address
 
   console.log(">> Deploying an upgradable StrictAlpacaOraclePriceFeed contract")
   const StrictAlpacaOraclePriceFeed = (await ethers.getContractFactory(
