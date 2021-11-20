@@ -1,74 +1,74 @@
 {
   "Timelock": "",
   "ProxyWalletFactory": {
-    "address": "0xd065FD43827dc3289F089767397aaE13C77826f8",
-    "deployedBlock": 0
+    "address": "0x3aBA32Ee26F2f6c1c3781249Eb8e0cCb9B25DBf3",
+    "deployedBlock": 14249251
   },
   "ProxyWalletRegistry": {
-    "address": "0x0407b60E295C3Cf197ec4ec3901eC87Cc220694a",
-    "deployedBlock": 0
+    "address": "0x13cc34e8eD06536638C6fC3fAfe50984af463a0f",
+    "deployedBlock": 14249285
   },
   "AlpacaStablecoinProxyActions": {
-    "address": "0x1Fdfc30645A4566793619ad44F49D69c11ef6588",
-    "deployedBlock": 0
+    "address": "0x3d8cAA970CfFfd338A88F958c2a72Fe747bdeAf7",
+    "deployedBlock": 14249310
   },
   "AccessControlConfig": {
-    "address": "0xAa672FD36f2323a2bA10CD43F4F7D55De27B33Be",
-    "deployedBlock": 0
+    "address": "0xB840cEca29B0303007be1C5DBF908e80805f0F36",
+    "deployedBlock": 14249357
   },
   "AlpacaStablecoin": {
     "AUSD": {
-      "address": "0x64c12ac760463FF3B6849FC1ab22Fe8D1c6e06de",
-      "deployedBlock": 0
+      "address": "0x425c5554c02C92a911d19Ac2eBf9742769f56352",
+      "deployedBlock": 14249384
     }
   },
   "CollateralPoolConfig": {
-    "address": "0xB63D363B9010e0cA047AC66740D2313493D36EBb",
-    "deployedBlock": 0,
+    "address": "0x393Aa297ea34B75ecF3731B9b5e87Eca9A8ee862",
+    "deployedBlock": 14249412,
     "collateralPools": [
       {
         "collateralPoolId": "ibBUSD",
         "debtCeiling": "1000000000000000000000000000000000000000000000000",
         "debtFloor": "1000000000000000000000000000000000000000000000",
-        "priceFeed": "0xdB6C007c0bb8E81A1b0A490190E9C971D6003753",
+        "priceFeed": "",
         "liquidationRatio": "1000000000000000000000000000",
         "stabilityFeeRate": "1000000000000000000000000000",
-        "adapter": "0x9017e71E1acEC97c0b0b58b34936834E38F8C63C",
+        "adapter": "",
         "closeFactorBps": 5000,
         "liquidatorIncentiveBps": 10250,
         "treasuryFeesBps": 5000,
-        "strategy": "0xf0b7Caa2955df11156690E8f7ad85Cb33B957EDF"
+        "strategy": ""
       }
     ]
   },
   "BookKeeper": {
-    "address": "0xA2724038a28E59e57f98cE9cB31Be858a571ddA9",
-    "deployedBlock": 0
+    "address": "0x60fDA1eB0C49280F4d2560765a6f4B5001b420b2",
+    "deployedBlock": 14249440
   },
   "FlashMintModule": {
     "address": "",
     "deployedBlock": 0
   },
   "ShowStopper": {
-    "address": "0x90b66Eb2519D1CEd7Be665a707A2Ee181FC97c84",
-    "deployedBlock": 0
+    "address": "0x7356440bE4357cc5573aAbcbF9d73AEc58eDf764",
+    "deployedBlock": 14249461
   },
   "PositionManager": {
-    "address": "0xDd2059159736A585c534d2Af1cb3221A41A7177a",
-    "deployedBlock": 0
+    "address": "0x4A9F38c09bD728DBBfDf810E9C98f8C87eCCD3FC",
+    "deployedBlock": 14249486
   },
   "GetPositions": {
-    "address": "0x768284031dEE9E2D23900a28E5929E590Fc2e329",
-    "deployedBlock": 0
+    "address": "0x9d33A894DaD11907BDb485B6D7F2cD8A975dF83F",
+    "deployedBlock": 14249541
   },
   "StabilityFeeCollector": {
-    "address": "0x1893518Ca56DE75b7021e83eDff2eB511e021a36",
-    "deployedBlock": 0
+    "address": "0x4B6dd9f8ddbCCb8761B09CcC4741d4e37069424d",
+    "deployedBlock": 14249612
   },
   "IbTokenAdapters": [
     {
-      "address": "0x9017e71E1acEC97c0b0b58b34936834E38F8C63C",
-      "deployedBlock": 0,
+      "address": "0xdD3eEB2d0c9e26d6225f1f052FC7c504715Ca47D",
+      "deployedBlock": 14249674,
       "collateralToken": "0xe5ed8148fE4915cE857FC648b9BdEF8Bb9491Fa5",
       "rewardToken": "0x354b3a11D5Ea2DA89405173977E271F58bE2897D",
       "treasuryFeeBps": "1000",
@@ -77,20 +77,20 @@
   ],
   "StablecoinAdapters": {
     "AUSD": {
-      "address": "0xea1FBaA5C061CF829Da88B3d711f7C2E4C09B9DC",
-      "deployedBlock": 0,
-      "alpacaStablecoin": "0x64c12ac760463FF3B6849FC1ab22Fe8D1c6e06de"
+      "address": "0x2989CdBC61EbB7db5d554B35f347858aACeE6D13",
+      "deployedBlock": 14266909,
+      "alpacaStablecoin": "0x425c5554c02C92a911d19Ac2eBf9742769f56352"
     }
   },
   "PriceOracle": {
-    "address": "0x674684fa12041e0Fe8C5fC60B2591EfE121118D5",
-    "deployedBlock": 0
+    "address": "0x7c0cDEA15A1B661eFbFa023ed33014C4201Cb9fa",
+    "deployedBlock": 14249639
   },
   "PriceFeed": {
     "AlpacaOraclePriceFeed": [
       {
-        "address": "0xc818621a6cf76995b49FC11A224aDb2Ff424DeC7",
-        "deployedBlock": 14190237,
+        "address": "0x2B47b786589AEaCf2E013935C0273973E911a548",
+        "deployedBlock": 14266989,
         "alpacaOracle": "0xFb0645d38e35DA4C4Aa0079366B7d9905f162fCe",
         "token0": "0xe5ed8148fE4915cE857FC648b9BdEF8Bb9491Fa5",
         "token1": "0x0266693F9Df932aD7dA8a9b44C2129Ce8a87E81f"
@@ -98,20 +98,20 @@
     ],
     "StrictAlpacaPriceOraclePriceFeed": [
       {
-        "address": "0x82fb9178a42f38915286F74035836809d249c6bc",
+        "address": "0x344e52A6104655094Eb1AF3C00CC91629733615b",
         "deployedBlock": 14214961,
         "primarySoure": "0xc4f3330dF77b0E925461ce5b5cfE0795114Cdf8E",
-        "secondary": "0x17F95DA692e6F578DE3Da184D10b6b3C6Ee49544",
+        "secondary": "0xEffd80F09aAd16147822849E9d0579ED174722BE",
         "token0": "0x0266693F9Df932aD7dA8a9b44C2129Ce8a87E81f",
         "token1": "0xffffffffffffffffffffffffffffffffffffffff"
       }
     ],
     "IbTokenPriceFeed": [
       {
-        "address": "0xdB6C007c0bb8E81A1b0A490190E9C971D6003753",
-        "deployedBlock": 14215416,
-        "AlpacaPriceOraclePriceFeed": "0xc818621a6cf76995b49FC11A224aDb2Ff424DeC7",
-        "StrictAlpacaPriceOraclePriceFeed": "0x82fb9178a42f38915286F74035836809d249c6bc"
+        "address": "0xb5E89cf5A44752decBdEa3967736fA654A66E22A",
+        "deployedBlock": 14267277,
+        "AlpacaPriceOraclePriceFeed": "0x2B47b786589AEaCf2E013935C0273973E911a548",
+        "StrictAlpacaPriceOraclePriceFeed": "0x344e52A6104655094Eb1AF3C00CC91629733615b"
       }
     ]
   },
@@ -125,8 +125,8 @@
       "deployedBlock": 0
     },
     "BandPriceOracle": {
-      "address": "0x17F95DA692e6F578DE3Da184D10b6b3C6Ee49544",
-      "deployedBlock": 0,
+      "address": "0xEffd80F09aAd16147822849E9d0579ED174722BE",
+      "deployedBlock": 14267021,
       "StdReferenceProxy": {
         "address": "0xDA7a001b254CD22e46d3eAB04d937489c93174C3",
         "deployedBlock": 2165210
@@ -134,17 +134,17 @@
     }
   },
   "SystemDebtEngine": {
-    "address": "0xe5306bb04AC6e32661c6f5E115734158EfD8E558",
-    "deployedBlock": 0
+    "address": "0x9870bfcb8bACad35AeAb1Bc87739fa069Cb2EED7",
+    "deployedBlock": 14249562
   },
   "LiquidationEngine": {
-    "address": "0x258FB4237aeefc54a66e0C83373A5Dd0A495eB07",
-    "deployedBlock": 0
+    "address": "0x0791cBf53799c0D65839BFeE4F5D47D021AddC9B",
+    "deployedBlock": 14267326
   },
   "Strategies": {
     "FixedSpreadLiquidationStrategy":{
-      "address": "0xf0b7Caa2955df11156690E8f7ad85Cb33B957EDF",
-      "deployedBlock": 0
+      "address": "0x9270c9bF8A4318Baae79e3538f199Cb523afc692",
+      "deployedBlock": 14267386
     }
   }
 }
