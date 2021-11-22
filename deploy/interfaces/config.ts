@@ -19,6 +19,7 @@ export interface Config {
   LiquidationEngine: LiquidationEngine
   StabilityFeeCollector: StabilityFeeCollector
   Strategies: LiquidationStrategy
+  FlashLiquidator: FlashLiquidator
 }
 export interface ProxyWalletFactory {
   address: string
@@ -146,6 +147,15 @@ export interface LiquidationStrategy {
 }
 
 export interface FixedSpreadLiquidationStrategy {
+  address: string
+  deployedBlock: number
+}
+
+export interface FlashLiquidator {
+  PCSFlashLiquidator: PCSFlashLiquidator
+}
+
+export interface PCSFlashLiquidator {
   address: string
   deployedBlock: number
 }

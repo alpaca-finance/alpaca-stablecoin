@@ -146,5 +146,11 @@
       "address": "0x9270c9bF8A4318Baae79e3538f199Cb523afc692",
       "deployedBlock": 14267386
     }
+  },
+  "FlashLiquidator": {
+    "PCSFlashLiquidator": {
+      "address": "0xb84e0B44dFB124f903fe615e6b505d709F55Da39",
+      "deployedBlock": 14334125
+    }
   }
 }

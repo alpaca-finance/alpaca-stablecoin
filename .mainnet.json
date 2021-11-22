@@ -146,5 +146,11 @@
       "address": "",
       "deployedBlock": 0
     }
+  },
+  "FlashLiquidator": {
+    "PCSFlashLiquidator": {
+      "address": "",
+      "deployedBlock": 0
+    }
   }
 }
