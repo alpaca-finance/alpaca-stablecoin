@@ -206,6 +206,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
   event LogSetCollateralPoolConfig(address indexed _caller, address _collateralPoolConfig);
   event LogAdjustPosition(
     address indexed _caller,
+    bytes32 _collateralPoolId,
     address _positionAddress,
     uint256 _lockedCollateral,
     uint256 _debtShare,
@@ -213,7 +214,13 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     int256 _addDebtShare
   );
   event LogAddCollateral(address indexed _caller, address _usr, int256 _amount);
-  event LogMoveCollateral(address indexed _caller, address _src, address _dst, uint256 _amount);
+  event LogMoveCollateral(
+    address indexed _caller,
+    bytes32 _collateralPoolId,
+    address _src,
+    address _dst,
+    uint256 _amount
+  );
 
   /// @dev access: OWNER_ROLE
   function setTotalDebtCeiling(uint256 _totalDebtCeiling) external onlyOwner {
@@ -285,7 +292,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     require(wish(_src, msg.sender), "BookKeeper/not-allowed");
     collateralToken[_collateralPoolId][_src] = sub(collateralToken[_collateralPoolId][_src], _amount);
     collateralToken[_collateralPoolId][_dst] = add(collateralToken[_collateralPoolId][_dst], _amount);
-    emit LogMoveCollateral(msg.sender, _src, _dst, _amount);
+    emit LogMoveCollateral(msg.sender, _collateralPoolId, _src, _dst, _amount);
   }
 
   /// @dev Move a balance of stablecoin from a source address to a destination address within the accounting of the protocol
@@ -395,6 +402,7 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
 
     emit LogAdjustPosition(
       msg.sender,
+      _collateralPoolId,
       _positionAddress,
       position.lockedCollateral,
       position.debtShare,
