@@ -84,12 +84,6 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
   event LogSetFlashLendingEnabled(address indexed caller, uint256 _flashLendingEnabled);
 
-  modifier onlyOwner() {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
-    _;
-  }
-
   modifier onlyOwnerOrGov() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
@@ -138,7 +132,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
   }
 
   // --- Setter ---
-  /// @dev access: OWNER_ROLE
+  /// @dev access: OWNER_ROLE, GOV_ROLE
   function setFlashLendingEnabled(uint256 _flashLendingEnabled) external onlyOwnerOrGov {
     flashLendingEnabled = _flashLendingEnabled;
     emit LogSetFlashLendingEnabled(msg.sender, _flashLendingEnabled);

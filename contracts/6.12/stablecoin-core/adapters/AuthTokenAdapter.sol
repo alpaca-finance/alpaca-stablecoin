@@ -47,12 +47,6 @@ contract AuthTokenAdapter is
   event LogDeposit(address indexed urn, uint256 wad, address indexed msgSender);
   event LogWithdraw(address indexed guy, uint256 wad);
 
-  modifier onlyOwner() {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
-    _;
-  }
-
   modifier onlyOwnerOrGov() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
     require(
@@ -136,7 +130,6 @@ contract AuthTokenAdapter is
    * @dev Withdraw token from the system to guy
    * @param _guy The destination address to receive collateral token
    * @param _wad The amount of collateral to be withdraw [wad]
-   * @dev access: WHITELISTED
    */
   function withdraw(address _guy, uint256 _wad) external override nonReentrant whenNotPaused {
     uint256 _wad18 = mul(_wad, 10**(18 - decimals));
