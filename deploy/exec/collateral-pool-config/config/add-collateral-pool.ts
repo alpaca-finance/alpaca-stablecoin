@@ -37,6 +37,19 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const config = ConfigEntity.getConfig()
 
   const COLLATERAL_POOLS: IAddCollateralPoolParamList = [
+    // {
+    //   COLLATERAL_POOL_ID: "ibBUSD",
+    //   DEBT_CEILING: WeiPerRad.mul(1000),
+    //   DEBT_FLOOR: WeiPerRad.mul(1),
+    //   PRICE_FEED: "0xf8210Fd8a21752aEa1FeE8F64c2BBaf9e304A37a",
+    //   LIQUIDATION_RATIO: WeiPerRay,
+    //   STABILITY_FEE_RATE: WeiPerRay,
+    //   ADAPTER: "0xF4ecba29De9Cb7c127E2fB870d560B35CEC73A5c",
+    //   CLOSE_FACTOR_BPS: BigNumber.from(5000),
+    //   LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10250),
+    //   TREASURY_FEES_BPS: BigNumber.from(5000),
+    //   STRATEGY: "0x4E4d4775889f25f3CdCa0fA4917D8C7907289049",
+    // },
     {
       COLLATERAL_POOL_ID: "ibBUSD",
       DEBT_CEILING: ethers.utils.parseUnits("30000000", 45), // 30M [rad]
