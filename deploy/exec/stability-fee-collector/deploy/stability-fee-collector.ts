@@ -24,7 +24,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       await ethers.getSigners()
     )[0]
   )) as StabilityFeeCollector__factory
-  const stabilityFeeCollector = await upgrades.deployProxy(StabilityFeeCollector, [config.BookKeeper.address])
+  const stabilityFeeCollector = await upgrades.deployProxy(StabilityFeeCollector, [
+    config.BookKeeper.address,
+    config.SystemDebtEngine.address,
+  ])
   await stabilityFeeCollector.deployed()
   console.log(`>> Deployed at ${stabilityFeeCollector.address}`)
   const tx = await stabilityFeeCollector.deployTransaction.wait()

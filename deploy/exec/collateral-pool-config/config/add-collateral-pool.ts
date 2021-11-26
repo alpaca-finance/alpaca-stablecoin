@@ -34,6 +34,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
+  const config = ConfigEntity.getConfig()
+
   const COLLATERAL_POOLS: IAddCollateralPoolParamList = [
     // {
     //   COLLATERAL_POOL_ID: "ibBUSD",
@@ -49,21 +51,27 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     //   STRATEGY: "0x4E4d4775889f25f3CdCa0fA4917D8C7907289049",
     // },
     {
-      COLLATERAL_POOL_ID: "ibWBNB",
-      DEBT_CEILING: WeiPerRad.mul(10000000),
-      DEBT_FLOOR: WeiPerRad.mul(1),
-      PRICE_FEED: "0xc8fa978b427F39a8d06cc705C1be2f32A1573D56",
-      LIQUIDATION_RATIO: WeiPerRay,
-      STABILITY_FEE_RATE: WeiPerRay,
-      ADAPTER: "0x3E1d93514d0e346959E7cB63b34dcEB170EFd204",
-      CLOSE_FACTOR_BPS: BigNumber.from(5000),
-      LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10250),
-      TREASURY_FEES_BPS: BigNumber.from(5000),
-      STRATEGY: "0x4E4d4775889f25f3CdCa0fA4917D8C7907289049",
+      COLLATERAL_POOL_ID: "ibBUSD",
+      DEBT_CEILING: ethers.utils.parseUnits("30000000", 45), // 30M [rad]
+      DEBT_FLOOR: ethers.utils.parseUnits("100", 45), // 100 [rad]
+      PRICE_FEED: "0xb5E89cf5A44752decBdEa3967736fA654A66E22A", // ibBUSD IbTokenPriceFeed
+      // Collateral Factor for ibBUSD = 99% = 0.99
+      // Liquidation Ratio = 1 / 0.99
+      LIQUIDATION_RATIO: ethers.utils
+        .parseUnits("1", 27)
+        .mul(ethers.utils.parseUnits("1", 27))
+        .div(ethers.utils.parseUnits("0.99", 27)),
+      // Stability Fee Rate for ibBUSD = 2% = 1.02
+      // Stability Fee Rate to be set = 1000000000627937192491029810
+      // Ref: https://www.wolframalpha.com/input/?i=sqrt%281.02%2C+31536000%29
+      STABILITY_FEE_RATE: BigNumber.from("1000000000627937192491029810"),
+      ADAPTER: "0xdD3eEB2d0c9e26d6225f1f052FC7c504715Ca47D", // ibBUSD IbTokenAdapter
+      CLOSE_FACTOR_BPS: BigNumber.from(5000), // 50% Close Factor
+      LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10500), // 5% Liquidator Incentive
+      TREASURY_FEES_BPS: BigNumber.from(8000), // 80% Treasury Fee
+      STRATEGY: config.Strategies.FixedSpreadLiquidationStrategy.address, // FixedSpreadLiquidationStrategy
     },
   ]
-
-  const config = ConfigEntity.getConfig()
 
   const collateralPoolConfig = CollateralPoolConfig__factory.connect(
     config.CollateralPoolConfig.address,

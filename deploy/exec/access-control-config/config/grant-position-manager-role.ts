@@ -15,9 +15,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const POSITION_MANAGER_ADDR = "0xDd2059159736A585c534d2Af1cb3221A41A7177a"
-
   const config = ConfigEntity.getConfig()
+
+  const POSITION_MANAGER_ADDR = config.PositionManager.address
 
   const accessContralConfig = AccessControlConfig__factory.connect(
     config.AccessControlConfig.address,

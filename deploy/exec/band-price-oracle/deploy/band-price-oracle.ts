@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const STD_REFERENCE_PROXY_ADDR = "0xDA7a001b254CD22e46d3eAB04d937489c93174C3"
+  const STD_REFERENCE_PROXY_ADDR = "0xDA7a001b254CD22e46d3eAB04d937489c93174C3" // Band Protocol mainnet and testnet use the same address
   const config = ConfigEntity.getConfig()
 
   console.log(">> Deploying an upgradable BandPriceOracle contract")

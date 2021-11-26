@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const ADAPTER_ADDR = "0xA26068b5dCb231f3d84Bf585aDCAD0509A3A6B93"
+  const ADAPTER_ADDR = "0xdD3eEB2d0c9e26d6225f1f052FC7c504715Ca47D"
 
   const config = ConfigEntity.getConfig()
 

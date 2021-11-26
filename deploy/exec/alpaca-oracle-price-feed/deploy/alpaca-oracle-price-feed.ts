@@ -15,9 +15,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const ALPACA_ORACLE = ""
-  const TOKEN_0 = ""
-  const TOKEN_1 = ""
+  const ALPACA_ORACLE = "0xFb0645d38e35DA4C4Aa0079366B7d9905f162fCe" // Alpaca LYF's SimplePriceOracle
+  const TOKEN_0 = "0xe5ed8148fE4915cE857FC648b9BdEF8Bb9491Fa5" // ibBUSD
+  const TOKEN_1 = "0x0266693F9Df932aD7dA8a9b44C2129Ce8a87E81f" // BUSD
 
   const config = ConfigEntity.getConfig()
 

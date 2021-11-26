@@ -15,9 +15,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const LIQUIDATION_ENGINE_ADDR = "0x4E4d4775889f25f3CdCa0fA4917D8C7907289049"
-
   const config = ConfigEntity.getConfig()
+
+  const LIQUIDATION_ENGINE_ADDR = config.LiquidationEngine.address
 
   const accessContralConfig = AccessControlConfig__factory.connect(
     config.AccessControlConfig.address,

@@ -2,11 +2,9 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, network } from "hardhat"
 import { ConfigEntity } from "../../../entities"
-import { BookKeeper__factory } from "../../../../typechain"
-import { WeiPerRad } from "../../../../test/helper/unit"
+import { AccessControlConfig__factory } from "../../../../typechain"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const RAD = 45
   /*
   ░██╗░░░░░░░██╗░█████╗░██████╗░███╗░░██╗██╗███╗░░██╗░██████╗░
   ░██║░░██╗░░██║██╔══██╗██╔══██╗████╗░██║██║████╗░██║██╔════╝░
@@ -17,17 +15,18 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  // 30,000,000 AUSD Total Debt Ceiling
-  const TOTAL_DEBT_CEILING = ethers.utils.parseUnits("30000000", RAD) // [RAD]
-
   const config = ConfigEntity.getConfig()
 
-  const bookKeeper = BookKeeper__factory.connect(config.BookKeeper.address, (await ethers.getSigners())[0])
+  const ADDR = config.PositionManager.address
 
-  console.log(">> set TOTAL_DEBT_SHARE")
-  await bookKeeper.setTotalDebtCeiling(TOTAL_DEBT_CEILING)
+  const accessContralConfig = AccessControlConfig__factory.connect(
+    config.AccessControlConfig.address,
+    (await ethers.getSigners())[0]
+  )
+  console.log(`>> Grant COLLATERAL_MANAGER_ROLE address: ${ADDR}`)
+  await accessContralConfig.grantRole(await accessContralConfig.COLLATERAL_MANAGER_ROLE(), ADDR)
   console.log("✅ Done")
 }
 
 export default func
-func.tags = ["SetTotalDebtCeiling"]
+func.tags = ["GrantCollateralManagerRole"]

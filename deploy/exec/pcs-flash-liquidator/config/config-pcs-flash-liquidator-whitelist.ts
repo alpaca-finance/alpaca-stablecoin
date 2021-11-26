@@ -2,11 +2,9 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, network } from "hardhat"
 import { ConfigEntity } from "../../../entities"
-import { BookKeeper__factory } from "../../../../typechain"
-import { WeiPerRad } from "../../../../test/helper/unit"
+import { PCSFlashLiquidator__factory } from "../../../../typechain"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const RAD = 45
   /*
   ░██╗░░░░░░░██╗░█████╗░██████╗░███╗░░██╗██╗███╗░░██╗░██████╗░
   ░██║░░██╗░░██║██╔══██╗██╔══██╗████╗░██║██║████╗░██║██╔════╝░
@@ -17,17 +15,16 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  // 30,000,000 AUSD Total Debt Ceiling
-  const TOTAL_DEBT_CEILING = ethers.utils.parseUnits("30000000", RAD) // [RAD]
-
   const config = ConfigEntity.getConfig()
 
-  const bookKeeper = BookKeeper__factory.connect(config.BookKeeper.address, (await ethers.getSigners())[0])
+  const FLASH_LIQUIDATOR_ADDR = config.FlashLiquidator.PCSFlashLiquidator.address
+  const TO_BE_WHITELISTED_ADDR = config.StablecoinAdapters.AUSD.address
 
-  console.log(">> set TOTAL_DEBT_SHARE")
-  await bookKeeper.setTotalDebtCeiling(TOTAL_DEBT_CEILING)
+  const pcsFlashLiquidator = PCSFlashLiquidator__factory.connect(FLASH_LIQUIDATOR_ADDR, (await ethers.getSigners())[0])
+  console.log(`>> Flash Liquidator whitelist address: ${TO_BE_WHITELISTED_ADDR}`)
+  await pcsFlashLiquidator.whitelist(TO_BE_WHITELISTED_ADDR)
   console.log("✅ Done")
 }
 
 export default func
-func.tags = ["SetTotalDebtCeiling"]
+func.tags = ["PCSFlashLiquidatorWhitelist"]

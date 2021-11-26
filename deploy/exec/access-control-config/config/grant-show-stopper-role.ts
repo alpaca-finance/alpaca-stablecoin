@@ -15,9 +15,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const SHOW_STOPPER_ADDR = ""
-
   const config = ConfigEntity.getConfig()
+
+  const SHOW_STOPPER_ADDR = config.ShowStopper.address
 
   const accessContralConfig = AccessControlConfig__factory.connect(
     config.AccessControlConfig.address,

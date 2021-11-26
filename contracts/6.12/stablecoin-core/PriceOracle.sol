@@ -38,7 +38,7 @@ contract PriceOracle is PausableUpgradeable, ReentrancyGuardUpgradeable, IPriceO
   }
 
   IBookKeeper public bookKeeper; // CDP Engine
-  uint256 public override stableCoinReferencePrice; // ref per dai [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
+  uint256 public override stableCoinReferencePrice; // ref per AUSD [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
 
   uint256 public live;
 

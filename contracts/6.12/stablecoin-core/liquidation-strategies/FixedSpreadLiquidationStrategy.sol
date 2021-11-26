@@ -55,7 +55,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
   // --- Data ---
   IBookKeeper public bookKeeper; // Core CDP Engine
   ILiquidationEngine public liquidationEngine; // Liquidation module
-  ISystemDebtEngine public systemDebtEngine; // Recipient of dai raised in auctions
+  ISystemDebtEngine public systemDebtEngine; // Recipient of AUSD raised in auctions
   IPriceOracle public priceOracle; // Collateral price module
 
   uint256 public flashLendingEnabled;
