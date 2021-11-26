@@ -12,7 +12,7 @@ Solidity contracts for Alpaca Stablecoin module.
 ![High_Level_Diagram](https://raw.githubusercontent.com/alpaca-finance/alpaca-stablecoin/chore/add-diagram-to-readme/docs/AlpacaUSD_HighLevelDiagram.png)
 
 ## System Architecture Diagram
-![System_Architecture_Diagram](https://raw.githubusercontent.com/alpaca-finance/alpaca-stablecoin/chore/add-diagram-to-readme/docs/AlpacaUSD_SystemArchitecture.png)
+![System_Architecture_Diagram](https://raw.githubusercontent.com/alpaca-finance/alpaca-stablecoin/chore/add-audit-report/docs/AlpacaUSD_SystemArchitecture.png)
 
 ## Testing and Development
 
