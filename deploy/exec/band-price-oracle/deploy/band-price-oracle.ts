@@ -1,7 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, upgrades } from "hardhat"
-import { DexPriceOracle__factory, StrictAlpacaOraclePriceFeed__factory } from "../../../../typechain"
+import { BandPriceOracle__factory } from "../../../../typechain"
+import { ConfigEntity } from "../../../entities"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -14,35 +15,25 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const PRIMARY_ALPACA_ORACLE = "" // ChainLinkPriceOracle
-  const PRIMARY_TOKEN_0 = ""
-  const PRIMARY_TOKEN_1 = ""
-  const SECONDARY_ALPACA_ORACLE = "" // BandPriceOracle
-  const SECONDARY_TOKEN_0 = ""
-  const SECONDARY_TOKEN_1 = ""
-  const ACCESS_CONTROL_CONFIG = ""
+  const STD_REFERENCE_PROXY_ADDR = "0xDA7a001b254CD22e46d3eAB04d937489c93174C3"
+  const config = ConfigEntity.getConfig()
 
-  console.log(">> Deploying an upgradable StrictAlpacaOraclePriceFeed contract")
-  const StrictAlpacaOraclePriceFeed = (await ethers.getContractFactory(
-    "StrictAlpacaOraclePriceFeed",
+  console.log(">> Deploying an upgradable BandPriceOracle contract")
+  const BandPriceOracle = (await ethers.getContractFactory(
+    "BandPriceOracle",
     (
       await ethers.getSigners()
     )[0]
-  )) as StrictAlpacaOraclePriceFeed__factory
-  const strictAlpacaOraclePriceFeed = await upgrades.deployProxy(StrictAlpacaOraclePriceFeed, [
-    PRIMARY_ALPACA_ORACLE,
-    PRIMARY_TOKEN_0,
-    PRIMARY_TOKEN_1,
-    SECONDARY_ALPACA_ORACLE,
-    SECONDARY_TOKEN_0,
-    SECONDARY_TOKEN_1,
-    ACCESS_CONTROL_CONFIG,
+  )) as BandPriceOracle__factory
+  const bandPriceOracle = await upgrades.deployProxy(BandPriceOracle, [
+    STD_REFERENCE_PROXY_ADDR,
+    config.AccessControlConfig.address,
   ])
-  await strictAlpacaOraclePriceFeed.deployed()
-  console.log(`>> Deployed at ${strictAlpacaOraclePriceFeed.address}`)
-  const tx = await strictAlpacaOraclePriceFeed.deployTransaction.wait()
+  await bandPriceOracle.deployed()
+  console.log(`>> Deployed at ${bandPriceOracle.address}`)
+  const tx = await bandPriceOracle.deployTransaction.wait()
   console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func
-func.tags = ["StrictAlpacaOraclePriceFeed"]
+func.tags = ["BandPriceOracle"]
