@@ -80,12 +80,33 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @notice Events
   event LogDeposit(uint256 _val);
   event LogWithdraw(uint256 _val);
-  event LogEmergencyWithdaraw();
+  event LogEmergencyWithdraw(address indexed _caller, address _to);
   event LogMoveStake(address indexed _src, address indexed _dst, uint256 _wad);
+  event LogSetTreasuryAccount(address indexed _caller, address _treasuryAccount);
+  event LogSetTreasuryFeeBps(address indexed _caller, uint256 _treasuryFeeBps);
 
   modifier onlyOwner() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    _;
+  }
+
+  modifier onlyOwnerOrGov() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _;
+  }
+
+  modifier onlyCollateralManager() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.COLLATERAL_MANAGER_ROLE(), msg.sender),
+      "!collateralManager"
+    );
     _;
   }
 
@@ -131,6 +152,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     rewardToken = IToken(_rewardToken);
 
     require(_treasuryAccount != address(0), "IbTokenAdapter/bad treasury account");
+    require(_treasuryFeeBps <= 5000, "IbTokenAdapter/bad treasury fee bps");
     treasuryFeeBps = _treasuryFeeBps;
     treasuryAccount = _treasuryAccount;
 
@@ -188,12 +210,14 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     require(live == 1, "IbTokenAdapter/not-live");
     require(_treasuryFeeBps <= 5000, "IbTokenAdapter/bad treasury fee bps");
     treasuryFeeBps = _treasuryFeeBps;
+    emit LogSetTreasuryFeeBps(msg.sender, _treasuryFeeBps);
   }
 
   function setTreasuryAccount(address _treasuryAccount) external onlyOwner {
     require(live == 1, "IbTokenAdapter/not-live");
     require(_treasuryAccount != address(0), "IbTokenAdapter/bad treasury account");
     treasuryAccount = _treasuryAccount;
+    emit LogSetTreasuryAccount(msg.sender, _treasuryAccount);
   }
 
   /// @dev Ignore collateralTokens that have been directly transferred
@@ -210,7 +234,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @dev Harvest ALPACA from FairLaunch
   /// @dev Return the amount of rewards that is harvested.
   /// Expect that the adapter which inherited BaseFarmableTokenAdapter
-  function _harvest() internal returns (uint256) {
+  function _harvestFromFarm() internal returns (uint256) {
     if (live == 1) {
       // Withdraw all rewards
       uint256 _pendingAlpaca = fairlaunch.pendingAlpaca(pid, address(this));
@@ -222,7 +246,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
 
   /// @dev Harvest rewards for "_positionAddress" and send to "to"
   /// @param _positionAddress The position address that is owned and staked the collateral tokens
-  function harvest(address _positionAddress) internal {
+  function _harvest(address _positionAddress) internal {
     // 1. Define the address to receive the harvested rewards
     // Give the rewards to the proxy wallet that owns this position address if there is any
     address _harvestTo = positionManager.mapPositionHandlerToOwner(_positionAddress);
@@ -230,7 +254,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     if (_harvestTo == address(0)) _harvestTo = _positionAddress;
     require(_harvestTo != address(0), "IbTokenAdapter/harvest-to-address-zero");
     // 2. Perform actual harvest. Calculate the new accRewardPerShare.
-    if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvest(), totalShare));
+    if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvestFromFarm(), totalShare));
     // 3. Calculate the rewards that "to" should get by:
     // stake[_positionAddress] * accRewardPerShare (rewards that each share should get) - rewardDebts (what already paid)
     uint256 _rewardDebt = rewardDebts[_positionAddress];
@@ -265,7 +289,12 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     if (totalShare == 0) return 0;
     uint256 _toBeHarvested = sub(add(_pending, rewardToken.balanceOf(address(this))), accRewardBalance);
     uint256 _pendingAccRewardPerShare = add(accRewardPerShare, rdiv(_toBeHarvested, totalShare));
-    return sub(rmulup(stake[_positionAddress], _pendingAccRewardPerShare), rewardDebts[_positionAddress]);
+    uint256 _pendingAccReward = rmul(stake[_positionAddress], _pendingAccRewardPerShare);
+    if (_pendingAccReward > rewardDebts[_positionAddress]) {
+      return sub(_pendingAccReward, rewardDebts[_positionAddress]);
+    } else {
+      return 0;
+    }
   }
 
   /// @dev Return the amount of rewards to be harvested for a giving position address, and deducted with treasury fee
@@ -301,7 +330,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   ) private {
     require(live == 1, "IbTokenAdapter/not live");
 
-    harvest(_positionAddress);
+    _harvest(_positionAddress);
 
     if (_amount > 0) {
       uint256 _share = wdiv(mul(_amount, to18ConversionFactor), netAssetPerShare()); // [wad]
@@ -339,7 +368,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @param _usr The position address to be updated
   /// @param _amount The amount to be deposited
   function _withdraw(address _usr, uint256 _amount) private {
-    harvest(msg.sender);
+    _harvest(msg.sender);
 
     if (_amount > 0) {
       uint256 _share = wdivup(mul(_amount, to18ConversionFactor), netAssetPerShare()); // [wad]
@@ -358,7 +387,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   }
 
   /// @dev EMERGENCY ONLY. Withdraw ibToken from FairLaunch with invoking "_harvest"
-  function emergencyWithdraw(address _to) external nonReentrant whenNotPaused {
+  function emergencyWithdraw(address _to) external nonReentrant {
     if (live == 1) {
       uint256 _amount = bookKeeper.collateralToken(collateralPoolId, msg.sender);
       fairlaunch.withdraw(address(this), pid, _amount);
@@ -370,14 +399,14 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @param _to The address to received collateralTokens
   function _emergencyWithdraw(address _to) private {
     uint256 _share = bookKeeper.collateralToken(collateralPoolId, msg.sender); //[wad]
-    require(_share <= 2**255, "IbTokenAdapter/share-overflow");
+    require(_share < 2**255, "IbTokenAdapter/share-overflow");
     uint256 _amount = wmul(wmul(_share, netAssetPerShare()), toTokenConversionFactor);
-    address(collateralToken).safeTransfer(_to, _amount);
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_share));
     totalShare = sub(totalShare, _share);
     stake[msg.sender] = sub(stake[msg.sender], _share);
     rewardDebts[msg.sender] = rmulup(stake[msg.sender], accRewardPerShare);
-    emit LogEmergencyWithdaraw();
+    address(collateralToken).safeTransfer(_to, _amount);
+    emit LogEmergencyWithdraw(msg.sender, _to);
   }
 
   function moveStake(
@@ -394,12 +423,13 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @param _source The address to be moved staked balance from
   /// @param _destination The address to be moved staked balance to
   /// @param _share The amount of staked balance to be moved
+  /// @dev access: COLLATERAL_MANAGER_ROLE
   function _moveStake(
     address _source,
     address _destination,
     uint256 _share,
     bytes calldata /* data */
-  ) private {
+  ) private onlyCollateralManager {
     // 1. Update collateral tokens for source and destination
     uint256 _stakedAmount = stake[_source];
     stake[_source] = sub(_stakedAmount, _share);
@@ -454,6 +484,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   }
 
   /// @dev Pause ibTokenAdapter when assumptions change
+  /// @dev access: OWNER_ROLE
   function cage() external override nonReentrant {
     // Allow caging if
     // - msg.sender is whitelisted to do so
@@ -470,12 +501,8 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     emit LogCage();
   }
 
-  function uncage() external override {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender),
-      "IbTokenAdapter/not-authorized"
-    );
+  /// @dev access: OWNER_ROLE
+  function uncage() external override onlyOwner {
     require(live == 0, "IbTokenAdapter/not-caged");
     fairlaunch.deposit(address(this), pid, totalShare);
     live = 1;
@@ -483,23 +510,18 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   }
 
   // --- pause ---
-  function pause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function unpause() external onlyOwnerOrGov {
     _unpause();
+  }
+
+  /// @dev access: OWNER_ROLE
+  function refreshApproval() external nonReentrant onlyOwner {
+    address(collateralToken).safeApprove(address(fairlaunch), uint256(-1));
   }
 }

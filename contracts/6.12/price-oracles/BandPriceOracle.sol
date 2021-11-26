@@ -49,6 +49,7 @@ contract BandPriceOracle is IAlpacaOracle, Initializable {
 
   event LogSetTokenSymbol(address indexed _tokenAddress, string _tokenSymbol);
 
+  /// @dev access: OWNER_ROLE
   function setTokenSymbol(address _tokenAddress, string memory _tokenSymbol) external onlyOwner {
     tokenSymbols[_tokenAddress] = _tokenSymbol;
     emit LogSetTokenSymbol(_tokenAddress, _tokenSymbol);
@@ -60,6 +61,7 @@ contract BandPriceOracle is IAlpacaOracle, Initializable {
     string memory symbol0 = tokenSymbols[_token0];
     string memory symbol1 = tokenSymbols[_token1];
 
+    require(keccak256(bytes(symbol0)) != keccak256(bytes(symbol1)), "BandPriceOracle/same-symbol");
     require(keccak256(bytes(symbol0)) != keccak256(bytes("")), "BandPriceOracle/unknown-token0");
     require(keccak256(bytes(symbol1)) != keccak256(bytes("")), "BandPriceOracle/unknown-token1");
 

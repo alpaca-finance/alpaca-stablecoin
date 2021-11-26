@@ -34,6 +34,8 @@ import {
   AccessControlConfig,
   SimplePriceFeed__factory,
   SimplePriceFeed,
+  SystemDebtEngine,
+  SystemDebtEngine__factory,
 } from "../../../typechain"
 import { expect } from "chai"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
@@ -172,11 +174,7 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
 
   // Deploy AlpacaStablecoin
   const AlpacaStablecoin = new AlpacaStablecoin__factory(deployer)
-  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [
-    "Alpaca USD",
-    "AUSD",
-    "31337",
-  ])) as AlpacaStablecoin
+  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, ["Alpaca USD", "AUSD"])) as AlpacaStablecoin
 
   const AccessControlConfig = (await ethers.getContractFactory(
     "AccessControlConfig",
@@ -263,9 +261,13 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   ])) as StablecoinAdapter
 
   // Deploy StabilityFeeCollector
+  const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
+  const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
+
   const StabilityFeeCollector = new StabilityFeeCollector__factory(deployer)
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
+    systemDebtEngine.address,
   ])) as StabilityFeeCollector
 
   await accessControlConfig.grantRole(
@@ -280,6 +282,10 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   await accessControlConfig.grantRole(await accessControlConfig.ADAPTER_ROLE(), alpacaTokenAdapter.address)
   await accessControlConfig.grantRole(
     ethers.utils.solidityKeccak256(["string"], ["POSITION_MANAGER_ROLE"]),
+    positionManager.address
+  )
+  await accessControlConfig.grantRole(
+    ethers.utils.solidityKeccak256(["string"], ["COLLATERAL_MANAGER_ROLE"]),
     positionManager.address
   )
   await accessControlConfig.grantRole(

@@ -361,16 +361,16 @@ describe("PriceFeedStack", () => {
           expect(ok).to.be.false
         })
       })
-      context("returns 25 hours old price, but ibInWbnbPriceFeed's price life is set to 26 hours", () => {
+      context("returns 20 hours old price, but ibInWbnbPriceFeed's price life is set to 21 hours", () => {
         it("should returns price with status ok=true", async () => {
           const now = DateTime.now()
           mockedPancakePair.smocked.getReserves.will.return.with([parseEther("400"), parseEther("1"), 0])
           mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 1)])
-          mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 25)])
+          mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 20)])
 
-          // set price life to 26 hours
+          // set price life to 21 hours
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
-          await ibInWbnbPriceFeed.setPriceLife(26 * 60 * 60)
+          await ibInWbnbPriceFeed.setPriceLife(21 * 60 * 60)
 
           const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
@@ -393,16 +393,16 @@ describe("PriceFeedStack", () => {
         })
       })
 
-      context("returns 25 hours old price, but strictWbnbInBusdPriceFeed's price life is set to 26 hours", () => {
+      context("returns 22 hours old price, but strictWbnbInBusdPriceFeed's price life is set to 23 hours", () => {
         it("should returns price with status ok=true", async () => {
           const now = DateTime.now()
           mockedPancakePair.smocked.getReserves.will.return.with([parseEther("400"), parseEther("1"), 0])
-          mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 25)])
+          mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 22)])
           mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
 
-          // set price life to 26 hours
+          // set price life to 23 hours
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
-          await strictWbnbInBusdPriceFeed1.setPriceLife(26 * 60 * 60)
+          await strictWbnbInBusdPriceFeed1.setPriceLife(23 * 60 * 60)
 
           const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1

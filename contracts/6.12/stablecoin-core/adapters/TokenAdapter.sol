@@ -54,6 +54,26 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     _;
   }
 
+  modifier onlyOwnerOrGov() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _;
+  }
+
+  modifier onlyOwnerOrShowStopper() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    _;
+  }
+
   IBookKeeper public bookKeeper; // CDP Engine
   bytes32 public override collateralPoolId; // Collateral Type
   address public override collateralToken;
@@ -73,27 +93,18 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     collateralPoolId = collateralPoolId_;
     collateralToken = collateralToken_;
     decimals = IToken(collateralToken).decimals();
+    require(decimals == 18, "TokenAdapter/bad-token-decimals");
   }
 
-  function cage() external override {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+  /// @dev access: OWNER_ROLE, SHOW_STOPPER_ROLE
+  function cage() external override onlyOwnerOrShowStopper {
     require(live == 1, "TokenAdapter/not-live");
     live = 0;
     emit LogCage();
   }
 
-  function uncage() external override {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(keccak256("SHOW_STOPPER_ROLE"), msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+  /// @dev access: OWNER_ROLE, SHOW_STOPPER_ROLE
+  function uncage() external override onlyOwnerOrShowStopper {
     require(live == 0, "TokenAdapter/not-caged");
     live = 1;
     emit LogUncage();
@@ -123,7 +134,7 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
     uint256 wad,
     bytes calldata /* data */
   ) external override nonReentrant whenNotPaused {
-    require(wad <= 2**255, "TokenAdapter/overflow");
+    require(wad < 2**255, "TokenAdapter/overflow");
     bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(wad));
 
     // Move the actual token
@@ -146,23 +157,13 @@ contract TokenAdapter is PausableUpgradeable, ReentrancyGuardUpgradeable, IGener
   ) external override nonReentrant {}
 
   // --- pause ---
-  function pause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE/// @dev access: OWNER_ROLE, GOV_ROLE
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function unpause() external onlyOwnerOrGov {
     _unpause();
   }
 }

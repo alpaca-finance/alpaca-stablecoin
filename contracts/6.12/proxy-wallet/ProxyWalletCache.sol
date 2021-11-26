@@ -21,7 +21,7 @@ contract ProxyWalletCache {
     return cache[hash];
   }
 
-  function write(bytes memory _code) public returns (address _target) {
+  function write(bytes memory _code) external returns (address _target) {
     assembly {
       _target := create(0, add(_code, 0x20), mload(_code))
       switch iszero(extcodesize(_target))

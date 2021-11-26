@@ -16,8 +16,11 @@ pragma solidity 0.6.12;
 import "../FlashMintModule.sol";
 import "../../interfaces/IBookKeeperFlashBorrower.sol";
 import "../../interfaces/IERC3156FlashBorrower.sol";
+import "../../utils/SafeToken.sol";
 
 abstract contract FlashLoanReceiverBase is IBookKeeperFlashBorrower, IERC3156FlashBorrower {
+  using SafeToken for address;
+
   FlashMintModule public flash;
 
   bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
@@ -47,7 +50,7 @@ abstract contract FlashLoanReceiverBase is IBookKeeperFlashBorrower, IERC3156Fla
   // --- Helper Functions ---
   function approvePayback(uint256 _amount) internal {
     // Lender takes back the stablecoin as per ERC 3156 spec
-    flash.stablecoin().approve(address(flash), _amount);
+    address(flash.stablecoin()).safeApprove(address(flash), _amount);
   }
 
   function payBackBookKeeper(uint256 _amount) internal {

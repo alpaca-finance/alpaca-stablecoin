@@ -22,11 +22,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   // Deploy mocked BookKeeper
   const AlpacaStablecoin = (await ethers.getContractFactory("AlpacaStablecoin", deployer)) as AlpacaStablecoin__factory
-  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [
-    "Alpaca USD",
-    "AUSD",
-    "31337",
-  ])) as AlpacaStablecoin
+  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, ["Alpaca USD", "AUSD"])) as AlpacaStablecoin
   await alpacaStablecoin.deployed()
 
   return { alpacaStablecoin }
@@ -255,85 +251,6 @@ describe("AlpacaStablecoin", () => {
           const totalSupplyAfter = await alpacaStablecoin.totalSupply()
           expect(totalSupplyAfter).to.be.equal(WeiPerWad.mul(90))
         })
-      })
-    })
-  })
-
-  context("#permit", () => {
-    context("when invalid address 0", () => {
-      it("should be revert", async () => {
-        await expect(
-          alpacaStablecoinAsAlice.permit(
-            AddressZero,
-            aliceAddress,
-            0,
-            0,
-            true,
-            0,
-            formatBytes32String(""),
-            formatBytes32String("")
-          )
-        ).to.be.revertedWith("AlpacaStablecoin/invalid-address-0")
-      })
-    })
-    context("when invalid holder", () => {
-      it("should be revert", async () => {
-        const result = await signDaiPermit(alice, alpacaStablecoin.address, aliceAddress, bobAddress)
-        await expect(
-          alpacaStablecoinAsAlice.permit(
-            bobAddress,
-            result.spender,
-            result.nonce,
-            result.expiry,
-            true,
-            result.v,
-            result.r,
-            result.s
-          )
-        ).to.be.revertedWith("AlpacaStablecoin/invalid-permit")
-      })
-    })
-    context("when permit expired", () => {
-      it("should be revert", async () => {
-        const result = await signDaiPermit(alice, alpacaStablecoin.address, aliceAddress, bobAddress, 1)
-        await expect(
-          alpacaStablecoinAsAlice.permit(
-            result.holder,
-            result.spender,
-            result.nonce,
-            result.expiry,
-            true,
-            result.v,
-            result.r,
-            result.s
-          )
-        ).to.be.revertedWith("AlpacaStablecoin/permit-expired")
-      })
-    })
-    context("when parameters are valid", () => {
-      it("should be able to call permit", async () => {
-        const result = await signDaiPermit(alice, alpacaStablecoin.address, aliceAddress, bobAddress)
-
-        const allowanceAliceBobBefore = await alpacaStablecoin.allowance(aliceAddress, bobAddress)
-        expect(allowanceAliceBobBefore).to.be.equal(0)
-
-        await expect(
-          alpacaStablecoinAsAlice.permit(
-            aliceAddress,
-            bobAddress,
-            result.nonce,
-            result.expiry,
-            true,
-            result.v,
-            result.r,
-            result.s
-          )
-        )
-          .to.be.emit(alpacaStablecoin, "Approval")
-          .withArgs(result.holder, result.spender, MaxUint256)
-
-        const allowanceAliceBobAfter = await alpacaStablecoin.allowance(aliceAddress, bobAddress)
-        expect(allowanceAliceBobAfter).to.be.equal(MaxUint256)
       })
     })
   })

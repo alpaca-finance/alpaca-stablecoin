@@ -53,10 +53,12 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
     _;
   }
 
+  /// @dev access: OWNER_ROLE, GOV_ROLE
   function pause() external onlyOwnerOrGov {
     _pause();
   }
 
+  /// @dev access: OWNER_ROLE, GOV_ROLE
   function unpause() external onlyOwnerOrGov {
     _unpause();
   }

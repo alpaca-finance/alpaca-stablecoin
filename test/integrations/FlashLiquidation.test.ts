@@ -180,6 +180,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   ])) as PositionManager
   await positionManager.deployed()
   await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), positionManager.address)
+  await accessControlConfig.grantRole(await accessControlConfig.COLLATERAL_MANAGER_ROLE(), positionManager.address)
 
   const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
   const ibTokenAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
@@ -202,7 +203,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     WeiPerRad.mul(10000000),
     0,
     simplePriceFeed.address,
-    0,
+    WeiPerRay,
     WeiPerRay,
     ibTokenAdapter.address,
     CLOSE_FACTOR_BPS,
@@ -223,11 +224,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   // Deploy Alpaca Stablecoin
   const AlpacaStablecoin = (await ethers.getContractFactory("AlpacaStablecoin", deployer)) as AlpacaStablecoin__factory
-  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [
-    "Alpaca USD",
-    "AUSD",
-    "31337",
-  ])) as AlpacaStablecoin
+  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, ["Alpaca USD", "AUSD"])) as AlpacaStablecoin
   await alpacaStablecoin.deployed()
 
   const StablecoinAdapter = (await ethers.getContractFactory(
@@ -256,6 +253,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   )) as StabilityFeeCollector__factory
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
+    systemDebtEngine.address,
   ])) as StabilityFeeCollector
   await stabilityFeeCollector.setSystemDebtEngine(systemDebtEngine.address)
   await accessControlConfig.grantRole(
@@ -296,6 +294,10 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     await accessControlConfig.LIQUIDATION_ENGINE_ROLE(),
     fixedSpreadLiquidationStrategy.address
   )
+  await accessControlConfig.grantRole(
+    await accessControlConfig.COLLATERAL_MANAGER_ROLE(),
+    fixedSpreadLiquidationStrategy.address
+  )
 
   const MockFlashLendingCalleeMintable = (await ethers.getContractFactory(
     "MockFlashLendingCalleeMintable",
@@ -305,6 +307,10 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     bookKeeper.address,
   ])) as MockFlashLendingCalleeMintable
   await accessControlConfig.grantRole(await accessControlConfig.MINTABLE_ROLE(), mockFlashLendingCalleeMintable.address)
+  await accessControlConfig.grantRole(
+    await accessControlConfig.COLLATERAL_MANAGER_ROLE(),
+    mockFlashLendingCalleeMintable.address
+  )
 
   const MockFlashLendingCallee = (await ethers.getContractFactory(
     "MockFlashLendingCallee",

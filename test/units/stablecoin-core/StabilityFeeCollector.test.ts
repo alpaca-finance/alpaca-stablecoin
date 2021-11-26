@@ -60,6 +60,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   )) as StabilityFeeCollector__factory
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     mockedBookKeeper.address,
+    deployer.address,
   ])) as StabilityFeeCollector
 
   return { stabilityFeeCollector, mockedBookKeeper, mockedCollateralPoolConfig, mockedAccessControlConfig }
@@ -120,7 +121,7 @@ describe("StabilityFeeCollector", () => {
         const { calls } = mockedBookKeeper.smocked.accrueStabilityFee
         expect(calls.length).to.be.equal(1)
         expect(calls[0]._collateralPoolId).to.be.equal(formatBytes32String("BNB"))
-        expect(calls[0]._stabilityFeeRecipient).to.be.equal(AddressZero)
+        expect(calls[0]._stabilityFeeRecipient).to.be.equal(deployerAddress)
         // rate ~ 0.01 ray ~ 1%
         AssertHelpers.assertAlmostEqual(
           calls[0]._debtAccumulatedRate.toString(),
@@ -148,9 +149,9 @@ describe("StabilityFeeCollector", () => {
         mockedBookKeeper.smocked.accessControlConfig.will.return.with(mockedAccessControlConfig.address)
         mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
-        await expect(stabilityFeeCollector.setGlobalStabilityFeeRate(UnitHelpers.WeiPerWad))
+        await expect(stabilityFeeCollector.setGlobalStabilityFeeRate(UnitHelpers.WeiPerRay))
           .to.emit(stabilityFeeCollector, "LogSetGlobalStabilityFeeRate")
-          .withArgs(deployerAddress, UnitHelpers.WeiPerWad)
+          .withArgs(deployerAddress, UnitHelpers.WeiPerRay)
       })
     })
   })

@@ -29,12 +29,12 @@ contract AlpacaAuth is AlpacaAuthEvents {
     emit LogSetOwner(msg.sender);
   }
 
-  function setOwner(address _owner) public auth {
+  function setOwner(address _owner) external auth {
     owner = _owner;
     emit LogSetOwner(owner);
   }
 
-  function setAuthority(IAuthority _authority) public auth {
+  function setAuthority(IAuthority _authority) external auth {
     authority = _authority;
     emit LogSetAuthority(address(authority));
   }

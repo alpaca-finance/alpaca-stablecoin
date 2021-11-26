@@ -33,7 +33,7 @@ contract ProxyWallet is AlpacaAuth, AlpacaNote {
 
   // use the proxy to execute calldata _data on contract _code
   function execute(bytes memory _code, bytes memory _data)
-    public
+    external
     payable
     returns (address _target, bytes memory _response)
   {

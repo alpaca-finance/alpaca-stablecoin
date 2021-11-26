@@ -22,8 +22,11 @@ import "../interfaces/IBookKeeperFlashLender.sol";
 import "../interfaces/IStablecoin.sol";
 import "../interfaces/IStablecoinAdapter.sol";
 import "../interfaces/IBookKeeper.sol";
+import "../utils/SafeToken.sol";
 
 contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeeperFlashLender {
+  using SafeToken for address;
+
   modifier onlyOwner() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
@@ -65,10 +68,11 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
     bookKeeper = IBookKeeper(IStablecoinAdapter(_stablecoinAdapter).bookKeeper());
     stablecoinAdapter = IStablecoinAdapter(_stablecoinAdapter);
     stablecoin = IStablecoin(IStablecoinAdapter(_stablecoinAdapter).stablecoin());
+    require(_systemDebtEngine != address(0), "FlashMintModule/bad-system-debt-engine-address");
     systemDebtEngine = _systemDebtEngine;
 
     bookKeeper.whitelist(_stablecoinAdapter);
-    stablecoin.approve(_stablecoinAdapter, type(uint256).max);
+    address(stablecoin).safeApprove(_stablecoinAdapter, type(uint256).max);
   }
 
   // --- Math ---
@@ -85,12 +89,14 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
   }
 
   // --- Administration ---
+  /// @dev access: OWNER_ROLE
   function setMax(uint256 _data) external onlyOwner {
     // Add an upper limit of 10^27 Stablecoin to avoid breaking technical assumptions of Stablecoin << 2^256 - 1
     require((max = _data) <= RAD, "FlashMintModule/ceiling-too-high");
     emit LogSetMax(_data);
   }
 
+  /// @dev access: OWNER_ROLE
   function setFeeRate(uint256 _data) external onlyOwner {
     feeRate = _data;
     emit LogSetFeeRate(_data);
@@ -134,7 +140,7 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
       "FlashMintModule/callback-failed"
     );
 
-    stablecoin.transferFrom(address(_receiver), address(this), _total); // The fee is also enforced here
+    address(stablecoin).safeTransferFrom(address(_receiver), address(this), _total); // The fee is also enforced here
     stablecoinAdapter.deposit(address(this), _total, abi.encode(0));
     bookKeeper.settleSystemBadDebt(_amt);
 
@@ -173,5 +179,10 @@ contract FlashMintModule is PausableUpgradeable, IERC3156FlashLender, IBookKeepe
 
   function accrue() external lock {
     bookKeeper.moveStablecoin(address(this), systemDebtEngine, bookKeeper.stablecoin(address(this)));
+  }
+
+  /// @dev access: OWNER_ROLE
+  function refreshApproval() external lock onlyOwner {
+    address(stablecoin).safeApprove(address(stablecoinAdapter), type(uint256).max);
   }
 }
