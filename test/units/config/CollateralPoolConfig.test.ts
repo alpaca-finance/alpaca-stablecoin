@@ -104,7 +104,7 @@ describe("CollateralPoolConfig", () => {
             WeiPerRad.mul(10000000),
             0,
             mockedSimplePriceFeed.address,
-            0,
+            WeiPerRay,
             WeiPerRay,
             mockedIbTokenAdapter.address,
             CLOSE_FACTOR_BPS,
@@ -122,7 +122,7 @@ describe("CollateralPoolConfig", () => {
           WeiPerRad.mul(10000000),
           0,
           mockedSimplePriceFeed.address,
-          0,
+          WeiPerRay,
           WeiPerRay,
           mockedIbTokenAdapter.address,
           CLOSE_FACTOR_BPS,
@@ -136,7 +136,7 @@ describe("CollateralPoolConfig", () => {
             WeiPerRad.mul(10000000),
             0,
             mockedSimplePriceFeed.address,
-            0,
+            WeiPerRay,
             WeiPerRay,
             mockedIbTokenAdapter.address,
             CLOSE_FACTOR_BPS,
@@ -155,7 +155,7 @@ describe("CollateralPoolConfig", () => {
             WeiPerRad.mul(10000000),
             0,
             mockedSimplePriceFeed.address,
-            0,
+            WeiPerRay,
             WeiPerWad,
             mockedIbTokenAdapter.address,
             CLOSE_FACTOR_BPS,
@@ -173,7 +173,7 @@ describe("CollateralPoolConfig", () => {
           WeiPerRad.mul(10000000),
           0,
           mockedSimplePriceFeed.address,
-          0,
+          WeiPerRay,
           WeiPerRay,
           mockedIbTokenAdapter.address,
           CLOSE_FACTOR_BPS,
@@ -296,6 +296,13 @@ describe("CollateralPoolConfig", () => {
       it("should be revert", async () => {
         await expect(collateralPoolConfig.setStabilityFeeRate(COLLATERAL_POOL_ID, WeiPerWad)).to.be.revertedWith(
           "CollateralPoolConfig/invalid-stability-fee-rate"
+        )
+      })
+    })
+    context("when stability fee rate too large", () => {
+      it("should be revert", async () => {
+        await expect(collateralPoolConfig.setStabilityFeeRate(COLLATERAL_POOL_ID, WeiPerRad)).to.be.revertedWith(
+          "CollateralPoolConfig/stability-fee-rate-too-large"
         )
       })
     })

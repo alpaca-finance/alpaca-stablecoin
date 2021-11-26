@@ -96,11 +96,7 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
 
   // Deploy AlpacaStablecoin
   const AlpacaStablecoin = new AlpacaStablecoin__factory(deployer)
-  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [
-    "Alpaca USD",
-    "AUSD",
-    "31337",
-  ])) as AlpacaStablecoin
+  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, ["Alpaca USD", "AUSD"])) as AlpacaStablecoin
 
   const BookKeeper = new BookKeeper__factory(deployer)
   const bookKeeper = (await upgrades.deployProxy(BookKeeper, [
@@ -164,14 +160,15 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     alpacaStablecoin.address,
   ])) as StablecoinAdapter
 
+  const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
+  const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
+
   // Deploy StabilityFeeCollector
   const StabilityFeeCollector = new StabilityFeeCollector__factory(deployer)
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
+    systemDebtEngine.address,
   ])) as StabilityFeeCollector
-
-  const SystemDebtEngine = new SystemDebtEngine__factory(deployer)
-  const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
 
   const LiquidationEngine = new LiquidationEngine__factory(deployer)
   const liquidationEngine = (await upgrades.deployProxy(LiquidationEngine, [
@@ -225,10 +222,12 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   await accessControlConfig.grantRole(await accessControlConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
   await accessControlConfig.grantRole(await accessControlConfig.LIQUIDATION_ENGINE_ROLE(), liquidationEngine.address)
   await accessControlConfig.grantRole(await accessControlConfig.LIQUIDATION_ENGINE_ROLE(), showStopper.address)
+  await accessControlConfig.grantRole(await accessControlConfig.COLLATERAL_MANAGER_ROLE(), showStopper.address)
   await accessControlConfig.grantRole(await accessControlConfig.PRICE_ORACLE_ROLE(), priceOracle.address)
   await accessControlConfig.grantRole(await accessControlConfig.ADAPTER_ROLE(), busdTokenAdapter.address)
   await accessControlConfig.grantRole(await accessControlConfig.ADAPTER_ROLE(), usdtTokenAdapter.address)
   await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), positionManager.address)
+  await accessControlConfig.grantRole(await accessControlConfig.COLLATERAL_MANAGER_ROLE(), positionManager.address)
   await accessControlConfig.grantRole(
     await accessControlConfig.STABILITY_FEE_COLLECTOR_ROLE(),
     stabilityFeeCollector.address

@@ -41,7 +41,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     uint256 actualDebtShareToBeLiquidated; // [wad]
     uint256 collateralAmountToBeLiquidated; // [wad]
     uint256 treasuryFees; // [wad]
-    uint256 maxLiquidatableDebtShare; // [rad]
+    uint256 maxLiquidatableDebtShare; // [wad]
   }
 
   struct LocalVars {
@@ -84,6 +84,16 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
   event LogSetFlashLendingEnabled(address indexed caller, uint256 _flashLendingEnabled);
 
+  modifier onlyOwnerOrGov() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _;
+  }
+
   // --- Init ---
   function initialize(
     address _bookKeeper,
@@ -122,13 +132,8 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
   }
 
   // --- Setter ---
-  function setFlashLendingEnabled(uint256 _flashLendingEnabled) external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function setFlashLendingEnabled(uint256 _flashLendingEnabled) external onlyOwnerOrGov {
     flashLendingEnabled = _flashLendingEnabled;
     emit LogSetFlashLendingEnabled(msg.sender, _flashLendingEnabled);
   }
@@ -217,12 +222,12 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
       ) {
         // Full Debt Liquidation
         info.actualDebtValueToBeLiquidated = _positionDebtValue; // [rad]
-        // actualDebtValueToBeLiquidated [rad] * liquidatorIncentiveBps [bps] / 10000 / _currentCollateralPrice [ray] /
 
+        // actualDebtValueToBeLiquidated [rad] * liquidatorIncentiveBps [bps] / 10000 / _currentCollateralPrice [ray] /
         info.collateralAmountToBeLiquidated = info
           .actualDebtValueToBeLiquidated
-          .div(10000)
           .mul(_vars.liquidatorIncentiveBps)
+          .div(10000)
           .div(_currentCollateralPrice); // [wad]
       } else {
         // Partial Liquidation
@@ -282,7 +287,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     );
     // Overflow check
     require(
-      info.collateralAmountToBeLiquidated <= 2**255 && info.actualDebtShareToBeLiquidated <= 2**255,
+      info.collateralAmountToBeLiquidated < 2**255 && info.actualDebtShareToBeLiquidated < 2**255,
       "FixedSpreadLiquidationStrategy/overflow"
     );
     bookKeeper.confiscatePosition(
@@ -359,23 +364,13 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
   }
 
   // --- pause ---
-  function pause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function unpause() external onlyOwnerOrGov {
     _unpause();
   }
 }

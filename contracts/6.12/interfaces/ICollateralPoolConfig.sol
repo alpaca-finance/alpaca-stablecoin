@@ -36,6 +36,14 @@ interface ICollateralPoolConfig {
     address strategy; // Liquidation strategy for this collateral pool
   }
 
+  struct CollateralPoolInfo {
+    uint256 debtAccumulatedRate; // [ray]
+    uint256 totalDebtShare; // [wad]
+    uint256 debtCeiling; // [rad]
+    uint256 priceWithSafetyMargin; // [ray]
+    uint256 debtFloor; // [rad]
+  }
+
   function setPriceWithSafetyMargin(bytes32 collateralPoolId, uint256 priceWithSafetyMargin) external;
 
   function collateralPools(bytes32 _collateralPoolId) external view returns (CollateralPool memory);
@@ -73,4 +81,6 @@ interface ICollateralPoolConfig {
   function getTreasuryFeesBps(bytes32 _collateralPoolId) external view returns (uint256);
 
   function getStrategy(bytes32 _collateralPoolId) external view returns (address);
+
+  function getCollateralPoolInfo(bytes32 _collateralPoolId) external view returns (CollateralPoolInfo memory);
 }

@@ -36,6 +36,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
 
   // Deploy mocked AlpacaStablecoin
   const mockAlpacaStablecoin = await smockit(await ethers.getContractFactory("AlpacaStablecoin", deployer))
+  mockAlpacaStablecoin.smocked.approve.will.return.with(true)
 
   // Deploy mocked ERC20
   const mockERC20 = await smockit(await ethers.getContractFactory("ERC20", deployer))
@@ -220,6 +221,8 @@ describe("FlashMintModule", () => {
     })
     context("when parameters are valid", () => {
       it("should be able to call flashLoan", async () => {
+        mockAlpacaStablecoin.smocked.transferFrom.will.return.with(true)
+
         await flashMintModule.setMax(WeiPerWad.mul(100))
         await flashMintModule.setFeeRate(WeiPerWad.div(10))
         mockMyFashLoan.smocked.onFlashLoan.will.return.with(keccak256(toUtf8Bytes("ERC3156FlashBorrower.onFlashLoan")))

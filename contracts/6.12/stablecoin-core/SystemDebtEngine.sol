@@ -57,24 +57,48 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     return _x <= _y ? _x : _y;
   }
 
+  modifier onlyOwner() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    _;
+  }
+
+  modifier onlyOwnerOrGov() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _;
+  }
+
+  modifier onlyOwnerOrShowStopper() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    _;
+  }
+
   // --- withdraw surplus ---
   /// @param _amount The amount of collateral. [wad]
+  /// @dev access: OWNER_ROLE
   function withdrawCollateralSurplus(
     bytes32 _collateralPoolId,
     IGenericTokenAdapter _adapter,
     address _to,
     uint256 _amount // [wad]
-  ) external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  ) external onlyOwner {
     bookKeeper.moveCollateral(_collateralPoolId, address(this), _to, _amount);
     _adapter.onMoveCollateral(address(this), _to, _amount, abi.encode(_to));
   }
 
   /// @param _value The value of collateral. [rad]
-  function withdrawStablecoinSurplus(address _to, uint256 _value) external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  /// @dev access: OWNER_ROLE
+  function withdrawStablecoinSurplus(address _to, uint256 _value) external onlyOwner {
     require(bookKeeper.systemBadDebt(address(this)) == 0, "SystemDebtEngine/system-bad-debt-remaining");
     require(
       sub(bookKeeper.stablecoin(address(this)), _value) >= surplusBuffer,
@@ -86,9 +110,8 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
   // --- Administration ---
   event LogSetSurplusBuffer(address indexed _caller, uint256 _data);
 
-  function setSurplusBuffer(uint256 _data) external whenNotPaused {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  /// @dev access: OWNER_ROLE
+  function setSurplusBuffer(uint256 _data) external whenNotPaused onlyOwner {
     surplusBuffer = _data;
     emit LogSetSurplusBuffer(msg.sender, _data);
   }
@@ -105,49 +128,29 @@ contract SystemDebtEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, IS
     bookKeeper.settleSystemBadDebt(_value);
   }
 
-  function cage() external override {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+  /// @dev access: OWNER_ROLE, SHOW_STOPPER_ROLE
+  function cage() external override onlyOwnerOrShowStopper {
     require(live == 1, "SystemDebtEngine/not-live");
     live = 0;
     bookKeeper.settleSystemBadDebt(min(bookKeeper.stablecoin(address(this)), bookKeeper.systemBadDebt(address(this))));
     emit LogCage();
   }
 
-  function uncage() external override {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+  /// @dev access: OWNER_ROLE, SHOW_STOPPER_ROLE
+  function uncage() external override onlyOwnerOrShowStopper {
     require(live == 0, "SystemDebtEngine/not-caged");
     live = 1;
     emit LogUncage();
   }
 
   // --- pause ---
-  function pause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function unpause() external onlyOwnerOrGov {
     _unpause();
   }
 }

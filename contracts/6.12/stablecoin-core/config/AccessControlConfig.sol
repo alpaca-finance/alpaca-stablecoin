@@ -26,6 +26,7 @@ contract AccessControlConfig is AccessControlUpgradeable {
   bytes32 public constant POSITION_MANAGER_ROLE = keccak256("POSITION_MANAGER_ROLE");
   bytes32 public constant MINTABLE_ROLE = keccak256("MINTABLE_ROLE");
   bytes32 public constant BOOK_KEEPER_ROLE = keccak256("BOOK_KEEPER_ROLE");
+  bytes32 public constant COLLATERAL_MANAGER_ROLE = keccak256("COLLATERAL_MANAGER_ROLE");
 
   function initialize() external initializer {
     AccessControlUpgradeable.__AccessControl_init();

@@ -205,8 +205,8 @@ describe("AlpacaOraclePriceFeed", () => {
       it("should revert", async () => {
         mockedAccessControlConfig.smocked.hasRole.will.return.with(false)
 
-        await expect(alpacaOraclePriceFeedAsAlice.pause()).to.be.revertedWith("!ownerRole")
-        await expect(alpacaOraclePriceFeedAsAlice.unpause()).to.be.revertedWith("!ownerRole")
+        await expect(alpacaOraclePriceFeedAsAlice.pause()).to.be.revertedWith("!(ownerRole or govRole)")
+        await expect(alpacaOraclePriceFeedAsAlice.unpause()).to.be.revertedWith("!(ownerRole or govRole)")
       })
     })
     context("when caller is the owner", () => {

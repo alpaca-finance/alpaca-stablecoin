@@ -14,10 +14,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const PRIMARY_ALPACA_ORACLE = ""
+  const PRIMARY_ALPACA_ORACLE = "" // ChainLinkPriceOracle
   const PRIMARY_TOKEN_0 = ""
   const PRIMARY_TOKEN_1 = ""
-  const SECONDARY_ALPACA_ORACLE = ""
+  const SECONDARY_ALPACA_ORACLE = "" // BandPriceOracle
   const SECONDARY_TOKEN_0 = ""
   const SECONDARY_TOKEN_1 = ""
   const ACCESS_CONTROL_CONFIG = ""

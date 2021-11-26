@@ -35,4 +35,6 @@ interface IAccessControlConfig {
   function MINTABLE_ROLE() external view returns (bytes32);
 
   function BOOK_KEEPER_ROLE() external view returns (bytes32);
+
+  function COLLATERAL_MANAGER_ROLE() external view returns (bytes32);
 }

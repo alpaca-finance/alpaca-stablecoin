@@ -14,6 +14,7 @@ export interface Config {
   IbTokenAdapters: IbTokenAdapter[]
   StablecoinAdapters: StablecoinAdapters
   PriceOracle: PriceOracle
+  Oracle: Oracle
   SystemDebtEngine: SystemDebtEngine
   LiquidationEngine: LiquidationEngine
 }
@@ -104,4 +105,37 @@ export interface SystemDebtEngine {
 export interface LiquidationEngine {
   address: string
   deployedBlock: number
+}
+
+export interface ChainLinkOracle {
+  address: string
+  deployedBlock: number
+}
+
+export interface SimpleOracle {
+  address: string
+  deployedBlock: number
+}
+
+export interface DexPriceOracle {
+  address: string
+  deployedBlock: number
+}
+
+export interface StdReferenceProxy {
+  address: string
+  deployedBlock: number
+}
+
+export interface BandPriceOracle {
+  address: string
+  deployedBlock: number
+  StdReferenceProxy: StdReferenceProxy
+}
+
+export interface Oracle {
+  ChainLinkOracle: ChainLinkOracle
+  SimpleOracle: SimpleOracle
+  DexPriceOracle: DexPriceOracle
+  BandPriceOracle: BandPriceOracle
 }
