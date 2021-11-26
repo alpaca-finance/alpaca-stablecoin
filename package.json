@@ -80,6 +80,8 @@
     "deploy:testnet:oracles:config:set-token-symbol": "hardhat --network testnet deploy --no-compile --reset --tags SetTokenSymbol",
     "deploy:mainnet:pcs-flash-liquidator:whitelist": "hardhat --network mainnet deploy --no-compile --reset --tags PCSFlashLiquidatorWhitelist",
     "deploy:testnet:pcs-flash-liquidator:whitelist": "hardhat --network testnet deploy --no-compile --reset --tags PCSFlashLiquidatorWhitelist",
+    "deploy:mainnet:fixed-spread-liquidation-strategy:set-flash-lending": "hardhat --network mainnet deploy --no-compile --reset --tags SetFlashLendingEnabled",
+    "deploy:testnet:fixed-spread-liquidation-strategy:set-flash-lending": "hardhat --network testnet deploy --no-compile --reset --tags SetFlashLendingEnabled",
     "test:case": "mocha --require hardhat/register --extension ts -g",
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
     "test": "hardhat test --no-compile",
