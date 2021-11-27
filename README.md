@@ -62,7 +62,7 @@ yarn test
 
   
 
-Alpaca Stablecoin contracts have been audited by [PeckShield](https://github.com/alpaca-finance/alpaca-stablecoin/blob/chore/add-audit-report/audits/PeckShield-Audit-Report-Alpaca-USD-v1.0.pdf) and [Inspex](https://github.com/alpaca-finance/alpaca-stablecoin/blob/chore/add-audit-report/audits/Inspex_AUDIT2021035_AlpacaFinance_AlpacaStablecoin_FullReport_v1.0.pdf).
+Alpaca Stablecoin contracts have been audited by [PeckShield](https://github.com/alpaca-finance/alpaca-stablecoin/blob/chore/add-audit-report/audits/PeckShield-Audit-Report-Alpaca-USD-v1.0.pdf), [Inspex](https://github.com/alpaca-finance/alpaca-stablecoin/blob/chore/add-audit-report/audits/Inspex_AUDIT2021035_AlpacaFinance_AlpacaStablecoin_FullReport_v1.0.pdf) and [SlowMist](https://github.com/alpaca-finance/alpaca-stablecoin/blob/chore/add-audit-report/audits/SlowMist_Audit_Report_-_AlpacaStablecoin.pdf).
 
   
 
