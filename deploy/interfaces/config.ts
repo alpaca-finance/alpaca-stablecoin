@@ -1,5 +1,6 @@
 export interface Config {
   Timelock: string
+  ProxyAdmin: string
   ProxyWalletFactory: ProxyWalletFactory
   ProxyWalletRegistry: ProxyWalletRegistry
   AlpacaStablecoinProxyActions: AlpacaStablecoinProxyActions

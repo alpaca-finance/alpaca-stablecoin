@@ -1,5 +1,6 @@
 {
-  "Timelock": "",
+  "Timelock": "0x2D5408f2287BF9F9B05404794459a846651D0a59",
+  "ProxyAdmin": "0x5379F32C8D5F663EACb61eeF63F722950294f452",
   "ProxyWalletFactory": {
     "address": "",
     "deployedBlock": 0
