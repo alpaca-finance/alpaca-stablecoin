@@ -86,6 +86,13 @@ contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgrad
   }
   event LogSetPriceLife(address indexed caller, uint256 second);
   event LogSetMaxPriceDiff(address indexed caller, uint256 maxPriceDiff);
+  event LogSetPrimary(address indexed caller, address newAlpacaOracle, address primaryToken0, address primaryToken1);
+  event LogSetSecondary(
+    address indexed caller,
+    address newAlpacaOracle,
+    address secondaryToken0,
+    address secondaryToken1
+  );
 
   /// @dev access: OWNER_ROLE
   function setPriceLife(uint256 _second) external onlyOwner {
@@ -98,6 +105,32 @@ contract StrictAlpacaOraclePriceFeed is PausableUpgradeable, AccessControlUpgrad
   function setMaxPriceDiff(uint256 _maxPriceDiff) external onlyOwner {
     maxPriceDiff = _maxPriceDiff;
     emit LogSetMaxPriceDiff(msg.sender, _maxPriceDiff);
+  }
+
+  /// @dev access: OWNER_ROLE
+  function setPrimary(
+    address _primaryAlpacaOracle,
+    address _primaryToken0,
+    address _primaryToken1
+  ) external onlyOwner {
+    primary.alpacaOracle = IAlpacaOracle(_primaryAlpacaOracle);
+    primary.token0 = _primaryToken0;
+    primary.token1 = _primaryToken1;
+    primary.alpacaOracle.getPrice(primary.token0, primary.token1);
+    emit LogSetPrimary(msg.sender, _primaryAlpacaOracle, _primaryToken0, _primaryToken1);
+  }
+
+  /// @dev access: OWNER_ROLE
+  function setSecondary(
+    address _secondaryAlpacaOracle,
+    address _secondaryToken0,
+    address _secondaryToken1
+  ) external onlyOwner {
+    secondary.alpacaOracle = IAlpacaOracle(_secondaryAlpacaOracle);
+    secondary.token0 = _secondaryToken0;
+    secondary.token1 = _secondaryToken1;
+    secondary.alpacaOracle.getPrice(secondary.token0, secondary.token1);
+    emit LogSetSecondary(msg.sender, _secondaryAlpacaOracle, _secondaryToken0, _secondaryToken1);
   }
 
   /// @dev access: OWNER_ROLE, GOV_ROLE
