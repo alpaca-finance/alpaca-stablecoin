@@ -494,4 +494,42 @@ describe("PriceFeedStack", () => {
       })
     })
   })
+
+  context("#StrictAlpacaOraclePriceFeed.setPrimary()", () => {
+    context("set primary correctly", () => {
+      it("should success", async () => {
+        await strictWbnbInBusdPriceFeed1.setPrimary(dexPriceOracle.address, wbnbAddress, busdAddress)
+
+        const newPrimary = await strictWbnbInBusdPriceFeed1.primary()
+        expect(newPrimary.alpacaOracle).to.be.equal(dexPriceOracle.address)
+        expect(newPrimary.token0).to.be.equal(wbnbAddress)
+        expect(newPrimary.token1).to.be.equal(busdAddress)
+      })
+    })
+
+    context("set primary incorrectly", () => {
+      it("should revert", async () => {
+        await expect(strictWbnbInBusdPriceFeed1.setPrimary(wbnbAddress, wbnbAddress, busdAddress)).to.be.reverted
+      })
+    })
+  })
+
+  context("#StrictAlpacaOraclePriceFeed.setSecondary()", () => {
+    context("set secondary correctly", () => {
+      it("should success", async () => {
+        await strictWbnbInBusdPriceFeed2.setSecondary(mockedChainLinkOracle.address, wbnbAddress, busdAddress)
+
+        const newSecondary = await strictWbnbInBusdPriceFeed2.secondary()
+        expect(newSecondary.alpacaOracle).to.be.equal(mockedChainLinkOracle.address)
+        expect(newSecondary.token0).to.be.equal(wbnbAddress)
+        expect(newSecondary.token1).to.be.equal(busdAddress)
+      })
+    })
+
+    context("set secondary incorrectly", () => {
+      it("should revert", async () => {
+        await expect(strictWbnbInBusdPriceFeed2.setSecondary(wbnbAddress, wbnbAddress, busdAddress)).to.be.reverted
+      })
+    })
+  })
 })
