@@ -15,8 +15,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const IB_IN_BASE_PRICE_FEED_ADDR = "0x2B47b786589AEaCf2E013935C0273973E911a548"
-  const BASE_IN_USD_PRICE_FEED_ADDR = "0x344e52A6104655094Eb1AF3C00CC91629733615b"
+  const IB_IN_BASE_PRICE_FEED_ADDR = "0xDb9B5574581a0e67b119f2c511f7C1e1F3409EC6"
+  const BASE_IN_USD_PRICE_FEED_ADDR = "0xFe104175A2503248438d16C2425d6C2f3FAa5b65"
 
   const config = ConfigEntity.getConfig()
 

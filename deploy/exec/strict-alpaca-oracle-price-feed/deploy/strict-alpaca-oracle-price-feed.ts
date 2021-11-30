@@ -19,10 +19,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const PRIMARY_ALPACA_ORACLE = config.Oracle.ChainLinkOracle.address // ChainLinkPriceOracle
   const PRIMARY_TOKEN_0 = "0x0266693F9Df932aD7dA8a9b44C2129Ce8a87E81f" // BUSD
-  const PRIMARY_TOKEN_1 = "0xffffffffffffffffffffffffffffffffffffffff" // USD
+  const PRIMARY_TOKEN_1 = "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff" // USD
   const SECONDARY_ALPACA_ORACLE = config.Oracle.BandPriceOracle.address // BandPriceOracle
   const SECONDARY_TOKEN_0 = "0x0266693F9Df932aD7dA8a9b44C2129Ce8a87E81f" // BUSD
-  const SECONDARY_TOKEN_1 = "0xffffffffffffffffffffffffffffffffffffffff" // USD
+  const SECONDARY_TOKEN_1 = "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff" // USD
   const ACCESS_CONTROL_CONFIG = config.AccessControlConfig.address
 
   console.log(">> Deploying an upgradable StrictAlpacaOraclePriceFeed contract")
