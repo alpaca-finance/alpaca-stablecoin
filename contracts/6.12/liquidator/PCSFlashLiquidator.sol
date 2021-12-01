@@ -68,12 +68,13 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
 
     // Swap token to AUSD
     require(
-      _debtValueToRepay.div(RAY) <= _sellCollateral(_token, _path, _router, _actualCollateralAmount, _debtValueToRepay),
+      _debtValueToRepay.div(RAY) + 1 <=
+        _sellCollateral(_token, _path, _router, _actualCollateralAmount, _debtValueToRepay),
       "not enough to repay debt"
     );
 
     // Deposit Alpaca Stablecoin for liquidatorAddress
-    uint256 _liquidationProfit = _depositAlpacaStablecoin(_debtValueToRepay.div(RAY), _liquidatorAddress);
+    uint256 _liquidationProfit = _depositAlpacaStablecoin(_debtValueToRepay.div(RAY) + 1, _liquidatorAddress);
     emit LogFlashLiquidation(_liquidatorAddress, _debtValueToRepay, _collateralAmountToLiquidate, _liquidationProfit);
   }
 
