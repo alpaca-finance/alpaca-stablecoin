@@ -61,6 +61,12 @@ import {
   WETH__factory,
   WETH,
   MdexRouter,
+  SimpleVaultConfig__factory,
+  WNativeRelayer__factory,
+  WNativeRelayer,
+  Vault__factory,
+  DebtToken__factory,
+  Vault,
 } from "@alpaca-finance/alpaca-contract/typechain"
 import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../helper/unit"
@@ -73,14 +79,17 @@ const { formatBytes32String } = ethers.utils
 const FOREVER = "2000000000"
 
 type fixture = {
+  wbnb: WETH
   proxyWalletRegistry: ProxyWalletRegistry
   ibTokenAdapter: IbTokenAdapter
+  ibWBNBAdapter: IbTokenAdapter
   stablecoinAdapter: StablecoinAdapter
   bookKeeper: BookKeeper
   dummyToken: BEP20
   shield: Shield
   alpacaToken: AlpacaToken
   fairLaunch: FairLaunch
+  bnbVault: Vault
   alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions
   positionManager: PositionManager
   stabilityFeeCollector: StabilityFeeCollector
@@ -98,6 +107,7 @@ type fixture = {
 
 const ALPACA_PER_BLOCK = ethers.utils.parseEther("100")
 const COLLATERAL_POOL_ID = formatBytes32String("dummyToken")
+const WBNB_COLLATERAL_POOL_ID = formatBytes32String("ibWBNB")
 const CLOSE_FACTOR_BPS = BigNumber.from(5000)
 const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(10250)
 const TREASURY_FEE_BPS = BigNumber.from(5000)
@@ -157,6 +167,19 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await alpacaToken.mint(await deployer.getAddress(), ethers.utils.parseEther("150"))
   await alpacaToken.deployed()
 
+  const WBNB = new WETH__factory(deployer)
+  const wbnb = await WBNB.deploy()
+  await wbnb.deployed()
+
+  const WNativeRelayer = new WNativeRelayer__factory(deployer)
+  const wNativeRelayer = (await WNativeRelayer.deploy(wbnb.address)) as WNativeRelayer
+  await wNativeRelayer.deployed()
+
+  const DebtToken = new DebtToken__factory(deployer)
+  const debtToken = await DebtToken.deploy()
+  await debtToken.deployed()
+  await debtToken.initialize("debtibBTOKEN_V2", "debtibBTOKEN_V2", deployer.address)
+
   const FairLaunch = (await ethers.getContractFactory("FairLaunch", deployer)) as FairLaunch__factory
   const fairLaunch = await FairLaunch.deploy(alpacaToken.address, await dev.getAddress(), ALPACA_PER_BLOCK, 0, 0, 0)
   await fairLaunch.deployed()
@@ -165,9 +188,56 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const shield = await Shield.deploy(deployer.address, fairLaunch.address)
   await shield.deployed()
 
+  const RESERVE_POOL_BPS = "1000" // 10% reserve pool
+  const KILL_PRIZE_BPS = "1000" // 10% Kill prize
+  const INTEREST_RATE = "3472222222222" // 30% per year
+  const MIN_DEBT_SIZE = ethers.utils.parseEther("1") // 1 BTOKEN min debt size
+  const KILL_TREASURY_BPS = "100"
+
+  const SimpleVaultConfig = new SimpleVaultConfig__factory(deployer)
+  const simpleVaultConfig = await SimpleVaultConfig.deploy()
+  await simpleVaultConfig.deployed()
+  await simpleVaultConfig.initialize(
+    MIN_DEBT_SIZE,
+    INTEREST_RATE,
+    RESERVE_POOL_BPS,
+    KILL_PRIZE_BPS,
+    wbnb.address,
+    wNativeRelayer.address,
+    fairLaunch.address,
+    KILL_TREASURY_BPS,
+    deployer.address
+  )
+
+  const Vault = new Vault__factory(deployer)
+  // const tokenVault = await Vault.deploy()
+  // await tokenVault.deployed()
+  // await tokenVault.initialize(
+  //   simpleVaultConfig.address,
+  //   baseToken.address,
+  //   "Interest Bearing BTOKEN",
+  //   "ibBTOKEN",
+  //   18,
+  //   debtToken.address
+  // )
+
+  const bnbVault = await Vault.deploy()
+  await bnbVault.deployed()
+  await bnbVault.initialize(
+    simpleVaultConfig.address,
+    wbnb.address,
+    "Interest Bearing BNB",
+    "ibBNB",
+    18,
+    debtToken.address
+  )
+
+  await wNativeRelayer.setCallerOk([bnbVault.address], true)
+
   // Config Alpaca's FairLaunch
   // Assuming Deployer is timelock for easy testing
   await fairLaunch.addPool(1, dummyToken.address, true)
+  await fairLaunch.addPool(1, bnbVault.address, true)
   await fairLaunch.transferOwnership(shield.address)
   await shield.transferOwnership(await deployer.getAddress())
   await alpacaToken.transferOwnership(fairLaunch.address)
@@ -198,6 +268,21 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   ])) as IbTokenAdapter
   await ibTokenAdapter.deployed()
 
+  const ibWBNBAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
+    bookKeeper.address,
+    WBNB_COLLATERAL_POOL_ID,
+    bnbVault.address,
+    alpacaToken.address,
+    fairLaunch.address,
+    1,
+    shield.address,
+    await deployer.getAddress(),
+    BigNumber.from(1000),
+    await dev.getAddress(),
+    positionManager.address,
+  ])) as IbTokenAdapter
+  await ibTokenAdapter.deployed()
+
   await collateralPoolConfig.initCollateralPool(
     COLLATERAL_POOL_ID,
     WeiPerRad.mul(10000000),
@@ -211,6 +296,19 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     TREASURY_FEE_BPS,
     AddressZero
   )
+  await collateralPoolConfig.initCollateralPool(
+    WBNB_COLLATERAL_POOL_ID,
+    WeiPerRad.mul(10000000),
+    0,
+    simplePriceFeed.address,
+    WeiPerRay,
+    WeiPerRay,
+    ibWBNBAdapter.address,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
+    AddressZero
+  )
   await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10000000))
 
   await accessControlConfig.grantRole(await accessControlConfig.PRICE_ORACLE_ROLE(), deployer.address)
@@ -219,6 +317,10 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await accessControlConfig.grantRole(
     ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]),
     ibTokenAdapter.address
+  )
+  await accessControlConfig.grantRole(
+    ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]),
+    ibWBNBAdapter.address
   )
   await accessControlConfig.grantRole(await accessControlConfig.MINTABLE_ROLE(), deployer.address)
 
@@ -288,6 +390,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     systemDebtEngine.address,
   ])) as FixedSpreadLiquidationStrategy
   await collateralPoolConfig.setStrategy(COLLATERAL_POOL_ID, fixedSpreadLiquidationStrategy.address)
+  await collateralPoolConfig.setStrategy(WBNB_COLLATERAL_POOL_ID, fixedSpreadLiquidationStrategy.address)
   await fixedSpreadLiquidationStrategy.setFlashLendingEnabled(1)
   await accessControlConfig.grantRole(await accessControlConfig.LIQUIDATION_ENGINE_ROLE(), liquidationEngine.address)
   await accessControlConfig.grantRole(
@@ -327,16 +430,13 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const factoryV2 = await PancakeFactoryV2.deploy(await deployer.getAddress())
   await factoryV2.deployed()
 
-  const WBNB = new WETH__factory(deployer)
-  const wbnb = await WBNB.deploy()
-  await wbnb.deployed()
-
   const PancakeRouterV2 = new PancakeRouterV2__factory(deployer)
   const routerV2 = await PancakeRouterV2.deploy(factoryV2.address, wbnb.address)
   await routerV2.deployed()
 
   /// Setup BUSD-AUSD pair on Pancakeswap
   await factoryV2.createPair(BUSD.address, alpacaStablecoin.address)
+  await factoryV2.createPair(wbnb.address, alpacaStablecoin.address)
   const lpV2 = PancakePair__factory.connect(await factoryV2.getPair(BUSD.address, alpacaStablecoin.address), deployer)
   await lpV2.deployed()
 
@@ -348,6 +448,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     bookKeeper.address,
     alpacaStablecoin.address,
     stablecoinAdapter.address,
+    wbnb.address,
   ])) as PCSFlashLiquidator
 
   await pcsFlashLiquidator.whitelist(liquidationEngine.address)
@@ -355,13 +456,16 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await pcsFlashLiquidator.whitelist(stablecoinAdapter.address)
 
   return {
+    wbnb,
     proxyWalletRegistry,
     ibTokenAdapter,
+    ibWBNBAdapter,
     stablecoinAdapter,
     bookKeeper,
     dummyToken,
     shield,
     alpacaToken,
+    bnbVault,
     fairLaunch,
     alpacaStablecoinProxyActions,
     positionManager,
@@ -401,13 +505,16 @@ describe("FlashLiquidation", () => {
   let deployerProxyWallet: ProxyWallet
   let aliceProxyWallet: ProxyWallet
 
+  let wbnb: WETH
   let ibTokenAdapter: IbTokenAdapter
+  let ibWBNBAdapter: IbTokenAdapter
   let stablecoinAdapter: StablecoinAdapter
   let bookKeeper: BookKeeper
   let dummyToken: BEP20
   let shield: Shield
   let alpacaToken: AlpacaToken
   let fairLaunch: FairLaunch
+  let bnbVault: Vault
 
   let positionManager: PositionManager
 
@@ -438,6 +545,7 @@ describe("FlashLiquidation", () => {
   let ibTokenAdapterAsBob: IbTokenAdapter
 
   let dummyTokenasAlice: BEP20
+  let bnbVaultasAlice: BEP20
   let dummyTokenasBob: BEP20
 
   let liquidationEngineAsBob: LiquidationEngine
@@ -454,13 +562,16 @@ describe("FlashLiquidation", () => {
 
   beforeEach(async () => {
     ;({
+      wbnb,
       proxyWalletRegistry,
       ibTokenAdapter,
+      ibWBNBAdapter,
       stablecoinAdapter,
       bookKeeper,
       dummyToken,
       shield,
       alpacaToken,
+      bnbVault,
       fairLaunch,
       alpacaStablecoinProxyActions,
       positionManager,
@@ -490,6 +601,7 @@ describe("FlashLiquidation", () => {
     ibTokenAdapterAsBob = IbTokenAdapter__factory.connect(ibTokenAdapter.address, bob)
 
     dummyTokenasAlice = BEP20__factory.connect(dummyToken.address, alice)
+    bnbVaultasAlice = BEP20__factory.connect(bnbVault.address, alice)
     dummyTokenasBob = BEP20__factory.connect(dummyToken.address, bob)
 
     liquidationEngineAsBob = LiquidationEngine__factory.connect(liquidationEngine.address, bob)
@@ -811,6 +923,169 @@ describe("FlashLiquidation", () => {
           expect(
             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address),
             "SystemDebtEngine should receive 0.00625 dummyToken as treasury fee"
+          )
+            .to.be.equal(expectedTreasuryFee)
+            .to.be.equal(ethers.utils.parseEther("0.00625"))
+          expect(
+            await alpacaToken.balanceOf(aliceProxyWallet.address),
+            "Alice's proxy wallet should have more than 0 ALPACA, because the liquidation process will distribute the pending ALPACA rewards to the position owner"
+          ).to.not.equal(0)
+
+          const alpacaStablecoinBalanceBefore = await alpacaStablecoin.balanceOf(deployerAddress)
+          await pcsFlashLiquidator.withdrawToken(
+            alpacaStablecoin.address,
+            await alpacaStablecoin.balanceOf(pcsFlashLiquidator.address)
+          )
+          const alpacaStablecoinBalanceAfter = await alpacaStablecoin.balanceOf(deployerAddress)
+          expect(
+            alpacaStablecoinBalanceAfter.sub(alpacaStablecoinBalanceBefore),
+            "Flash Liquidation profit should be 0.004729494491680053 AUSD"
+          ).to.be.equal(expectedProfitFromLiquidation)
+        })
+      }
+    )
+    context(
+      "(BNB Pool) safety buffer -0.1%, position is liquidated up to full close factor with flash liquidation; AUSD is obtained by swapping at PancakeSwap",
+      async () => {
+        it("should success", async () => {
+          // 1. Set priceWithSafetyMargin for wbnb to 2 USD
+          await collateralPoolConfig.setPriceWithSafetyMargin(WBNB_COLLATERAL_POOL_ID, WeiPerRay.mul(2))
+          // 2. Alice open a new position with 1 wbnb and draw 1 AUSD
+          const lockedCollateralAmount = WeiPerWad
+          const drawStablecoinAmount = WeiPerWad
+
+          const openPositionCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertBNBOpenLockTokenAndDraw",
+            [
+              bnbVault.address,
+              positionManager.address,
+              stabilityFeeCollector.address,
+              ibWBNBAdapter.address,
+              stablecoinAdapter.address,
+              WBNB_COLLATERAL_POOL_ID,
+              drawStablecoinAmount,
+              true,
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+
+          await bnbVaultasAlice.approve(aliceProxyWallet.address, WeiPerWad.mul(10000))
+          await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, openPositionCall, {
+            value: lockedCollateralAmount,
+          })
+          const alicePositionAddress = await positionManager.positions(1)
+          const alpacaStablecoinBalance = await alpacaStablecoin.balanceOf(aliceAddress)
+          const alicePosition = await bookKeeper.positions(WBNB_COLLATERAL_POOL_ID, alicePositionAddress)
+          expect(
+            alicePosition.lockedCollateral,
+            "lockedCollateral should be 1 wbnb, because Alice locked 1 wbnb"
+          ).to.be.equal(WeiPerWad)
+          expect(alicePosition.debtShare, "debtShare should be 1 AUSD, because Alice drew 1 AUSD").to.be.equal(
+            WeiPerWad
+          )
+          expect(
+            await bookKeeper.collateralToken(WBNB_COLLATERAL_POOL_ID, alicePositionAddress),
+            "collateralToken inside Alice's position address should be 0 wbnb, because Alice locked all wbnb into the position"
+          ).to.be.equal(0)
+          expect(alpacaStablecoinBalance, "Alice should receive 1 AUSD from drawing 1 AUSD").to.be.equal(WeiPerWad)
+          expect(
+            await alpacaToken.balanceOf(aliceProxyWallet.address),
+            "Alice's proxy wallet should have 0 ALPACA, as Alice has not harvest any rewards from her position"
+          ).to.be.equal(0)
+
+          // 3. wbnb price drop to 0.99 USD
+          await collateralPoolConfig.setPriceWithSafetyMargin(WBNB_COLLATERAL_POOL_ID, WeiPerRay.sub(1))
+          await simplePriceFeedAsDeployer.setPrice(WeiPerRay.sub(1).div(1e9))
+          // 4. Bob liquidate Alice's position up to full close factor successfully
+          const debtShareToRepay = ethers.utils.parseEther("0.5")
+          await bookKeeperAsBob.whitelist(liquidationEngine.address)
+          await bookKeeperAsBob.whitelist(fixedSpreadLiquidationStrategy.address)
+          await bookKeeper.mintUnbackedStablecoin(deployerAddress, bobAddress, WeiPerRad.mul(100))
+          const bobStablecoinBeforeLiquidation = await bookKeeper.stablecoin(bobAddress)
+          const expectedSeizedCollateral = debtShareToRepay.mul(LIQUIDATOR_INCENTIVE_BPS).div(BPS)
+          const expectedLiquidatorIncentive = expectedSeizedCollateral.sub(
+            expectedSeizedCollateral.mul(BPS).div(LIQUIDATOR_INCENTIVE_BPS)
+          )
+          const expectedTreasuryFee = expectedLiquidatorIncentive.mul(TREASURY_FEE_BPS).div(BPS)
+          const expectedCollateralBobShouldReceive = expectedSeizedCollateral.sub(expectedTreasuryFee)
+
+          await bookKeeper.mintUnbackedStablecoin(
+            deployerAddress,
+            deployerAddress,
+            ethers.utils.parseEther("1000").mul(WeiPerRay)
+          )
+          await stablecoinAdapter.withdraw(deployerAddress, ethers.utils.parseEther("1000"), "0x")
+          await wbnb.deposit({ value: ethers.utils.parseEther("1000") })
+          await wbnb.approve(pancakeRouter.address, ethers.utils.parseEther("1000"))
+          await alpacaStablecoin.approve(pancakeRouter.address, ethers.utils.parseEther("1000"))
+          await pancakeRouter.addLiquidity(
+            wbnb.address,
+            alpacaStablecoin.address,
+            ethers.utils.parseEther("1000"),
+            ethers.utils.parseEther("1000"),
+            "0",
+            "0",
+            deployerAddress,
+            FOREVER
+          )
+          const expectedAmountOut = await pancakeRouter.getAmountOut(
+            expectedCollateralBobShouldReceive,
+            ethers.utils.parseEther("1000"),
+            ethers.utils.parseEther("1000")
+          )
+          const expectedProfitFromLiquidation = expectedAmountOut.sub(debtShareToRepay.add(1))
+          await liquidationEngineAsBob.liquidate(
+            WBNB_COLLATERAL_POOL_ID,
+            alicePositionAddress,
+            debtShareToRepay,
+            debtShareToRepay,
+            pcsFlashLiquidator.address,
+            ethers.utils.defaultAbiCoder.encode(
+              ["address", "address", "address", "address", "address[]"],
+              [
+                bobAddress,
+                ibWBNBAdapter.address,
+                bnbVault.address,
+                pancakeRouter.address,
+                [wbnb.address, alpacaStablecoin.address],
+              ]
+            )
+          )
+          // 5. Settle system bad debt
+          await systemDebtEngine.settleSystemBadDebt(debtShareToRepay.mul(WeiPerRay))
+
+          const bobStablecoinAfterLiquidation = await bookKeeper.stablecoin(bobAddress)
+          const alicePositionAfterLiquidation = await bookKeeper.positions(
+            WBNB_COLLATERAL_POOL_ID,
+            alicePositionAddress
+          )
+          expect(
+            alicePositionAfterLiquidation.lockedCollateral,
+            "lockedCollateral should be 0.4875 wbnb after including liquidator incentive and treasury fee"
+          )
+            .to.be.equal(lockedCollateralAmount.sub(expectedSeizedCollateral))
+            .to.be.equal(ethers.utils.parseEther("0.4875"))
+          expect(
+            alicePositionAfterLiquidation.debtShare,
+            "debtShare should be 0.5 AUSD, because Bob liquidated 0.5 AUSD from Alice's position"
+          )
+            .to.be.equal(alicePosition.debtShare.sub(debtShareToRepay))
+            .to.be.equal(ethers.utils.parseEther("0.5"))
+          expect(
+            await bookKeeper.systemBadDebt(systemDebtEngine.address),
+            "System bad debt should be 0 AUSD"
+          ).to.be.equal(0)
+          expect(
+            await bookKeeper.collateralToken(WBNB_COLLATERAL_POOL_ID, bobAddress),
+            "Bob should not receive wbnb, because Bob use flash liquidation to sell all of them"
+          ).to.be.equal(ethers.utils.parseEther("0"))
+          expect(
+            bobStablecoinAfterLiquidation.sub(bobStablecoinBeforeLiquidation),
+            "Bob should pay 0 AUSD for this liquidation due to using flash liquidation with PCS"
+          ).to.be.gte(0)
+          expect(
+            await bookKeeper.collateralToken(WBNB_COLLATERAL_POOL_ID, systemDebtEngine.address),
+            "SystemDebtEngine should receive 0.00625 wbnb as treasury fee"
           )
             .to.be.equal(expectedTreasuryFee)
             .to.be.equal(ethers.utils.parseEther("0.00625"))
