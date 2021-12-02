@@ -41,7 +41,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       COLLATERAL_POOL_ID: "ibBUSD",
       DEBT_CEILING: ethers.utils.parseUnits("30000000", 45), // 30M [rad]
       DEBT_FLOOR: ethers.utils.parseUnits("100", 45), // 100 [rad]
-      PRICE_FEED: "0x6712262dbA21F3d348f040D87C6779fEB5f56a6B", // ibBUSD IbTokenPriceFeed
+      PRICE_FEED: "0x4a89F897AA97D096dBeA0f874a5854662996f8ae", // ibBUSD IbTokenPriceFeed
       // Collateral Factor for ibBUSD = 99% = 0.99
       // Liquidation Ratio = 1 / 0.99
       LIQUIDATION_RATIO: ethers.utils
@@ -52,7 +52,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       // Stability Fee Rate to be set = 1000000000627937192491029810
       // Ref: https://www.wolframalpha.com/input/?i=sqrt%281.02%2C+31536000%29
       STABILITY_FEE_RATE: BigNumber.from("1000000000627937192491029810"),
-      ADAPTER: "0x045Ee584B4D7Faa8acdC8e7E7fe869b74889697a", // ibBUSD IbTokenAdapter
+      ADAPTER: "0x4f56a92cA885bE50E705006876261e839b080E36", // ibBUSD IbTokenAdapter
       CLOSE_FACTOR_BPS: BigNumber.from(5000), // 50% Close Factor
       LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10500), // 5% Liquidator Incentive
       TREASURY_FEES_BPS: BigNumber.from(8000), // 80% Treasury Fee
@@ -67,7 +67,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   for (let i = 0; i < COLLATERAL_POOLS.length; i++) {
     const collateralPool = COLLATERAL_POOLS[i]
     console.log(`>> add CollateralPool ID: ${collateralPool.COLLATERAL_POOL_ID}`)
-    await collateralPoolConfig.initCollateralPool(
+    const tx = await collateralPoolConfig.initCollateralPool(
       formatBytes32String(collateralPool.COLLATERAL_POOL_ID),
       collateralPool.DEBT_CEILING,
       collateralPool.DEBT_FLOOR,
@@ -80,6 +80,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       collateralPool.TREASURY_FEES_BPS,
       collateralPool.STRATEGY
     )
+    console.log(`tx: ${tx.hash}`)
     console.log(`✅ Done Pool ID: ${collateralPool.COLLATERAL_POOL_ID}`)
   }
 }
