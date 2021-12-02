@@ -105,7 +105,7 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   ) internal returns (uint256 receivedAmount) {
     uint256 _alpacaStablecoinBalanceBefore = alpacaStablecoin.myBalance();
     _token.safeApprove(address(_router), uint256(-1));
-    _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY), _path, address(this), now);
+    _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY) + 1, _path, address(this), now);
     _token.safeApprove(address(_router), 0);
     uint256 _alpacaStablecoinBalanceAfter = alpacaStablecoin.myBalance();
     receivedAmount = _alpacaStablecoinBalanceAfter.sub(_alpacaStablecoinBalanceBefore);

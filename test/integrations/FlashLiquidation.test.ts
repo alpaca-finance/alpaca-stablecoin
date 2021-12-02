@@ -759,7 +759,7 @@ describe("FlashLiquidation", () => {
             ethers.utils.parseEther("1000"),
             ethers.utils.parseEther("1000")
           )
-          const expectedProfitFromLiquidation = expectedAmountOut.sub(debtShareToRepay)
+          const expectedProfitFromLiquidation = expectedAmountOut.sub(debtShareToRepay.add(1))
 
           await liquidationEngineAsBob.liquidate(
             COLLATERAL_POOL_ID,
@@ -805,9 +805,9 @@ describe("FlashLiquidation", () => {
             "Bob should not receive dummyToken, because Bob use flash liquidation to sell all of them"
           ).to.be.equal(ethers.utils.parseEther("0"))
           expect(
-            bobStablecoinBeforeLiquidation.sub(bobStablecoinAfterLiquidation),
+            bobStablecoinAfterLiquidation.sub(bobStablecoinBeforeLiquidation),
             "Bob should pay 0 AUSD for this liquidation due to using flash liquidation with PCS"
-          ).to.be.equal(0)
+          ).to.be.gte(0)
           expect(
             await bookKeeper.collateralToken(COLLATERAL_POOL_ID, systemDebtEngine.address),
             "SystemDebtEngine should receive 0.00625 dummyToken as treasury fee"
