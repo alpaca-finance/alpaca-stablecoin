@@ -68,12 +68,13 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
 
     // Swap token to AUSD
     require(
-      _debtValueToRepay.div(RAY) <= _sellCollateral(_token, _path, _router, _actualCollateralAmount, _debtValueToRepay),
+      _debtValueToRepay.div(RAY) + 1 <=
+        _sellCollateral(_token, _path, _router, _actualCollateralAmount, _debtValueToRepay),
       "not enough to repay debt"
     );
 
     // Deposit Alpaca Stablecoin for liquidatorAddress
-    uint256 _liquidationProfit = _depositAlpacaStablecoin(_debtValueToRepay.div(RAY), _liquidatorAddress);
+    uint256 _liquidationProfit = _depositAlpacaStablecoin(_debtValueToRepay.div(RAY) + 1, _liquidatorAddress);
     emit LogFlashLiquidation(_liquidatorAddress, _debtValueToRepay, _collateralAmountToLiquidate, _liquidationProfit);
   }
 
@@ -104,7 +105,7 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   ) internal returns (uint256 receivedAmount) {
     uint256 _alpacaStablecoinBalanceBefore = alpacaStablecoin.myBalance();
     _token.safeApprove(address(_router), uint256(-1));
-    _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY), _path, address(this), now);
+    _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY) + 1, _path, address(this), now);
     _token.safeApprove(address(_router), 0);
     uint256 _alpacaStablecoinBalanceAfter = alpacaStablecoin.myBalance();
     receivedAmount = _alpacaStablecoinBalanceAfter.sub(_alpacaStablecoinBalanceBefore);
