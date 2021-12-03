@@ -88,6 +88,8 @@
     "deploy:testnet:strict-alpaca-oracle-price-feed:set-primary": "hardhat --network testnet deploy --no-compile --reset --tags SetPrimary",
     "deploy:mainnet:strict-alpaca-oracle-price-feed:set-secondary": "hardhat --network mainnet deploy --no-compile --reset --tags SetSecondary",
     "deploy:testnet:strict-alpaca-oracle-price-feed:set-secondary": "hardhat --network testnet deploy --no-compile --reset --tags SetSecondary",
+    "deploy:mainnet:upgrade-pcs-flash-liquidator": "hardhat --network mainnet deploy --no-compile --reset --tags UpgradePCSFlashLiquidator",
+    "deploy:testnet:upgrade-pcs-flash-liquidator": "hardhat --network testnet deploy --no-compile --reset --tags UpgradePCSFlashLiquidator",
     "test:case": "mocha --require hardhat/register --extension ts -g",
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
     "test": "hardhat test --no-compile",
