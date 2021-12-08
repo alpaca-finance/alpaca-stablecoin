@@ -90,6 +90,8 @@
     "deploy:testnet:strict-alpaca-oracle-price-feed:set-secondary": "hardhat --network testnet deploy --no-compile --reset --tags SetSecondary",
     "deploy:mainnet:upgrade-pcs-flash-liquidator": "hardhat --network mainnet deploy --no-compile --reset --tags UpgradePCSFlashLiquidator",
     "deploy:testnet:upgrade-pcs-flash-liquidator": "hardhat --network testnet deploy --no-compile --reset --tags UpgradePCSFlashLiquidator",
+    "deploy:mainnet:upgrade-ib-token-price-feed": "hardhat --network mainnet deploy --no-compile --reset --tags UpgradeIbTokenPriceFeed",
+    "deploy:testnet:upgrade-ib-token-price-feed": "hardhat --network testnet deploy --no-compile --reset --tags UpgradeIbTokenPriceFeed",
     "deploy:mainnet:collateral-pool-config:set-liquidation-ratio": "hardhat --network mainnet deploy --no-compile --reset --tags SetLiquidationRatio",
     "deploy:testnet:collateral-pool-config:set-liquidation-ratio": "hardhat --network testnet deploy --no-compile --reset --tags SetLiquidationRatio",
     "deploy:mainnet:collateral-pool-config:set-debt-floor": "hardhat --network mainnet deploy --no-compile --reset --tags SetDebtFloor",

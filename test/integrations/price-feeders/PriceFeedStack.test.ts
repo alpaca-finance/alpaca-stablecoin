@@ -56,6 +56,7 @@ import { Signer, Wallet } from "ethers"
 import { parseEther } from "ethers/lib/utils"
 import { ethers, upgrades, waffle } from "hardhat"
 import { DateTime } from "luxon"
+import * as TimeHelpers from "../../helper/time"
 import {
   AccessControlConfig,
   AccessControlConfig__factory,
@@ -95,6 +96,7 @@ const ibWBNBAddress = AddressOne
 const wbnbAddress = AddressTwo
 const busdAddress = AddressThree
 const usdAddress = AddressFour
+const ORACLE_TIME_DELAY = 900
 
 const nHoursAgoInSec = (now: DateTime, n: number): BigNumber => {
   const d = now.minus({ hours: n })
@@ -212,6 +214,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     ibInWbnbPriceFeed.address,
     strictWbnbInBusdPriceFeed1.address,
     accessControlConfig.address,
+    ORACLE_TIME_DELAY,
   ])) as IbTokenPriceFeed
   await ibTokenPriceFeed1.deployed()
   // Deploy IbTokenPriceFeed (Band strict version)
@@ -219,6 +222,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
     ibInWbnbPriceFeed.address,
     strictWbnbInBusdPriceFeed2.address,
     accessControlConfig.address,
+    ORACLE_TIME_DELAY,
   ])) as IbTokenPriceFeed
   await ibTokenPriceFeed2.deployed()
 
@@ -301,9 +305,7 @@ describe("PriceFeedStack", () => {
         // mock simple oracle to return 1 ibWBNB = 1.1 BNB
         mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
 
-        const [price, ok] = await ibTokenPriceFeed1.peekPrice()
-        expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
-        expect(ok).to.be.true
+        await ibTokenPriceFeed1.setPrice()
 
         const { calls: chainlinkCalls } = mockedChainLinkOracle.smocked.getPrice
         expect(chainlinkCalls.length).to.be.equal(1)
@@ -314,6 +316,13 @@ describe("PriceFeedStack", () => {
         expect(simpleCalls.length).to.be.equal(1)
         expect(simpleCalls[0][0]).to.be.equal(ibWBNBAddress) // token0
         expect(simpleCalls[0][1]).to.be.equal(wbnbAddress) // token1
+
+        TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+        await ibTokenPriceFeed1.setPrice()
+
+        const [price, ok] = await ibTokenPriceFeed1.peekPrice()
+        expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
+        expect(ok).to.be.true
       })
       it("ibTokenPriceFeed2 should returns price with status ok=true", async () => {
         const now = DateTime.now()
@@ -328,11 +337,10 @@ describe("PriceFeedStack", () => {
         // mock simple oracle to return 1 ibWBNB = 1.1 BNB
         mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
 
-        const [price, ok] = await ibTokenPriceFeed2.peekPrice()
-        expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
-        expect(ok).to.be.true
+        await ibTokenPriceFeed2.setPrice()
 
         const { calls: chainlinkCalls } = mockedChainLinkOracle.smocked.getPrice
+
         expect(chainlinkCalls.length).to.be.equal(1)
         expect(chainlinkCalls[0][0]).to.be.equal(wbnbAddress) // token0
         expect(chainlinkCalls[0][1]).to.be.equal(busdAddress) // token1
@@ -346,6 +354,12 @@ describe("PriceFeedStack", () => {
         expect(stdReferenceCalls.length).to.be.equal(1)
         expect(stdReferenceCalls[0][0]).to.be.equal("BNB") // token0
         expect(stdReferenceCalls[0][1]).to.be.equal("BUSD") // token1
+
+        TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+        await ibTokenPriceFeed2.setPrice()
+        const [price, ok] = await ibTokenPriceFeed2.peekPrice()
+        expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
+        expect(ok).to.be.true
       })
     })
     context("when ibWBNB to WBNB price source (mockedSimpleOracle)...", () => {
@@ -356,8 +370,11 @@ describe("PriceFeedStack", () => {
           mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 1)])
           mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 25)])
 
+          await ibTokenPriceFeed1.setPrice()
+          TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+          await ibTokenPriceFeed1.setPrice()
           const [price, ok] = await ibTokenPriceFeed1.peekPrice()
-          expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
+          expect(BigNumber.from(price)).to.be.equal(0)
           expect(ok).to.be.false
         })
       })
@@ -372,6 +389,9 @@ describe("PriceFeedStack", () => {
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
           await ibInWbnbPriceFeed.setPriceLife(21 * 60 * 60)
 
+          await ibTokenPriceFeed1.setPrice()
+          TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+          await ibTokenPriceFeed1.setPrice()
           const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
           expect(ok).to.be.true
@@ -387,8 +407,11 @@ describe("PriceFeedStack", () => {
           mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 25)])
           mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
 
+          await ibTokenPriceFeed1.setPrice()
+          TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+          await ibTokenPriceFeed1.setPrice()
           const [price, ok] = await ibTokenPriceFeed1.peekPrice()
-          expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
+          expect(BigNumber.from(price)).to.be.equal(0)
           expect(ok).to.be.false
         })
       })
@@ -404,6 +427,9 @@ describe("PriceFeedStack", () => {
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
           await strictWbnbInBusdPriceFeed1.setPriceLife(23 * 60 * 60)
 
+          await ibTokenPriceFeed1.setPrice()
+          TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+          await ibTokenPriceFeed1.setPrice()
           const [price, ok] = await ibTokenPriceFeed1.peekPrice()
           expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
           expect(ok).to.be.true
@@ -420,8 +446,11 @@ describe("PriceFeedStack", () => {
           ])
           mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
 
+          await ibTokenPriceFeed1.setPrice()
+          TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+          await ibTokenPriceFeed1.setPrice()
           const [price, ok] = await ibTokenPriceFeed1.peekPrice()
-          expect(BigNumber.from(price)).to.be.equal(parseEther("462.000000000000000001")) // 420 * 1.1
+          expect(BigNumber.from(price)).to.be.equal(0)
           expect(ok).to.be.false
         })
       })
@@ -433,8 +462,11 @@ describe("PriceFeedStack", () => {
           mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("380"), nHoursAgoInSec(now, 1)])
           mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
 
+          await ibTokenPriceFeed1.setPrice()
+          TimeHelpers.increase(BigNumber.from(900))
+          await ibTokenPriceFeed1.setPrice()
           const [price, ok] = await ibTokenPriceFeed1.peekPrice()
-          expect(BigNumber.from(price)).to.be.equal(parseEther("418")) // 380 * 1.1
+          expect(BigNumber.from(price)).to.be.equal(0) // 380 * 1.1
           expect(ok).to.be.false
         })
       })
@@ -451,8 +483,11 @@ describe("PriceFeedStack", () => {
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
           await ibInWbnbPriceFeed.pause()
 
+          await ibTokenPriceFeed1.setPrice()
+          TimeHelpers.increase(BigNumber.from(900))
+          await ibTokenPriceFeed1.setPrice()
           const [price, ok] = await ibTokenPriceFeed1.peekPrice()
-          expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
+          expect(BigNumber.from(price)).to.be.equal(0)
           expect(ok).to.be.false
         })
       })
@@ -469,8 +504,11 @@ describe("PriceFeedStack", () => {
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
           await strictWbnbInBusdPriceFeed1.pause()
 
+          await ibTokenPriceFeed1.setPrice()
+          TimeHelpers.increase(BigNumber.from(900))
+          await ibTokenPriceFeed1.setPrice()
           const [price, ok] = await ibTokenPriceFeed1.peekPrice()
-          expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
+          expect(BigNumber.from(price)).to.be.equal(0)
           expect(ok).to.be.false
         })
       })
@@ -487,10 +525,102 @@ describe("PriceFeedStack", () => {
           await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployerAddress)
           await ibTokenPriceFeed1.pause()
 
-          const [price, ok] = await ibTokenPriceFeed1.peekPrice()
-          expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
-          expect(ok).to.be.false
+          await expect(ibTokenPriceFeed1.setPrice()).to.be.reverted
         })
+      })
+    })
+
+    context("when IbTokenPriceFeed setPrice before time delay passed", () => {
+      it("should revert", async () => {
+        const now = DateTime.now()
+        // mock reserve 1 WBNB = 400 BUSD
+        mockedPancakePair.smocked.getReserves.will.return.with([parseEther("400"), parseEther("1"), 0])
+        // mock chainlink oracle to return 1 WBNB = 401 BUSD
+        mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 1)])
+        // mock simple oracle to return 1 ibWBNB = 1.1 BNB
+        mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
+
+        await ibTokenPriceFeed1.setPrice()
+        TimeHelpers.increase(BigNumber.from(10))
+        await expect(ibTokenPriceFeed1.setPrice()).to.be.revertedWith("IbTokenPriceFeed/time-delay-has-not-passed")
+      })
+    })
+
+    context("when IbTokenPriceFeed still use previous price because time delay has not passed", () => {
+      it("should return the same price", async () => {
+        const now = DateTime.now()
+        // mock reserve 1 WBNB = 400 BUSD
+        mockedPancakePair.smocked.getReserves.will.return.with([parseEther("400"), parseEther("1"), 0])
+        // mock chainlink oracle to return 1 WBNB = 401 BUSD
+        mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 1)])
+        // mock simple oracle to return 1 ibWBNB = 1.1 BNB
+        mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
+
+        await ibTokenPriceFeed1.setPrice()
+        TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+
+        await ibTokenPriceFeed1.setPrice()
+        const [price, ok] = await ibTokenPriceFeed1.peekPrice()
+        expect(BigNumber.from(price)).to.be.eq(parseEther("441.1"))
+        expect(ok).to.be.eq(true)
+
+        TimeHelpers.increase(BigNumber.from(50))
+        mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("420"), nHoursAgoInSec(now, 1)])
+        const [price2, ok2] = await ibTokenPriceFeed1.peekPrice()
+        expect(BigNumber.from(price2)).to.be.eq(parseEther("441.1"))
+        expect(ok2).to.be.eq(true)
+      })
+    })
+
+    context("when IbTokenPriceFeed has advanced to the next price", () => {
+      it("should return the next price", async () => {
+        const now = DateTime.now()
+        // mock reserve 1 WBNB = 400 BUSD
+        mockedPancakePair.smocked.getReserves.will.return.with([parseEther("400"), parseEther("1"), 0])
+        // mock chainlink oracle to return 1 WBNB = 401 BUSD
+        mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 1)])
+        // mock simple oracle to return 1 ibWBNB = 1.1 BNB
+        mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
+
+        await ibTokenPriceFeed1.setPrice()
+        TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+        mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("420"), nHoursAgoInSec(now, 1)])
+        await ibTokenPriceFeed1.setPrice()
+        const [price, ok] = await ibTokenPriceFeed1.peekPrice()
+        expect(BigNumber.from(price)).to.be.eq(parseEther("441.1"))
+        expect(ok).to.be.eq(true)
+
+        TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+        await ibTokenPriceFeed1.setPrice()
+        const [price2, ok2] = await ibTokenPriceFeed1.peekPrice()
+        expect(BigNumber.from(price2)).to.be.eq(parseEther("462"))
+        expect(ok2).to.be.eq(true)
+      })
+    })
+
+    context("when IbTokenPriceFeed new price is not ok", () => {
+      it("should return the previos price", async () => {
+        const now = DateTime.now()
+        // mock reserve 1 WBNB = 400 BUSD
+        mockedPancakePair.smocked.getReserves.will.return.with([parseEther("400"), parseEther("1"), 0])
+        // mock chainlink oracle to return 1 WBNB = 401 BUSD
+        mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("401"), nHoursAgoInSec(now, 1)])
+        // mock simple oracle to return 1 ibWBNB = 1.1 BNB
+        mockedSimpleOracle.smocked.getPrice.will.return.with([parseEther("1.1"), nHoursAgoInSec(now, 1)])
+
+        await ibTokenPriceFeed1.setPrice()
+        TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+        await ibTokenPriceFeed1.setPrice()
+        const [price, ok] = await ibTokenPriceFeed1.peekPrice()
+        expect(BigNumber.from(price)).to.be.eq(parseEther("441.1"))
+        expect(ok).to.be.eq(true)
+
+        mockedChainLinkOracle.smocked.getPrice.will.return.with([parseEther("820"), nHoursAgoInSec(now, 1)])
+        TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+        await ibTokenPriceFeed1.setPrice()
+        const [price2, ok2] = await ibTokenPriceFeed1.peekPrice()
+        expect(BigNumber.from(price2)).to.be.eq(parseEther("441.1"))
+        expect(ok2).to.be.eq(true)
       })
     })
   })

@@ -29,11 +29,28 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
   IPriceFeed public ibInBasePriceFeed;
   IPriceFeed public baseInUsdPriceFeed;
 
+  uint16 public timeDelay; // in seconds
+  uint64 public lastUpdateTimestamp; // block timestamp
+
+  struct Feed {
+    uint128 val;
+    uint128 ok;
+  }
+
+  Feed currentPrice;
+  Feed nextPrice;
+
+  event LogValue(bytes32 val);
+  event LogSetTimeDelay(address indexed caller, uint16 newTimeDelay);
+  event SetIbInBasePriceFeed(address indexed caller, address newIbInBasePriceFeed);
+  event SetBaseInUsdPriceFeed(address indexed caller, address newBaseInUserPriceFeed);
+
   // --- Init ---
   function initialize(
     address _ibInBasePriceFeed,
     address _baseInUsdPriceFeed,
-    address _accessControlConfig
+    address _accessControlConfig,
+    uint16 _timeDelay
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
@@ -42,6 +59,8 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
     baseInUsdPriceFeed = IPriceFeed(_baseInUsdPriceFeed);
 
     accessControlConfig = IAccessControlConfig(_accessControlConfig);
+
+    timeDelay = _timeDelay;
   }
 
   modifier onlyOwnerOrGov() {
@@ -51,6 +70,12 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
       "!(ownerRole or govRole)"
     );
     _;
+  }
+
+  // --- Math ---
+  function add(uint64 x, uint64 y) internal pure returns (uint64 z) {
+    z = x + y;
+    require(z >= x);
   }
 
   /// @dev access: OWNER_ROLE, GOV_ROLE
@@ -63,19 +88,58 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
     _unpause();
   }
 
-  function readPrice() external view override returns (bytes32) {
-    bytes32 ibInBasePrice = ibInBasePriceFeed.readPrice();
-    bytes32 baseInUsdPrice = baseInUsdPriceFeed.readPrice();
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function setTimeDelay(uint16 _newTimeDelay) external onlyOwnerOrGov {
+    timeDelay = _newTimeDelay;
+    emit LogSetTimeDelay(_msgSender(), _newTimeDelay);
+  }
 
-    uint256 price = uint256(ibInBasePrice).mul(uint256(baseInUsdPrice)).div(1e18);
-    return bytes32(price);
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function setIbInBasePriceFeed(IPriceFeed _newIbInBasePriceFeed) external onlyOwnerOrGov {
+    ibInBasePriceFeed = _newIbInBasePriceFeed;
+    emit SetIbInBasePriceFeed(_msgSender(), address(_newIbInBasePriceFeed));
+  }
+
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function setBaseInUsdPriceFeed(IPriceFeed _newBaseInUsdPriceFeed) external onlyOwnerOrGov {
+    baseInUsdPriceFeed = _newBaseInUsdPriceFeed;
+    emit SetBaseInUsdPriceFeed(_msgSender(), address(_newBaseInUsdPriceFeed));
+  }
+
+  function readPrice() external view override returns (bytes32) {
+    return (bytes32(uint256(currentPrice.val)));
   }
 
   function peekPrice() external view override returns (bytes32, bool) {
+    return (bytes32(uint256(currentPrice.val)), currentPrice.ok == 1);
+  }
+
+  function peekNextPrice() external view returns (bytes32, bool) {
+    return (bytes32(uint256(nextPrice.val)), nextPrice.ok == 1);
+  }
+
+  function setPrice() external whenNotPaused {
+    require(pass(), "IbTokenPriceFeed/time-delay-has-not-passed");
     (bytes32 ibInBasePrice, bool ibInBasePriceOk) = ibInBasePriceFeed.peekPrice();
     (bytes32 baseInUsdPrice, bool baseInUsdPriceOk) = baseInUsdPriceFeed.peekPrice();
 
     uint256 price = uint256(ibInBasePrice).mul(uint256(baseInUsdPrice)).div(1e18);
-    return (bytes32(price), ibInBasePriceOk && baseInUsdPriceOk && !paused());
+    bool ok = ibInBasePriceOk && baseInUsdPriceOk && !paused();
+
+    if (ok) {
+      currentPrice = nextPrice;
+      nextPrice = Feed(uint128(uint256(price)), 1);
+      lastUpdateTimestamp = prev(block.timestamp);
+      emit LogValue(bytes32(uint256(currentPrice.val)));
+    }
+  }
+
+  function prev(uint256 ts) internal view returns (uint64) {
+    require(timeDelay != 0, "IbTokenPriceFeed/time-delay-is-zero");
+    return uint64(ts - (ts % timeDelay));
+  }
+
+  function pass() public view returns (bool ok) {
+    return block.timestamp >= add(lastUpdateTimestamp, timeDelay);
   }
 }
