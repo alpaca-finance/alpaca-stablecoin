@@ -32,17 +32,20 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   IBookKeeper public bookKeeper;
   IStablecoinAdapter public stablecoinAdapter;
   address public alpacaStablecoin;
+  address public wrappedNativeAddr;
 
   function initialize(
     address _bookKeeper,
     address _alpacaStablecoin,
-    address _stablecoinAdapter
+    address _stablecoinAdapter,
+    address _wrappedNativeAddr
   ) external initializer {
     OwnableUpgradeable.__Ownable_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
     alpacaStablecoin = _alpacaStablecoin;
     stablecoinAdapter = IStablecoinAdapter(_stablecoinAdapter);
+    wrappedNativeAddr = _wrappedNativeAddr;
   }
 
   function flashLendingCall(
@@ -68,12 +71,13 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
 
     // Swap token to AUSD
     require(
-      _debtValueToRepay.div(RAY) <= _sellCollateral(_token, _path, _router, _actualCollateralAmount, _debtValueToRepay),
+      _debtValueToRepay.div(RAY) + 1 <=
+        _sellCollateral(_token, _path, _router, _actualCollateralAmount, _debtValueToRepay),
       "not enough to repay debt"
     );
 
     // Deposit Alpaca Stablecoin for liquidatorAddress
-    uint256 _liquidationProfit = _depositAlpacaStablecoin(_debtValueToRepay.div(RAY), _liquidatorAddress);
+    uint256 _liquidationProfit = _depositAlpacaStablecoin(_debtValueToRepay.div(RAY) + 1, _liquidatorAddress);
     emit LogFlashLiquidation(_liquidatorAddress, _debtValueToRepay, _collateralAmountToLiquidate, _liquidationProfit);
   }
 
@@ -87,11 +91,18 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     _token = _tokenAdapter.collateralToken();
     _actualAmount = _amount;
     if (_vaultAddress != address(0)) {
-      uint256 vaultBaseTokenBalanceBefore = IAlpacaVault(_vaultAddress).token().myBalance();
-      IAlpacaVault(_vaultAddress).withdraw(_amount);
-      uint256 vaultBaseTokenBalanceAfter = IAlpacaVault(_vaultAddress).token().myBalance();
-      _actualAmount = vaultBaseTokenBalanceAfter.sub(vaultBaseTokenBalanceBefore);
       _token = IAlpacaVault(_vaultAddress).token();
+      if (_token == wrappedNativeAddr) {
+        uint256 vaultBaseTokenBalanceBefore = address(this).balance;
+        IAlpacaVault(_vaultAddress).withdraw(_amount);
+        uint256 vaultBaseTokenBalanceAfter = address(this).balance;
+        _actualAmount = vaultBaseTokenBalanceAfter.sub(vaultBaseTokenBalanceBefore);
+      } else {
+        uint256 vaultBaseTokenBalanceBefore = IAlpacaVault(_vaultAddress).token().myBalance();
+        IAlpacaVault(_vaultAddress).withdraw(_amount);
+        uint256 vaultBaseTokenBalanceAfter = IAlpacaVault(_vaultAddress).token().myBalance();
+        _actualAmount = vaultBaseTokenBalanceAfter.sub(vaultBaseTokenBalanceBefore);
+      }
     }
   }
 
@@ -103,9 +114,13 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     uint256 _minAmountOut
   ) internal returns (uint256 receivedAmount) {
     uint256 _alpacaStablecoinBalanceBefore = alpacaStablecoin.myBalance();
-    _token.safeApprove(address(_router), uint256(-1));
-    _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY), _path, address(this), now);
-    _token.safeApprove(address(_router), 0);
+    if (_token == wrappedNativeAddr) {
+      _router.swapExactETHForTokens{ value: _amount }(_minAmountOut.div(RAY) + 1, _path, address(this), now);
+    } else {
+      _token.safeApprove(address(_router), uint256(-1));
+      _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY) + 1, _path, address(this), now);
+      _token.safeApprove(address(_router), 0);
+    }
     uint256 _alpacaStablecoinBalanceAfter = alpacaStablecoin.myBalance();
     receivedAmount = _alpacaStablecoinBalanceAfter.sub(_alpacaStablecoinBalanceBefore);
     emit LogSellCollateral(_amount, _minAmountOut, receivedAmount);
@@ -129,4 +144,8 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   function withdrawToken(address _token, uint256 _amount) external onlyOwner {
     _token.safeTransfer(msg.sender, _amount);
   }
+
+  fallback() external payable {}
+
+  receive() external payable {}
 }

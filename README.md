@@ -6,7 +6,7 @@
 Solidity contracts for Alpaca Stablecoin module.
 
 ## System Interaction Diagram
-![System_Interaction_Diagram](https://raw.githubusercontent.com/alpaca-finance/alpaca-stablecoin/chore/add-diagram-to-readme/docs/AlpacaUSD_SystemInteractionDiagram.jpg)
+![System_Interaction_Diagram](https://raw.githubusercontent.com/alpaca-finance/alpaca-stablecoin/chore/add-diagram-to-readme/docs/AlpacaUSD_SystemInteractionDiagram.png)
 
 ## High Level Diagram
 ![High_Level_Diagram](https://raw.githubusercontent.com/alpaca-finance/alpaca-stablecoin/chore/add-diagram-to-readme/docs/AlpacaUSD_HighLevelDiagram.png)
@@ -62,7 +62,7 @@ yarn test
 
   
 
-Alpaca Stablecoin contracts have been audited by [PeckShield](https://github.com/alpaca-finance/alpaca-stablecoin/blob/chore/add-audit-report/audits/PeckShield-Audit-Report-Alpaca-USD-v1.0.pdf), [Inspex](https://github.com/alpaca-finance/alpaca-stablecoin/blob/chore/add-audit-report/audits/Inspex_AUDIT2021035_AlpacaFinance_AlpacaStablecoin_FullReport_v1.0.pdf) and [SlowMist](https://github.com/alpaca-finance/alpaca-stablecoin/blob/chore/add-audit-report/audits/SlowMist_Audit_Report_-_AlpacaStablecoin.pdf).
+Alpaca Stablecoin contracts have been audited by [PeckShield](https://github.com/alpaca-finance/alpaca-stablecoin/blob/chore/add-audit-report/audits/PeckShield-Audit-Report-Alpaca-USD-v1.0.pdf), [Inspex](https://github.com/alpaca-finance/alpaca-stablecoin/blob/chore/add-audit-report/audits/Inspex_AUDIT2021035_AlpacaFinance_AlpacaStablecoin_FullReport_v1.0.pdf) and [SlowMist](https://github.com/alpaca-finance/alpaca-stablecoin/blob/main/audits/SlowMist_Audit_Report_-_AlpacaStablecoin.pdf).
 
   
 

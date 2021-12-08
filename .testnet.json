@@ -150,8 +150,8 @@
   },
   "FlashLiquidator": {
     "PCSFlashLiquidator": {
-      "address": "0xDF09fCF398DfcD57A0534b2F7733e4F2B9F6dC91",
-      "deployedBlock": 14534346
+      "address": "0x3dAba79d2CB6E30dcfD09E0181E3044339720DdF",
+      "deployedBlock": 14613537
     }
   }
 }
