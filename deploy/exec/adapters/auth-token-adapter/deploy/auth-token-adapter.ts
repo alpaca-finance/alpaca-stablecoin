@@ -18,7 +18,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const config = ConfigEntity.getConfig()
   const COLLATERAL_POOL_ID = formatBytes32String("BUSD-STABLE")
-  const TOKEN_ADDR = "0x0266693F9Df932aD7dA8a9b44C2129Ce8a87E81f"
+  const TOKEN_ADDR = "0xe9e7cea3dedca5984780bafc599bd69add087d56" // BUSD
 
   console.log(">> Deploying an upgradable AuthTokenAdapter contract")
   const AuthTokenAdapter = (await ethers.getContractFactory(

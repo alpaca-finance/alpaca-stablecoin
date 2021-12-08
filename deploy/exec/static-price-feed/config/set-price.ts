@@ -17,9 +17,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  // 30,000,000 AUSD Total Debt Ceiling
   const PRICE_IN_WAD = ethers.utils.parseUnits("1", 18) // [WAD]
-  const STATIC_PRICE_FEED_ADDR = "0x53F0FfCa30467685fB15115bbb277dC47b7476b4"
+  const STATIC_PRICE_FEED_ADDR = ""
 
   const config = ConfigEntity.getConfig()
 

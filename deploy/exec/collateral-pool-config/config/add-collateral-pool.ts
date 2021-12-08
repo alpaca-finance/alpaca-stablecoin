@@ -42,14 +42,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       COLLATERAL_POOL_ID: "BUSD-STABLE",
       DEBT_CEILING: ethers.utils.parseUnits("30000000", 45), // 30M [rad]
       DEBT_FLOOR: BigNumber.from(0), // 0 [rad]
-      PRICE_FEED: "0x53F0FfCa30467685fB15115bbb277dC47b7476b4", // ibBUSD IbTokenPriceFeed
+      PRICE_FEED: "xxx", // StaticPriceFeed
       LIQUIDATION_RATIO: ethers.utils.parseUnits("1", 27),
       STABILITY_FEE_RATE: ethers.utils.parseUnits("1", 27),
-      ADAPTER: "0x7df2012A6D89c48B111f9535E84b4906f726d54f", // ibBUSD IbTokenAdapter
-      CLOSE_FACTOR_BPS: BigNumber.from(0), // 50% Close Factor
-      LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10000), // 5% Liquidator Incentive
-      TREASURY_FEES_BPS: BigNumber.from(0), // 80% Treasury Fee
-      STRATEGY: AddressZero,
+      ADAPTER: "xxx", // BUSD AuthTokenAdapter
+      CLOSE_FACTOR_BPS: BigNumber.from(0), // 0% Close Factor
+      LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10000), // 0% Liquidator Incentive
+      TREASURY_FEES_BPS: BigNumber.from(0), // 0% Treasury Fee
+      STRATEGY: AddressZero, // No liquidation strategy
     },
   ]
 

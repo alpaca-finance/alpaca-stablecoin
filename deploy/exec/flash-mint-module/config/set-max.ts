@@ -15,7 +15,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const MAX = "" // [WAD]
+  // 30M AUSD
+  const MAX = ethers.utils.parseUnits("30000000", 18).toString() // [WAD]
 
   const config = ConfigEntity.getConfig()
 

@@ -17,7 +17,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const config = ConfigEntity.getConfig()
 
-  const AUTH_TOKEN_ADAPTER_ADDR = "0x7df2012A6D89c48B111f9535E84b4906f726d54f"
+  const AUTH_TOKEN_ADAPTER_ADDR = ""
   const STABLECOIN_ADAPTER_ADDR = config.StablecoinAdapters.AUSD.address
   const SYSTEM_DEBT_ENGINE_ADDR = config.SystemDebtEngine.address
 

@@ -114,6 +114,8 @@
     "deploy:testnet:stable-swap-module:set-fee-in": "hardhat --network testnet deploy --no-compile --reset --tags SetFeeIn",
     "deploy:mainnet:stable-swap-module:set-fee-out": "hardhat --network mainnet deploy --no-compile --reset --tags SetFeeOut",
     "deploy:testnet:stable-swap-module:set-fee-out": "hardhat --network testnet deploy --no-compile --reset --tags SetFeeOut",
+    "deploy:mainnet:add-collateral-pool": "hardhat --network mainnet deploy --no-compile --reset --tags AddCollateralPool",
+    "deploy:testnet:add-collateral-pool": "hardhat --network testnet deploy --no-compile --reset --tags AddCollateralPool",
     "test:case": "mocha --require hardhat/register --extension ts -g",
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
     "test": "hardhat test --no-compile",

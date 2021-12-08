@@ -114,6 +114,12 @@
         "AlpacaPriceOraclePriceFeed": "",
         "StrictAlpacaPriceOraclePriceFeed": ""
       }
+    ],
+    "StaticPriceFeed": [
+      {
+        "address": "",
+        "deployedBlock": 0
+      }
     ]
   },
   "Oracle": {
