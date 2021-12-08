@@ -124,6 +124,16 @@
       "address": "0x4DFc61A2A781A40e4a23AbeB4CbdF1dCAf23Ce3c",
       "txHash": "0xee5d76bd6208d4dbcc4bb7dcbc255a5139272c7cc41251b16620991dedaf0e48",
       "kind": "transparent"
+    },
+    {
+      "address": "0x9bF789d04bf316221e593183Ab2E3dDFA458A5f3",
+      "txHash": "0xa911fa2d54dbbbf46db5d0620e596a14c9c779177b851531dbe07e7ced3e2a49",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x8E0432fD4ef62286453B5E10FB02CF3CdEEfc932",
+      "txHash": "0xfc03ed787ec539e0b6a3ca1d008f4a23851e5d81ce64bf744802e4fb0e8c560e",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -3108,6 +3118,112 @@
           },
           "t_bool": {
             "label": "bool"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          }
+        }
+      }
+    },
+    "8efd69d0f47f2812bda5779e32322f9a6b284c885dfc4ac63dbc5ef2a873a825": {
+      "address": "0x752ac75B3165969de534708bcF7D26fBd3CA08A0",
+      "txHash": "0x666847cf651426f5b41dff89bd0f70e9e6457756ab70baf7121d283fb5142a05",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:31"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:28"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:96"
+          },
+          {
+            "contract": "FlashMintModule",
+            "label": "bookKeeper",
+            "type": "t_contract(IBookKeeper)4557",
+            "src": "contracts/6.12/flash-mint/FlashMintModule.sol:38"
+          },
+          {
+            "contract": "FlashMintModule",
+            "label": "stablecoinAdapter",
+            "type": "t_contract(IStablecoinAdapter)5299",
+            "src": "contracts/6.12/flash-mint/FlashMintModule.sol:39"
+          },
+          {
+            "contract": "FlashMintModule",
+            "label": "stablecoin",
+            "type": "t_contract(IStablecoin)5266",
+            "src": "contracts/6.12/flash-mint/FlashMintModule.sol:40"
+          },
+          {
+            "contract": "FlashMintModule",
+            "label": "systemDebtEngine",
+            "type": "t_address",
+            "src": "contracts/6.12/flash-mint/FlashMintModule.sol:40"
+          },
+          {
+            "contract": "FlashMintModule",
+            "label": "max",
+            "type": "t_uint256",
+            "src": "contracts/6.12/flash-mint/FlashMintModule.sol:43"
+          },
+          {
+            "contract": "FlashMintModule",
+            "label": "feeRate",
+            "type": "t_uint256",
+            "src": "contracts/6.12/flash-mint/FlashMintModule.sol:44"
+          },
+          {
+            "contract": "FlashMintModule",
+            "label": "locked",
+            "type": "t_uint256",
+            "src": "contracts/6.12/flash-mint/FlashMintModule.sol:46"
+          }
+        ],
+        "types": {
+          "t_contract(IBookKeeper)4557": {
+            "label": "contract IBookKeeper"
+          },
+          "t_contract(IStablecoinAdapter)5299": {
+            "label": "contract IStablecoinAdapter"
+          },
+          "t_contract(IStablecoin)5266": {
+            "label": "contract IStablecoin"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
           },
           "t_array(t_uint256)50_storage": {
             "label": "uint256[50]"
