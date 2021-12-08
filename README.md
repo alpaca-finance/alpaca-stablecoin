@@ -6,7 +6,7 @@
 Solidity contracts for Alpaca Stablecoin module.
 
 ## System Interaction Diagram
-![System_Interaction_Diagram](https://raw.githubusercontent.com/alpaca-finance/alpaca-stablecoin/chore/add-diagram-to-readme/docs/AlpacaUSD_SystemInteractionDiagram.jpg)
+![System_Interaction_Diagram](https://raw.githubusercontent.com/alpaca-finance/alpaca-stablecoin/chore/add-diagram-to-readme/docs/AlpacaUSD_SystemInteractionDiagram.png)
 
 ## High Level Diagram
 ![High_Level_Diagram](https://raw.githubusercontent.com/alpaca-finance/alpaca-stablecoin/chore/add-diagram-to-readme/docs/AlpacaUSD_HighLevelDiagram.png)
