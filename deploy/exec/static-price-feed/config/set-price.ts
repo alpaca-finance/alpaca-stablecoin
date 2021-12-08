@@ -2,9 +2,11 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, network } from "hardhat"
 import { ConfigEntity } from "../../../entities"
-import { AccessControlConfig__factory } from "../../../../typechain"
+import { StaticPriceFeed__factory } from "../../../../typechain"
+import { WeiPerRad } from "../../../../test/helper/unit"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  const RAD = 45
   /*
   ░██╗░░░░░░░██╗░█████╗░██████╗░███╗░░██╗██╗███╗░░██╗░██████╗░
   ░██║░░██╗░░██║██╔══██╗██╔══██╗████╗░██║██║████╗░██║██╔════╝░
@@ -15,18 +17,18 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const ADAPTER_ADDR = "0x7df2012A6D89c48B111f9535E84b4906f726d54f"
+  // 30,000,000 AUSD Total Debt Ceiling
+  const PRICE_IN_WAD = ethers.utils.parseUnits("1", 18) // [WAD]
+  const STATIC_PRICE_FEED_ADDR = "0x53F0FfCa30467685fB15115bbb277dC47b7476b4"
 
   const config = ConfigEntity.getConfig()
 
-  const accessContralConfig = AccessControlConfig__factory.connect(
-    config.AccessControlConfig.address,
-    (await ethers.getSigners())[0]
-  )
-  console.log(`>> Grant ADAPTER_ROLE address: ${ADAPTER_ADDR}`)
-  await accessContralConfig.grantRole(await accessContralConfig.ADAPTER_ROLE(), ADAPTER_ADDR, { gasLimit: 1000000 })
+  const staticPriceFeed = StaticPriceFeed__factory.connect(STATIC_PRICE_FEED_ADDR, (await ethers.getSigners())[0])
+
+  console.log(">> setPrice")
+  await staticPriceFeed.setPrice(PRICE_IN_WAD, { gasLimit: 1000000 })
   console.log("✅ Done")
 }
 
 export default func
-func.tags = ["GrantAdapterRole"]
+func.tags = ["SetPriceStatic"]

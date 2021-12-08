@@ -6,6 +6,7 @@ import { CollateralPoolConfig__factory } from "../../../../typechain"
 import { BigNumber } from "ethers"
 import { formatBytes32String } from "ethers/lib/utils"
 import { WeiPerRad, WeiPerRay } from "../../../../test/helper/unit"
+import { AddressZero } from "../../../../test/helper/address"
 
 interface IAddCollateralPoolParam {
   COLLATERAL_POOL_ID: string
@@ -38,25 +39,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const COLLATERAL_POOLS: IAddCollateralPoolParamList = [
     {
-      COLLATERAL_POOL_ID: "ibBUSD",
+      COLLATERAL_POOL_ID: "BUSD-STABLE",
       DEBT_CEILING: ethers.utils.parseUnits("30000000", 45), // 30M [rad]
-      DEBT_FLOOR: ethers.utils.parseUnits("100", 45), // 100 [rad]
-      PRICE_FEED: "0x6712262dbA21F3d348f040D87C6779fEB5f56a6B", // ibBUSD IbTokenPriceFeed
-      // Collateral Factor for ibBUSD = 99% = 0.99
-      // Liquidation Ratio = 1 / 0.99
-      LIQUIDATION_RATIO: ethers.utils
-        .parseUnits("1", 27)
-        .mul(ethers.utils.parseUnits("1", 27))
-        .div(ethers.utils.parseUnits("0.99", 27)),
-      // Stability Fee Rate for ibBUSD = 2% = 1.02
-      // Stability Fee Rate to be set = 1000000000627937192491029810
-      // Ref: https://www.wolframalpha.com/input/?i=sqrt%281.02%2C+31536000%29
-      STABILITY_FEE_RATE: BigNumber.from("1000000000627937192491029810"),
-      ADAPTER: "0x045Ee584B4D7Faa8acdC8e7E7fe869b74889697a", // ibBUSD IbTokenAdapter
-      CLOSE_FACTOR_BPS: BigNumber.from(5000), // 50% Close Factor
-      LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10500), // 5% Liquidator Incentive
-      TREASURY_FEES_BPS: BigNumber.from(8000), // 80% Treasury Fee
-      STRATEGY: config.Strategies.FixedSpreadLiquidationStrategy.address, // FixedSpreadLiquidationStrategy
+      DEBT_FLOOR: BigNumber.from(0), // 0 [rad]
+      PRICE_FEED: "0x53F0FfCa30467685fB15115bbb277dC47b7476b4", // ibBUSD IbTokenPriceFeed
+      LIQUIDATION_RATIO: ethers.utils.parseUnits("1", 27),
+      STABILITY_FEE_RATE: ethers.utils.parseUnits("1", 27),
+      ADAPTER: "0x7df2012A6D89c48B111f9535E84b4906f726d54f", // ibBUSD IbTokenAdapter
+      CLOSE_FACTOR_BPS: BigNumber.from(0), // 50% Close Factor
+      LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10000), // 5% Liquidator Incentive
+      TREASURY_FEES_BPS: BigNumber.from(0), // 80% Treasury Fee
+      STRATEGY: AddressZero,
     },
   ]
 
@@ -78,7 +71,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       collateralPool.CLOSE_FACTOR_BPS,
       collateralPool.LIQUIDATOR_INCENTIVE_BPS,
       collateralPool.TREASURY_FEES_BPS,
-      collateralPool.STRATEGY
+      collateralPool.STRATEGY,
+      { gasLimit: 1500000 }
     )
     console.log(`✅ Done Pool ID: ${collateralPool.COLLATERAL_POOL_ID}`)
   }

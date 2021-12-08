@@ -1,8 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
-import { ethers, network } from "hardhat"
+import { ethers, upgrades } from "hardhat"
+import { StaticPriceFeed__factory } from "../../../../typechain"
 import { ConfigEntity } from "../../../entities"
-import { AccessControlConfig__factory } from "../../../../typechain"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -15,18 +15,21 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const ADAPTER_ADDR = "0x7df2012A6D89c48B111f9535E84b4906f726d54f"
-
   const config = ConfigEntity.getConfig()
 
-  const accessContralConfig = AccessControlConfig__factory.connect(
-    config.AccessControlConfig.address,
-    (await ethers.getSigners())[0]
-  )
-  console.log(`>> Grant ADAPTER_ROLE address: ${ADAPTER_ADDR}`)
-  await accessContralConfig.grantRole(await accessContralConfig.ADAPTER_ROLE(), ADAPTER_ADDR, { gasLimit: 1000000 })
-  console.log("✅ Done")
+  console.log(">> Deploying an upgradable StaticPriceFeed contract")
+  const StaticPriceFeed = (await ethers.getContractFactory(
+    "StaticPriceFeed",
+    (
+      await ethers.getSigners()
+    )[0]
+  )) as StaticPriceFeed__factory
+  const staticPriceFeed = await upgrades.deployProxy(StaticPriceFeed, [config.AccessControlConfig.address])
+  await staticPriceFeed.deployed()
+  console.log(`>> Deployed at ${staticPriceFeed.address}`)
+  const tx = await staticPriceFeed.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func
-func.tags = ["GrantAdapterRole"]
+func.tags = ["DeployStaticPriceFeed"]

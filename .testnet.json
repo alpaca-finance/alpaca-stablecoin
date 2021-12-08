@@ -153,5 +153,9 @@
       "address": "0x3dAba79d2CB6E30dcfD09E0181E3044339720DdF",
       "deployedBlock": 14613537
     }
+  },
+  "StableSwapModule": {
+    "address": "",
+    "deployedBlock": 0
   }
 }

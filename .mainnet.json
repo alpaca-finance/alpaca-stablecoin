@@ -153,5 +153,9 @@
       "address": "",
       "deployedBlock": 0
     }
+  },
+  "StableSwapModule": {
+    "address": "",
+    "deployedBlock": 0
   }
 }
