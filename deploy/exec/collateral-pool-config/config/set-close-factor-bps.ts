@@ -28,7 +28,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     (await ethers.getSigners())[0]
   )
   console.log(`>> setCloseFactorBps to ${NEW_CLOSE_FACTOR_BPS}`)
-  const tx = await collateralPoolConfig.setCloseFactorBps(COLLATERAL_POOL_ID, NEW_CLOSE_FACTOR_BPS)
+  const tx = await collateralPoolConfig.setCloseFactorBps(COLLATERAL_POOL_ID, NEW_CLOSE_FACTOR_BPS, {
+    gasPrice: ethers.utils.parseUnits("30", "gwei"),
+  })
   await tx.wait()
   console.log(`tx hash: ${tx.hash}`)
 }
