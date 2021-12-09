@@ -58,9 +58,15 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
     ibInBasePriceFeed = IPriceFeed(_ibInBasePriceFeed);
     baseInUsdPriceFeed = IPriceFeed(_baseInUsdPriceFeed);
 
+    ibInBasePriceFeed.peekPrice();
+    baseInUsdPriceFeed.peekPrice();
+
     accessControlConfig = IAccessControlConfig(_accessControlConfig);
 
+    require(_timeDelay > 15 minutes && _timeDelay < 2 days, "IbTokenPriceFeed/time-delay-out-of-bound");
     timeDelay = _timeDelay;
+
+    setPrice();
   }
 
   modifier onlyOwnerOrGov() {
@@ -90,6 +96,7 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
 
   /// @dev access: OWNER_ROLE, GOV_ROLE
   function setTimeDelay(uint16 _newTimeDelay) external onlyOwnerOrGov {
+    require(_newTimeDelay > 15 minutes && _newTimeDelay < 2 days, "IbTokenPriceFeed/time-delay-out-of-bound");
     timeDelay = _newTimeDelay;
     emit LogSetTimeDelay(_msgSender(), _newTimeDelay);
   }
@@ -97,12 +104,14 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
   /// @dev access: OWNER_ROLE, GOV_ROLE
   function setIbInBasePriceFeed(IPriceFeed _newIbInBasePriceFeed) external onlyOwnerOrGov {
     ibInBasePriceFeed = _newIbInBasePriceFeed;
+    IPriceFeed(ibInBasePriceFeed).peekPrice();
     emit SetIbInBasePriceFeed(_msgSender(), address(_newIbInBasePriceFeed));
   }
 
   /// @dev access: OWNER_ROLE, GOV_ROLE
   function setBaseInUsdPriceFeed(IPriceFeed _newBaseInUsdPriceFeed) external onlyOwnerOrGov {
     baseInUsdPriceFeed = _newBaseInUsdPriceFeed;
+    IPriceFeed(baseInUsdPriceFeed).peekPrice();
     emit SetBaseInUsdPriceFeed(_msgSender(), address(_newBaseInUsdPriceFeed));
   }
 
@@ -118,7 +127,7 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
     return (bytes32(uint256(nextPrice.val)), nextPrice.ok == 1);
   }
 
-  function setPrice() external whenNotPaused {
+  function setPrice() public whenNotPaused {
     require(pass(), "IbTokenPriceFeed/time-delay-has-not-passed");
     (bytes32 ibInBasePrice, bool ibInBasePriceOk) = ibInBasePriceFeed.peekPrice();
     (bytes32 baseInUsdPrice, bool baseInUsdPriceOk) = baseInUsdPriceFeed.peekPrice();
@@ -128,13 +137,13 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
 
     if (ok) {
       currentPrice = nextPrice;
-      nextPrice = Feed(uint128(uint256(price)), 1);
-      lastUpdateTimestamp = prev(block.timestamp);
+      nextPrice = Feed(uint128(price), 1);
+      lastUpdateTimestamp = getStartOfIntervalTimestamp(block.timestamp);
       emit LogValue(bytes32(uint256(currentPrice.val)));
     }
   }
 
-  function prev(uint256 ts) internal view returns (uint64) {
+  function getStartOfIntervalTimestamp(uint256 ts) internal view returns (uint64) {
     require(timeDelay != 0, "IbTokenPriceFeed/time-delay-is-zero");
     return uint64(ts - (ts % timeDelay));
   }
