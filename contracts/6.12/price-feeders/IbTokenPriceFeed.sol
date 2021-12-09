@@ -63,7 +63,7 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
 
     accessControlConfig = IAccessControlConfig(_accessControlConfig);
 
-    require(_timeDelay > 15 minutes && _timeDelay < 2 days, "IbTokenPriceFeed/time-delay-out-of-bound");
+    require(_timeDelay >= 15 minutes && _timeDelay <= 2 days, "IbTokenPriceFeed/time-delay-out-of-bound");
     timeDelay = _timeDelay;
 
     setPrice();
@@ -96,7 +96,7 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
 
   /// @dev access: OWNER_ROLE, GOV_ROLE
   function setTimeDelay(uint16 _newTimeDelay) external onlyOwnerOrGov {
-    require(_newTimeDelay > 15 minutes && _newTimeDelay < 2 days, "IbTokenPriceFeed/time-delay-out-of-bound");
+    require(_newTimeDelay >= 15 minutes && _newTimeDelay <= 2 days, "IbTokenPriceFeed/time-delay-out-of-bound");
     timeDelay = _newTimeDelay;
     emit LogSetTimeDelay(_msgSender(), _newTimeDelay);
   }
