@@ -3,8 +3,15 @@ import { ethers, network } from "hardhat"
 import "@openzeppelin/test-helpers"
 import MainnetConfig from "../.mainnet.json"
 import TestnetConfig from "../.testnet.json"
-import { IbTokenAdapter, CollateralPool } from "../deploy/interfaces/config"
-import { CollateralPoolConfig, CollateralPoolConfig__factory, IbTokenAdapter__factory } from "../typechain"
+import { IbTokenAdapter, CollateralPool, BookKeeper, PriceOracle } from "../deploy/interfaces/config"
+import {
+  AccessControlConfig,
+  AccessControlConfig__factory,
+  AlpacaStablecoin__factory,
+  CollateralPoolConfig,
+  CollateralPoolConfig__factory,
+  IbTokenAdapter__factory,
+} from "../typechain"
 
 async function validateCollateralPool(collateralPoolConfig: CollateralPoolConfig, collateralPoolInfo: CollateralPool) {
   const collateralPool = await collateralPoolConfig.collateralPools(
@@ -59,6 +66,90 @@ async function validateIbTokenAdapter(adapterInfo: IbTokenAdapter) {
   }
 }
 
+async function validateRole(
+  accessContralConfig: AccessControlConfig,
+  config: typeof MainnetConfig | typeof TestnetConfig
+) {
+  try {
+    const accessControlConfig = AccessControlConfig__factory.connect(accessContralConfig.address, ethers.provider)
+    // PRICE_ORACLE_ROLE
+    expect(
+      await accessControlConfig.hasRole(await accessControlConfig.PRICE_ORACLE_ROLE(), config.PriceOracle.address)
+    ).to.be.equal(true, `${config.PriceOracle.address}, PRICE_ORACLE_ROLE mis-config`)
+    // ADAPTER_ROLE
+    config.IbTokenAdapters.forEach(async (o) => {
+      expect(await accessControlConfig.hasRole(await accessControlConfig.ADAPTER_ROLE(), o.address)).to.be.equal(
+        true,
+        `${o.address}, ADAPTER_ROLE mis-config`
+      )
+    })
+    // LIQUIDATION_ENGINE_ROLE
+    expect(
+      await accessControlConfig.hasRole(
+        await accessControlConfig.LIQUIDATION_ENGINE_ROLE(),
+        config.LiquidationEngine.address
+      )
+    ).to.be.equal(true, `${config.LiquidationEngine.address}, LIQUIDATION_ENGINE_ROLE mis-config`)
+    expect(
+      await accessControlConfig.hasRole(
+        await accessControlConfig.LIQUIDATION_ENGINE_ROLE(),
+        config.Strategies.FixedSpreadLiquidationStrategy.address
+      )
+    ).to.be.equal(
+      true,
+      `${config.Strategies.FixedSpreadLiquidationStrategy.address}, LIQUIDATION_ENGINE_ROLE mis-config`
+    )
+    // STABILITY_FEE_COLLECTOR_ROLE
+    expect(
+      await accessControlConfig.hasRole(
+        await accessControlConfig.STABILITY_FEE_COLLECTOR_ROLE(),
+        config.StabilityFeeCollector.address
+      )
+    ).to.be.equal(true, `${config.StabilityFeeCollector.address}, STABILITY_FEE_COLLECTOR_ROLE mis-config`)
+    // SHOW_STOPPER_ROLE
+    expect(
+      await accessControlConfig.hasRole(await accessControlConfig.SHOW_STOPPER_ROLE(), config.ShowStopper.address)
+    ).to.be.equal(true, `${config.ShowStopper.address}, SHOW_STOPPER_ROLE mis-config`)
+    // POSITION_MANAGER_ROLE
+    expect(
+      await accessControlConfig.hasRole(
+        await accessControlConfig.POSITION_MANAGER_ROLE(),
+        config.PositionManager.address
+      )
+    ).to.be.equal(true, `${config.PositionManager.address}, POSITION_MANAGER_ROLE mis-config`)
+    // MINTABLE_ROLE
+    // TO DO: When FlashMintModule deploy
+    // expect(
+    //   await accessControlConfig.hasRole(await accessControlConfig.MINTABLE_ROLE(), config.FlashMintModule.address)
+    // ).to.be.equal(true, `${config.FlashMintModule.address}, MINTABLE_ROLE mis-config`)
+    // BOOK_KEEPER_ROLE
+    expect(
+      await accessControlConfig.hasRole(await accessControlConfig.BOOK_KEEPER_ROLE(), config.BookKeeper.address)
+    ).to.be.equal(true, `${config.BookKeeper.address}, BOOK_KEEPER_ROLE mis-config`)
+    // COLLATERAL_MANAGER_ROLE
+    expect(
+      await accessControlConfig.hasRole(
+        await accessControlConfig.COLLATERAL_MANAGER_ROLE(),
+        config.Strategies.FixedSpreadLiquidationStrategy.address
+      )
+    ).to.be.equal(
+      true,
+      `${config.Strategies.FixedSpreadLiquidationStrategy.address}, COLLATERAL_MANAGER_ROLE mis-config`
+    )
+    // MINTER_ROLE
+    const AUSD = AlpacaStablecoin__factory.connect(config.AlpacaStablecoin.AUSD.address, ethers.provider)
+    expect(await AUSD.hasRole(await AUSD.MINTER_ROLE(), config.StablecoinAdapters.AUSD.address)).to.be.equal(
+      true,
+      `${config.StablecoinAdapters.AUSD.address}, MINTER_ROLE mis-config`
+    )
+
+    console.log(`> ✅ done validated, no problem found`)
+  } catch (e) {
+    console.log(`> ❌ some problem found in validateRole, please double check`)
+    console.log(e)
+  }
+}
+
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -83,6 +174,10 @@ async function main() {
     validateCollateralPools.push(validateCollateralPool(collateralPoolConfig, collateralPool as CollateralPool))
   }
   await Promise.all(validateCollateralPools)
+
+  const accessContralConfig = AccessControlConfig__factory.connect(config.AccessControlConfig.address, ethers.provider)
+  console.log("=== validate Role config ===")
+  await validateRole(accessContralConfig, config)
   await delay(3000)
 }
 
