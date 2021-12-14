@@ -29,8 +29,8 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
   IPriceFeed public ibInBasePriceFeed;
   IPriceFeed public baseInUsdPriceFeed;
 
-  uint16 public timeDelay; // in seconds
-  uint64 public lastUpdateTimestamp; // block timestamp
+  uint256 public timeDelay; // in seconds
+  uint256 public lastUpdateTimestamp; // block timestamp
 
   struct Feed {
     uint128 val;
@@ -41,7 +41,7 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
   Feed nextPrice;
 
   event LogValue(bytes32 val);
-  event LogSetTimeDelay(address indexed caller, uint16 newTimeDelay);
+  event LogSetTimeDelay(address indexed caller, uint256 newTimeDelay);
   event SetIbInBasePriceFeed(address indexed caller, address newIbInBasePriceFeed);
   event SetBaseInUsdPriceFeed(address indexed caller, address newBaseInUserPriceFeed);
 
@@ -95,7 +95,7 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
   }
 
   /// @dev access: OWNER_ROLE, GOV_ROLE
-  function setTimeDelay(uint16 _newTimeDelay) external onlyOwnerOrGov {
+  function setTimeDelay(uint256 _newTimeDelay) external onlyOwnerOrGov {
     require(_newTimeDelay >= 15 minutes && _newTimeDelay <= 2 days, "IbTokenPriceFeed/time-delay-out-of-bound");
     timeDelay = _newTimeDelay;
     emit LogSetTimeDelay(_msgSender(), _newTimeDelay);
@@ -143,12 +143,12 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
     }
   }
 
-  function getStartOfIntervalTimestamp(uint256 ts) internal view returns (uint64) {
+  function getStartOfIntervalTimestamp(uint256 ts) internal view returns (uint256) {
     require(timeDelay != 0, "IbTokenPriceFeed/time-delay-is-zero");
-    return uint64(ts - (ts % timeDelay));
+    return ts.sub(ts.mod(timeDelay));
   }
 
   function pass() public view returns (bool ok) {
-    return block.timestamp >= add(lastUpdateTimestamp, timeDelay);
+    return block.timestamp >= lastUpdateTimestamp.add(timeDelay);
   }
 }
