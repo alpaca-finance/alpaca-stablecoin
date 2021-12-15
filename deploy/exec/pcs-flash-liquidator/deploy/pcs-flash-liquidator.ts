@@ -16,6 +16,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
 
   const config = ConfigEntity.getConfig()
+  const wbnb = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
 
   console.log(">> Deploying an upgradable PCSFlashLiquidator contract")
   const PCSFlashLiquidator = (await ethers.getContractFactory(
@@ -28,6 +29,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     config.BookKeeper.address,
     config.AlpacaStablecoin.AUSD.address,
     config.StablecoinAdapters.AUSD.address,
+    wbnb,
   ])
   await pcsFlashLiquidator.deployed()
   console.log(`>> Deployed at ${pcsFlashLiquidator.address}`)
