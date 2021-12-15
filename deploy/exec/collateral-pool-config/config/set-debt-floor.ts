@@ -28,7 +28,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     (await ethers.getSigners())[0]
   )
   console.log(`>> setDebtFloor to ${NEW_DEBT_FLOOR}`)
-  const tx = await collateralPoolConfig.setDebtFloor(COLLATERAL_POOL_ID, NEW_DEBT_FLOOR)
+  const tx = await collateralPoolConfig.setDebtFloor(COLLATERAL_POOL_ID, NEW_DEBT_FLOOR, {
+    gasPrice: ethers.utils.parseUnits("30", "gwei"),
+  })
   await tx.wait()
   console.log(`tx hash: ${tx.hash}`)
 }
