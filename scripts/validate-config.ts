@@ -142,6 +142,20 @@ async function validateRole(
       true,
       `${config.StablecoinAdapters.AUSD.address}, MINTER_ROLE mis-config`
     )
+    // OWNER_ROLE
+    expect(
+      await accessControlConfig.hasRole(
+        await accessControlConfig.OWNER_ROLE(),
+        "0xC44f82b07Ab3E691F826951a6E335E1bC1bB0B51"
+      )
+    ).to.be.equal(true, `${"0xC44f82b07Ab3E691F826951a6E335E1bC1bB0B51"}, OWNER_ROLE mis-config`)
+    // GOV_ROLE
+    expect(
+      await accessControlConfig.hasRole(
+        await accessControlConfig.GOV_ROLE(),
+        "0xC44f82b07Ab3E691F826951a6E335E1bC1bB0B51"
+      )
+    ).to.be.equal(true, `${"0xC44f82b07Ab3E691F826951a6E335E1bC1bB0B51"}, GOV_ROLE mis-config`)
 
     console.log(`> ✅ done validated, no problem found`)
   } catch (e) {
