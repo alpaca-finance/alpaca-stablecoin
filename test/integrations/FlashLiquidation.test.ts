@@ -964,7 +964,6 @@ describe("FlashLiquidation", () => {
               stablecoinAdapter.address,
               WBNB_COLLATERAL_POOL_ID,
               drawStablecoinAmount,
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )

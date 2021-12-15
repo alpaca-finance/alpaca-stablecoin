@@ -550,6 +550,7 @@ describe("position manager", () => {
           const convertCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("tokenToIbToken", [
             vault.address,
             WeiPerWad.mul(10),
+            true,
           ])
           const convertTx = await aliceProxyWallet["execute(address,bytes)"](
             alpacaStablecoinProxyActions.address,
@@ -610,6 +611,7 @@ describe("position manager", () => {
             const convertCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("tokenToIbToken", [
               vault.address,
               WeiPerWad.mul(10),
+              true,
             ])
             const convertTx = await aliceProxyWallet["execute(address,bytes)"](
               alpacaStablecoinProxyActions.address,
@@ -695,7 +697,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(15),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]),
             ]
           )
@@ -725,7 +726,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(15),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -757,7 +757,6 @@ describe("position manager", () => {
                 formatBytes32String("ibBUSD"),
                 WeiPerWad.mul(10),
                 WeiPerWad.mul(5),
-                true,
                 ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
               ]
             )
@@ -766,7 +765,6 @@ describe("position manager", () => {
               convertOpenLockTokenAndDrawCall
             )
             const txReceipt = await convertOpenLockTokenAndDrawTx.wait()
-            console.log("convertOpenLockTokenAndDrawTx gas used", txReceipt.gasUsed.toString())
 
             const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
             const positionAddress = await positionManager.positions(positionId)
@@ -816,7 +814,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -919,7 +916,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -938,7 +934,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1043,7 +1038,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1119,7 +1113,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1198,7 +1191,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1217,7 +1209,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1299,7 +1290,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1354,7 +1344,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1409,7 +1398,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1487,7 +1475,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1591,7 +1578,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1674,7 +1660,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1770,7 +1755,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1846,7 +1830,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1869,7 +1852,7 @@ describe("position manager", () => {
           //  b. lock ibBUSD
           const convertAndLockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
             "convertAndLockToken",
-            [vault.address, positionManager.address, ibTokenAdapter.address, positionId, WeiPerWad.mul(10), true, "0x"]
+            [vault.address, positionManager.address, ibTokenAdapter.address, positionId, WeiPerWad.mul(10), "0x"]
           )
           const convertAndLockTokenTx = await aliceProxyWallet["execute(address,bytes)"](
             alpacaStablecoinProxyActions.address,
@@ -1901,7 +1884,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1936,7 +1918,6 @@ describe("position manager", () => {
               positionId,
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               "0x",
             ]
           )
@@ -1969,7 +1950,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1992,7 +1972,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD2"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
