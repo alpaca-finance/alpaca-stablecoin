@@ -17,7 +17,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const config = ConfigEntity.getConfig()
 
-  const POSITION_MANAGER_ADDR = ""
+  const POSITION_MANAGER_ADDR = config.StableSwapModule.address
 
   const accessContralConfig = AccessControlConfig__factory.connect(
     config.AccessControlConfig.address,

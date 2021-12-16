@@ -41,23 +41,20 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     {
       COLLATERAL_POOL_ID: "BUSD-STABLE",
       DEBT_CEILING: ethers.utils.parseUnits("30000000", 45), // 30M [rad]
-      DEBT_FLOOR: ethers.utils.parseUnits("100", 45), // 100 [rad]
-      PRICE_FEED: "0x4a89F897AA97D096dBeA0f874a5854662996f8ae", // ibBUSD IbTokenPriceFeed
+      DEBT_FLOOR: ethers.BigNumber.from(0),
+      PRICE_FEED: "0x8Dafc3dE02250A691b51aECC5FcE8977Aa518ffa", // ibBUSD IbTokenPriceFeed
       // Collateral Factor for ibBUSD = 99% = 0.99
       // Liquidation Ratio = 1 / 0.99
-      LIQUIDATION_RATIO: ethers.utils
-        .parseUnits("1", 27)
-        .mul(ethers.utils.parseUnits("1", 27))
-        .div(ethers.utils.parseUnits("0.99", 27)),
+      LIQUIDATION_RATIO: ethers.utils.parseUnits("1", 27),
       // Stability Fee Rate for ibBUSD = 2% = 1.02
       // Stability Fee Rate to be set = 1000000000627937192491029810
       // Ref: https://www.wolframalpha.com/input/?i=sqrt%281.02%2C+31536000%29
-      STABILITY_FEE_RATE: BigNumber.from("1000000000627937192491029810"),
-      ADAPTER: "0x4f56a92cA885bE50E705006876261e839b080E36", // ibBUSD IbTokenAdapter
-      CLOSE_FACTOR_BPS: BigNumber.from(5000), // 50% Close Factor
-      LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10500), // 5% Liquidator Incentive
-      TREASURY_FEES_BPS: BigNumber.from(8000), // 80% Treasury Fee
-      STRATEGY: config.Strategies.FixedSpreadLiquidationStrategy.address, // FixedSpreadLiquidationStrategy
+      STABILITY_FEE_RATE: ethers.utils.parseUnits("1", 27),
+      ADAPTER: "0x1542479af09Ca5d5CF0bFB7cB7cd7f47B7a625D8", // ibBUSD IbTokenAdapter
+      CLOSE_FACTOR_BPS: BigNumber.from(0), // 50% Close Factor
+      LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10000), // 5% Liquidator Incentive
+      TREASURY_FEES_BPS: BigNumber.from(0), // 80% Treasury Fee
+      STRATEGY: ethers.constants.AddressZero, // FixedSpreadLiquidationStrategy
     },
   ]
 

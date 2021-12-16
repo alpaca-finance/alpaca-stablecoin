@@ -13,6 +13,7 @@ export interface Config {
   PositionManager: PositionManager
   GetPositions: GetPositions
   IbTokenAdapters: IbTokenAdapter[]
+  AuthTokenAdapters: AuthTokenAdapter[]
   StablecoinAdapters: StablecoinAdapters
   PriceOracle: PriceOracle
   Oracle: Oracle
@@ -85,6 +86,10 @@ export interface PositionManager {
   deployedBlock: number
 }
 export interface GetPositions {
+  address: string
+  deployedBlock: number
+}
+export interface AuthTokenAdapter {
   address: string
   deployedBlock: number
 }
