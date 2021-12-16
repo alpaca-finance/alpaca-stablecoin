@@ -15,18 +15,18 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const ADAPTER_ADDR = "0x4f56a92cA885bE50E705006876261e839b080E36"
-
   const config = ConfigEntity.getConfig()
+
+  const GOV_ROLE_ADDR = "0xC44f82b07Ab3E691F826951a6E335E1bC1bB0B51" // Alpaca Deployer
 
   const accessContralConfig = AccessControlConfig__factory.connect(
     config.AccessControlConfig.address,
     (await ethers.getSigners())[0]
   )
-  console.log(`>> Grant ADAPTER_ROLE address: ${ADAPTER_ADDR}`)
-  await accessContralConfig.grantRole(await accessContralConfig.ADAPTER_ROLE(), ADAPTER_ADDR, { gasLimit: 1000000 })
+  console.log(`>> Grant GOV_ROLE address: ${GOV_ROLE_ADDR}`)
+  await accessContralConfig.grantRole(await accessContralConfig.GOV_ROLE(), GOV_ROLE_ADDR)
   console.log("✅ Done")
 }
 
 export default func
-func.tags = ["GrantAdapterRole"]
+func.tags = ["GrantGovRole"]

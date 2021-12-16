@@ -2,7 +2,10 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, network } from "hardhat"
 import { ConfigEntity } from "../../../entities"
-import { AccessControlConfig__factory } from "../../../../typechain"
+import { CollateralPoolConfig__factory } from "../../../../typechain"
+import { BigNumber } from "ethers"
+import { formatBytes32String } from "ethers/lib/utils"
+import { WeiPerRad, WeiPerRay } from "../../../../test/helper/unit"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -15,18 +18,27 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const ADAPTER_ADDR = "0x4f56a92cA885bE50E705006876261e839b080E36"
-
   const config = ConfigEntity.getConfig()
 
-  const accessContralConfig = AccessControlConfig__factory.connect(
-    config.AccessControlConfig.address,
+  // Collateral Factor for ibBUSD = 90% = 0.90
+  // Liquidation Ratio = 1 / 0.90 = 1111111111111111111111111111
+  const NEW_LIQUIDATION_RATIO = ethers.utils
+    .parseUnits("1", 27)
+    .mul(ethers.utils.parseUnits("1", 27))
+    .div(ethers.utils.parseUnits("0.90", 27))
+  const COLLATERAL_POOL_ID = formatBytes32String("ibBUSD")
+
+  const collateralPoolConfig = CollateralPoolConfig__factory.connect(
+    config.CollateralPoolConfig.address,
     (await ethers.getSigners())[0]
   )
-  console.log(`>> Grant ADAPTER_ROLE address: ${ADAPTER_ADDR}`)
-  await accessContralConfig.grantRole(await accessContralConfig.ADAPTER_ROLE(), ADAPTER_ADDR, { gasLimit: 1000000 })
-  console.log("✅ Done")
+  console.log(`>> setLiquidationRatio to ${NEW_LIQUIDATION_RATIO}`)
+  const tx = await collateralPoolConfig.setLiquidationRatio(COLLATERAL_POOL_ID, NEW_LIQUIDATION_RATIO, {
+    gasLimit: 1000000,
+  })
+  await tx.wait()
+  console.log(`tx hash: ${tx.hash}`)
 }
 
 export default func
-func.tags = ["GrantAdapterRole"]
+func.tags = ["SetLiquidationRatio"]
