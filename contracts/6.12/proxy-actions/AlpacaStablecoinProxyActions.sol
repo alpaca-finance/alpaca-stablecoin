@@ -192,9 +192,9 @@ contract AlpacaStablecoinProxyActions {
     if (_transferFrom) {
       // Gets token from the user's wallet
       _collateralToken.safeTransferFrom(msg.sender, address(this), _amount);
-      // Approves adapter to take the token amount
-      _collateralToken.safeApprove(_adapter, _amount);
     }
+    // Approves adapter to take the token amount
+    _collateralToken.safeApprove(_adapter, _amount);
     // Deposits token collateral into the bookKeeper
     IGenericTokenAdapter(_adapter).deposit(_positionAddress, _amount, _data);
   }
@@ -328,7 +328,8 @@ contract AlpacaStablecoinProxyActions {
 
   function bnbToIbBNB(
     address _vault,
-    uint256 _amount // [wad]
+    uint256 _amount, // [wad]
+    bool _transferTo
   ) public payable returns (uint256) {
     SafeToken.safeApprove(address(IAlpacaVault(_vault).token()), address(_vault), _amount);
     uint256 _ibBNBBefore = _vault.balanceOf(address(this));
@@ -336,7 +337,9 @@ contract AlpacaStablecoinProxyActions {
     uint256 _ibBNBAfter = _vault.balanceOf(address(this));
     SafeToken.safeApprove(address(IAlpacaVault(_vault).token()), address(_vault), 0);
     uint256 _backIbBNB = _safeSub(_ibBNBAfter, _ibBNBBefore);
-    address(_vault).safeTransfer(msg.sender, _backIbBNB);
+    if (_transferTo) {
+      address(_vault).safeTransfer(msg.sender, _backIbBNB);
+    }
     return _backIbBNB;
   }
 
@@ -354,7 +357,8 @@ contract AlpacaStablecoinProxyActions {
 
   function tokenToIbToken(
     address _vault,
-    uint256 _amount // [wad]
+    uint256 _amount, // [wad]
+    bool _transferTo
   ) public returns (uint256) {
     // user requires to approve the proxy wallet before calling this function
     address(IAlpacaVault(_vault).token()).safeTransferFrom(msg.sender, address(this), _amount);
@@ -364,7 +368,9 @@ contract AlpacaStablecoinProxyActions {
     uint256 _collateralTokenAfter = _vault.balanceOf(address(this));
     SafeToken.safeApprove(address(IAlpacaVault(_vault).token()), address(_vault), 0);
     uint256 _backCollateralToken = _safeSub(_collateralTokenAfter, _collateralTokenBefore);
-    address(_vault).safeTransfer(msg.sender, _backCollateralToken);
+    if (_transferTo) {
+      address(_vault).safeTransfer(msg.sender, _backCollateralToken);
+    }
     return _backCollateralToken;
   }
 
@@ -769,11 +775,10 @@ contract AlpacaStablecoinProxyActions {
     address _tokenAdapter,
     uint256 _positionId,
     uint256 _amount, // [wad]
-    bool _transferFrom,
     bytes calldata _data
   ) external {
-    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _amount));
-    lockToken(_manager, _tokenAdapter, _positionId, _collateralAmount, _transferFrom, _data);
+    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _amount), false);
+    lockToken(_manager, _tokenAdapter, _positionId, _collateralAmount, false, _data);
   }
 
   function convertLockTokenAndDraw(
@@ -785,10 +790,9 @@ contract AlpacaStablecoinProxyActions {
     uint256 _positionId,
     uint256 _amount, // [in token decimal]
     uint256 _stablecoinAmount, // [wad]
-    bool _transferFrom,
     bytes calldata _data
   ) external {
-    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _amount));
+    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _amount), false);
     lockTokenAndDraw(
       IManager(_manager),
       _stabilityFeeCollector,
@@ -797,7 +801,7 @@ contract AlpacaStablecoinProxyActions {
       _positionId,
       _collateralAmount,
       _stablecoinAmount,
-      _transferFrom,
+      false,
       _data
     );
   }
@@ -807,11 +811,10 @@ contract AlpacaStablecoinProxyActions {
     address _manager,
     address _tokenAdapter,
     uint256 _positionId,
-    bool _transferFrom,
     bytes calldata _data
   ) external payable {
-    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value);
-    lockToken(_manager, _tokenAdapter, _positionId, _collateralAmount, _transferFrom, _data);
+    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value, false);
+    lockToken(_manager, _tokenAdapter, _positionId, _collateralAmount, false, _data);
   }
 
   function convertBNBLockTokenAndDraw(
@@ -822,10 +825,9 @@ contract AlpacaStablecoinProxyActions {
     address _stablecoinAdapter,
     uint256 _positionId,
     uint256 _stablecoinAmount, // [wad]
-    bool _transferFrom,
     bytes calldata _data
   ) external payable {
-    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value);
+    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value, false);
     lockTokenAndDraw(
       IManager(_manager),
       _stabilityFeeCollector,
@@ -834,7 +836,7 @@ contract AlpacaStablecoinProxyActions {
       _positionId,
       _collateralAmount,
       _stablecoinAmount,
-      _transferFrom,
+      false,
       _data
     );
   }
@@ -847,10 +849,9 @@ contract AlpacaStablecoinProxyActions {
     address _stablecoinAdapter,
     bytes32 _collateralPoolId,
     uint256 _stablecoinAmount, // [wad]
-    bool _transferFrom,
     bytes calldata _data
   ) external payable returns (uint256 positionId) {
-    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value);
+    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value, false);
     return
       openLockTokenAndDraw(
         _manager,
@@ -860,7 +861,7 @@ contract AlpacaStablecoinProxyActions {
         _collateralPoolId,
         _collateralAmount,
         _stablecoinAmount,
-        _transferFrom,
+        false,
         _data
       );
   }
@@ -874,10 +875,9 @@ contract AlpacaStablecoinProxyActions {
     bytes32 _collateralPoolId,
     uint256 _tokenAmount, // [in token decimal]
     uint256 _stablecoinAmount, // [wad]
-    bool _transferFrom,
     bytes calldata _data
   ) external returns (uint256 positionId) {
-    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _tokenAmount));
+    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _tokenAmount), false);
     return
       openLockTokenAndDraw(
         _manager,
@@ -887,7 +887,7 @@ contract AlpacaStablecoinProxyActions {
         _collateralPoolId,
         _collateralAmount,
         _stablecoinAmount,
-        _transferFrom,
+        false,
         _data
       );
   }

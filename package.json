@@ -6,7 +6,7 @@
     "prepublish": "yarn build",
     "build": "yarn run build:cjs",
     "build:cjs": "tsc -p tsconfig.cjs.json",
-    "compile": "hardhat typechain --config hardhat.config.ts",
+    "compile": "hardhat typechain --config hardhat.config.ts && yarn run build:cjs",
     "mainnet": "hardhat console --no-compile --network mainnet",
     "deploy:mainnet:001": "hardhat --network mainnet deploy --no-compile --reset --tags ProxyWalletFactory",
     "deploy:mainnet:002": "hardhat --network mainnet deploy --no-compile --reset --tags ProxyWalletRegistry",
