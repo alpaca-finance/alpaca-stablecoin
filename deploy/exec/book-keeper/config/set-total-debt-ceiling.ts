@@ -18,7 +18,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
 
   // 30,000,000 AUSD Total Debt Ceiling
-  const TOTAL_DEBT_CEILING = ethers.utils.parseUnits("30000000", RAD).toString() // [RAD]
+  const TOTAL_DEBT_CEILING = ethers.utils.parseUnits("200003008325123", RAD).toString() // [RAD]
 
   const config = ConfigEntity.getConfig()
 

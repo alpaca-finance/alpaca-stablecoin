@@ -1,8 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
-import { ethers, network } from "hardhat"
+import { ethers, upgrades } from "hardhat"
+import { StableSwapModule__factory } from "../../../../typechain"
 import { ConfigEntity } from "../../../entities"
-import { AccessControlConfig__factory } from "../../../../typechain"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -15,18 +15,29 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const ADAPTER_ADDR = "0x4f56a92cA885bE50E705006876261e839b080E36"
-
   const config = ConfigEntity.getConfig()
 
-  const accessContralConfig = AccessControlConfig__factory.connect(
-    config.AccessControlConfig.address,
-    (await ethers.getSigners())[0]
-  )
-  console.log(`>> Grant ADAPTER_ROLE address: ${ADAPTER_ADDR}`)
-  await accessContralConfig.grantRole(await accessContralConfig.ADAPTER_ROLE(), ADAPTER_ADDR, { gasLimit: 1000000 })
-  console.log("✅ Done")
+  const AUTH_TOKEN_ADAPTER_ADDR = ""
+  const STABLECOIN_ADAPTER_ADDR = config.StablecoinAdapters.AUSD.address
+  const SYSTEM_DEBT_ENGINE_ADDR = config.SystemDebtEngine.address
+
+  console.log(">> Deploying an upgradable StableSwapModule contract")
+  const StableSwapModule = (await ethers.getContractFactory(
+    "StableSwapModule",
+    (
+      await ethers.getSigners()
+    )[0]
+  )) as StableSwapModule__factory
+  const stableSwapModule = await upgrades.deployProxy(StableSwapModule, [
+    AUTH_TOKEN_ADAPTER_ADDR,
+    STABLECOIN_ADAPTER_ADDR,
+    SYSTEM_DEBT_ENGINE_ADDR,
+  ])
+  await stableSwapModule.deployed()
+  console.log(`>> Deployed at ${stableSwapModule.address}`)
+  const tx = await stableSwapModule.deployTransaction.wait()
+  console.log(`>> Deploy block ${tx.blockNumber}`)
 }
 
 export default func
-func.tags = ["GrantAdapterRole"]
+func.tags = ["DeployStableSwapModule"]

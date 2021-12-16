@@ -114,6 +114,12 @@
         "AlpacaPriceOraclePriceFeed": "0x8CC012356E61424446646ec3B261fe5EF5B44A8a",
         "StrictAlpacaPriceOraclePriceFeed": "0x9F748f798C75EA44F86a5871045629a2aC9C0568"
       }
+    ],
+    "StaticPriceFeed": [
+      {
+        "address": "",
+        "deployedBlock": 0
+      }
     ]
   },
   "Oracle": {
@@ -153,5 +159,9 @@
       "address": "0x7940E34ad993D14374C28d96AdB26f54b69B292c",
       "deployedBlock": 13487876
     }
+  },
+  "StableSwapModule": {
+    "address": "",
+    "deployedBlock": 0
   }
 }

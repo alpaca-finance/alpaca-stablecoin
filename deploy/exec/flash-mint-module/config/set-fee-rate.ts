@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const FEE_RATE = "" // [wad = 100%]
+  const FEE_RATE = ethers.utils.parseUnits("0.002", 18).toString() // [wad = 100%]
 
   const config = ConfigEntity.getConfig()
 

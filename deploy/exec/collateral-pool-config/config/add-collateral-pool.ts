@@ -6,6 +6,7 @@ import { CollateralPoolConfig__factory } from "../../../../typechain"
 import { BigNumber } from "ethers"
 import { formatBytes32String } from "ethers/lib/utils"
 import { WeiPerRad, WeiPerRay } from "../../../../test/helper/unit"
+import { AddressZero } from "../../../../test/helper/address"
 
 interface IAddCollateralPoolParam {
   COLLATERAL_POOL_ID: string
@@ -38,7 +39,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const COLLATERAL_POOLS: IAddCollateralPoolParamList = [
     {
-      COLLATERAL_POOL_ID: "ibBUSD",
+      COLLATERAL_POOL_ID: "BUSD-STABLE",
       DEBT_CEILING: ethers.utils.parseUnits("30000000", 45), // 30M [rad]
       DEBT_FLOOR: ethers.utils.parseUnits("100", 45), // 100 [rad]
       PRICE_FEED: "0x4a89F897AA97D096dBeA0f874a5854662996f8ae", // ibBUSD IbTokenPriceFeed
@@ -78,7 +79,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       collateralPool.CLOSE_FACTOR_BPS,
       collateralPool.LIQUIDATOR_INCENTIVE_BPS,
       collateralPool.TREASURY_FEES_BPS,
-      collateralPool.STRATEGY
+      collateralPool.STRATEGY,
+      { gasLimit: 1500000 }
     )
     console.log(`tx: ${tx.hash}`)
     console.log(`✅ Done Pool ID: ${collateralPool.COLLATERAL_POOL_ID}`)

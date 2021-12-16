@@ -2,7 +2,8 @@ import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, network } from "hardhat"
 import { ConfigEntity } from "../../../entities"
-import { AccessControlConfig__factory } from "../../../../typechain"
+import { StableSwapModule__factory } from "../../../../typechain"
+import { WeiPerRad } from "../../../../test/helper/unit"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -15,18 +16,21 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const ADAPTER_ADDR = "0x4f56a92cA885bE50E705006876261e839b080E36"
+  const FEE_IN = ethers.utils.parseUnits("0.002", 18).toString() // [wad = 100%]
 
   const config = ConfigEntity.getConfig()
 
-  const accessContralConfig = AccessControlConfig__factory.connect(
-    config.AccessControlConfig.address,
+  const stableSwapModule = StableSwapModule__factory.connect(
+    config.StableSwapModule.address,
     (await ethers.getSigners())[0]
   )
-  console.log(`>> Grant ADAPTER_ROLE address: ${ADAPTER_ADDR}`)
-  await accessContralConfig.grantRole(await accessContralConfig.ADAPTER_ROLE(), ADAPTER_ADDR, { gasLimit: 1000000 })
+
+  console.log(`>> setFeeIn to ${FEE_IN}`)
+  const tx = await stableSwapModule.setFeeIn(FEE_IN)
+  await tx.wait()
+  console.log(`tx hash: ${tx.hash}`)
   console.log("✅ Done")
 }
 
 export default func
-func.tags = ["GrantAdapterRole"]
+func.tags = ["SetFeeIn"]
