@@ -47,7 +47,20 @@ StrictAlpacaPriceOraclePriceFeed config
 - secondarySource token1 = USD address (0xfff...fff)
 */
 
-import { PancakeFactory__factory, PancakePair__factory } from "@alpaca-finance/alpaca-contract/typechain"
+import {
+  DebtToken__factory,
+  MockWBNB,
+  MockWBNB__factory,
+  PancakeFactory__factory,
+  PancakePair__factory,
+  SimplePriceOracle,
+  SimplePriceOracle__factory,
+  SimpleVaultConfig__factory,
+  Vault,
+  Vault__factory,
+  WNativeRelayer,
+  WNativeRelayer__factory,
+} from "@alpaca-finance/alpaca-contract/typechain"
 import { MockContract, smockit } from "@eth-optimism/smock"
 import { BigNumber } from "@ethersproject/bignumber"
 import { expect } from "chai"
@@ -73,23 +86,35 @@ import {
   BandPriceOracle,
   BandPriceOracle__factory,
   MockStdReference__factory,
+  AlpacaToken__factory,
+  FairLaunch__factory,
+  VaultPriceOracle__factory,
+  VaultPriceOracle,
+  SimplePriceFeed,
+  SimplePriceFeed__factory,
 } from "../../../typechain"
 import { AddressFour, AddressOne, AddressThree, AddressTwo, AddressZero } from "../../helper/address"
 
 type fixture = {
   strictWbnbInBusdPriceFeed1: StrictAlpacaOraclePriceFeed // Dex strict version
   strictWbnbInBusdPriceFeed2: StrictAlpacaOraclePriceFeed // Band strict version
+  strictibBNBInBasePriceFeed1: StrictAlpacaOraclePriceFeed // Vault strict version
   ibTokenPriceFeed1: IbTokenPriceFeed // Dex strict version
   ibTokenPriceFeed2: IbTokenPriceFeed // Band strict version
+  ibTokenPriceFeed3: IbTokenPriceFeed // Vault strict version
   ibInWbnbPriceFeed: AlpacaOraclePriceFeed
   dexPriceOracle: DexPriceOracle // [Deperecated] use as base/busd price source actual (secondary source)
   bandPriceOracle: BandPriceOracle // use as base/busd price source actual (secondary source)
+  vaultPriceOracle: VaultPriceOracle // use as ib/base price source actual (secondary source)
   accessControlConfig: AccessControlConfig
   mockedSimpleOracle: MockContract // use as ib/base price source
+  simplePriceOracle: SimplePriceOracle
   mockedChainLinkOracle: MockContract // use as base/busd price source actual (primary source)
   mockedPcsFactory: MockContract
   mockedPancakePair: MockContract
   mockedStdReference: MockContract
+  bnbVault: Vault
+  wbnb: MockWBNB
 }
 
 const ibWBNBAddress = AddressOne
@@ -156,6 +181,10 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   await accessControlConfig.grantRole(await accessControlConfig.OWNER_ROLE(), deployer.address)
   await bandPriceOracle.setTokenSymbol(wbnbAddress, "BNB")
   await bandPriceOracle.setTokenSymbol(busdAddress, "BUSD")
+
+  const VaultPriceOracle = (await ethers.getContractFactory("VaultPriceOracle", deployer)) as VaultPriceOracle__factory
+  const vaultPriceOracle = (await upgrades.deployProxy(VaultPriceOracle)) as VaultPriceOracle
+  await vaultPriceOracle.deployed()
 
   // Deploy AlpacaOraclePriceFeed
   const AlpacaOraclePriceFeed = (await ethers.getContractFactory(
@@ -226,20 +255,129 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   ])) as IbTokenPriceFeed
   await ibTokenPriceFeed2.deployed()
 
+  /// Deploy SimpleOracle
+  const SimplePriceOracle = new SimplePriceOracle__factory(deployer)
+  // const SimplePriceOracle = (await ethers.getContractFactory(
+  //   "SimplePriceOracle",
+  //   deployer
+  // )) as SimplePriceOracle__factory
+  const simplePriceOracle = await SimplePriceOracle.deploy()
+  await simplePriceOracle.deployed()
+  await simplePriceOracle.initialize(deployer.address)
+  // const simplePriceOracle = (await upgrades.deployProxy(SimplePriceOracle, [deployer])) as SimplePriceOracle
+  // await simplePriceOracle.deployed()
+
+  const ALPACA_BONUS_LOCK_UP_BPS = 7000
+  const ALPACA_REWARD_PER_BLOCK = ethers.utils.parseEther("5000")
+  const RESERVE_POOL_BPS = "1000" // 10% reserve pool
+  const KILL_PRIZE_BPS = "1000" // 10% Kill prize
+  const INTEREST_RATE = "3472222222222" // 30% per year
+  const MIN_DEBT_SIZE = ethers.utils.parseEther("1") // 1 BTOKEN min debt size
+  const KILL_TREASURY_BPS = "100"
+
+  const WBNB = new MockWBNB__factory(deployer)
+  const wbnb = (await WBNB.deploy()) as MockWBNB
+  await wbnb.deployed()
+
+  await wbnb.mint(deployer.address, parseEther("1"))
+
+  const WNativeRelayer = new WNativeRelayer__factory(deployer)
+  const wNativeRelayer = (await WNativeRelayer.deploy(wbnb.address)) as WNativeRelayer
+  await wNativeRelayer.deployed()
+
+  const DebtToken = new DebtToken__factory(deployer)
+  const debtToken = await DebtToken.deploy()
+  await debtToken.deployed()
+  await debtToken.initialize("debtibBTOKEN_V2", "debtibBTOKEN_V2", deployer.address)
+
+  // Setup FairLaunch contract
+  // Deploy ALPACAs
+  const AlpacaToken = new AlpacaToken__factory(deployer)
+  const alpacaToken = await AlpacaToken.deploy(132, 137)
+  await alpacaToken.deployed()
+
+  const FairLaunch = new FairLaunch__factory(deployer)
+  const fairLaunch = await FairLaunch.deploy(
+    alpacaToken.address,
+    deployer.address,
+    ALPACA_REWARD_PER_BLOCK,
+    0,
+    ALPACA_BONUS_LOCK_UP_BPS,
+    0
+  )
+  await fairLaunch.deployed()
+
+  const SimpleVaultConfig = new SimpleVaultConfig__factory(deployer)
+  const simpleVaultConfig = await SimpleVaultConfig.deploy()
+  await simpleVaultConfig.deployed()
+  await simpleVaultConfig.initialize(
+    MIN_DEBT_SIZE,
+    INTEREST_RATE,
+    RESERVE_POOL_BPS,
+    KILL_PRIZE_BPS,
+    wbnb.address,
+    wNativeRelayer.address,
+    fairLaunch.address,
+    KILL_TREASURY_BPS,
+    deployer.address
+  )
+
+  const Vault = new Vault__factory(deployer)
+
+  const bnbVault = await Vault.deploy()
+  await bnbVault.deployed()
+  await bnbVault.initialize(
+    simpleVaultConfig.address,
+    wbnb.address,
+    "Interest Bearing BNB",
+    "ibBNB",
+    18,
+    debtToken.address
+  )
+
+  await simplePriceOracle.setPrices([bnbVault.address], [wbnb.address], [parseEther("1")])
+
+  // use VaultPriceOracle as secondary source
+  const strictibBNBInBasePriceFeed1 = (await upgrades.deployProxy(StrictAlpacaOraclePriceFeed, [
+    simplePriceOracle.address,
+    bnbVault.address,
+    wbnb.address,
+    vaultPriceOracle.address,
+    bnbVault.address,
+    wbnb.address,
+    accessControlConfig.address,
+  ])) as StrictAlpacaOraclePriceFeed
+  await strictibBNBInBasePriceFeed1.deployed()
+
+  // Deploy IbTokenPriceFeed (Vault strict version)
+  const ibTokenPriceFeed3 = (await upgrades.deployProxy(IbTokenPriceFeed, [
+    strictibBNBInBasePriceFeed1.address,
+    strictWbnbInBusdPriceFeed2.address,
+    accessControlConfig.address,
+    ORACLE_TIME_DELAY,
+  ])) as IbTokenPriceFeed
+  await ibTokenPriceFeed3.deployed()
+
   return {
     strictWbnbInBusdPriceFeed1,
     strictWbnbInBusdPriceFeed2,
+    strictibBNBInBasePriceFeed1,
     ibInWbnbPriceFeed,
     ibTokenPriceFeed1,
     ibTokenPriceFeed2,
+    ibTokenPriceFeed3,
     dexPriceOracle,
     bandPriceOracle,
+    vaultPriceOracle,
     mockedSimpleOracle,
+    simplePriceOracle,
     mockedChainLinkOracle,
     accessControlConfig,
     mockedPcsFactory,
     mockedPancakePair,
     mockedStdReference,
+    bnbVault,
+    wbnb,
   }
 }
 
@@ -258,32 +396,45 @@ describe("PriceFeedStack", () => {
 
   let strictWbnbInBusdPriceFeed1: StrictAlpacaOraclePriceFeed
   let strictWbnbInBusdPriceFeed2: StrictAlpacaOraclePriceFeed
+  let strictibBNBInBasePriceFeed1: StrictAlpacaOraclePriceFeed
   let ibInWbnbPriceFeed: AlpacaOraclePriceFeed
   let ibTokenPriceFeed1: IbTokenPriceFeed
   let ibTokenPriceFeed2: IbTokenPriceFeed
+  let ibTokenPriceFeed3: IbTokenPriceFeed
   let dexPriceOracle: DexPriceOracle
   let bandPriceOracle: BandPriceOracle
+  let vaultPriceOracle: VaultPriceOracle
   let accessControlConfig: AccessControlConfig
   let mockedSimpleOracle: MockContract
   let mockedChainLinkOracle: MockContract
   let mockedPcsFactory: MockContract
   let mockedPancakePair: MockContract
   let mockedStdReference: MockContract
+  let bnbVault: Vault
+  let simplePriceOracle: SimplePriceOracle
+
+  let wbnb: MockWBNB
 
   beforeEach(async () => {
     ;({
       strictWbnbInBusdPriceFeed1,
       strictWbnbInBusdPriceFeed2,
+      strictibBNBInBasePriceFeed1,
       ibInWbnbPriceFeed,
       ibTokenPriceFeed1,
       ibTokenPriceFeed2,
+      ibTokenPriceFeed3,
       dexPriceOracle,
       mockedSimpleOracle,
+      simplePriceOracle,
       mockedChainLinkOracle,
+      vaultPriceOracle,
       accessControlConfig,
       mockedPcsFactory,
       mockedPancakePair,
       mockedStdReference,
+      bnbVault,
+      wbnb,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
@@ -358,6 +509,20 @@ describe("PriceFeedStack", () => {
         TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
         await ibTokenPriceFeed2.setPrice()
         const [price, ok] = await ibTokenPriceFeed2.peekPrice()
+        expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
+        expect(ok).to.be.true
+      })
+      it("ibTokenPriceFeed3 should returns price with status ok=true", async () => {
+        await bnbVault.deposit(parseEther("1"), { value: parseEther("1") })
+        await wbnb.transfer(bnbVault.address, parseEther("0.1"))
+        await simplePriceOracle.setPrices([bnbVault.address], [wbnb.address], [parseEther("1.1")])
+        await vaultPriceOracle.setVault(bnbVault.address, true)
+        await strictibBNBInBasePriceFeed1.setPriceLife(23 * 60 * 60)
+        await ibTokenPriceFeed3.setPrice()
+
+        TimeHelpers.increase(BigNumber.from(ORACLE_TIME_DELAY))
+        await ibTokenPriceFeed3.setPrice()
+        const [price, ok] = await ibTokenPriceFeed3.peekPrice()
         expect(BigNumber.from(price)).to.be.equal(parseEther("441.1")) // 401 * 1.1
         expect(ok).to.be.true
       })
