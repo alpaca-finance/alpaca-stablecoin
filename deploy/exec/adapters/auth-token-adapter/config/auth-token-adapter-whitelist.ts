@@ -17,8 +17,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const config = ConfigEntity.getConfig()
 
-  const STABLE_SWAP_MODULE_ADDR = "0x4DFc61A2A781A40e4a23AbeB4CbdF1dCAf23Ce3c"
-  const AUTH_TOKEN_ADAPTER_ADDR = "0x7df2012A6D89c48B111f9535E84b4906f726d54f"
+  const STABLE_SWAP_MODULE_ADDR = config.StableSwapModule.address
+  const AUTH_TOKEN_ADAPTER_ADDR = config.AuthTokenAdapters[0].address
 
   const authTokenAdapter = AuthTokenAdapter__factory.connect(AUTH_TOKEN_ADAPTER_ADDR, (await ethers.getSigners())[0])
   console.log(`>> AuthTokenAdapter whitelist address: ${STABLE_SWAP_MODULE_ADDR}`)

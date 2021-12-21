@@ -18,7 +18,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
 
   const PRICE_IN_WAD = ethers.utils.parseUnits("1", 18) // [WAD]
-  const STATIC_PRICE_FEED_ADDR = ""
+  const STATIC_PRICE_FEED_ADDR = "0x8Dafc3dE02250A691b51aECC5FcE8977Aa518ffa"
 
   const config = ConfigEntity.getConfig()
 

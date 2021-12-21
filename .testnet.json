@@ -39,6 +39,19 @@
         "liquidatorIncentiveBps": 10500,
         "treasuryFeesBps": 8000,
         "strategy": "0xC48C1b7410Ab164E110d92C083F137f7dBb15dE1"
+      },
+      {
+        "collateralPoolId": "BUSD-STABLE",
+        "debtCeiling": "30000000000000000000000000000000000000000000000000000",
+        "debtFloor": "0",
+        "priceFeed": "0x8Dafc3dE02250A691b51aECC5FcE8977Aa518ffa",
+        "liquidationRatio": "1000000000000000000000000000",
+        "stabilityFeeRate": "1000000000000000000000000000",
+        "adapter": "0x1542479af09Ca5d5CF0bFB7cB7cd7f47B7a625D8",
+        "closeFactorBps": 0,
+        "liquidatorIncentiveBps": 10000,
+        "treasuryFeesBps": 0,
+        "strategy": "0x0000000000000000000000000000000000000000"
       }
     ]
   },
@@ -47,8 +60,8 @@
     "deployedBlock": 14532712
   },
   "FlashMintModule": {
-    "address": "",
-    "deployedBlock": 0
+    "address": "0x954de3261F67081c75602e7a9dAf9880576aAB5b",
+    "deployedBlock": 15020462
   },
   "ShowStopper": {
     "address": "0x398F75bBEB7bE96f83a71BAF9Bc0E0114F1E0C4d",
@@ -74,6 +87,12 @@
       "rewardToken": "0x354b3a11D5Ea2DA89405173977E271F58bE2897D",
       "treasuryFeeBps": "900",
       "treasuryAccount": "0xa96F122f567Df5f4A9978E1e5731acF2f2Fe2ab6"
+    }
+  ],
+  "AuthTokenAdapters": [
+    {
+      "address": "0x1542479af09Ca5d5CF0bFB7cB7cd7f47B7a625D8",
+      "deployedBlock": 15020082
     }
   ],
   "StablecoinAdapters": {
@@ -113,6 +132,12 @@
         "deployedBlock": 14533728,
         "AlpacaPriceOraclePriceFeed": "0xDb9B5574581a0e67b119f2c511f7C1e1F3409EC6",
         "StrictAlpacaPriceOraclePriceFeed": "0xFe104175A2503248438d16C2425d6C2f3FAa5b65"
+      }
+    ],
+    "StaticPriceFeed": [
+      {
+        "address": "0x8Dafc3dE02250A691b51aECC5FcE8977Aa518ffa",
+        "deployedBlock": 15020012
       }
     ]
   },
@@ -155,7 +180,7 @@
     }
   },
   "StableSwapModule": {
-    "address": "",
-    "deployedBlock": 0
+    "address": "0xb69b77213D9499E2E30A62d081BBf21f85b39cd5",
+    "deployedBlock": 15020292
   }
 }

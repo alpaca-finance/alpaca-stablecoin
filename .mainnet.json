@@ -66,6 +66,12 @@
     "address": "0x45040e48C00b52D9C0bd11b8F577f188991129e6",
     "deployedBlock": 13123336
   },
+  "AuthTokenAdapters": [
+    {
+      "address": "",
+      "deployedBlock": 1234
+    }
+  ],
   "IbTokenAdapters": [
     {
       "address": "0x4f56a92cA885bE50E705006876261e839b080E36",
