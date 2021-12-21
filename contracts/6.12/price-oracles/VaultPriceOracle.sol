@@ -40,6 +40,7 @@ contract VaultPriceOracle is Initializable, IAlpacaOracle {
   }
 
   function setVault(address _vault, bool _isOk) external {
+    IAlpacaVault(_vault).totalToken();
     vaults[_vault] = _isOk;
 
     emit LogSetVault(_vault, _isOk);
