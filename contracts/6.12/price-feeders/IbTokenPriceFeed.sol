@@ -65,8 +65,6 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
 
     require(_timeDelay >= 15 minutes && _timeDelay <= 2 days, "IbTokenPriceFeed/time-delay-out-of-bound");
     timeDelay = _timeDelay;
-
-    setPrice();
   }
 
   modifier onlyOwnerOrGov() {
@@ -135,12 +133,11 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
     uint256 price = uint256(ibInBasePrice).mul(uint256(baseInUsdPrice)).div(1e18);
     bool ok = ibInBasePriceOk && baseInUsdPriceOk && !paused();
 
-    if (ok) {
-      currentPrice = nextPrice;
-      nextPrice = Feed(uint128(price), 1);
-      lastUpdateTimestamp = getStartOfIntervalTimestamp(block.timestamp);
-      emit LogValue(bytes32(uint256(currentPrice.val)));
-    }
+    require(ok, "IbTokenPriceFeed/not-ok");
+    currentPrice = nextPrice;
+    nextPrice = Feed(uint128(price), 1);
+    lastUpdateTimestamp = getStartOfIntervalTimestamp(block.timestamp);
+    emit LogValue(bytes32(uint256(currentPrice.val)));
   }
 
   function getStartOfIntervalTimestamp(uint256 ts) internal view returns (uint256) {
