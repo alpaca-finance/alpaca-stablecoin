@@ -132,6 +132,10 @@
         "address": "0xDA7a001b254CD22e46d3eAB04d937489c93174C3",
         "deployedBlock": 2165210
       }
+    },
+    "VaultPriceOracle": {
+      "address": "",
+      "deployedBlock": 0
     }
   },
   "SystemDebtEngine": {

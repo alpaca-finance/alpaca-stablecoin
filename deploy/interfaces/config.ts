@@ -132,10 +132,16 @@ export interface BandPriceOracle {
   StdReferenceProxy: StdReferenceProxy
 }
 
+export interface PricePriceOracle {
+  address: string
+  deployedBlock: number
+}
+
 export interface Oracle {
   ChainLinkOracle: ChainLinkOracle
   SimpleOracle: SimpleOracle
   BandPriceOracle: BandPriceOracle
+  VaultPriceOracle: PricePriceOracle
 }
 
 export interface StabilityFeeCollector {
