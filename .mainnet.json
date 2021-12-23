@@ -10,8 +10,8 @@
     "deployedBlock": 13122597
   },
   "AlpacaStablecoinProxyActions": {
-    "address": "0x9d9507b4eeDE3E3fD83E8bEbdB9a9bF3ED681C0a",
-    "deployedBlock": 13122652
+    "address": "0x1391FB5efc2394f33930A0CfFb9d407aBdbf1481",
+    "deployedBlock": 13719179
   },
   "AccessControlConfig": {
     "address": "0x0780d461480a3386031498f264a91f3d473A181a",
@@ -39,6 +39,19 @@
         "liquidatorIncentiveBps": 10500,
         "treasuryFeesBps": 8000,
         "strategy": "0x9fA028cF1DdaAa514A1addE6A9fE7224ca10D6d1"
+      },
+      {
+        "collateralPoolId": "BUSD-STABLE",
+        "debtCeiling": "10000000000000000000000000000000000000000000000000000",
+        "debtFloor": "0",
+        "priceFeed": "0xD67286e5969ca0D2ad282EB4eDa4B51d60A9eB45",
+        "liquidationRatio": "1000000000000000000000000000",
+        "stabilityFeeRate": "1000000000000000000000000000",
+        "adapter": "0x8fff07f961e75Dcced6f1620386D91E66109A9e9",
+        "closeFactorBps": 0,
+        "liquidatorIncentiveBps": 10000,
+        "treasuryFeesBps": 0,
+        "strategy": "0x0000000000000000000000000000000000000000000000000000000000000000"
       }
     ]
   },
@@ -47,8 +60,8 @@
     "deployedBlock": 13122862
   },
   "FlashMintModule": {
-    "address": "",
-    "deployedBlock": 0
+    "address": "0xE7a49Ae5c9500d18481e0E0EFBFF1D5d0FF75DE3",
+    "deployedBlock": 13718979
   },
   "ShowStopper": {
     "address": "0x9b601FBAd19036D6E074caDAF61CD70ea2513318",
@@ -68,8 +81,8 @@
   },
   "AuthTokenAdapters": [
     {
-      "address": "",
-      "deployedBlock": 1234
+      "address": "0x8fff07f961e75Dcced6f1620386D91E66109A9e9",
+      "deployedBlock": 13718736
     }
   ],
   "IbTokenAdapters": [
@@ -123,8 +136,8 @@
     ],
     "StaticPriceFeed": [
       {
-        "address": "",
-        "deployedBlock": 0
+        "address": "0xD67286e5969ca0D2ad282EB4eDa4B51d60A9eB45",
+        "deployedBlock": 13718630
       }
     ]
   },
@@ -171,7 +184,7 @@
     }
   },
   "StableSwapModule": {
-    "address": "",
-    "deployedBlock": 0
+    "address": "0xd16004424b9C3f0A7C74C4c8dcDa0D8C4D513fAC",
+    "deployedBlock": 13718839
   }
 }

@@ -1,12 +1,10 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
-import { ethers, network } from "hardhat"
+import { ethers } from "hardhat"
 import { ConfigEntity } from "../../../entities"
 import { StaticPriceFeed__factory } from "../../../../typechain"
-import { WeiPerRad } from "../../../../test/helper/unit"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const RAD = 45
   /*
   ░██╗░░░░░░░██╗░█████╗░██████╗░███╗░░██╗██╗███╗░░██╗░██████╗░
   ░██║░░██╗░░██║██╔══██╗██╔══██╗████╗░██║██║████╗░██║██╔════╝░
@@ -18,7 +16,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
 
   const PRICE_IN_WAD = ethers.utils.parseUnits("1", 18) // [WAD]
-  const STATIC_PRICE_FEED_ADDR = "0x8Dafc3dE02250A691b51aECC5FcE8977Aa518ffa"
+  const STATIC_PRICE_FEED_ADDR = "0xD67286e5969ca0D2ad282EB4eDa4B51d60A9eB45"
 
   const config = ConfigEntity.getConfig()
 
