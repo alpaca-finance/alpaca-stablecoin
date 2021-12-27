@@ -1,9 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
-import { ethers, network } from "hardhat"
+import { ethers } from "hardhat"
 import { ConfigEntity } from "../../../entities"
 import { StableSwapModule__factory } from "../../../../typechain"
-import { WeiPerRad } from "../../../../test/helper/unit"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
