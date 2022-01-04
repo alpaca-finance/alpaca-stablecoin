@@ -106,12 +106,10 @@ describe("IbTokenPriceFeed", () => {
         // 1 BNB = 400 USD
         mockedBaseUsdPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(parseEther("400")), true])
 
-        await ibTokenPriceFeed.setPrice()
+        await expect(ibTokenPriceFeed.setPrice()).to.be.revertedWith("IbTokenPriceFeed/not-ok")
         assertPeekPriceCall(mockedIbBasePriceFeed.smocked.peekPrice.calls)
         assertPeekPriceCall(mockedBaseUsdPriceFeed.smocked.peekPrice.calls)
 
-        TimeHelpers.increase(BigNumber.from(900))
-        await ibTokenPriceFeed.setPrice()
         const [price, ok] = await ibTokenPriceFeed.peekPrice()
         expect(BigNumber.from(price)).to.be.equal(0)
         expect(ok).to.be.false
@@ -124,12 +122,10 @@ describe("IbTokenPriceFeed", () => {
         // 1 BNB = 400 USD
         mockedBaseUsdPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(parseEther("400")), false])
 
-        await ibTokenPriceFeed.setPrice()
+        await expect(ibTokenPriceFeed.setPrice()).to.be.revertedWith("IbTokenPriceFeed/not-ok")
         assertPeekPriceCall(mockedIbBasePriceFeed.smocked.peekPrice.calls)
         assertPeekPriceCall(mockedBaseUsdPriceFeed.smocked.peekPrice.calls)
 
-        TimeHelpers.increase(BigNumber.from(900))
-        await ibTokenPriceFeed.setPrice()
         const [price, ok] = await ibTokenPriceFeed.peekPrice()
         expect(BigNumber.from(price)).to.be.equal(0)
         expect(ok).to.be.false
