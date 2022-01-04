@@ -130,8 +130,8 @@
       {
         "address": "0x4a89F897AA97D096dBeA0f874a5854662996f8ae",
         "deployedBlock": 13125204,
-        "AlpacaPriceOraclePriceFeed": "0x8CC012356E61424446646ec3B261fe5EF5B44A8a",
-        "StrictAlpacaPriceOraclePriceFeed": "0x9F748f798C75EA44F86a5871045629a2aC9C0568"
+        "ibInBasePriceFeed": "0x8CC012356E61424446646ec3B261fe5EF5B44A8a",
+        "baseInUsdPriceFeed": "0x9F748f798C75EA44F86a5871045629a2aC9C0568"
       }
     ],
     "StaticPriceFeed": [
