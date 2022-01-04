@@ -30,12 +30,12 @@
       {
         "collateralPoolId": "ibBUSD",
         "debtCeiling": "30000000000000000000000000000000000000000000000000000",
-        "debtFloor": "100000000000000000000000000000000000000000000000",
+        "debtFloor": "500000000000000000000000000000000000000000000000",
         "priceFeed": "0x4a89F897AA97D096dBeA0f874a5854662996f8ae",
-        "liquidationRatio": "1010101010101010101010101010",
+        "liquidationRatio": "1111111111111111111111111111",
         "stabilityFeeRate": "1000000000627937192491029810",
         "adapter": "0x4f56a92cA885bE50E705006876261e839b080E36",
-        "closeFactorBps": 5000,
+        "closeFactorBps": 2500,
         "liquidatorIncentiveBps": 10500,
         "treasuryFeesBps": 8000,
         "strategy": "0x9fA028cF1DdaAa514A1addE6A9fE7224ca10D6d1"
@@ -51,7 +51,7 @@
         "closeFactorBps": 0,
         "liquidatorIncentiveBps": 10000,
         "treasuryFeesBps": 0,
-        "strategy": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        "strategy": "0x0000000000000000000000000000000000000000"
       }
     ]
   },
