@@ -16,6 +16,7 @@ export interface Config {
   AuthTokenAdapters: AuthTokenAdapter[]
   StablecoinAdapters: StablecoinAdapters
   PriceOracle: PriceOracle
+  PriceFeed: PriceFeed
   Oracle: Oracle
   SystemDebtEngine: SystemDebtEngine
   LiquidationEngine: LiquidationEngine
@@ -74,6 +75,40 @@ export interface FlashMintModule {
   deployedBlock: number
 }
 export interface PriceOracle {
+  address: string
+  deployedBlock: number
+}
+export interface PriceFeed {
+  AlpacaOraclePriceFeed: AlpacaOraclePriceFeed[]
+  StrictAlpacaPriceOraclePriceFeed: StrictAlpacaPriceOraclePriceFeed[]
+  IbTokenPriceFeed: IbTokenPriceFeed[]
+  StaticPriceFeed: StaticPriceFeed[]
+}
+export interface AlpacaOraclePriceFeed {
+  name: string
+  address: string
+  deployedBlock: number
+  alpacaOracle: string
+  token0: string
+  token1: string
+}
+export interface StrictAlpacaPriceOraclePriceFeed {
+  name: string
+  address: string
+  deployedBlock: number
+  primarySoure: string
+  secondary: string
+  token0: string
+  token1: string
+}
+export interface IbTokenPriceFeed {
+  name: string
+  address: string
+  deployedBlock: number
+  ibInBasePriceFeed: string
+  baseInUsdPriceFeed: string
+}
+export interface StaticPriceFeed {
   address: string
   deployedBlock: number
 }

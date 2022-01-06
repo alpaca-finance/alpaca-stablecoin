@@ -3,7 +3,14 @@ import { ethers, network } from "hardhat"
 import "@openzeppelin/test-helpers"
 import MainnetConfig from "../.mainnet.json"
 import TestnetConfig from "../.testnet.json"
-import { IbTokenAdapter, CollateralPool, BookKeeper, PriceOracle } from "../deploy/interfaces/config"
+import {
+  IbTokenAdapter,
+  CollateralPool,
+  BookKeeper,
+  PriceOracle,
+  StrictAlpacaPriceOraclePriceFeed,
+  IbTokenPriceFeed,
+} from "../deploy/interfaces/config"
 import {
   AccessControlConfig,
   AccessControlConfig__factory,
@@ -11,6 +18,8 @@ import {
   CollateralPoolConfig,
   CollateralPoolConfig__factory,
   IbTokenAdapter__factory,
+  IbTokenPriceFeed__factory,
+  StrictAlpacaOraclePriceFeed__factory,
 } from "../typechain"
 
 async function validateCollateralPool(collateralPoolConfig: CollateralPoolConfig, collateralPoolInfo: CollateralPool) {
@@ -62,6 +71,32 @@ async function validateIbTokenAdapter(adapterInfo: IbTokenAdapter) {
     console.log(`> ✅ done validated ${adapterInfo.address}, no problem found`)
   } catch (e) {
     console.log(`> ❌ some problem found in ${adapterInfo.address}, please double check`)
+    console.log(e)
+  }
+}
+
+async function validateStrictAlpacaOraclePriceFeed(priceFeedInfo: StrictAlpacaPriceOraclePriceFeed) {
+  const priceFeed = StrictAlpacaOraclePriceFeed__factory.connect(priceFeedInfo.address, ethers.provider)
+  try {
+    expect((await priceFeed.primary()).alpacaOracle).to.be.equal(priceFeedInfo.primarySoure)
+    expect((await priceFeed.secondary()).alpacaOracle).to.be.equal(priceFeedInfo.secondary)
+
+    console.log(`> ✅ done validated ${priceFeedInfo.name}, no problem found`)
+  } catch (e) {
+    console.log(`> ❌ some problem found in ${priceFeedInfo.name}, please double check`)
+    console.log(e)
+  }
+}
+
+async function validateIbTokenPriceFeed(priceFeedInfo: IbTokenPriceFeed) {
+  const priceFeed = IbTokenPriceFeed__factory.connect(priceFeedInfo.address, ethers.provider)
+  try {
+    expect(await priceFeed.ibInBasePriceFeed()).to.be.equal(priceFeedInfo.ibInBasePriceFeed)
+    expect(await priceFeed.baseInUsdPriceFeed()).to.be.equal(priceFeedInfo.baseInUsdPriceFeed)
+
+    console.log(`> ✅ done validated ${priceFeedInfo.name}, no problem found`)
+  } catch (e) {
+    console.log(`> ❌ some problem found in ${priceFeedInfo.name}, please double check`)
     console.log(e)
   }
 }
@@ -188,6 +223,20 @@ async function main() {
     validateCollateralPools.push(validateCollateralPool(collateralPoolConfig, collateralPool as CollateralPool))
   }
   await Promise.all(validateCollateralPools)
+
+  console.log("=== validate StrictAlpacaOraclePriceFeed config ===")
+  const validateStrictAlpacaOraclePriceFeeds = []
+  for (const strictAlpacaPriceOraclePriceFeed of config.PriceFeed.StrictAlpacaPriceOraclePriceFeed) {
+    validateStrictAlpacaOraclePriceFeeds.push(validateStrictAlpacaOraclePriceFeed(strictAlpacaPriceOraclePriceFeed))
+  }
+  await Promise.all(validateStrictAlpacaOraclePriceFeeds)
+
+  console.log("=== validate IbTokenPriceFeed config ===")
+  const validateIbTokenPriceFeeds = []
+  for (const ibTokenPriceFeed of config.PriceFeed.IbTokenPriceFeed) {
+    validateIbTokenPriceFeeds.push(validateIbTokenPriceFeed(ibTokenPriceFeed))
+  }
+  await Promise.all(validateIbTokenPriceFeeds)
 
   const accessContralConfig = AccessControlConfig__factory.connect(config.AccessControlConfig.address, ethers.provider)
   console.log("=== validate Role config ===")
