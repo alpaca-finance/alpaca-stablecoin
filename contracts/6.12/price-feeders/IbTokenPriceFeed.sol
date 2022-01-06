@@ -50,7 +50,7 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
     address _ibInBasePriceFeed,
     address _baseInUsdPriceFeed,
     address _accessControlConfig,
-    uint16 _timeDelay
+    uint256 _timeDelay
   ) external initializer {
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
