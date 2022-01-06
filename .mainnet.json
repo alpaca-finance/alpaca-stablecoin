@@ -109,6 +109,7 @@
   "PriceFeed": {
     "AlpacaOraclePriceFeed": [
       {
+        "name": "ibBUSD-BUSD",
         "address": "0x8CC012356E61424446646ec3B261fe5EF5B44A8a",
         "deployedBlock": 13124898,
         "alpacaOracle": "0x166f56F2EDa9817cAB77118AE4FCAA0002A17eC7",
@@ -118,6 +119,7 @@
     ],
     "StrictAlpacaPriceOraclePriceFeed": [
       {
+        "name": "BUSD-USD",
         "address": "0x9F748f798C75EA44F86a5871045629a2aC9C0568",
         "deployedBlock": 13125078,
         "primarySoure": "0x634902128543b25265da350e2d961C7ff540fC71",
@@ -128,6 +130,7 @@
     ],
     "IbTokenPriceFeed": [
       {
+        "name": "ibBUSD-USD",
         "address": "0x4a89F897AA97D096dBeA0f874a5854662996f8ae",
         "deployedBlock": 13125204,
         "ibInBasePriceFeed": "0x8CC012356E61424446646ec3B261fe5EF5B44A8a",
