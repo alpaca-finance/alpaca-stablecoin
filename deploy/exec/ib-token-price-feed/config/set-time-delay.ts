@@ -19,7 +19,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const IB_TOKEN_PRICE_FEED = "ibBUSD-USD"
 
-  const NEW_IB_IN_BASE_PRICE_FEED = ""
+  const NEW_TIME_DELAY = 0
 
   const ibTokenPriceFeed = config.PriceFeed.IbTokenPriceFeed.find((o) => o.name === IB_TOKEN_PRICE_FEED)
   if (!ibTokenPriceFeed) throw new Error(`error: unable to map ${IB_TOKEN_PRICE_FEED} to any IbTokenPriceFeed`)
@@ -27,10 +27,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     ibTokenPriceFeed.address,
     (await ethers.getSigners())[0]
   )
-  console.log(`>> ${IB_TOKEN_PRICE_FEED} ibTokenPriceFeed set IbInBasePriceFeed: ${NEW_IB_IN_BASE_PRICE_FEED}`)
-  await ibTokenPriceFeedContract.setIbInBasePriceFeed(NEW_IB_IN_BASE_PRICE_FEED)
+  console.log(`>> ${IB_TOKEN_PRICE_FEED} ibTokenPriceFeed set time delay: ${NEW_TIME_DELAY}`)
+  await ibTokenPriceFeedContract.setTimeDelay(NEW_TIME_DELAY)
   console.log("✅ Done")
 }
 
 export default func
-func.tags = ["SetIbInBasePriceFeed"]
+func.tags = ["SetTimeDelay"]
