@@ -18,6 +18,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const IB_IN_BASE_PRICE_FEED_ADDR = "0x8CC012356E61424446646ec3B261fe5EF5B44A8a" // AlpacaOraclePriceFeed dddress from 016
   const BASE_IN_USD_PRICE_FEED_ADDR = "0x9F748f798C75EA44F86a5871045629a2aC9C0568" // StrictAlpacaOraclePriceFeed address from 018
 
+  const TIME_DELAY = 900
+
   const config = ConfigEntity.getConfig()
 
   console.log(">> Deploying an upgradable IbTokenPriceFeed contract")
@@ -31,6 +33,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     IB_IN_BASE_PRICE_FEED_ADDR,
     BASE_IN_USD_PRICE_FEED_ADDR,
     config.AccessControlConfig.address,
+    TIME_DELAY,
   ])
   await ibTokenPriceFeed.deployed()
   console.log(`>> Deployed at ${ibTokenPriceFeed.address}`)
