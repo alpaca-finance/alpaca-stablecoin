@@ -50,6 +50,10 @@ import {
   AccessControlConfig,
   PCSFlashLiquidator,
   PCSFlashLiquidator__factory,
+  StableSwapModule,
+  StableSwapModule__factory,
+  AuthTokenAdapter__factory,
+  AuthTokenAdapter,
 } from "../../typechain"
 import {
   PancakeFactory__factory,
@@ -103,11 +107,15 @@ type fixture = {
   collateralPoolConfig: CollateralPoolConfig
   pcsFlashLiquidator: PCSFlashLiquidator
   pancakeRouter: PancakeRouterV2
+  stableSwapModule: StableSwapModule
+  authTokenAdapter: AuthTokenAdapter
+  BUSD: BEP20
 }
 
 const ALPACA_PER_BLOCK = ethers.utils.parseEther("100")
 const COLLATERAL_POOL_ID = formatBytes32String("dummyToken")
 const WBNB_COLLATERAL_POOL_ID = formatBytes32String("ibWBNB")
+const BUSD_COLLATERAL_POOL_ID = formatBytes32String("BUSD-StableSwap")
 const CLOSE_FACTOR_BPS = BigNumber.from(5000)
 const LIQUIDATOR_INCENTIVE_BPS = BigNumber.from(10250)
 const TREASURY_FEE_BPS = BigNumber.from(5000)
@@ -435,9 +443,10 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await routerV2.deployed()
 
   /// Setup BUSD-AUSD pair on Pancakeswap
+  await factoryV2.createPair(dummyToken.address, BUSD.address)
   await factoryV2.createPair(BUSD.address, alpacaStablecoin.address)
   await factoryV2.createPair(wbnb.address, alpacaStablecoin.address)
-  const lpV2 = PancakePair__factory.connect(await factoryV2.getPair(BUSD.address, alpacaStablecoin.address), deployer)
+  const lpV2 = PancakePair__factory.connect(await factoryV2.getPair(dummyToken.address, BUSD.address), deployer)
   await lpV2.deployed()
 
   const PCSFlashLiquidator = (await ethers.getContractFactory(
@@ -454,6 +463,48 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await pcsFlashLiquidator.whitelist(liquidationEngine.address)
   await pcsFlashLiquidator.whitelist(fixedSpreadLiquidationStrategy.address)
   await pcsFlashLiquidator.whitelist(stablecoinAdapter.address)
+
+  // Deploy AuthTokenAdapter
+  const AuthTokenAdapter = (await ethers.getContractFactory("AuthTokenAdapter", deployer)) as AuthTokenAdapter__factory
+  const authTokenAdapter = (await upgrades.deployProxy(AuthTokenAdapter, [
+    bookKeeper.address,
+    BUSD_COLLATERAL_POOL_ID,
+    BUSD.address,
+  ])) as AuthTokenAdapter
+  await authTokenAdapter.deployed()
+  await accessControlConfig.grantRole(
+    ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]),
+    authTokenAdapter.address
+  )
+
+  await collateralPoolConfig.initCollateralPool(
+    BUSD_COLLATERAL_POOL_ID,
+    WeiPerRad.mul(10000000),
+    0,
+    simplePriceFeed.address,
+    WeiPerRay,
+    WeiPerRay,
+    authTokenAdapter.address,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
+    AddressZero
+  )
+  await collateralPoolConfig.setPriceWithSafetyMargin(BUSD_COLLATERAL_POOL_ID, WeiPerRay)
+
+  // Deploy StableSwapModule
+  const StableSwapModule = (await ethers.getContractFactory("StableSwapModule", deployer)) as StableSwapModule__factory
+  const stableSwapModule = (await upgrades.deployProxy(StableSwapModule, [
+    authTokenAdapter.address,
+    stablecoinAdapter.address,
+    systemDebtEngine.address,
+  ])) as StableSwapModule
+  await stableSwapModule.deployed()
+  await stableSwapModule.setFeeIn(ethers.utils.parseEther("0.001"))
+  await stableSwapModule.setFeeOut(ethers.utils.parseEther("0.001"))
+  await authTokenAdapter.grantRole(await authTokenAdapter.WHITELISTED(), stableSwapModule.address)
+  await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), stableSwapModule.address)
+  await accessControlConfig.grantRole(await accessControlConfig.COLLATERAL_MANAGER_ROLE(), stableSwapModule.address)
 
   return {
     wbnb,
@@ -480,6 +531,9 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     collateralPoolConfig,
     pcsFlashLiquidator,
     pancakeRouter: routerV2,
+    stableSwapModule,
+    BUSD,
+    authTokenAdapter,
   }
 }
 
@@ -511,6 +565,7 @@ describe("FlashLiquidation", () => {
   let stablecoinAdapter: StablecoinAdapter
   let bookKeeper: BookKeeper
   let dummyToken: BEP20
+  let BUSD: BEP20
   let shield: Shield
   let alpacaToken: AlpacaToken
   let fairLaunch: FairLaunch
@@ -554,6 +609,10 @@ describe("FlashLiquidation", () => {
 
   let bookKeeperAsBob: BookKeeper
 
+  let stableSwapModule: StableSwapModule
+
+  let authTokenAdapter: AuthTokenAdapter
+
   before(async () => {
     ;({
       proxyWallets: [deployerProxyWallet, aliceProxyWallet],
@@ -586,6 +645,9 @@ describe("FlashLiquidation", () => {
       collateralPoolConfig,
       pcsFlashLiquidator,
       pancakeRouter,
+      stableSwapModule,
+      BUSD,
+      authTokenAdapter,
     } = await waffle.loadFixture(loadFixtureHandler))
     ;[deployer, alice, bob, dev] = await ethers.getSigners()
     ;[deployerAddress, aliceAddress, bobAddress, devAddress] = await Promise.all([
@@ -852,12 +914,14 @@ describe("FlashLiquidation", () => {
           )
           await stablecoinAdapter.withdraw(deployerAddress, ethers.utils.parseEther("1000"), "0x")
           await dummyToken.mint(deployerAddress, ethers.utils.parseEther("1000"))
+          await BUSD.mint(deployerAddress, ethers.utils.parseEther("1000"))
 
           await dummyToken.approve(pancakeRouter.address, ethers.utils.parseEther("1000"))
-          await alpacaStablecoin.approve(pancakeRouter.address, ethers.utils.parseEther("1000"))
+          await BUSD.approve(pancakeRouter.address, ethers.utils.parseEther("1000"))
+          await BUSD.approve(authTokenAdapter.address, MaxUint256)
           await pancakeRouter.addLiquidity(
             dummyToken.address,
-            alpacaStablecoin.address,
+            BUSD.address,
             ethers.utils.parseEther("1000"),
             ethers.utils.parseEther("1000"),
             "0",
@@ -871,7 +935,6 @@ describe("FlashLiquidation", () => {
             ethers.utils.parseEther("1000"),
             ethers.utils.parseEther("1000")
           )
-          const expectedProfitFromLiquidation = expectedAmountOut.sub(debtShareToRepay.add(1))
 
           await liquidationEngineAsBob.liquidate(
             COLLATERAL_POOL_ID,
@@ -880,16 +943,21 @@ describe("FlashLiquidation", () => {
             debtShareToRepay,
             pcsFlashLiquidator.address,
             ethers.utils.defaultAbiCoder.encode(
-              ["address", "address", "address", "address", "address[]"],
+              ["address", "address", "address", "address", "address[]", "address"],
               [
                 bobAddress,
                 ibTokenAdapter.address,
                 AddressZero,
                 pancakeRouter.address,
-                [dummyToken.address, alpacaStablecoin.address],
+                [dummyToken.address, BUSD.address],
+                stableSwapModule.address,
               ]
             )
           )
+
+          // feeFromSwap = fee + debtShareToRepay
+          const feeFromSwap = await (await bookKeeper.stablecoin(systemDebtEngine.address)).div(WeiPerRay)
+          const expectedProfitFromLiquidation = expectedAmountOut.sub(feeFromSwap.add(1))
 
           // 5. Settle system bad debt
           await systemDebtEngine.settleSystemBadDebt(debtShareToRepay.mul(WeiPerRay))
@@ -1014,12 +1082,14 @@ describe("FlashLiquidation", () => {
             ethers.utils.parseEther("1000").mul(WeiPerRay)
           )
           await stablecoinAdapter.withdraw(deployerAddress, ethers.utils.parseEther("1000"), "0x")
+          await BUSD.mint(deployerAddress, ethers.utils.parseEther("1000"))
           await wbnb.deposit({ value: ethers.utils.parseEther("1000") })
           await wbnb.approve(pancakeRouter.address, ethers.utils.parseEther("1000"))
-          await alpacaStablecoin.approve(pancakeRouter.address, ethers.utils.parseEther("1000"))
+          await BUSD.approve(pancakeRouter.address, ethers.utils.parseEther("1000"))
+          await BUSD.approve(authTokenAdapter.address, MaxUint256)
           await pancakeRouter.addLiquidity(
             wbnb.address,
-            alpacaStablecoin.address,
+            BUSD.address,
             ethers.utils.parseEther("1000"),
             ethers.utils.parseEther("1000"),
             "0",
@@ -1032,7 +1102,7 @@ describe("FlashLiquidation", () => {
             ethers.utils.parseEther("1000"),
             ethers.utils.parseEther("1000")
           )
-          const expectedProfitFromLiquidation = expectedAmountOut.sub(debtShareToRepay.add(1))
+
           await liquidationEngineAsBob.liquidate(
             WBNB_COLLATERAL_POOL_ID,
             alicePositionAddress,
@@ -1040,16 +1110,22 @@ describe("FlashLiquidation", () => {
             debtShareToRepay,
             pcsFlashLiquidator.address,
             ethers.utils.defaultAbiCoder.encode(
-              ["address", "address", "address", "address", "address[]"],
+              ["address", "address", "address", "address", "address[]", "address"],
               [
                 bobAddress,
                 ibWBNBAdapter.address,
                 bnbVault.address,
                 pancakeRouter.address,
-                [wbnb.address, alpacaStablecoin.address],
+                [wbnb.address, BUSD.address],
+                stableSwapModule.address,
               ]
             )
           )
+
+          // feeFromSwap = fee + debtShareToRepay
+          const feeFromSwap = await (await bookKeeper.stablecoin(systemDebtEngine.address)).div(WeiPerRay)
+          const expectedProfitFromLiquidation = expectedAmountOut.sub(feeFromSwap.add(1))
+
           // 5. Settle system bad debt
           await systemDebtEngine.settleSystemBadDebt(debtShareToRepay.mul(WeiPerRay))
 
@@ -1174,12 +1250,14 @@ describe("FlashLiquidation", () => {
           )
           await stablecoinAdapter.withdraw(deployerAddress, ethers.utils.parseEther("1000"), "0x")
           await dummyToken.mint(deployerAddress, ethers.utils.parseEther("1000"))
+          await BUSD.mint(deployerAddress, ethers.utils.parseEther("1000"))
 
           await dummyToken.approve(pancakeRouter.address, ethers.utils.parseEther("1000"))
-          await alpacaStablecoin.approve(pancakeRouter.address, ethers.utils.parseEther("1000"))
+          await BUSD.approve(pancakeRouter.address, ethers.utils.parseEther("1000"))
+          await BUSD.approve(authTokenAdapter.address, MaxUint256)
           await pancakeRouter.addLiquidity(
             dummyToken.address,
-            alpacaStablecoin.address,
+            BUSD.address,
             ethers.utils.parseEther("1"),
             ethers.utils.parseEther("1"),
             "0",
@@ -1203,13 +1281,14 @@ describe("FlashLiquidation", () => {
               debtShareToRepay,
               pcsFlashLiquidator.address,
               ethers.utils.defaultAbiCoder.encode(
-                ["address", "address", "address", "address", "address[]"],
+                ["address", "address", "address", "address", "address[]", "address"],
                 [
                   bobAddress,
                   ibTokenAdapter.address,
                   AddressZero,
                   pancakeRouter.address,
-                  [dummyToken.address, alpacaStablecoin.address],
+                  [dummyToken.address, BUSD.address],
+                  stableSwapModule.address,
                 ]
               )
             )
