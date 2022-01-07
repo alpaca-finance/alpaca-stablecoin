@@ -1,5 +1,5 @@
-import { ethers, network, upgrades, waffle } from "hardhat"
-import { BigNumber, Contract, ContractReceipt, Event, EventFilter, Signer } from "ethers"
+import { ethers, network, upgrades } from "hardhat"
+import { BigNumber, Signer } from "ethers"
 
 import {
   ProxyWallet,
@@ -34,6 +34,8 @@ import {
   AccessControlConfig,
   SimplePriceFeed__factory,
   SimplePriceFeed,
+  SystemDebtEngine,
+  SystemDebtEngine__factory,
 } from "../../../typechain"
 import { expect } from "chai"
 import { loadProxyWalletFixtureHandler } from "../../helper/proxy"
@@ -54,6 +56,7 @@ import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../helper/unit"
 import * as TimeHelpers from "../../helper/time"
 import * as AssertHelpers from "../../helper/assert"
 import { AddressZero } from "../../helper/address"
+import { TransactionReceipt } from "@ethersproject/abstract-provider"
 
 type Fixture = {
   positionManager: PositionManager
@@ -61,6 +64,7 @@ type Fixture = {
   bookKeeper: BookKeeper
   stabilityFeeCollector: StabilityFeeCollector
   ibTokenAdapter: IbTokenAdapter
+  ibTokenAdapter2: IbTokenAdapter
   wbnbTokenAdapter: TokenAdapter
   alpacaTokenAdapter: TokenAdapter
   stablecoinAdapter: StablecoinAdapter
@@ -170,11 +174,7 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
 
   // Deploy AlpacaStablecoin
   const AlpacaStablecoin = new AlpacaStablecoin__factory(deployer)
-  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [
-    "Alpaca USD",
-    "AUSD",
-    "31337",
-  ])) as AlpacaStablecoin
+  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, ["Alpaca USD", "AUSD"])) as AlpacaStablecoin
 
   const AccessControlConfig = (await ethers.getContractFactory(
     "AccessControlConfig",
@@ -226,6 +226,20 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     positionManager.address,
   ])) as IbTokenAdapter
 
+  const ibTokenAdapter2 = (await upgrades.deployProxy(IbTokenAdapter, [
+    bookKeeper.address,
+    formatBytes32String("ibBUSD2"),
+    busdVault.address,
+    alpacaToken.address,
+    fairLaunch.address,
+    0,
+    shield.address,
+    await deployer.getAddress(),
+    BigNumber.from(1000),
+    await dev.getAddress(),
+    positionManager.address,
+  ])) as IbTokenAdapter
+
   const WBNBTokenAdapter = new TokenAdapter__factory(deployer)
   const wbnbTokenAdapter = (await upgrades.deployProxy(WBNBTokenAdapter, [
     bookKeeper.address,
@@ -247,19 +261,31 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
   ])) as StablecoinAdapter
 
   // Deploy StabilityFeeCollector
+  const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
+  const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
+
   const StabilityFeeCollector = new StabilityFeeCollector__factory(deployer)
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
+    systemDebtEngine.address,
   ])) as StabilityFeeCollector
 
   await accessControlConfig.grantRole(
     ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]),
     ibTokenAdapter.address
   )
+  await accessControlConfig.grantRole(
+    ethers.utils.solidityKeccak256(["string"], ["ADAPTER_ROLE"]),
+    ibTokenAdapter2.address
+  )
   await accessControlConfig.grantRole(await accessControlConfig.ADAPTER_ROLE(), wbnbTokenAdapter.address)
   await accessControlConfig.grantRole(await accessControlConfig.ADAPTER_ROLE(), alpacaTokenAdapter.address)
   await accessControlConfig.grantRole(
     ethers.utils.solidityKeccak256(["string"], ["POSITION_MANAGER_ROLE"]),
+    positionManager.address
+  )
+  await accessControlConfig.grantRole(
+    ethers.utils.solidityKeccak256(["string"], ["COLLATERAL_MANAGER_ROLE"]),
     positionManager.address
   )
   await accessControlConfig.grantRole(
@@ -294,8 +320,26 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     TREASURY_FEE_BPS,
     AddressZero
   )
+  // init ibBUSD2 pool
+  await collateralPoolConfig.initCollateralPool(
+    formatBytes32String("ibBUSD2"),
+    // set pool debt ceiling 100 rad
+    WeiPerRad.mul(100),
+    // set position debt floor 1 rad
+    WeiPerRad.mul(1),
+    simplePriceFeed.address,
+    WeiPerRay,
+    WeiPerRay,
+    ibTokenAdapter2.address,
+    CLOSE_FACTOR_BPS,
+    LIQUIDATOR_INCENTIVE_BPS,
+    TREASURY_FEE_BPS,
+    AddressZero
+  )
+
   // set price with safety margin 1 ray (1 ibBUSD = 1 USD)
   await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("ibBUSD"), WeiPerRay)
+  await collateralPoolConfig.setPriceWithSafetyMargin(formatBytes32String("ibBUSD2"), WeiPerRay)
 
   // init WBNB pool
   await collateralPoolConfig.initCollateralPool(
@@ -341,6 +385,7 @@ const loadFixtureHandler = async (): Promise<Fixture> => {
     bookKeeper,
     stabilityFeeCollector,
     ibTokenAdapter,
+    ibTokenAdapter2,
     wbnbTokenAdapter,
     alpacaTokenAdapter,
     stablecoinAdapter,
@@ -375,6 +420,7 @@ describe("position manager", () => {
   let alpacaStablecoinProxyActionsAsAlice: AlpacaStablecoinProxyActions
   let bookKeeper: BookKeeper
   let ibTokenAdapter: IbTokenAdapter
+  let ibTokenAdapter2: IbTokenAdapter
   let wbnbTokenAdapter: TokenAdapter
   let alpacaTokenAdapter: TokenAdapter
   let stablecoinAdapter: StablecoinAdapter
@@ -401,6 +447,7 @@ describe("position manager", () => {
       positionManager,
       bookKeeper,
       ibTokenAdapter,
+      ibTokenAdapter2,
       wbnbTokenAdapter,
       alpacaTokenAdapter,
       stablecoinAdapter,
@@ -503,6 +550,7 @@ describe("position manager", () => {
           const convertCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("tokenToIbToken", [
             vault.address,
             WeiPerWad.mul(10),
+            true,
           ])
           const convertTx = await aliceProxyWallet["execute(address,bytes)"](
             alpacaStablecoinProxyActions.address,
@@ -563,6 +611,7 @@ describe("position manager", () => {
             const convertCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("tokenToIbToken", [
               vault.address,
               WeiPerWad.mul(10),
+              true,
             ])
             const convertTx = await aliceProxyWallet["execute(address,bytes)"](
               alpacaStablecoinProxyActions.address,
@@ -648,7 +697,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(15),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress]),
             ]
           )
@@ -678,7 +726,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(15),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -710,7 +757,6 @@ describe("position manager", () => {
                 formatBytes32String("ibBUSD"),
                 WeiPerWad.mul(10),
                 WeiPerWad.mul(5),
-                true,
                 ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
               ]
             )
@@ -718,6 +764,7 @@ describe("position manager", () => {
               alpacaStablecoinProxyActions.address,
               convertOpenLockTokenAndDrawCall
             )
+            const txReceipt = await convertOpenLockTokenAndDrawTx.wait()
 
             const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
             const positionAddress = await positionManager.positions(positionId)
@@ -738,7 +785,6 @@ describe("position manager", () => {
               positionManager.address,
               ibTokenAdapter.address,
               1,
-              aliceAddress,
               alpacaToken.address,
             ])
             await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestCall)
@@ -768,7 +814,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -871,7 +916,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -890,7 +934,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -995,7 +1038,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1071,7 +1113,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1150,7 +1191,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1169,7 +1209,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1251,7 +1290,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1306,7 +1344,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1361,7 +1398,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1439,7 +1475,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1543,7 +1578,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1626,7 +1660,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1722,7 +1755,6 @@ describe("position manager", () => {
               formatBytes32String("ibBUSD"),
               WeiPerWad.mul(10),
               WeiPerWad.mul(5),
-              true,
               ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
             ]
           )
@@ -1776,6 +1808,288 @@ describe("position manager", () => {
           const alpacaTokenAfter = await alpacaToken.balanceOf(aliceAddress)
           // 1 block is mined, after unlock, alice should get alpaca rewards 4500 alpaca ((1 * 5000) - 10% )
           expect(alpacaTokenAfter.sub(alpacaTokenBefore)).to.be.equal(WeiPerWad.mul(4500))
+        })
+      })
+    })
+    describe("user adjust position", () => {
+      context("alice convert and lock collateral", () => {
+        it("should be able to adjust position", async () => {
+          // 1.
+          //  a. convert BUSD to ibBUSD
+          //  b. open a new position
+          //  c. lock ibBUSD
+          //  d. mint AUSD
+          const convertOpenLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertOpenLockTokenAndDraw",
+            [
+              vault.address,
+              positionManager.address,
+              stabilityFeeCollector.address,
+              ibTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ibBUSD"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(5),
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const convertOpenLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            convertOpenLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const [lockCaollateralBefore, debtShareBefor] = await bookKeeper.positions(
+            ethers.utils.formatBytes32String("ibBUSD"),
+            positionAddress
+          )
+          expect(lockCaollateralBefore).to.be.equal(WeiPerWad.mul(10))
+
+          // 2.
+          //  a. conver BUSD to ibBUSD
+          //  b. lock ibBUSD
+          const convertAndLockTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertAndLockToken",
+            [vault.address, positionManager.address, ibTokenAdapter.address, positionId, WeiPerWad.mul(10), "0x"]
+          )
+          const convertAndLockTokenTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            convertAndLockTokenCall
+          )
+
+          const [lockCaollateralAfter, debtShareAfter] = await bookKeeper.positions(
+            ethers.utils.formatBytes32String("ibBUSD"),
+            positionAddress
+          )
+          expect(lockCaollateralAfter).to.be.equal(WeiPerWad.mul(20))
+        })
+      })
+      context("alice convert and lock collateral and mint AUSD", () => {
+        it("should be able to adjust position", async () => {
+          // 1.
+          //  a. convert BUSD to ibBUSD
+          //  b. open a new position
+          //  c. lock ibBUSD
+          //  d. mint AUSD
+          const convertOpenLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertOpenLockTokenAndDraw",
+            [
+              vault.address,
+              positionManager.address,
+              stabilityFeeCollector.address,
+              ibTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ibBUSD"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(5),
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const convertOpenLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            convertOpenLockTokenAndDrawCall
+          )
+
+          const positionId = await positionManager.ownerLastPositionId(aliceProxyWallet.address)
+          const positionAddress = await positionManager.positions(positionId)
+
+          const [lockCaollateralBefore, debtShareBefor] = await bookKeeper.positions(
+            ethers.utils.formatBytes32String("ibBUSD"),
+            positionAddress
+          )
+          expect(lockCaollateralBefore).to.be.equal(WeiPerWad.mul(10))
+          expect(debtShareBefor).to.be.equal(WeiPerWad.mul(5))
+
+          // 2.
+          //  a. conver BUSD to ibBUSD
+          //  b. lock ibBUSD
+          //  c. mint AUSD
+
+          const convertLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertLockTokenAndDraw",
+            [
+              vault.address,
+              positionManager.address,
+              stabilityFeeCollector.address,
+              ibTokenAdapter.address,
+              stablecoinAdapter.address,
+              positionId,
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(5),
+              "0x",
+            ]
+          )
+          const convertLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            convertLockTokenAndDrawCall
+          )
+
+          const [lockCaollateralAfter, debtShareAfter] = await bookKeeper.positions(
+            ethers.utils.formatBytes32String("ibBUSD"),
+            positionAddress
+          )
+          expect(lockCaollateralAfter).to.be.equal(WeiPerWad.mul(20))
+          expect(debtShareAfter).to.be.equal(WeiPerWad.mul(10))
+        })
+      })
+    })
+
+    describe("user openAndLock multiple positions", () => {
+      context("alice openAndLock multiple position and want to claim ALPACA rewards", () => {
+        const openWithAdapter1 = async (): Promise<TransactionReceipt> => {
+          const convertOpenLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertOpenLockTokenAndDraw",
+            [
+              vault.address,
+              positionManager.address,
+              stabilityFeeCollector.address,
+              ibTokenAdapter.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ibBUSD"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(5),
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const convertOpenLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            convertOpenLockTokenAndDrawCall
+          )
+          const txReceipt = await convertOpenLockTokenAndDrawTx.wait()
+          return txReceipt
+        }
+        const openWithAdapter2 = async (): Promise<TransactionReceipt> => {
+          const convertOpenLockTokenAndDrawCall = alpacaStablecoinProxyActions.interface.encodeFunctionData(
+            "convertOpenLockTokenAndDraw",
+            [
+              vault.address,
+              positionManager.address,
+              stabilityFeeCollector.address,
+              ibTokenAdapter2.address,
+              stablecoinAdapter.address,
+              formatBytes32String("ibBUSD2"),
+              WeiPerWad.mul(10),
+              WeiPerWad.mul(5),
+              ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress]),
+            ]
+          )
+          const convertOpenLockTokenAndDrawTx = await aliceProxyWallet["execute(address,bytes)"](
+            alpacaStablecoinProxyActions.address,
+            convertOpenLockTokenAndDrawCall
+          )
+          const txReceipt = await convertOpenLockTokenAndDrawTx.wait()
+          return txReceipt
+        }
+        it("should revert when harvest invalid position id", async () => {
+          const harvestCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("harvest", [
+            positionManager.address,
+            ibTokenAdapter.address,
+            999,
+            alpacaToken.address,
+          ])
+
+          await expect(
+            aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestCall)
+          ).to.be.revertedWith("IbTokenAdapter/harvest-to-address-zero")
+
+          const harvestMultipleCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("harvestMultiple", [
+            positionManager.address,
+            [ibTokenAdapter.address, ibTokenAdapter.address],
+            [888, 999],
+            alpacaToken.address,
+          ])
+
+          await expect(
+            aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestMultipleCall)
+          ).to.be.revertedWith("IbTokenAdapter/harvest-to-address-zero")
+        })
+        it("alice should be able to harvest reward one position at a time", async () => {
+          await openWithAdapter1()
+
+          // Harvest ALPACA from the position
+          const aliceAlpacaBefore = await alpacaToken.balanceOf(aliceAddress)
+          const proxyWalletAlpacaBefore = await alpacaToken.balanceOf(aliceProxyWallet.address)
+
+          const harvestCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("harvest", [
+            positionManager.address,
+            ibTokenAdapter.address,
+            1,
+            alpacaToken.address,
+          ])
+
+          await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestCall)
+          const aliceAlpacaAfter = await alpacaToken.balanceOf(aliceAddress)
+          const proxyWalletAlpacaAfter = await alpacaToken.balanceOf(aliceProxyWallet.address)
+
+          expect(aliceAlpacaBefore).to.be.equal(ethers.utils.parseEther("100"))
+          expect(aliceAlpacaAfter).to.be.equal(ethers.utils.parseEther("4600"))
+          expect(proxyWalletAlpacaBefore).to.be.equal(0)
+          expect(proxyWalletAlpacaAfter).to.be.equal(0)
+        })
+        it("alice should be able to harvest reward multiple positions at a time", async () => {
+          const block = await TimeHelpers.latestBlockNumber()
+          await openWithAdapter1()
+          await openWithAdapter1()
+          await openWithAdapter1()
+          await openWithAdapter1()
+
+          // Harvest ALPACA from the position
+          const aliceAlpacaBefore = await alpacaToken.balanceOf(aliceAddress)
+          const proxyWalletAlpacaBefore = await alpacaToken.balanceOf(aliceProxyWallet.address)
+
+          const harvestMultipleCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("harvestMultiple", [
+            positionManager.address,
+            [ibTokenAdapter.address, ibTokenAdapter.address, ibTokenAdapter.address, ibTokenAdapter.address],
+            [1, 2, 3, 4],
+            alpacaToken.address,
+          ])
+
+          await TimeHelpers.advanceBlockTo(block.toNumber() + 100)
+          await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestMultipleCall)
+          const aliceAlpacaAfter = await alpacaToken.balanceOf(aliceAddress)
+          const proxyWalletAlpacaAfter = await alpacaToken.balanceOf(aliceProxyWallet.address)
+
+          expect(aliceAlpacaBefore).to.be.equal(ethers.utils.parseEther("100"))
+          expect(aliceAlpacaAfter).to.be.equal(ethers.utils.parseEther("450099.999999999982000000"))
+          expect(proxyWalletAlpacaBefore).to.be.equal(0)
+          expect(proxyWalletAlpacaAfter).to.be.equal(0)
+        })
+        it("alice should be able to harvest reward multiple positions from different adapter", async () => {
+          const block = await TimeHelpers.latestBlockNumber()
+          await openWithAdapter1()
+          await openWithAdapter1()
+          await openWithAdapter1()
+          await openWithAdapter2()
+          await openWithAdapter2()
+
+          // Harvest ALPACA from the position
+          const aliceAlpacaBefore = await alpacaToken.balanceOf(aliceAddress)
+          const proxyWalletAlpacaBefore = await alpacaToken.balanceOf(aliceProxyWallet.address)
+
+          const harvestMultipleCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("harvestMultiple", [
+            positionManager.address,
+            [
+              ibTokenAdapter2.address,
+              ibTokenAdapter2.address,
+              ibTokenAdapter.address,
+              ibTokenAdapter.address,
+              ibTokenAdapter.address,
+            ],
+            [4, 5, 1, 2, 3],
+            alpacaToken.address,
+          ])
+
+          await TimeHelpers.advanceBlockTo(block.toNumber() + 100)
+          await aliceProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, harvestMultipleCall)
+
+          const aliceAlpacaAfter = await alpacaToken.balanceOf(aliceAddress)
+          const proxyWalletAlpacaAfter = await alpacaToken.balanceOf(aliceProxyWallet.address)
+          expect(aliceAlpacaBefore).to.be.equal(ethers.utils.parseEther("100"))
+          expect(aliceAlpacaAfter).to.be.equal(ethers.utils.parseEther("450099.999999999982000000"))
+          expect(proxyWalletAlpacaBefore).to.be.equal(0)
+          expect(proxyWalletAlpacaAfter).to.be.equal(0)
         })
       })
     })

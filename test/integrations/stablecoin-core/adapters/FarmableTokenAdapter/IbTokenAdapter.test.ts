@@ -112,6 +112,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   ])) as PositionManager
   await positionManager.deployed()
   await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), positionManager.address)
+  await accessControlConfig.grantRole(await accessControlConfig.COLLATERAL_MANAGER_ROLE(), positionManager.address)
 
   const IbTokenAdapter = (await ethers.getContractFactory("IbTokenAdapter", deployer)) as IbTokenAdapter__factory
   const ibTokenAdapter = (await upgrades.deployProxy(IbTokenAdapter, [
@@ -703,6 +704,63 @@ describe("IbTokenAdapter", () => {
         expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("10"))
       })
     })
+    context("when bob withdraw collateral to alice", async () => {
+      context("when bob doesn't has collateral", () => {
+        it("should be revert", async () => {
+          // Assuming Alice is the first one to deposit hence no rewards to be harvested yet
+          await ibDUMMYasAlice.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+          await ibTokenAdapterAsAlice.deposit(
+            aliceAddress,
+            ethers.utils.parseEther("1"),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+          )
+
+          await expect(
+            ibTokenAdapterAsBob.withdraw(
+              aliceAddress,
+              ethers.utils.parseEther("1"),
+              ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress])
+            )
+          ).to.be.revertedWith("IbTokenAdapter/insufficient staked amount")
+        })
+      })
+      context("when bob has collateral", async () => {
+        it("should be able to call withdraw", async () => {
+          await ibDUMMYasAlice.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+          await ibTokenAdapterAsAlice.deposit(
+            aliceAddress,
+            ethers.utils.parseEther("1"),
+            ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
+          )
+
+          expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(0)
+          expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("1"))
+          expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(0)
+          expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(0)
+          expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
+          expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(0)
+
+          await ibDUMMYasBob.approve(ibTokenAdapter.address, ethers.utils.parseEther("1"))
+          await ibTokenAdapterAsBob.deposit(
+            bobAddress,
+            ethers.utils.parseEther("1"),
+            ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress])
+          )
+
+          let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
+          let bobIbDUMMYbefore = await ibDUMMY.balanceOf(bobAddress)
+          await ibTokenAdapterAsBob.withdraw(aliceAddress, ethers.utils.parseEther("1"), "0x")
+          let aliceIbDUMMYafter = await ibDUMMY.balanceOf(aliceAddress)
+          let bobIbDUMMYafter = await ibDUMMY.balanceOf(bobAddress)
+
+          expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
+          expect(bobIbDUMMYafter.sub(bobIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("0"))
+          expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("250"))
+          expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq("0")
+          expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(ethers.utils.parseEther("45"))
+        })
+      })
+    })
   })
 
   describe("#emergencyWithdraw", async () => {
@@ -765,7 +823,7 @@ describe("IbTokenAdapter", () => {
         // - Alice should not get any ALPACA as she decided to do exit via emergency withdraw instead of withdraw
         // - Alice should get 1 ibDUMMY back.
         let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
-        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress, aliceAddress)
+        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress)
         let aliceIbDUMMYafter = await ibDUMMY.balanceOf(aliceAddress)
 
         expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
@@ -831,7 +889,7 @@ describe("IbTokenAdapter", () => {
         // - Alice shouldn't be paid by any ALPACA
         // - Alice's state should be reset
         let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
-        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress, aliceAddress)
+        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress)
         let aliceIbDUMMYafter = await ibDUMMY.balanceOf(aliceAddress)
 
         expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))
@@ -1273,7 +1331,7 @@ describe("IbTokenAdapter", () => {
         // - Alice should not get any ALPACA as she decided to do exit via emergency withdraw instead of withdraw
         // - Alice should get 1 ibDUMMY back.
         let aliceIbDUMMYbefore = await ibDUMMY.balanceOf(aliceAddress)
-        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress, aliceAddress)
+        await ibTokenAdapterAsAlice.emergencyWithdraw(aliceAddress)
         let aliceIbDUMMYafter = await ibDUMMY.balanceOf(aliceAddress)
 
         expect(aliceIbDUMMYafter.sub(aliceIbDUMMYbefore)).to.be.eq(ethers.utils.parseEther("1"))

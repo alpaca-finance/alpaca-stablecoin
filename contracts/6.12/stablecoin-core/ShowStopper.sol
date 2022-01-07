@@ -18,7 +18,6 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import "../interfaces/IBookKeeper.sol";
-import "../interfaces/IAuctioneer.sol";
 import "../interfaces/ILiquidationEngine.sol";
 import "../interfaces/IPriceFeed.sol";
 import "../interfaces/IPriceOracle.sol";
@@ -43,12 +42,12 @@ import "../interfaces/IShowStopper.sol";
        - set the cage price for each `collateralPoolId`, reading off the price feed
 
     We must process some system state before it is possible to calculate
-    the final dai / collateral price. In particular, we need to determine
+    the final AUSD / collateral price. In particular, we need to determine
 
       a. `badDebtAccumulator`, the collateral badDebtAccumulator per collateral type by
          considering under-collateralised CDPs.
 
-      b. `debt`, the outstanding dai supply after including system
+      b. `debt`, the outstanding AUSD supply after including system
          surplus / deficit
 
     We determine (a) by processing all under-collateralised CDPs with
@@ -59,9 +58,9 @@ import "../interfaces/IShowStopper.sol";
        - any excess collateral remains
        - backing collateral taken
 
-    We determine (b) by processing ongoing dai generating processes,
+    We determine (b) by processing ongoing AUSD generating processes,
     i.e. auctions. We need to ensure that auctions will not generate any
-    further dai income.
+    further AUSD income.
 
     In the two-way auction model (Flipper) this occurs cagedTimestamp
     all auctions are in the reverse (`dent`) phase. There are two ways
@@ -72,18 +71,18 @@ import "../interfaces/IShowStopper.sol";
            cage administrator.
 
            This takes a fairly predictable time to occur but with altered
-           auction dynamics due to the now varying price of dai.
+           auction dynamics due to the now varying price of AUSD.
 
        ii) `skip`: cancel all ongoing auctions and seize the collateral.
 
            This allows for faster processing at the expense of more
-           processing calls. This option allows dai holders to retrieve
+           processing calls. This option allows AUSD holders to retrieve
            their collateral faster.
 
            `skip(collateralPoolId, id)`:
             - cancel individual flip auctions in the `tend` (forward) phase
             - retrieves collateral and debt (including penalty) to owner's CDP
-            - returns dai to last bidder
+            - returns AUSD to last bidder
             - `dent` (reverse) phase auctions can continue normally
 
     Option (i), `cageCoolDown`, is sufficient (if all auctions were bidded at least
@@ -94,7 +93,7 @@ import "../interfaces/IShowStopper.sol";
     In the case of the Dutch Auctions model (Clipper) they keep recovering
     debt during the whole lifetime and there isn't a max duration time
     guaranteed for the auction to end.
-    So the way to ensure the protocol will not receive extra dai income is:
+    So the way to ensure the protocol will not receive extra AUSD income is:
 
     4b. i) `snip`: cancel all ongoing auctions and seize the collateral.
 
@@ -116,7 +115,7 @@ import "../interfaces/IShowStopper.sol";
     6. `finalizeDebt()`:
        - only callable after processing time period elapsed
        - assumption that all under-collateralised CDPs are processed
-       - fixes the total outstanding supply of dai
+       - fixes the total outstanding supply of AUSD
        - may also require extra CDP processing to cover systemDebtEngine surplus
 
     7. `finalizeCashPrice(collateralPoolId)`:
@@ -124,21 +123,21 @@ import "../interfaces/IShowStopper.sol";
         - adjusts the `fix` in the case of deficit / surplus
 
     At this point we have computed the final price for each collateral
-    type and dai holders can now turn their dai into collateral. Each
-    unit dai can claim a fixed basket of collateral.
+    type and AUSD holders can now turn their AUSD into collateral. Each
+    unit AUSD can claim a fixed basket of collateral.
 
-    Dai holders must first `accumulateStablecoin` some dai into a `stablecoinAccumulator`. Once packed,
-    dai cannot be unpacked and is not transferrable. More dai can be
+    AUSD holders must first `accumulateStablecoin` some AUSD into a `stablecoinAccumulator`. Once packed,
+    AUSD cannot be unpacked and is not transferrable. More AUSD can be
     added to a stablecoinAccumulator later.
 
     8. `accumulateStablecoin(wad)`:
-        - put some dai into a stablecoinAccumulator in preparation for `redeemStablecoin`
+        - put some AUSD into a stablecoinAccumulator in preparation for `redeemStablecoin`
 
     Finally, collateral can be obtained with `redeemStablecoin`. The bigger the stablecoinAccumulator,
     the more collateral can be released.
 
     9. `redeemStablecoin(collateralPoolId, wad)`:
-        - exchange some dai from your stablecoinAccumulator for gems from a specific collateralPoolId
+        - exchange some AUSD from your stablecoinAccumulator for gems from a specific collateralPoolId
         - the number of gems is limited by how big your stablecoinAccumulator is
 */
 
@@ -163,7 +162,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
   mapping(bytes32 => mapping(address => uint256)) public redeemedStablecoinAmount; //    [wad]
 
   event LogCage();
-  event LogCage(bytes32 indexed collateralPoolId);
+  event LogCageCollateralPool(bytes32 indexed collateralPoolId);
 
   event LogAccumulateBadDebt(
     bytes32 indexed collateralPoolId,
@@ -226,9 +225,14 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
   event LogSetPriceOracle(address indexed caller, address _priceOracle);
   event LogSetCageCoolDown(address indexed caller, uint256 _cageCoolDown);
 
-  function setBookKeeper(address _bookKeeper) external {
+  modifier onlyOwner() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    _;
+  }
+
+  /// @dev access: OWNER_ROLE
+  function setBookKeeper(address _bookKeeper) external onlyOwner {
     require(live == 1, "ShowStopper/not-live");
 
     IBookKeeper(_bookKeeper).totalStablecoinIssued(); // Sanity Check Call
@@ -236,33 +240,29 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     emit LogSetBookKeeper(msg.sender, _bookKeeper);
   }
 
-  function setLiquidationEngine(address _liquidationEngine) external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  /// @dev access: OWNER_ROLE
+  function setLiquidationEngine(address _liquidationEngine) external onlyOwner {
     require(live == 1, "ShowStopper/not-live");
     liquidationEngine = ILiquidationEngine(_liquidationEngine);
     emit LogSetLiquidationEngine(msg.sender, _liquidationEngine);
   }
 
-  function setSystemDebtEngine(address _systemDebtEngine) external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  /// @dev access: OWNER_ROLE
+  function setSystemDebtEngine(address _systemDebtEngine) external onlyOwner {
     require(live == 1, "ShowStopper/not-live");
     systemDebtEngine = ISystemDebtEngine(_systemDebtEngine);
     emit LogSetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
 
-  function setPriceOracle(address _priceOracle) external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  /// @dev access: OWNER_ROLE
+  function setPriceOracle(address _priceOracle) external onlyOwner {
     require(live == 1, "ShowStopper/not-live");
     priceOracle = IPriceOracle(_priceOracle);
     emit LogSetPriceOracle(msg.sender, _priceOracle);
   }
 
-  function setCageCoolDown(uint256 _cageCoolDown) external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  /// @dev access: OWNER_ROLE
+  function setCageCoolDown(uint256 _cageCoolDown) external onlyOwner {
     require(live == 1, "ShowStopper/not-live");
     cageCoolDown = _cageCoolDown;
     emit LogSetCageCoolDown(msg.sender, _cageCoolDown);
@@ -276,9 +276,8 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
       - SystemDebtEngine will be paused: no accrual of new debt, no system debt settlement
       - PriceOracle will be paused: no new price update, no liquidation trigger
    */
-  function cage() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  /// @dev access: OWNER_ROLE
+  function cage() external onlyOwner {
     require(live == 1, "ShowStopper/not-live");
     live = 0;
     cagedTimestamp = block.timestamp;
@@ -291,9 +290,8 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
 
   /// @dev Set the cage price of the collateral pool with the latest price from the price oracle
   /// @param _collateralPoolId Collateral pool id
-  function cage(bytes32 _collateralPoolId) external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  /// @dev access: OWNER_ROLE
+  function cage(bytes32 _collateralPoolId) external onlyOwner {
     require(live == 0, "ShowStopper/still-live");
     require(cagePrice[_collateralPoolId] == 0, "ShowStopper/cage-price-collateral-pool-id-already-defined");
     uint256 _totalDebtShare = ICollateralPoolConfig(bookKeeper.collateralPoolConfig()).getTotalDebtShare(
@@ -306,7 +304,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     totalDebtShare[_collateralPoolId] = _totalDebtShare;
     // par is a ray, priceFeed returns a wad
     cagePrice[_collateralPoolId] = wdiv(priceOracle.stableCoinReferencePrice(), uint256(_priceFeed.readPrice()));
-    emit LogCage(_collateralPoolId);
+    emit LogCageCollateralPool(_collateralPoolId);
   }
 
   /** @dev Inspect the specified position and use the cage price of the collateral pool id to calculate the current badDebtAccumulator of the position.
@@ -330,7 +328,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     // accumulate bad debt in badDebtAccumulator (if there is any)
     badDebtAccumulator[_collateralPoolId] = add(badDebtAccumulator[_collateralPoolId], sub(_debtAmount, _amount));
 
-    require(_amount <= 2**255 && _debtShare <= 2**255, "ShowStopper/overflow");
+    require(_amount < 2**255 && _debtShare < 2**255, "ShowStopper/overflow");
 
     // force close the position with the best amount we could achieve
     bookKeeper.confiscatePosition(
@@ -364,7 +362,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
     );
     (uint256 _lockedCollateralAmount, uint256 _debtShare) = bookKeeper.positions(_collateralPoolId, _positionAddress);
     require(_debtShare == 0, "ShowStopper/debtShare-not-zero");
-    require(_lockedCollateralAmount <= 2**255, "ShowStopper/overflow");
+    require(_lockedCollateralAmount < 2**255, "ShowStopper/overflow");
     bookKeeper.confiscatePosition(
       _collateralPoolId,
       _positionAddress,
@@ -413,6 +411,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
   /// @dev Accumulate the deposited stablecoin of the caller into a stablecoinAccumulator to be redeemed into collateral token later
   /// @param _amount the amount of stablecoin to be accumulated [wad]
   function accumulateStablecoin(uint256 _amount) external {
+    require(_amount != 0, "ShowStopper/amount-zero");
     require(debt != 0, "ShowStopper/debt-zero");
     bookKeeper.moveStablecoin(msg.sender, address(systemDebtEngine), mul(_amount, RAY));
     stablecoinAccumulator[msg.sender] = add(stablecoinAccumulator[msg.sender], _amount);
@@ -423,6 +422,7 @@ contract ShowStopper is PausableUpgradeable, IShowStopper {
   /// @param _collateralPoolId Collateral pool id
   /// @param _amount the amount of stablecoin to be redeemed [wad]
   function redeemStablecoin(bytes32 _collateralPoolId, uint256 _amount) external {
+    require(_amount != 0, "ShowStopper/amount-zero");
     require(finalCashPrice[_collateralPoolId] != 0, "ShowStopper/final-cash-price-collateral-pool-id-not-defined");
     bookKeeper.moveCollateral(
       _collateralPoolId,

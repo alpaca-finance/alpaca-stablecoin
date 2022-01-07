@@ -14,29 +14,25 @@ Alpaca Fin Corporation
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 import "./ProxyWallet.sol";
 import "./ProxyWalletFactory.sol";
 
 // This Registry deploys new proxy instances through ProxyWalletFactory.build(address) and keeps a registry of owner => proxy
-contract ProxyWalletRegistry is OwnableUpgradeable, PausableUpgradeable, AccessControlUpgradeable {
+contract ProxyWalletRegistry is OwnableUpgradeable {
   mapping(address => ProxyWallet) public proxies;
   ProxyWalletFactory factory;
 
   // --- Init ---
   function initialize(address _factory) external initializer {
     OwnableUpgradeable.__Ownable_init();
-    PausableUpgradeable.__Pausable_init();
-    AccessControlUpgradeable.__AccessControl_init();
 
     factory = ProxyWalletFactory(_factory);
   }
 
   // deploys a new proxy instance
   // sets owner of proxy to caller
-  function build() public returns (address payable _proxy) {
+  function build() external returns (address payable _proxy) {
     _proxy = build(msg.sender);
   }
 
@@ -48,7 +44,7 @@ contract ProxyWalletRegistry is OwnableUpgradeable, PausableUpgradeable, AccessC
     proxies[owner] = ProxyWallet(_proxy);
   }
 
-  function setOwner(address _newOwner) public {
+  function setOwner(address _newOwner) external {
     require(proxies[_newOwner] == ProxyWallet(0));
     ProxyWallet _proxy = proxies[msg.sender];
     require(_proxy.owner() == _newOwner);

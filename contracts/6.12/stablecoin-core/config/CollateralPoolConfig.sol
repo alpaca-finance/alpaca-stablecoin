@@ -97,8 +97,11 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
     _collateralPools[_collateralPoolId].debtFloor = _debtFloor;
     IPriceFeed(_priceFeed).peekPrice(); // Sanity Check Call
     _collateralPools[_collateralPoolId].priceFeed = _priceFeed;
+    require(_liquidationRatio >= RAY, "CollateralPoolConfig/invalid-liquidation-ratio");
     _collateralPools[_collateralPoolId].liquidationRatio = _liquidationRatio;
-    require(_stabilityFeeRate >= RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
+    require(_stabilityFeeRate == 0 || _stabilityFeeRate >= RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
+    // Maximum stability fee rate is 50% yearly
+    require(_stabilityFeeRate <= 1000000012857214317438491659, "CollateralPoolConfig/stability-fee-rate-too-large");
     _collateralPools[_collateralPoolId].stabilityFeeRate = _stabilityFeeRate;
     _collateralPools[_collateralPoolId].lastAccumulationTime = now;
     IGenericTokenAdapter(_adapter).decimals(); // Sanity Check Call
@@ -168,7 +171,9 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
   /// @param _collateralPool Collateral pool id
   /// @param _stabilityFeeRate the new stability fee rate [ray]
   function setStabilityFeeRate(bytes32 _collateralPool, uint256 _stabilityFeeRate) external onlyOwner {
-    require(_stabilityFeeRate >= RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
+    require(_stabilityFeeRate == 0 || _stabilityFeeRate >= RAY, "CollateralPoolConfig/invalid-stability-fee-rate");
+    // Maximum stability fee rate is 50% yearly
+    require(_stabilityFeeRate <= 1000000012857214317438491659, "CollateralPoolConfig/stability-fee-rate-too-large");
     _collateralPools[_collateralPool].stabilityFeeRate = _stabilityFeeRate;
     emit LogSetStabilityFeeRate(msg.sender, _collateralPool, _stabilityFeeRate);
   }
@@ -278,5 +283,18 @@ contract CollateralPoolConfig is AccessControlUpgradeable, ICollateralPoolConfig
 
   function getStrategy(bytes32 _collateralPoolId) external view override returns (address) {
     return _collateralPools[_collateralPoolId].strategy;
+  }
+
+  function getCollateralPoolInfo(bytes32 _collateralPoolId)
+    external
+    view
+    override
+    returns (CollateralPoolInfo memory _info)
+  {
+    _info.debtAccumulatedRate = _collateralPools[_collateralPoolId].debtAccumulatedRate;
+    _info.totalDebtShare = _collateralPools[_collateralPoolId].totalDebtShare;
+    _info.debtCeiling = _collateralPools[_collateralPoolId].debtCeiling;
+    _info.priceWithSafetyMargin = _collateralPools[_collateralPoolId].priceWithSafetyMargin;
+    _info.debtFloor = _collateralPools[_collateralPoolId].debtFloor;
   }
 }

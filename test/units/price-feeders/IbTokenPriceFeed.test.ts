@@ -9,6 +9,8 @@ import { formatBytes32BigNumber } from "../../helper/format"
 import { parseEther } from "ethers/lib/utils"
 import { AccessControlConfig } from "../../../typechain/AccessControlConfig"
 import { AccessControlConfig__factory } from "../../../typechain/factories/AccessControlConfig__factory"
+import * as TimeHelpers from "../../helper/time"
+import { BigNumber } from "@ethersproject/bignumber"
 
 chai.use(solidity)
 const { expect } = chai
@@ -18,6 +20,8 @@ type fixture = {
   mockedBaseUsdPriceFeed: MockContract
   mockedAccessControlConfig: MockContract
 }
+
+const ORACLE_TIME_DELAY = 900
 
 const loadFixtureHandler = async (): Promise<fixture> => {
   const [deployer] = await ethers.getSigners()
@@ -47,6 +51,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     mockedIbBasePriceFeed.address,
     mockedBaseUsdPriceFeed.address,
     mockedAccessControlConfig.address,
+    ORACLE_TIME_DELAY,
   ])) as IbTokenPriceFeed
   await ibTokenPriceFeed.deployed()
 
@@ -101,12 +106,13 @@ describe("IbTokenPriceFeed", () => {
         // 1 BNB = 400 USD
         mockedBaseUsdPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(parseEther("400")), true])
 
-        const [price, ok] = await ibTokenPriceFeed.peekPrice()
-        expect(price).to.be.equal(parseEther("440"))
-        expect(ok).to.be.false
-
+        await expect(ibTokenPriceFeed.setPrice()).to.be.revertedWith("IbTokenPriceFeed/not-ok")
         assertPeekPriceCall(mockedIbBasePriceFeed.smocked.peekPrice.calls)
         assertPeekPriceCall(mockedBaseUsdPriceFeed.smocked.peekPrice.calls)
+
+        const [price, ok] = await ibTokenPriceFeed.peekPrice()
+        expect(BigNumber.from(price)).to.be.equal(0)
+        expect(ok).to.be.false
       })
     })
     context("when baseInUsdPriceFeed returns ok=false", () => {
@@ -116,12 +122,13 @@ describe("IbTokenPriceFeed", () => {
         // 1 BNB = 400 USD
         mockedBaseUsdPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(parseEther("400")), false])
 
-        const [price, ok] = await ibTokenPriceFeed.peekPrice()
-        expect(price).to.be.equal(parseEther("440"))
-        expect(ok).to.be.false
-
+        await expect(ibTokenPriceFeed.setPrice()).to.be.revertedWith("IbTokenPriceFeed/not-ok")
         assertPeekPriceCall(mockedIbBasePriceFeed.smocked.peekPrice.calls)
         assertPeekPriceCall(mockedBaseUsdPriceFeed.smocked.peekPrice.calls)
+
+        const [price, ok] = await ibTokenPriceFeed.peekPrice()
+        expect(BigNumber.from(price)).to.be.equal(0)
+        expect(ok).to.be.false
       })
     })
     context("when both returns ok=true", () => {
@@ -131,12 +138,15 @@ describe("IbTokenPriceFeed", () => {
         // 1 BNB = 400 USD
         mockedBaseUsdPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(parseEther("400")), true])
 
-        const [price, ok] = await ibTokenPriceFeed.peekPrice()
-        expect(price).to.be.equal(parseEther("440"))
-        expect(ok).to.be.true
-
+        await ibTokenPriceFeed.setPrice()
         assertPeekPriceCall(mockedIbBasePriceFeed.smocked.peekPrice.calls)
         assertPeekPriceCall(mockedBaseUsdPriceFeed.smocked.peekPrice.calls)
+
+        TimeHelpers.increase(BigNumber.from(900))
+        await ibTokenPriceFeed.setPrice()
+        const [price, ok] = await ibTokenPriceFeed.peekPrice()
+        expect(BigNumber.from(price)).to.be.equal(parseEther("440"))
+        expect(ok).to.be.true
       })
     })
     context("when contract is in paused state", () => {
@@ -149,12 +159,7 @@ describe("IbTokenPriceFeed", () => {
         // 1 BNB = 400 USD
         mockedBaseUsdPriceFeed.smocked.peekPrice.will.return.with([formatBytes32BigNumber(parseEther("400")), true])
 
-        const [price, ok] = await ibTokenPriceFeed.peekPrice()
-        expect(price).to.be.equal(parseEther("440"))
-        expect(ok).to.be.false
-
-        assertPeekPriceCall(mockedIbBasePriceFeed.smocked.peekPrice.calls)
-        assertPeekPriceCall(mockedBaseUsdPriceFeed.smocked.peekPrice.calls)
+        await expect(ibTokenPriceFeed.setPrice()).to.reverted
       })
     })
   })

@@ -124,7 +124,10 @@ contract AlpacaStablecoinProxyActions {
     // Gets actual stablecoin amount in the usr
     uint256 _stablecoinValue = IBookKeeper(_bookKeeper).stablecoin(_usr); // [rad]
 
-    uint256 _requiredStablecoinValue = _safeSub(_safeMul(_debtShare, _debtAccumulatedRate), _stablecoinValue); // [rad]
+    uint256 _positionDebtValue = _safeMul(_debtShare, _debtAccumulatedRate);
+    uint256 _requiredStablecoinValue = _positionDebtValue >= _stablecoinValue
+      ? _safeSub(_positionDebtValue, _stablecoinValue)
+      : 0; // [rad]
     _requiredStablecoinAmount = _requiredStablecoinValue / RAY; // [wad] = [rad]/[ray]
 
     // If the value precision has some dust, it will need to request for 1 extra amount wei
@@ -189,9 +192,9 @@ contract AlpacaStablecoinProxyActions {
     if (_transferFrom) {
       // Gets token from the user's wallet
       _collateralToken.safeTransferFrom(msg.sender, address(this), _amount);
-      // Approves adapter to take the token amount
-      _collateralToken.safeApprove(_adapter, _amount);
     }
+    // Approves adapter to take the token amount
+    _collateralToken.safeApprove(_adapter, _amount);
     // Deposits token collateral into the bookKeeper
     IGenericTokenAdapter(_adapter).deposit(_positionAddress, _amount, _data);
   }
@@ -325,7 +328,8 @@ contract AlpacaStablecoinProxyActions {
 
   function bnbToIbBNB(
     address _vault,
-    uint256 _amount // [wad]
+    uint256 _amount, // [wad]
+    bool _transferTo
   ) public payable returns (uint256) {
     SafeToken.safeApprove(address(IAlpacaVault(_vault).token()), address(_vault), _amount);
     uint256 _ibBNBBefore = _vault.balanceOf(address(this));
@@ -333,7 +337,9 @@ contract AlpacaStablecoinProxyActions {
     uint256 _ibBNBAfter = _vault.balanceOf(address(this));
     SafeToken.safeApprove(address(IAlpacaVault(_vault).token()), address(_vault), 0);
     uint256 _backIbBNB = _safeSub(_ibBNBAfter, _ibBNBBefore);
-    address(_vault).safeTransfer(msg.sender, _backIbBNB);
+    if (_transferTo) {
+      address(_vault).safeTransfer(msg.sender, _backIbBNB);
+    }
     return _backIbBNB;
   }
 
@@ -351,7 +357,8 @@ contract AlpacaStablecoinProxyActions {
 
   function tokenToIbToken(
     address _vault,
-    uint256 _amount // [wad]
+    uint256 _amount, // [wad]
+    bool _transferTo
   ) public returns (uint256) {
     // user requires to approve the proxy wallet before calling this function
     address(IAlpacaVault(_vault).token()).safeTransferFrom(msg.sender, address(this), _amount);
@@ -361,7 +368,9 @@ contract AlpacaStablecoinProxyActions {
     uint256 _collateralTokenAfter = _vault.balanceOf(address(this));
     SafeToken.safeApprove(address(IAlpacaVault(_vault).token()), address(_vault), 0);
     uint256 _backCollateralToken = _safeSub(_collateralTokenAfter, _collateralTokenBefore);
-    address(_vault).safeTransfer(msg.sender, _backCollateralToken);
+    if (_transferTo) {
+      address(_vault).safeTransfer(msg.sender, _backCollateralToken);
+    }
     return _backCollateralToken;
   }
 
@@ -436,7 +445,7 @@ contract AlpacaStablecoinProxyActions {
     uint256 _positionId,
     uint256 _amount, // [wad]
     bytes calldata _data
-  ) public {
+  ) external {
     // Unlocks WBNB amount from the CDP
     adjustPosition(_manager, _positionId, -_safeToInt(_amount), 0, _bnbAdapter, _data);
     // Moves the amount from the CDP positionAddress to proxy's address
@@ -455,14 +464,18 @@ contract AlpacaStablecoinProxyActions {
     uint256 _positionId,
     uint256 _amount, // [in token decimal]
     bytes calldata _data
-  ) public {
+  ) external {
+    // Try to decode user address for harvested rewards from calldata
+    // if the user address is not passed, then send zero address to `harvest` and let it handle
+    address _user = address(0);
+    if (_data.length > 0) _user = abi.decode(_data, (address));
     uint256 _amountInWad = convertTo18(_tokenAdapter, _amount);
     // Unlocks token amount from the position
     adjustPosition(_manager, _positionId, -_safeToInt(_amountInWad), 0, _tokenAdapter, _data);
     // Moves the amount from the position to proxy's address
     moveCollateral(_manager, _positionId, address(this), _amountInWad, _tokenAdapter, _data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(_tokenAdapter).withdraw(address(this), _amount, _data);
+    IGenericTokenAdapter(_tokenAdapter).withdraw(msg.sender, _amount, _data);
   }
 
   function withdrawBNB(
@@ -756,6 +769,78 @@ contract AlpacaStablecoinProxyActions {
     );
   }
 
+  function convertAndLockToken(
+    address _vault,
+    address _manager,
+    address _tokenAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [wad]
+    bytes calldata _data
+  ) external {
+    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _amount), false);
+    lockToken(_manager, _tokenAdapter, _positionId, _collateralAmount, false, _data);
+  }
+
+  function convertLockTokenAndDraw(
+    address _vault,
+    IManager _manager,
+    address _stabilityFeeCollector,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _amount, // [in token decimal]
+    uint256 _stablecoinAmount, // [wad]
+    bytes calldata _data
+  ) external {
+    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _amount), false);
+    lockTokenAndDraw(
+      IManager(_manager),
+      _stabilityFeeCollector,
+      _tokenAdapter,
+      _stablecoinAdapter,
+      _positionId,
+      _collateralAmount,
+      _stablecoinAmount,
+      false,
+      _data
+    );
+  }
+
+  function convertBNBAndLockToken(
+    address _vault,
+    address _manager,
+    address _tokenAdapter,
+    uint256 _positionId,
+    bytes calldata _data
+  ) external payable {
+    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value, false);
+    lockToken(_manager, _tokenAdapter, _positionId, _collateralAmount, false, _data);
+  }
+
+  function convertBNBLockTokenAndDraw(
+    address _vault,
+    IManager _manager,
+    address _stabilityFeeCollector,
+    address _tokenAdapter,
+    address _stablecoinAdapter,
+    uint256 _positionId,
+    uint256 _stablecoinAmount, // [wad]
+    bytes calldata _data
+  ) external payable {
+    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value, false);
+    lockTokenAndDraw(
+      IManager(_manager),
+      _stabilityFeeCollector,
+      _tokenAdapter,
+      _stablecoinAdapter,
+      _positionId,
+      _collateralAmount,
+      _stablecoinAmount,
+      false,
+      _data
+    );
+  }
+
   function convertBNBOpenLockTokenAndDraw(
     address _vault,
     address _manager,
@@ -764,10 +849,9 @@ contract AlpacaStablecoinProxyActions {
     address _stablecoinAdapter,
     bytes32 _collateralPoolId,
     uint256 _stablecoinAmount, // [wad]
-    bool _transferFrom,
     bytes calldata _data
   ) external payable returns (uint256 positionId) {
-    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value);
+    uint256 _collateralAmount = bnbToIbBNB(_vault, msg.value, false);
     return
       openLockTokenAndDraw(
         _manager,
@@ -777,7 +861,7 @@ contract AlpacaStablecoinProxyActions {
         _collateralPoolId,
         _collateralAmount,
         _stablecoinAmount,
-        _transferFrom,
+        false,
         _data
       );
   }
@@ -791,10 +875,9 @@ contract AlpacaStablecoinProxyActions {
     bytes32 _collateralPoolId,
     uint256 _tokenAmount, // [in token decimal]
     uint256 _stablecoinAmount, // [wad]
-    bool _transferFrom,
     bytes calldata _data
   ) external returns (uint256 positionId) {
-    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _tokenAmount));
+    uint256 _collateralAmount = tokenToIbToken(_vault, convertTo18(_tokenAdapter, _tokenAmount), false);
     return
       openLockTokenAndDraw(
         _manager,
@@ -804,7 +887,7 @@ contract AlpacaStablecoinProxyActions {
         _collateralPoolId,
         _collateralAmount,
         _stablecoinAmount,
-        _transferFrom,
+        false,
         _data
       );
   }
@@ -895,7 +978,7 @@ contract AlpacaStablecoinProxyActions {
     // Moves the amount from the position to proxy's address
     moveCollateral(_manager, _positionId, address(this), _collateralAmountInWad, _tokenAdapter, _data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(_tokenAdapter).withdraw(address(this), _collateralAmount, _data);
+    IGenericTokenAdapter(_tokenAdapter).withdraw(msg.sender, _collateralAmount, _data);
   }
 
   function wipeUnlockIbBNBAndCovertToBNB(
@@ -975,7 +1058,7 @@ contract AlpacaStablecoinProxyActions {
     // Moves the amount from the position to proxy's address
     moveCollateral(_manager, _positionId, address(this), _collateralAmountInWad, _tokenAdapter, _data);
     // Withdraws token amount to the user's wallet as a token
-    IGenericTokenAdapter(_tokenAdapter).withdraw(address(this), _collateralAmount, _data);
+    IGenericTokenAdapter(_tokenAdapter).withdraw(msg.sender, _collateralAmount, _data);
   }
 
   function wipeAllUnlockIbBNBAndConvertToBNB(
@@ -1008,11 +1091,26 @@ contract AlpacaStablecoinProxyActions {
     address _manager,
     address _tokenAdapter,
     uint256 _positionId,
-    address _harvestTo,
     address _harvestToken
   ) external {
     address _positionAddress = IManager(_manager).positions(_positionId);
-    IGenericTokenAdapter(_tokenAdapter).deposit(_positionAddress, 0, abi.encode(_harvestTo));
+    IGenericTokenAdapter(_tokenAdapter).deposit(_positionAddress, 0, abi.encode());
+    transfer(_harvestToken, msg.sender, _harvestToken.myBalance());
+  }
+
+  function harvestMultiple(
+    address _manager,
+    address[] memory _tokenAdapters,
+    uint256[] memory _positionIds,
+    address _harvestToken
+  ) external {
+    require(_tokenAdapters.length == _positionIds.length, "tokenAdapters and positionIds length mismatch");
+
+    for (uint256 i = 0; i < _positionIds.length; i++) {
+      address _positionAddress = IManager(_manager).positions(_positionIds[i]);
+      IGenericTokenAdapter(_tokenAdapters[i]).deposit(_positionAddress, 0, abi.encode());
+    }
+
     transfer(_harvestToken, msg.sender, _harvestToken.myBalance());
   }
 

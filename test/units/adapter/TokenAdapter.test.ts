@@ -42,6 +42,7 @@ const loadFixtureHandler = async (maybeWallets?: Wallet[], maybeProvider?: MockP
   const token = await Token.deploy("BTCB", "BTCB")
   await token.deployed()
   const mockedToken = await smockit(token)
+  mockedToken.smocked.decimals.will.return.with(18)
 
   // Deploy TokenAdapter
   const TokenAdapter = (await ethers.getContractFactory("TokenAdapter", deployer)) as TokenAdapter__factory

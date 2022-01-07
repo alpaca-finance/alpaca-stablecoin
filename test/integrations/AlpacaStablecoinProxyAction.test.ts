@@ -184,6 +184,7 @@ describe("AlpacaStablecoinProxyAction", () => {
         const bnbToIbBNBCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("bnbToIbBNB", [
           bnbVault.address,
           WeiPerWad.mul(3),
+          true,
         ])
         await deployerProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, bnbToIbBNBCall, {
           value: WeiPerWad.mul(3),
@@ -206,6 +207,7 @@ describe("AlpacaStablecoinProxyAction", () => {
         const bnbToIbBNBCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("bnbToIbBNB", [
           bnbVault.address,
           WeiPerWad.mul(3),
+          true,
         ])
         await deployerProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, bnbToIbBNBCall, {
           value: WeiPerWad.mul(3),
@@ -242,6 +244,7 @@ describe("AlpacaStablecoinProxyAction", () => {
         const tokenToIbTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("tokenToIbToken", [
           tokenVault.address,
           WeiPerWad.mul(10),
+          true,
         ])
         await deployerProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, tokenToIbTokenCall)
 
@@ -261,6 +264,7 @@ describe("AlpacaStablecoinProxyAction", () => {
         const tokenToIbTokenCall = alpacaStablecoinProxyActions.interface.encodeFunctionData("tokenToIbToken", [
           tokenVault.address,
           WeiPerWad.mul(10),
+          true,
         ])
         await deployerProxyWallet["execute(address,bytes)"](alpacaStablecoinProxyActions.address, tokenToIbTokenCall)
 

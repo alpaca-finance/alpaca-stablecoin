@@ -38,7 +38,7 @@ contract PriceOracle is PausableUpgradeable, ReentrancyGuardUpgradeable, IPriceO
   }
 
   IBookKeeper public bookKeeper; // CDP Engine
-  uint256 public override stableCoinReferencePrice; // ref per dai [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
+  uint256 public override stableCoinReferencePrice; // ref per AUSD [ray] :: value of stablecoin in the reference asset (e.g. $1 per Alpaca USD)
 
   uint256 public live;
 
@@ -74,9 +74,34 @@ contract PriceOracle is PausableUpgradeable, ReentrancyGuardUpgradeable, IPriceO
   // --- Administration ---
   event LogSetStableCoinReferencePrice(address indexed _caller, uint256 _data);
 
-  function setStableCoinReferencePrice(uint256 _data) external {
+  modifier onlyOwner() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    _;
+  }
+
+  modifier onlyOwnerOrGov() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _;
+  }
+
+  modifier onlyOwnerOrShowStopper() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
+      "!(ownerRole or showStopperRole)"
+    );
+    _;
+  }
+
+  /// @dev access: OWNER_ROLE
+  function setStableCoinReferencePrice(uint256 _data) external onlyOwner {
     require(live == 1, "PriceOracle/not-live");
     stableCoinReferencePrice = _data;
     emit LogSetStableCoinReferencePrice(msg.sender, _data);
@@ -101,48 +126,28 @@ contract PriceOracle is PausableUpgradeable, ReentrancyGuardUpgradeable, IPriceO
     emit LogSetPrice(_collateralPoolId, _rawPrice, _priceWithSafetyMargin);
   }
 
-  function cage() external override {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+  /// @dev access: OWNER_ROLE, SHOW_STOPPER_ROLE
+  function cage() external override onlyOwnerOrShowStopper {
     require(live == 1, "PriceOracle/not-live");
     live = 0;
     emit LogCage();
   }
 
-  function uncage() external override {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.SHOW_STOPPER_ROLE(), msg.sender),
-      "!(ownerRole or showStopperRole)"
-    );
+  /// @dev access: OWNER_ROLE, SHOW_STOPPER_ROLE
+  function uncage() external override onlyOwnerOrShowStopper {
     require(live == 0, "PriceOracle/not-caged");
     live = 1;
     emit LogUncage();
   }
 
   // --- pause ---
-  function pause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function unpause() external onlyOwnerOrGov {
     _unpause();
   }
 }

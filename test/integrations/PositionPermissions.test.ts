@@ -133,6 +133,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   ])) as PositionManager
   await positionManager.deployed()
   await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), positionManager.address)
+  await accessControlConfig.grantRole(await accessControlConfig.COLLATERAL_MANAGER_ROLE(), positionManager.address)
 
   // Deploy mocked BEP20
   const BEP20 = (await ethers.getContractFactory("BEP20", deployer)) as BEP20__factory
@@ -199,7 +200,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     WeiPerRad.mul(1000),
     0,
     simplePriceFeed.address,
-    0,
+    WeiPerRay,
     WeiPerRay,
     ibTokenAdapter.address,
     CLOSE_FACTOR_BPS,
@@ -213,7 +214,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     WeiPerRad.mul(1000),
     0,
     simplePriceFeed.address,
-    0,
+    WeiPerRay,
     WeiPerRay,
     ibTokenAdapter2.address,
     CLOSE_FACTOR_BPS,
@@ -239,11 +240,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   // Deploy Alpaca Stablecoin
   const AlpacaStablecoin = (await ethers.getContractFactory("AlpacaStablecoin", deployer)) as AlpacaStablecoin__factory
-  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [
-    "Alpaca USD",
-    "AUSD",
-    "31337",
-  ])) as AlpacaStablecoin
+  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, ["Alpaca USD", "AUSD"])) as AlpacaStablecoin
   await alpacaStablecoin.deployed()
 
   const StablecoinAdapter = (await ethers.getContractFactory(
@@ -261,6 +258,9 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const AlpacaStablecoinProxyActions = new AlpacaStablecoinProxyActions__factory(deployer)
   const alpacaStablecoinProxyActions: AlpacaStablecoinProxyActions = await AlpacaStablecoinProxyActions.deploy()
 
+  const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
+  const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
+
   // Deploy StabilityFeeCollector
   const StabilityFeeCollector = (await ethers.getContractFactory(
     "StabilityFeeCollector",
@@ -268,14 +268,12 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   )) as StabilityFeeCollector__factory
   const stabilityFeeCollector = (await upgrades.deployProxy(StabilityFeeCollector, [
     bookKeeper.address,
+    systemDebtEngine.address,
   ])) as StabilityFeeCollector
   await accessControlConfig.grantRole(
     await accessControlConfig.STABILITY_FEE_COLLECTOR_ROLE(),
     stabilityFeeCollector.address
   )
-
-  const SystemDebtEngine = (await ethers.getContractFactory("SystemDebtEngine", deployer)) as SystemDebtEngine__factory
-  const systemDebtEngine = (await upgrades.deployProxy(SystemDebtEngine, [bookKeeper.address])) as SystemDebtEngine
 
   const LiquidationEngine = (await ethers.getContractFactory(
     "LiquidationEngine",
@@ -298,7 +296,6 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     priceOracle.address,
     liquidationEngine.address,
     systemDebtEngine.address,
-    positionManager.address,
   ])) as FixedSpreadLiquidationStrategy
   await collateralPoolConfig.setStrategy(COLLATERAL_POOL_ID, fixedSpreadLiquidationStrategy.address)
   await collateralPoolConfig.setStrategy(COLLATERAL_POOL_ID2, fixedSpreadLiquidationStrategy.address)
@@ -306,6 +303,10 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await accessControlConfig.grantRole(await accessControlConfig.LIQUIDATION_ENGINE_ROLE(), liquidationEngine.address)
   await accessControlConfig.grantRole(
     await accessControlConfig.LIQUIDATION_ENGINE_ROLE(),
+    fixedSpreadLiquidationStrategy.address
+  )
+  await accessControlConfig.grantRole(
+    await accessControlConfig.COLLATERAL_MANAGER_ROLE(),
     fixedSpreadLiquidationStrategy.address
   )
 
@@ -1374,6 +1375,10 @@ describe("PositionPermissions", () => {
                   alpacaStablecoinBalancefinal,
                   "Alice should receive 2 AUSD from drawing 2 AUSD, because Alice drew 2 times"
                 ).to.be.equal(WeiPerWad.mul(2))
+                const alicePosition1Stake = await ibTokenAdapter.stake(alicePositionAddress)
+                expect(alicePosition1Stake, "Stake must be correctly updated after movePosition").to.be.equal(
+                  WeiPerWad.mul(2)
+                )
               })
             }
           )
@@ -3607,6 +3612,8 @@ describe("PositionPermissions", () => {
           alicePositionWalletPositionAfterExport.debtShare,
           "debtShare should be 0 AUSD, because Alice export"
         ).to.be.equal(0)
+        const aliceAddressStake = await ibTokenAdapter.stake(aliceAddress)
+        expect(aliceAddressStake, "Stake must be correctly updated after exportPosition").to.be.equal(WeiPerWad)
 
         //6. alice import position back
         const importPosition = alpacaStablecoinProxyActions.interface.encodeFunctionData("importPosition", [
@@ -3633,6 +3640,8 @@ describe("PositionPermissions", () => {
           alicePositionWalletPositionAfterImport.debtShare,
           "debtShare should be 1 AUSD, because Alice Import"
         ).to.be.equal(WeiPerWad)
+        const alicePositionStake = await ibTokenAdapter.stake(alicePositionAddress)
+        expect(alicePositionStake, "Stake must be correctly updated after importPosition").to.be.equal(WeiPerWad)
       })
     })
   })

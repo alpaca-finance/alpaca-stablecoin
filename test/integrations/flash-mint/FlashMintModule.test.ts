@@ -126,7 +126,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     0,
     0,
     simplePriceFeed.address,
-    0,
+    WeiPerRay,
     WeiPerRay,
     authTokenAdapter.address,
     CLOSE_FACTOR_BPS,
@@ -141,11 +141,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   // Deploy Alpaca Stablecoin
   const AlpacaStablecoin = (await ethers.getContractFactory("AlpacaStablecoin", deployer)) as AlpacaStablecoin__factory
-  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, [
-    "Alpaca USD",
-    "AUSD",
-    "31337",
-  ])) as AlpacaStablecoin
+  const alpacaStablecoin = (await upgrades.deployProxy(AlpacaStablecoin, ["Alpaca USD", "AUSD"])) as AlpacaStablecoin
   await alpacaStablecoin.deployed()
 
   const StablecoinAdapter = (await ethers.getContractFactory(
@@ -172,6 +168,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   await stableSwapModule.deployed()
   await authTokenAdapter.grantRole(await authTokenAdapter.WHITELISTED(), stableSwapModule.address)
   await accessControlConfig.grantRole(await accessControlConfig.POSITION_MANAGER_ROLE(), stableSwapModule.address)
+  await accessControlConfig.grantRole(await accessControlConfig.COLLATERAL_MANAGER_ROLE(), stableSwapModule.address)
 
   const FlashMintModule = (await ethers.getContractFactory("FlashMintModule", deployer)) as FlashMintModule__factory
   const flashMintModule = (await upgrades.deployProxy(FlashMintModule, [
@@ -324,7 +321,7 @@ describe("FlastMintModule", () => {
               [routerV2.address, BUSD.address, stableSwapModule.address]
             )
           )
-        ).to.be.revertedWith("AlpacaStablecoin/insufficient-balance")
+        ).to.be.revertedWith("!safeTransferFrom")
       })
     })
 

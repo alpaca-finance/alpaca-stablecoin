@@ -1,5 +1,5 @@
 import { ethers, upgrades, waffle } from "hardhat"
-import { Signer } from "ethers"
+import { Signer, BigNumber } from "ethers"
 import chai from "chai"
 import { solidity } from "ethereum-waffle"
 import "@openzeppelin/test-helpers"
@@ -343,6 +343,14 @@ describe("BookKeeper", () => {
             mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
             mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
+            mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+              debtAccumulatedRate: WeiPerRay,
+              totalDebtShare: 0,
+              debtCeiling: WeiPerRad.mul(10000),
+              priceWithSafetyMargin: WeiPerRay,
+              debtFloor: 0,
+            })
+
             await expect(
               bookKeeperAsAlice.adjustPosition(
                 formatBytes32String("BNB"),
@@ -640,6 +648,14 @@ describe("BookKeeper", () => {
               mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
               mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
+              mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+                debtAccumulatedRate: WeiPerRay,
+                totalDebtShare: 0,
+                debtCeiling: WeiPerRad,
+                priceWithSafetyMargin: WeiPerRay,
+                debtFloor: 0,
+              })
+
               // set total debt ceiling 10 rad
               await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -665,6 +681,14 @@ describe("BookKeeper", () => {
               mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
               mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
               mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
+
+              mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+                debtAccumulatedRate: WeiPerRay,
+                totalDebtShare: 0,
+                debtCeiling: WeiPerRad.mul(10),
+                priceWithSafetyMargin: WeiPerRay,
+                debtFloor: 0,
+              })
 
               // set total debt ceiling 1 rad
               await bookKeeper.setTotalDebtCeiling(WeiPerRad)
@@ -693,6 +717,14 @@ describe("BookKeeper", () => {
             mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
             mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
+            mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+              debtAccumulatedRate: WeiPerRay,
+              totalDebtShare: 0,
+              debtCeiling: WeiPerRad.mul(10),
+              priceWithSafetyMargin: WeiPerRay,
+              debtFloor: 0,
+            })
+
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -719,6 +751,14 @@ describe("BookKeeper", () => {
               mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
               mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
               mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
+
+              mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+                debtAccumulatedRate: WeiPerRay,
+                totalDebtShare: 0,
+                debtCeiling: WeiPerRad.mul(10),
+                priceWithSafetyMargin: WeiPerRay,
+                debtFloor: 0,
+              })
 
               // set total debt ceiling 10 rad
               await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -758,6 +798,14 @@ describe("BookKeeper", () => {
                 mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
                 mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
                 mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
+
+                mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+                  debtAccumulatedRate: WeiPerRay,
+                  totalDebtShare: 0,
+                  debtCeiling: WeiPerRad.mul(10),
+                  priceWithSafetyMargin: WeiPerRay,
+                  debtFloor: 0,
+                })
 
                 // set total debt ceiling 10 rad
                 await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -823,6 +871,14 @@ describe("BookKeeper", () => {
               mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
               mockedCollateralPoolConfig.smocked.setTotalDebtShare.will.return.with()
 
+              mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+                debtAccumulatedRate: WeiPerRay,
+                totalDebtShare: 0,
+                debtCeiling: WeiPerRad.mul(10),
+                priceWithSafetyMargin: WeiPerRay,
+                debtFloor: 0,
+              })
+
               // set total debt ceiling 10 rad
               await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -874,6 +930,14 @@ describe("BookKeeper", () => {
               mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
               mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
+              mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+                debtAccumulatedRate: WeiPerRay,
+                totalDebtShare: 0,
+                debtCeiling: WeiPerRad.mul(10),
+                priceWithSafetyMargin: WeiPerRay,
+                debtFloor: WeiPerRad.mul(20),
+              })
+
               // set total debt ceiling 10 rad
               await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -913,6 +977,14 @@ describe("BookKeeper", () => {
                 mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
                 mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
+                mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+                  debtAccumulatedRate: WeiPerRay,
+                  totalDebtShare: BigNumber.from(0),
+                  debtCeiling: WeiPerRad.mul(10),
+                  priceWithSafetyMargin: WeiPerRay,
+                  debtFloor: WeiPerRad.mul(1),
+                })
+
                 // set total debt ceiling 10 rad
                 await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -944,6 +1016,13 @@ describe("BookKeeper", () => {
                 const stablecoinAliceBefore = await bookKeeper.stablecoin(aliceAddress)
                 expect(stablecoinAliceBefore).to.be.equal(WeiPerRad.mul(10))
                 mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(WeiPerWad.mul(10))
+                mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+                  debtAccumulatedRate: WeiPerRay,
+                  totalDebtShare: WeiPerWad.mul(10),
+                  debtCeiling: WeiPerRad.mul(10),
+                  priceWithSafetyMargin: WeiPerRay,
+                  debtFloor: WeiPerRad.mul(1),
+                })
                 // alice wipe
                 await bookKeeperAsAlice.adjustPosition(
                   formatBytes32String("BNB"),
@@ -968,6 +1047,14 @@ describe("BookKeeper", () => {
                 mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(5))
                 mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
                 mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+
+                mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+                  debtAccumulatedRate: WeiPerRay,
+                  totalDebtShare: 0,
+                  debtCeiling: WeiPerRad.mul(10),
+                  priceWithSafetyMargin: WeiPerRay,
+                  debtFloor: WeiPerRad.mul(5),
+                })
 
                 // set total debt ceiling 10 rad
                 await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -995,6 +1082,13 @@ describe("BookKeeper", () => {
                   WeiPerWad.mul(10)
                 )
                 mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(WeiPerWad.mul(10))
+                mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+                  debtAccumulatedRate: WeiPerRay,
+                  totalDebtShare: WeiPerWad.mul(10),
+                  debtCeiling: WeiPerRad.mul(10),
+                  priceWithSafetyMargin: WeiPerRay,
+                  debtFloor: WeiPerRad.mul(5),
+                })
                 // alice wipe
                 await expect(
                   bookKeeperAsAlice.adjustPosition(
@@ -1023,6 +1117,14 @@ describe("BookKeeper", () => {
           mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(1))
           mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
           mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+
+          mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+            debtAccumulatedRate: WeiPerRay,
+            totalDebtShare: 0,
+            debtCeiling: WeiPerRad.mul(10),
+            priceWithSafetyMargin: WeiPerRay,
+            debtFloor: WeiPerRad.mul(1),
+          })
 
           // set total debt ceiling 10 rad
           await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -1059,6 +1161,14 @@ describe("BookKeeper", () => {
             mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(1))
             mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
             mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+
+            mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+              debtAccumulatedRate: WeiPerRay,
+              totalDebtShare: 0,
+              debtCeiling: WeiPerRad.mul(10),
+              priceWithSafetyMargin: WeiPerRay,
+              debtFloor: WeiPerRad.mul(1),
+            })
 
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -1098,6 +1208,14 @@ describe("BookKeeper", () => {
             mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
             mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
+            mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+              debtAccumulatedRate: WeiPerRay,
+              totalDebtShare: 0,
+              debtCeiling: WeiPerRad.mul(10),
+              priceWithSafetyMargin: WeiPerRay,
+              debtFloor: WeiPerRad.mul(1),
+            })
+
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1135,6 +1253,14 @@ describe("BookKeeper", () => {
             mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(2))
             mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
             mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+
+            mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+              debtAccumulatedRate: WeiPerRay,
+              totalDebtShare: 0,
+              debtCeiling: WeiPerRad.mul(10),
+              priceWithSafetyMargin: WeiPerRay,
+              debtFloor: WeiPerRad.mul(2),
+            })
 
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -1174,6 +1300,14 @@ describe("BookKeeper", () => {
             mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
             mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
 
+            mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+              debtAccumulatedRate: WeiPerRay,
+              totalDebtShare: 0,
+              debtCeiling: WeiPerRad.mul(10),
+              priceWithSafetyMargin: WeiPerRay,
+              debtFloor: WeiPerRad.mul(2),
+            })
+
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1211,6 +1345,14 @@ describe("BookKeeper", () => {
             mockedCollateralPoolConfig.smocked.getDebtFloor.will.return.with(WeiPerRad.mul(1))
             mockedCollateralPoolConfig.smocked.getDebtCeiling.will.return.with(WeiPerRad.mul(10))
             mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
+
+            mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+              debtAccumulatedRate: WeiPerRay,
+              totalDebtShare: 0,
+              debtCeiling: WeiPerRad.mul(10),
+              priceWithSafetyMargin: WeiPerRay,
+              debtFloor: WeiPerRad.mul(1),
+            })
 
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
@@ -1287,6 +1429,14 @@ describe("BookKeeper", () => {
             mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
             mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
+            mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+              debtAccumulatedRate: WeiPerRay,
+              totalDebtShare: 0,
+              debtCeiling: WeiPerRad.mul(10),
+              priceWithSafetyMargin: WeiPerRay,
+              debtFloor: WeiPerRad.mul(1),
+            })
+
             // set total debt ceiling 1 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad)
 
@@ -1315,6 +1465,13 @@ describe("BookKeeper", () => {
             const totalUnbackedStablecoinBefore = await bookKeeper.totalUnbackedStablecoin()
             expect(totalUnbackedStablecoinBefore).to.be.equal(0)
             mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(WeiPerWad.mul(1))
+            mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+              debtAccumulatedRate: WeiPerRay,
+              totalDebtShare: WeiPerWad.mul(1),
+              debtCeiling: WeiPerRad.mul(10),
+              priceWithSafetyMargin: WeiPerRay,
+              debtFloor: WeiPerRad.mul(1),
+            })
             // confiscate position
             await bookKeeper.confiscatePosition(
               formatBytes32String("BNB"),
@@ -1348,6 +1505,14 @@ describe("BookKeeper", () => {
             mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
             mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
+            mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+              debtAccumulatedRate: WeiPerRay,
+              totalDebtShare: 0,
+              debtCeiling: WeiPerRad.mul(10),
+              priceWithSafetyMargin: WeiPerRay,
+              debtFloor: WeiPerRad.mul(1),
+            })
+
             // set total debt ceiling 10 rad
             await bookKeeper.setTotalDebtCeiling(WeiPerRad.mul(10))
 
@@ -1376,6 +1541,13 @@ describe("BookKeeper", () => {
             const totalUnbackedStablecoinBefore = await bookKeeper.totalUnbackedStablecoin()
             expect(totalUnbackedStablecoinBefore).to.be.equal(0)
             mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(WeiPerWad.mul(2))
+            mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+              debtAccumulatedRate: WeiPerRay,
+              totalDebtShare: WeiPerWad.mul(2),
+              debtCeiling: WeiPerRad.mul(10),
+              priceWithSafetyMargin: WeiPerRay,
+              debtFloor: WeiPerRad.mul(1),
+            })
             // confiscate position
             await bookKeeper.confiscatePosition(
               formatBytes32String("BNB"),
@@ -1506,6 +1678,14 @@ describe("BookKeeper", () => {
           mockedCollateralPoolConfig.smocked.getPriceWithSafetyMargin.will.return.with(WeiPerRay)
           mockedAccessControlConfig.smocked.hasRole.will.return.with(true)
 
+          mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+            debtAccumulatedRate: WeiPerRay,
+            totalDebtShare: 0,
+            debtCeiling: WeiPerRad.mul(10),
+            priceWithSafetyMargin: WeiPerRay,
+            debtFloor: WeiPerRad.mul(1),
+          })
+
           // set total debt ceiling 1 rad
           await bookKeeper.setTotalDebtCeiling(WeiPerRad)
 
@@ -1527,6 +1707,13 @@ describe("BookKeeper", () => {
           expect(totalStablecoinIssuedBefore).to.be.equal(WeiPerRad)
 
           mockedCollateralPoolConfig.smocked.getTotalDebtShare.will.return.with(WeiPerWad.mul(1))
+          mockedCollateralPoolConfig.smocked.getCollateralPoolInfo.will.return.with({
+            debtAccumulatedRate: WeiPerRay,
+            totalDebtShare: WeiPerWad.mul(1),
+            debtCeiling: WeiPerRad.mul(10),
+            priceWithSafetyMargin: WeiPerRay,
+            debtFloor: WeiPerRad.mul(1),
+          })
 
           await bookKeeper.accrueStabilityFee(formatBytes32String("BNB"), deployerAddress, WeiPerRay)
 

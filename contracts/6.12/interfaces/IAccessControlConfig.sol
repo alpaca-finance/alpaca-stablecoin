@@ -37,4 +37,6 @@ interface IAccessControlConfig {
   function BOOK_KEEPER_ROLE() external view returns (bytes32);
 
   function REINVESTOR_ROLE() external view returns (bytes32);
+
+  function COLLATERAL_MANAGER_ROLE() external view returns (bytes32);
 }

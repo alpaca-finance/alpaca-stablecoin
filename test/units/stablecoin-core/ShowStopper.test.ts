@@ -47,6 +47,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const dummyToken = await BEP20.deploy("dummy", "DUMP")
   await dummyToken.deployed()
   const mockedDummyToken = await smockit(dummyToken)
+  mockedDummyToken.smocked.decimals.will.return.with(18)
 
   // Deploy mocked TokenAdapter
   const TokenAdapter = (await ethers.getContractFactory("TokenAdapter", deployer)) as TokenAdapter__factory
@@ -231,7 +232,7 @@ describe("ShowStopper", () => {
           mockedPriceOracle.smocked.stableCoinReferencePrice.will.return.with(UnitHelpers.WeiPerRay)
 
           await expect(showStopper["cage(bytes32)"](formatBytes32String("BNB")))
-            .to.emit(showStopper, "LogCage(bytes32)")
+            .to.emit(showStopper, "LogCageCollateralPool(bytes32)")
             .withArgs(formatBytes32String("BNB"))
 
           expect(await showStopper.live()).to.be.equal(0)

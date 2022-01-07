@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
-  ∩~~~~∩ 
-  ξ ･×･ ξ 
-  ξ　~　ξ 
-  ξ　　 ξ 
-  ξ　　 “~～~～〇 
-  ξ　　　　　　 ξ 
-  ξ ξ ξ~～~ξ ξ ξ 
+  ∩~~~~∩
+  ξ ･×･ ξ
+  ξ　~　ξ
+  ξ　　 ξ
+  ξ　　 “~～~～〇
+  ξ　　　　　　 ξ
+  ξ ξ ξ~～~ξ ξ ξ
 　 ξ_ξξ_ξ　ξ_ξξ_ξ
 Alpaca Fin Corporation
 */
@@ -60,7 +60,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @dev The token that will get after collateral has been staked
   IToken public rewardToken;
 
-  IManager positionManager;
+  IManager public positionManager;
 
   /// @dev Rewards per collateralToken in RAY
   uint256 public accRewardPerShare;
@@ -80,12 +80,33 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @notice Events
   event LogDeposit(uint256 _val);
   event LogWithdraw(uint256 _val);
-  event LogEmergencyWithdaraw();
+  event LogEmergencyWithdraw(address indexed _caller, address _to);
   event LogMoveStake(address indexed _src, address indexed _dst, uint256 _wad);
+  event LogSetTreasuryAccount(address indexed _caller, address _treasuryAccount);
+  event LogSetTreasuryFeeBps(address indexed _caller, uint256 _treasuryFeeBps);
 
   modifier onlyOwner() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    _;
+  }
+
+  modifier onlyOwnerOrGov() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _;
+  }
+
+  modifier onlyCollateralManager() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.COLLATERAL_MANAGER_ROLE(), msg.sender),
+      "!collateralManager"
+    );
     _;
   }
 
@@ -131,6 +152,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     rewardToken = IToken(_rewardToken);
 
     require(_treasuryAccount != address(0), "IbTokenAdapter/bad treasury account");
+    require(_treasuryFeeBps <= 5000, "IbTokenAdapter/bad treasury fee bps");
     treasuryFeeBps = _treasuryFeeBps;
     treasuryAccount = _treasuryAccount;
 
@@ -188,12 +210,14 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     require(live == 1, "IbTokenAdapter/not-live");
     require(_treasuryFeeBps <= 5000, "IbTokenAdapter/bad treasury fee bps");
     treasuryFeeBps = _treasuryFeeBps;
+    emit LogSetTreasuryFeeBps(msg.sender, _treasuryFeeBps);
   }
 
   function setTreasuryAccount(address _treasuryAccount) external onlyOwner {
     require(live == 1, "IbTokenAdapter/not-live");
     require(_treasuryAccount != address(0), "IbTokenAdapter/bad treasury account");
     treasuryAccount = _treasuryAccount;
+    emit LogSetTreasuryAccount(msg.sender, _treasuryAccount);
   }
 
   /// @dev Ignore collateralTokens that have been directly transferred
@@ -210,29 +234,27 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @dev Harvest ALPACA from FairLaunch
   /// @dev Return the amount of rewards that is harvested.
   /// Expect that the adapter which inherited BaseFarmableTokenAdapter
-  function _harvest() internal returns (uint256) {
+  function _harvestFromFarm() internal returns (uint256) {
     if (live == 1) {
       // Withdraw all rewards
+      uint256 _pendingAlpaca = fairlaunch.pendingAlpaca(pid, address(this));
       (uint256 _stakedBalance, , , ) = fairlaunch.userInfo(pid, address(this));
-      if (_stakedBalance > 0) fairlaunch.withdraw(address(this), pid, 0);
+      if (_stakedBalance > 0 && _pendingAlpaca > 0) fairlaunch.withdraw(address(this), pid, 0);
     }
     return sub(rewardToken.balanceOf(address(this)), accRewardBalance);
   }
 
   /// @dev Harvest rewards for "_positionAddress" and send to "to"
   /// @param _positionAddress The position address that is owned and staked the collateral tokens
-  /// @param _to The address to receive the yields
-  function harvest(address _positionAddress, address _to) internal {
+  function _harvest(address _positionAddress) internal {
     // 1. Define the address to receive the harvested rewards
     // Give the rewards to the proxy wallet that owns this position address if there is any
     address _harvestTo = positionManager.mapPositionHandlerToOwner(_positionAddress);
-    // if the position owner is not recognized by the position manager,
-    // check if the msg.sender is the owner of this position and harvest to msg.sender.
-    // or else, harvest to _to address decoded from additional calldata
-    if (_harvestTo == address(0)) _harvestTo = msg.sender == _positionAddress ? msg.sender : _to;
+    // defeault _harvestTo as _positionAddress if not properly defined
+    if (_harvestTo == address(0)) _harvestTo = _positionAddress;
     require(_harvestTo != address(0), "IbTokenAdapter/harvest-to-address-zero");
     // 2. Perform actual harvest. Calculate the new accRewardPerShare.
-    if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvest(), totalShare));
+    if (totalShare > 0) accRewardPerShare = add(accRewardPerShare, rdiv(_harvestFromFarm(), totalShare));
     // 3. Calculate the rewards that "to" should get by:
     // stake[_positionAddress] * accRewardPerShare (rewards that each share should get) - rewardDebts (what already paid)
     uint256 _rewardDebt = rewardDebts[_positionAddress];
@@ -254,6 +276,12 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     return _pendingRewards(_positionAddress, fairlaunch.pendingAlpaca(pid, address(this)));
   }
 
+  /// @dev Like pendingRewards, but it is pending rewards after deduected with treasury fee
+  /// @param _positionAddress The address that you want to check pending ALPACA
+  function netPendingRewards(address _positionAddress) external view returns (uint256) {
+    return _netPendingRewards(_positionAddress, fairlaunch.pendingAlpaca(pid, address(this)));
+  }
+
   /// @dev Return the amount of rewards to be harvested for a giving position address
   /// @param _positionAddress The position address
   /// @param _pending The pending rewards from staking contract
@@ -261,7 +289,22 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     if (totalShare == 0) return 0;
     uint256 _toBeHarvested = sub(add(_pending, rewardToken.balanceOf(address(this))), accRewardBalance);
     uint256 _pendingAccRewardPerShare = add(accRewardPerShare, rdiv(_toBeHarvested, totalShare));
-    return sub(rmul(stake[_positionAddress], _pendingAccRewardPerShare), rewardDebts[_positionAddress]);
+    uint256 _pendingAccReward = rmul(stake[_positionAddress], _pendingAccRewardPerShare);
+    if (_pendingAccReward > rewardDebts[_positionAddress]) {
+      return sub(_pendingAccReward, rewardDebts[_positionAddress]);
+    } else {
+      return 0;
+    }
+  }
+
+  /// @dev Return the amount of rewards to be harvested for a giving position address, and deducted with treasury fee
+  /// @param _positionAddress The position address
+  /// @param _pending The pending rewards from staking contract
+  function _netPendingRewards(address _positionAddress, uint256 _pending) internal view returns (uint256) {
+    uint256 _pendingReward = _pendingRewards(_positionAddress, _pending);
+    uint256 _treasuryFee = div(mul(_pendingReward, treasuryFeeBps), 10000);
+
+    return sub(_pendingReward, _treasuryFee);
   }
 
   /// @dev Harvest and deposit received ibToken to FairLaunch
@@ -280,19 +323,14 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// deposit collateral tokens to staking contract, and update BookKeeper
   /// @param _positionAddress The position address to be updated
   /// @param _amount The amount to be deposited
-  /// @param _data The extra data information pass along to this adapter
   function _deposit(
     address _positionAddress,
     uint256 _amount,
-    bytes calldata _data
+    bytes calldata /* _data */
   ) private {
     require(live == 1, "IbTokenAdapter/not live");
 
-    // Try to decode user address for harvested rewards from calldata
-    // if the user address is not passed, then send zero address to `harvest` and let it handle
-    address _user = address(0);
-    if (_data.length > 0) _user = abi.decode(_data, (address));
-    harvest(_positionAddress, _user);
+    _harvest(_positionAddress);
 
     if (_amount > 0) {
       uint256 _share = wdiv(mul(_amount, to18ConversionFactor), netAssetPerShare()); // [wad]
@@ -306,80 +344,69 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     }
     rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
 
-    fairlaunch.deposit(address(this), pid, _amount);
+    if (_amount > 0) fairlaunch.deposit(address(this), pid, _amount);
 
     emit LogDeposit(_amount);
   }
 
   /// @dev Harvest and withdraw ibToken from FairLaunch
-  /// @param _positionAddress The address that holding states of the position
+  /// @param _usr The address that holding states of the position
   /// @param _amount The ibToken amount to be withdrawn from FairLaunch and return to user
-  /// @param _data The extra data that may needs to execute the withdraw
   function withdraw(
-    address _positionAddress,
+    address _usr,
     uint256 _amount,
-    bytes calldata _data
+    bytes calldata /* _data */
   ) external override nonReentrant whenNotPaused {
     if (live == 1) {
-      fairlaunch.withdraw(address(this), pid, _amount);
+      if (_amount > 0) fairlaunch.withdraw(address(this), pid, _amount);
     }
-    _withdraw(_positionAddress, _amount, _data);
+    _withdraw(_usr, _amount);
   }
 
   /// @dev Harvest rewardTokens and distribute to user,
   /// withdraw collateral tokens from staking contract, and update BookKeeper
-  /// @param _positionAddress The position address to be updated
+  /// @param _usr The position address to be updated
   /// @param _amount The amount to be deposited
-  /// @param _data The extra data information pass along to this adapter
-  function _withdraw(
-    address _positionAddress,
-    uint256 _amount,
-    bytes calldata _data
-  ) private {
-    // Try to decode user address for harvested rewards from calldata
-    // if the user address is not passed, then send zero address to `harvest` and let it handle
-    address _user = address(0);
-    if (_data.length > 0) _user = abi.decode(_data, (address));
-    harvest(_positionAddress, _user);
+  function _withdraw(address _usr, uint256 _amount) private {
+    _harvest(msg.sender);
 
     if (_amount > 0) {
       uint256 _share = wdivup(mul(_amount, to18ConversionFactor), netAssetPerShare()); // [wad]
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
       require(int256(_share) > 0, "IbTokenAdapter/share-overflow");
-      require(stake[_positionAddress] >= _share, "IbTokenAdapter/insufficient staked amount");
+      require(stake[msg.sender] >= _share, "IbTokenAdapter/insufficient staked amount");
 
-      address(collateralToken).safeTransfer(_user, _amount);
-      bookKeeper.addCollateral(collateralPoolId, _positionAddress, -int256(_share));
+      bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_share));
       totalShare = sub(totalShare, _share);
-      stake[_positionAddress] = sub(stake[_positionAddress], _share);
+      stake[msg.sender] = sub(stake[msg.sender], _share);
+      address(collateralToken).safeTransfer(_usr, _amount);
     }
-    rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
+    rewardDebts[msg.sender] = rmulup(stake[msg.sender], accRewardPerShare);
     emit LogWithdraw(_amount);
   }
 
   /// @dev EMERGENCY ONLY. Withdraw ibToken from FairLaunch with invoking "_harvest"
-  function emergencyWithdraw(address _positionAddress, address _to) external nonReentrant whenNotPaused {
+  function emergencyWithdraw(address _to) external nonReentrant {
     if (live == 1) {
-      uint256 _amount = bookKeeper.collateralToken(collateralPoolId, _positionAddress);
+      uint256 _amount = bookKeeper.collateralToken(collateralPoolId, msg.sender);
       fairlaunch.withdraw(address(this), pid, _amount);
     }
-    _emergencyWithdraw(_positionAddress, _to);
+    _emergencyWithdraw(_to);
   }
 
   /// @dev EMERGENCY ONLY. Withdraw collateralTokens from staking contract without invoking _harvest
-  /// @param _positionAddress The positionAddress to do emergency withdraw
   /// @param _to The address to received collateralTokens
-  function _emergencyWithdraw(address _positionAddress, address _to) private {
-    uint256 _share = bookKeeper.collateralToken(collateralPoolId, _positionAddress); //[wad]
-    require(_share <= 2**255, "IbTokenAdapter/share-overflow");
+  function _emergencyWithdraw(address _to) private {
+    uint256 _share = bookKeeper.collateralToken(collateralPoolId, msg.sender); //[wad]
+    require(_share < 2**255, "IbTokenAdapter/share-overflow");
     uint256 _amount = wmul(wmul(_share, netAssetPerShare()), toTokenConversionFactor);
-    address(collateralToken).safeTransfer(_to, _amount);
-    bookKeeper.addCollateral(collateralPoolId, _positionAddress, -int256(_share));
+    bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_share));
     totalShare = sub(totalShare, _share);
-    stake[_positionAddress] = sub(stake[_positionAddress], _share);
-    rewardDebts[_positionAddress] = rmulup(stake[_positionAddress], accRewardPerShare);
-    emit LogEmergencyWithdaraw();
+    stake[msg.sender] = sub(stake[msg.sender], _share);
+    rewardDebts[msg.sender] = rmulup(stake[msg.sender], accRewardPerShare);
+    address(collateralToken).safeTransfer(_to, _amount);
+    emit LogEmergencyWithdraw(msg.sender, _to);
   }
 
   function moveStake(
@@ -396,12 +423,13 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   /// @param _source The address to be moved staked balance from
   /// @param _destination The address to be moved staked balance to
   /// @param _share The amount of staked balance to be moved
+  /// @dev access: COLLATERAL_MANAGER_ROLE
   function _moveStake(
     address _source,
     address _destination,
     uint256 _share,
     bytes calldata /* data */
-  ) private {
+  ) private onlyCollateralManager {
     // 1. Update collateral tokens for source and destination
     uint256 _stakedAmount = stake[_source];
     stake[_source] = sub(_stakedAmount, _share);
@@ -456,6 +484,7 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   }
 
   /// @dev Pause ibTokenAdapter when assumptions change
+  /// @dev access: OWNER_ROLE
   function cage() external override nonReentrant {
     // Allow caging if
     // - msg.sender is whitelisted to do so
@@ -472,12 +501,8 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
     emit LogCage();
   }
 
-  function uncage() external override {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender),
-      "IbTokenAdapter/not-authorized"
-    );
+  /// @dev access: OWNER_ROLE
+  function uncage() external override onlyOwner {
     require(live == 0, "IbTokenAdapter/not-caged");
     fairlaunch.deposit(address(this), pid, totalShare);
     live = 1;
@@ -485,23 +510,18 @@ contract IbTokenAdapter is IFarmableTokenAdapter, PausableUpgradeable, Reentranc
   }
 
   // --- pause ---
-  function pause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function unpause() external onlyOwnerOrGov {
     _unpause();
+  }
+
+  /// @dev access: OWNER_ROLE
+  function refreshApproval() external nonReentrant onlyOwner {
+    address(collateralToken).safeApprove(address(fairlaunch), uint256(-1));
   }
 }

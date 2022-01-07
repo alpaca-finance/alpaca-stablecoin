@@ -40,11 +40,13 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   uint256 public globalStabilityFeeRate; // Global, per-second stability fee debtAccumulatedRate [ray]
 
   // --- Init ---
-  function initialize(address _bookKeeper) external initializer {
+  function initialize(address _bookKeeper, address _systemDebtEngine) external initializer {
     PausableUpgradeable.__Pausable_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
     bookKeeper = IBookKeeper(_bookKeeper);
+    require(_systemDebtEngine != address(0), "StabilityFeeCollector/bad-system-debt-engine-address");
+    systemDebtEngine = _systemDebtEngine;
   }
 
   // --- Math ---
@@ -125,18 +127,42 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   event LogSetGlobalStabilityFeeRate(address indexed _caller, uint256 _data);
   event LogSetSystemDebtEngine(address indexed _caller, address _data);
 
-  /// @dev Set the global stability fee debtAccumulatedRate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
-  /// @param _globalStabilityFeeRate Global stability fee debtAccumulatedRate [ray]
-  function setGlobalStabilityFeeRate(uint256 _globalStabilityFeeRate) external {
+  modifier onlyOwner() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    _;
+  }
+
+  modifier onlyOwnerOrGov() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(IBookKeeper(bookKeeper).accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _;
+  }
+
+  /// @dev Set the global stability fee debtAccumulatedRate which will be apply to every collateral pool. Please see the explanation on the input format from the `setStabilityFeeRate` function.
+  /// @param _globalStabilityFeeRate Global stability fee debtAccumulatedRate [ray]
+  /// @dev access: OWNER_ROLE
+  function setGlobalStabilityFeeRate(uint256 _globalStabilityFeeRate) external onlyOwner {
+    require(
+      _globalStabilityFeeRate == 0 || _globalStabilityFeeRate >= RAY,
+      "StabilityFeeCollector/invalid-stability-fee-rate"
+    );
+    // Maximum stability fee rate is 50% yearly
+    require(
+      _globalStabilityFeeRate <= 1000000012857214317438491659,
+      "StabilityFeeCollector/stability-fee-rate-too-large"
+    );
     globalStabilityFeeRate = _globalStabilityFeeRate;
     emit LogSetGlobalStabilityFeeRate(msg.sender, _globalStabilityFeeRate);
   }
 
-  function setSystemDebtEngine(address _systemDebtEngine) external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+  /// @dev access: OWNER_ROLE
+  function setSystemDebtEngine(address _systemDebtEngine) external onlyOwner {
+    require(_systemDebtEngine != address(0), "StabilityFeeCollector/bad-system-debt-engine-address");
     systemDebtEngine = _systemDebtEngine;
     emit LogSetSystemDebtEngine(msg.sender, _systemDebtEngine);
   }
@@ -168,6 +194,7 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
       _collateralPoolId
     );
     require(now >= _lastAccumulationTime, "StabilityFeeCollector/invalid-now");
+    require(systemDebtEngine != address(0), "StabilityFeeCollector/system-debt-engine-not-set");
 
     // debtAccumulatedRate [ray]
     _debtAccumulatedRate = rmul(
@@ -183,23 +210,13 @@ contract StabilityFeeCollector is PausableUpgradeable, ReentrancyGuardUpgradeabl
   }
 
   // --- pause ---
-  function pause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function unpause() external onlyOwnerOrGov {
     _unpause();
   }
 }
