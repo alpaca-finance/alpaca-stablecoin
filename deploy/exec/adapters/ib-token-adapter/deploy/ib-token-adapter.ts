@@ -17,11 +17,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const COLLATERAL_POOL_ID = formatBytes32String("ibUSDT")
-  const COLLATERAL_TOKEN_ADDR = "0xb5913CD4C508f07025678CeF939BcC54D3024C39" // ibUSDT
+  const COLLATERAL_POOL_ID = formatBytes32String("ibWBNB")
+  const COLLATERAL_TOKEN_ADDR = "0xf9d32C5E10Dd51511894b360e6bD39D7573450F9" // ibWBNB
   const REWARD_TOKEN_ADDR = "0x354b3a11D5Ea2DA89405173977E271F58bE2897D" // ALPACA
   const FAIR_LAUNCH_ADDR = "0xac2fefDaF83285EA016BE3f5f1fb039eb800F43D"
-  const PID = 15
+  const PID = 1
   const SHIELD_ADDR = "0x938350DF8BF3bD81Baae368b72132f1Bd14E7C13"
   const TIME_LOCK_ADDR = "0xb3c3aE82358DF7fC0bd98629D5ed91767e45c337"
   const TREASURY_FEE_BPS = BigNumber.from(900) // 9%
