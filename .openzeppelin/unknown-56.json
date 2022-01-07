@@ -3064,6 +3064,181 @@
           }
         }
       }
+    },
+    "f92228e8c777ed2ee50a4e7cfa0e4a1b5099e1d8e458489ed4afec357ebb007e": {
+      "address": "0xBb403A75A49Aec69d0333da3D95Ec1D1F5973d7D",
+      "txHash": "0x69c4ab29be85e71a25f12a8a6e649e9756737aa8c1bb8ac8cba406c86aae2566",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:31"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:28"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:96"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "_roles",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)1079_storage)",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:225"
+          },
+          {
+            "contract": "IbTokenPriceFeed",
+            "label": "accessControlConfig",
+            "type": "t_contract(IAccessControlConfig)4041",
+            "src": "contracts/6.12/price-feeders/IbTokenPriceFeed.sol:29"
+          },
+          {
+            "contract": "IbTokenPriceFeed",
+            "label": "ibInBasePriceFeed",
+            "type": "t_contract(IPriceFeed)5143",
+            "src": "contracts/6.12/price-feeders/IbTokenPriceFeed.sol:30"
+          },
+          {
+            "contract": "IbTokenPriceFeed",
+            "label": "baseInUsdPriceFeed",
+            "type": "t_contract(IPriceFeed)5143",
+            "src": "contracts/6.12/price-feeders/IbTokenPriceFeed.sol:32"
+          },
+          {
+            "contract": "IbTokenPriceFeed",
+            "label": "timeDelay",
+            "type": "t_uint256",
+            "src": "contracts/6.12/price-feeders/IbTokenPriceFeed.sol:33"
+          },
+          {
+            "contract": "IbTokenPriceFeed",
+            "label": "lastUpdateTimestamp",
+            "type": "t_uint256",
+            "src": "contracts/6.12/price-feeders/IbTokenPriceFeed.sol:35"
+          },
+          {
+            "contract": "IbTokenPriceFeed",
+            "label": "currentPrice",
+            "type": "t_struct(Feed)8941_storage",
+            "src": "contracts/6.12/price-feeders/IbTokenPriceFeed.sol:44"
+          },
+          {
+            "contract": "IbTokenPriceFeed",
+            "label": "nextPrice",
+            "type": "t_struct(Feed)8941_storage",
+            "src": "contracts/6.12/price-feeders/IbTokenPriceFeed.sol:44"
+          }
+        ],
+        "types": {
+          "t_contract(IAccessControlConfig)4041": {
+            "label": "contract IAccessControlConfig"
+          },
+          "t_contract(IPriceFeed)5143": {
+            "label": "contract IPriceFeed"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_struct(Feed)8941_storage": {
+            "label": "struct IbTokenPriceFeed.Feed",
+            "members": [
+              {
+                "label": "val",
+                "type": "t_uint128"
+              },
+              {
+                "label": "ok",
+                "type": "t_uint128"
+              }
+            ]
+          },
+          "t_uint128": {
+            "label": "uint128"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)1079_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_struct(RoleData)1079_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_struct(AddressSet)2464_storage"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32"
+              }
+            ]
+          },
+          "t_struct(AddressSet)2464_storage": {
+            "label": "struct EnumerableSetUpgradeable.AddressSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)2199_storage"
+              }
+            ]
+          },
+          "t_struct(Set)2199_storage": {
+            "label": "struct EnumerableSetUpgradeable.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage"
+              },
+              {
+                "label": "_indexes",
+                "type": "t_mapping(t_bytes32,t_uint256)"
+              }
+            ]
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          }
+        }
+      }
     }
   }
 }
