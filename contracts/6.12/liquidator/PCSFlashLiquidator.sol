@@ -24,7 +24,6 @@ import "../interfaces/IAlpacaVault.sol";
 import "../interfaces/IStableSwapModule.sol";
 import "../interfaces/IStablecoinAdapter.sol";
 import "../utils/SafeToken.sol";
-import "hardhat/console.sol";
 
 contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   using SafeToken for address;
