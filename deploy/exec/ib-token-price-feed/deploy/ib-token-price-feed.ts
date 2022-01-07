@@ -15,9 +15,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const IB_IN_BASE_PRICE_FEED_ADDR = "0x8CC012356E61424446646ec3B261fe5EF5B44A8a" // AlpacaOraclePriceFeed dddress from 016
-  const BASE_IN_USD_PRICE_FEED_ADDR = "0x9F748f798C75EA44F86a5871045629a2aC9C0568" // StrictAlpacaOraclePriceFeed address from 018
-
+  const IB_IN_BASE_PRICE_FEED_ADDR = "0x521725f72F69447f81C698085EC1Dcb938bFF9aA" // ibUSDT/USDT StrictAlpacaOraclePriceFeed address
+  const BASE_IN_USD_PRICE_FEED_ADDR = "0x97ffE64668C39DCd0A0429dc21572Ff617aB920B" // USDT/USD StrictAlpacaOraclePriceFeed address
   const TIME_DELAY = 900
 
   const config = ConfigEntity.getConfig()

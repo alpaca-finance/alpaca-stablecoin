@@ -17,9 +17,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     Check all variables below before execute the deployment script
     */
 
-  const EXACT_ETA = ""
-
-  const IB_TOKEN_PRICE_FEED_ADDR = ""
+  const EXACT_ETA = "1641546000"
+  const IB_TOKEN_PRICE_FEED_ADDR = "0x6712262dbA21F3d348f040D87C6779fEB5f56a6B"
 
   const config = network.name === "mainnet" ? MainnetConfig : TestnetConfig
 

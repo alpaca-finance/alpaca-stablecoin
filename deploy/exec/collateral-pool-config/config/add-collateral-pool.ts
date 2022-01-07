@@ -39,17 +39,25 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const COLLATERAL_POOLS: IAddCollateralPoolParamList = [
     {
-      COLLATERAL_POOL_ID: "BUSD-STABLE",
-      DEBT_CEILING: ethers.utils.parseUnits("10000000", 45), // 10M [rad]
-      DEBT_FLOOR: BigNumber.from(0), // 0 [rad]
-      PRICE_FEED: "0xD67286e5969ca0D2ad282EB4eDa4B51d60A9eB45", // StaticPriceFeed
-      LIQUIDATION_RATIO: ethers.utils.parseUnits("1", 27),
-      STABILITY_FEE_RATE: ethers.utils.parseUnits("1", 27),
-      ADAPTER: "0x8fff07f961e75Dcced6f1620386D91E66109A9e9", // BUSD AuthTokenAdapter
-      CLOSE_FACTOR_BPS: BigNumber.from(0), // 0% Close Factor
-      LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10000), // 0% Liquidator Incentive
-      TREASURY_FEES_BPS: BigNumber.from(0), // 0% Treasury Fee
-      STRATEGY: AddressZero, // No liquidation strategy
+      COLLATERAL_POOL_ID: "ibUSDT",
+      DEBT_CEILING: ethers.utils.parseUnits("30000000", 45), // 30M [rad]
+      DEBT_FLOOR: ethers.utils.parseUnits("500", 45), // 500 AUSD [rad]
+      PRICE_FEED: "0x7171041c054238c428fca8BC841B2582CDe58d10", // ibUSDT IbTokenPriceFeed
+      // Collateral Factor for ibUSDT = 90% = 0.90
+      // Liquidation Ratio = 1 / 0.90
+      LIQUIDATION_RATIO: ethers.utils
+        .parseUnits("1", 27)
+        .mul(ethers.utils.parseUnits("1", 27))
+        .div(ethers.utils.parseUnits("0.90", 27)),
+      // Stability Fee Rate for ibUSDT = 2% = 1.02
+      // Stability Fee Rate to be set = 1000000000627937192491029810
+      // Ref: https://www.wolframalpha.com/input/?i=sqrt%281.02%2C+31536000%29
+      STABILITY_FEE_RATE: BigNumber.from("1000000000627937192491029810"),
+      ADAPTER: "0x2d764397908566c09E08f200DB6839bB791239f3", // ibUSDT IbTokenAdapter
+      CLOSE_FACTOR_BPS: BigNumber.from(2500), // 25% Close Factor
+      LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10500), // 5% Liquidator Incentive
+      TREASURY_FEES_BPS: BigNumber.from(8000), // 80% Treasury Fee
+      STRATEGY: config.Strategies.FixedSpreadLiquidationStrategy.address, // FixedSpreadLiquidationStrategy
     },
   ]
 

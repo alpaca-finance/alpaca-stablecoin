@@ -18,8 +18,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const config = ConfigEntity.getConfig()
 
   const IB_TOKEN_PRICE_FEED = "ibBUSD-USD"
-
-  const NEW_IB_IN_BASE_PRICE_FEED = ""
+  const NEW_IB_IN_BASE_PRICE_FEED = "0xaccAeb86817b62C4dC36D7C21a94e59c6663fA52"
 
   const ibTokenPriceFeed = config.PriceFeed.IbTokenPriceFeed.find((o) => o.name === IB_TOKEN_PRICE_FEED)
   if (!ibTokenPriceFeed) throw new Error(`error: unable to map ${IB_TOKEN_PRICE_FEED} to any IbTokenPriceFeed`)
