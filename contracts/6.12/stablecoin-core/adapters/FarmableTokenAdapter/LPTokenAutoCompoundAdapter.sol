@@ -21,7 +21,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import "@alpaca-finance/alpaca-contract/contracts/6/protocol/apis/pancake/IPancakeRouter02.sol";
 import "@pancakeswap-libs/pancake-swap-core/contracts/interfaces/IPancakePair.sol";
-
 import "../../../interfaces/IBookKeeper.sol";
 import "../../../interfaces/IFarmableTokenAdapter.sol";
 import "../../../interfaces/ICagable.sol";
@@ -30,6 +29,7 @@ import "../../../interfaces/IPancakeMasterChef.sol";
 import "../../../interfaces/IAlpacaVault.sol";
 import "../../../interfaces/ILyfStrategy.sol";
 import "../../../utils/SafeToken.sol";
+import "hardhat/console.sol";
 
 /// @title LPTokenAutoCompoundAdapter is the adapter that inherited BaseFarmableTokenAdapter.
 /// It receives Alpaca's ibTOKEN from users and deposit in Alpaca's FairLaunch.
@@ -83,12 +83,8 @@ contract LPTokenAutoCompoundAdapter is
 
   IManager public positionManager;
 
-  /// @dev Rewards per collateralToken in RAY
-  uint256 public accRewardPerShare;
   /// @dev Total CollateralTokens that has been staked in WAD
   uint256 public totalShare;
-  /// @dev Accummulate reward balance in WAD
-  uint256 public accRewardBalance;
 
   /// @dev Mapping of user => collteralTokens that he is staking
   mapping(address => uint256) public stake;
@@ -112,12 +108,33 @@ contract LPTokenAutoCompoundAdapter is
   event LogReinvest(address indexed caller, uint256 reward, uint256 bounty);
   event LogDeposit(uint256 _val);
   event LogWithdraw(uint256 _val);
-  event LogEmergencyWithdaraw();
+  event LogEmergencyWithdraw(address indexed _caller, address _to);
   event LogMoveStake(address indexed _src, address indexed _dst, uint256 _wad);
+  event LogSetTreasuryAccount(address indexed _caller, address _treasuryAccount);
+  event LogSetTreasuryFeeBps(address indexed _caller, uint256 _treasuryFeeBps);
 
   modifier onlyOwner() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(_accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender), "!ownerRole");
+    _;
+  }
+
+  modifier onlyOwnerOrGov() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
+        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
+      "!(ownerRole or govRole)"
+    );
+    _;
+  }
+
+  modifier onlyCollateralManager() {
+    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
+    require(
+      _accessControlConfig.hasRole(_accessControlConfig.COLLATERAL_MANAGER_ROLE(), msg.sender),
+      "!collateralManager"
+    );
     _;
   }
 
@@ -429,11 +446,10 @@ contract LPTokenAutoCompoundAdapter is
   /// deposit collateral tokens to staking contract, and update BookKeeper
   /// @param _positionAddress The position address to be updated
   /// @param _amount The amount to be deposited
-  /// @param _data The extra data information pass along to this adapter
   function _deposit(
     address _positionAddress,
     uint256 _amount,
-    bytes calldata _data
+    bytes calldata /* _data */
   ) private {
     require(live == 1, "LPTokenAutoCompoundAdapter/not live");
 
@@ -444,11 +460,14 @@ contract LPTokenAutoCompoundAdapter is
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
       require(int256(_share) > 0, "LPTokenAutoCompoundAdapter/share-overflow");
-      address(collateralToken).safeTransferFrom(msg.sender, address(this), _amount);
+      collateralToken.safeTransferFrom(msg.sender, address(this), _amount);
       bookKeeper.addCollateral(collateralPoolId, _positionAddress, int256(_share));
       totalShare = add(totalShare, _share);
       stake[_positionAddress] = add(stake[_positionAddress], _share);
 
+      console.log("_amount", _amount);
+      console.log(address(collateralToken).myBalance());
+      collateralToken.safeApprove(address(masterChef), _amount);
       masterChef.deposit(pid, _amount);
     }
 
@@ -456,72 +475,63 @@ contract LPTokenAutoCompoundAdapter is
   }
 
   /// @dev Harvest and withdraw ibToken from FairLaunch
-  /// @param _positionAddress The address that holding states of the position
-  /// @param _amount The ibToken amount to be withdrawn from FairLaunch and return to user
-  /// @param _data The extra data that may needs to execute the withdraw
+  /// @param _usr The address that holding states of the position
+  /// @param _share The number of share to withdraw
   function withdraw(
-    address _positionAddress,
-    uint256 _amount,
-    bytes calldata _data
+    address _usr,
+    uint256 _share,
+    bytes calldata /* _data */
   ) external override nonReentrant whenNotPaused {
-    if (live == 1) {
-      masterChef.withdraw(pid, _amount);
-    }
-    _withdraw(_positionAddress, _amount, _data);
+    _reinvest(treasuryAccount, treasuryFeeBps, actualBaseTokenBalance(), reinvestThreshold);
+    _withdraw(_usr, _share);
   }
 
   /// @dev Harvest rewardTokens and distribute to user,
   /// withdraw collateral tokens from staking contract, and update BookKeeper
-  /// @param _positionAddress The position address to be updated
-  /// @param _amount The amount to be deposited
-  /// @param _data The extra data information pass along to this adapter
-  function _withdraw(
-    address _positionAddress,
-    uint256 _amount,
-    bytes calldata _data
-  ) private {
-    // Try to decode user address for harvested rewards from calldata
-    // if the user address is not passed, then send zero address to `harvest` and let it handle
-    address _user = address(0);
-    if (_data.length > 0) _user = abi.decode(_data, (address));
-    _reinvest(treasuryAccount, treasuryFeeBps, actualBaseTokenBalance(), reinvestThreshold);
+  /// @param _usr The position address to be updated
+  /// @param _share The number of share to withdraw
+  function _withdraw(address _usr, uint256 _share) private {
+    require(live == 1, "LPTokenAutoCompoundAdapter/not live");
+    if (_share > 0) {
+      uint256 _amount = _share.mul(netAssetPerShare()).div(1e18); // [wad]
 
-    if (_amount > 0) {
-      uint256 _share = wdivup(mul(_amount, to18ConversionFactor), netAssetPerShare()); // [wad]
+      // Withdraw from MasterChef
+      masterChef.withdraw(pid, _amount);
+
       // Overflow check for int256(wad) cast below
       // Also enforces a non-zero wad
       require(int256(_share) > 0, "LPTokenAutoCompoundAdapter/share-overflow");
-      require(stake[_positionAddress] >= _share, "LPTokenAutoCompoundAdapter/insufficient staked amount");
+      require(stake[msg.sender] >= _share, "LPTokenAutoCompoundAdapter/insufficient staked amount");
 
-      address(collateralToken).safeTransfer(_user, _amount);
-      bookKeeper.addCollateral(collateralPoolId, _positionAddress, -int256(_share));
+      bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_share));
       totalShare = sub(totalShare, _share);
-      stake[_positionAddress] = sub(stake[_positionAddress], _share);
+      stake[msg.sender] = sub(stake[msg.sender], _share);
+
+      address(collateralToken).safeTransfer(_usr, _amount);
     }
-    emit LogWithdraw(_amount);
+    emit LogWithdraw(_share);
   }
 
   /// @dev EMERGENCY ONLY. Withdraw ibToken from FairLaunch with invoking "_harvest"
-  function emergencyWithdraw(address _positionAddress, address _to) external nonReentrant whenNotPaused {
+  function emergencyWithdraw(address _to) external nonReentrant {
     if (live == 1) {
-      uint256 _amount = bookKeeper.collateralToken(collateralPoolId, _positionAddress);
+      uint256 _amount = bookKeeper.collateralToken(collateralPoolId, msg.sender);
       masterChef.withdraw(pid, _amount);
     }
-    _emergencyWithdraw(_positionAddress, _to);
+    _emergencyWithdraw(_to);
   }
 
   /// @dev EMERGENCY ONLY. Withdraw collateralTokens from staking contract without invoking _harvest
-  /// @param _positionAddress The positionAddress to do emergency withdraw
   /// @param _to The address to received collateralTokens
-  function _emergencyWithdraw(address _positionAddress, address _to) private {
-    uint256 _share = bookKeeper.collateralToken(collateralPoolId, _positionAddress); //[wad]
-    require(_share <= 2**255, "LPTokenAutoCompoundAdapter/share-overflow");
+  function _emergencyWithdraw(address _to) private {
+    uint256 _share = bookKeeper.collateralToken(collateralPoolId, msg.sender); //[wad]
+    require(_share < 2**255, "LPTokenAutoCompoundAdapter/share-overflow");
     uint256 _amount = wmul(wmul(_share, netAssetPerShare()), toTokenConversionFactor);
-    address(collateralToken).safeTransfer(_to, _amount);
-    bookKeeper.addCollateral(collateralPoolId, _positionAddress, -int256(_share));
+    bookKeeper.addCollateral(collateralPoolId, msg.sender, -int256(_share));
     totalShare = sub(totalShare, _share);
-    stake[_positionAddress] = sub(stake[_positionAddress], _share);
-    emit LogEmergencyWithdaraw();
+    stake[msg.sender] = sub(stake[msg.sender], _share);
+    address(collateralToken).safeTransfer(_to, _amount);
+    emit LogEmergencyWithdraw(msg.sender, _to);
   }
 
   function moveStake(
@@ -538,6 +548,7 @@ contract LPTokenAutoCompoundAdapter is
   /// @param _source The address to be moved staked balance from
   /// @param _destination The address to be moved staked balance to
   /// @param _share The amount of staked balance to be moved
+  /// @dev access: COLLATERAL_MANAGER_ROLE
   function _moveStake(
     address _source,
     address _destination,
@@ -571,7 +582,8 @@ contract LPTokenAutoCompoundAdapter is
     _moveStake(_source, _destination, _share, _data);
   }
 
-  /// @dev Pause LPTokenAutoCompoundAdapter when assumptions change
+  /// @dev Pause ibTokenAdapter when assumptions change
+  /// @dev access: OWNER_ROLE
   function cage() external override nonReentrant {
     // Allow caging if
     // - msg.sender is whitelisted to do so
@@ -587,6 +599,7 @@ contract LPTokenAutoCompoundAdapter is
     emit LogCage();
   }
 
+  /// @dev access: OWNER_ROLE
   function uncage() external override {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
     require(
@@ -600,23 +613,18 @@ contract LPTokenAutoCompoundAdapter is
   }
 
   // --- pause ---
-  function pause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function pause() external onlyOwnerOrGov {
     _pause();
   }
 
-  function unpause() external {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(
-      _accessControlConfig.hasRole(_accessControlConfig.OWNER_ROLE(), msg.sender) ||
-        _accessControlConfig.hasRole(_accessControlConfig.GOV_ROLE(), msg.sender),
-      "!(ownerRole or govRole)"
-    );
+  /// @dev access: OWNER_ROLE, GOV_ROLE
+  function unpause() external onlyOwnerOrGov {
     _unpause();
+  }
+
+  /// @dev access: OWNER_ROLE
+  function refreshApproval() external nonReentrant onlyOwner {
+    address(collateralToken).safeApprove(address(masterChef), uint256(-1));
   }
 }

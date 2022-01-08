@@ -2,9 +2,9 @@ import { config as dotEnvConfig } from "dotenv"
 dotEnvConfig()
 
 import "@openzeppelin/hardhat-upgrades"
-
+import "@typechain/hardhat"
+import "@nomiclabs/hardhat-ethers"
 import "@nomiclabs/hardhat-waffle"
-import "hardhat-typechain"
 import "hardhat-deploy"
 import "solidity-coverage"
 
