@@ -102,11 +102,4 @@ interface IBookKeeper {
   function collateralPoolConfig() external view returns (address);
 
   function accessControlConfig() external view returns (address);
-
-  function repayLoan(
-    bytes32 _collateralPoolId,
-    address _stabilityFeeRecipient,
-    uint256 _stablecoinAmount, // [wad]
-    uint256 _stableCoinReferencePrice
-  ) external;
 }

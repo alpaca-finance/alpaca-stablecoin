@@ -557,26 +557,4 @@ contract BookKeeper is IBookKeeper, PausableUpgradeable, ReentrancyGuardUpgradea
     stablecoin[_stabilityFeeRecipient] = add(stablecoin[_stabilityFeeRecipient], _value);
     totalStablecoinIssued = add(totalStablecoinIssued, _value);
   }
-
-  function repayLoan(
-    bytes32 _collateralPoolId,
-    address _stabilityFeeRecipient,
-    uint256 _stablecoinAmount, // [wad]
-    uint256 _stableCoinReferencePrice
-  ) external override nonReentrant whenNotPaused {
-    IAccessControlConfig _accessControlConfig = IAccessControlConfig(accessControlConfig);
-    require(_accessControlConfig.hasRole(_accessControlConfig.ADAPTER_ROLE(), msg.sender), "!adapterRole");
-    uint256 _debtAccumulatedRate = ICollateralPoolConfig(collateralPoolConfig).getDebtAccumulatedRate(
-      _collateralPoolId
-    );
-    uint256 _totalDebtShare = ICollateralPoolConfig(collateralPoolConfig).getTotalDebtShare(_collateralPoolId); // [wad]
-    uint256 _totalDebtValue = mul(_totalDebtShare, _debtAccumulatedRate); // [rad]
-
-    uint256 _repayValue = mul(_stablecoinAmount, _stableCoinReferencePrice);
-    _moveStablecoin(msg.sender, _stabilityFeeRecipient, _repayValue);
-    ICollateralPoolConfig(collateralPoolConfig).setDebtAccumulatedRate(
-      _collateralPoolId,
-      sub(_totalDebtValue, _repayValue) / _totalDebtShare
-    );
-  }
 }
