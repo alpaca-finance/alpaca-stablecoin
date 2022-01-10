@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const VAULT = "0xf9d32C5E10Dd51511894b360e6bD39D7573450F9" // ibWBNB
+  const VAULT = "0x158Da805682BdC8ee32d52833aD41E74bb951E59" // ibWBNB
   const IS_OK = true
 
   const config = ConfigEntity.getConfig()

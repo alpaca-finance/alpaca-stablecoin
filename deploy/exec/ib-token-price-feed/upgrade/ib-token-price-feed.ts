@@ -18,7 +18,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     */
 
   const IB_TOKEN_PRICE_FEED_ADDR = "0x4a89F897AA97D096dBeA0f874a5854662996f8ae"
-  const EXACT_ETA = "1641637800"
+  const EXACT_ETA = "1641876000"
 
   const config = network.name === "mainnet" ? MainnetConfig : TestnetConfig
 

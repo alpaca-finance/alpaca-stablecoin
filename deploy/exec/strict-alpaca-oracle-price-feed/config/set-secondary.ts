@@ -17,9 +17,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const config = ConfigEntity.getConfig()
 
-  const ADDR = "0xFe104175A2503248438d16C2425d6C2f3FAa5b65"
+  const ADDR = "0x97ffe64668c39dcd0a0429dc21572ff617ab920b"
   const SECONDARY_ALPACA_ORACLE = config.Oracle.ChainLinkOracle.address // ChainLinkOracle
-  const SECONDARY_TOKEN_0 = "0x0266693F9Df932aD7dA8a9b44C2129Ce8a87E81f" // BUSD
+  const SECONDARY_TOKEN_0 = "0xe60fa777deb72c364447bb18c823c4731fbed671" // USDT
   const SECONDARY_TOKEN_1 = "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff" // USD
 
   const strictAlpacaOraclePriceFeed = StrictAlpacaOraclePriceFeed__factory.connect(ADDR, (await ethers.getSigners())[0])

@@ -18,10 +18,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const config = ConfigEntity.getConfig()
 
   const PRIMARY_ALPACA_ORACLE = config.Oracle.ChainLinkOracle.address // ChainLinkPriceOracle
-  const PRIMARY_TOKEN_0 = "0xDfb1211E2694193df5765d54350e1145FD2404A1" // WBNB
+  const PRIMARY_TOKEN_0 = "0x55d398326f99059ff775485246999027b3197955" // USDT
   const PRIMARY_TOKEN_1 = "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff" // USD
   const SECONDARY_ALPACA_ORACLE = config.Oracle.BandPriceOracle.address // BandPriceOracle
-  const SECONDARY_TOKEN_0 = "0xDfb1211E2694193df5765d54350e1145FD2404A1" // WBNB
+  const SECONDARY_TOKEN_0 = "0x55d398326f99059ff775485246999027b3197955" // USDT
   const SECONDARY_TOKEN_1 = "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff" // USD
   const ACCESS_CONTROL_CONFIG = config.AccessControlConfig.address
 

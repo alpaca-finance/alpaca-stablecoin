@@ -14,8 +14,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   ░░░╚═╝░░░╚═╝░░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝╚═╝╚═╝░░╚══╝░╚═════╝░
   Check all variables below before execute the deployment script
   */
-  const TOKEN_SYMBOL = "BNB"
-  const TOKEN_ADDRESS = "0xDfb1211E2694193df5765d54350e1145FD2404A1"
+  const TOKEN_SYMBOL = "USDT"
+  const TOKEN_ADDRESS = "0x55d398326f99059ff775485246999027b3197955"
 
   const config = ConfigEntity.getConfig()
   const bandPriceOracle = BandPriceOracle__factory.connect(

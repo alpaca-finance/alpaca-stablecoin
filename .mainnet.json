@@ -52,6 +52,19 @@
         "liquidatorIncentiveBps": 10000,
         "treasuryFeesBps": 0,
         "strategy": "0x0000000000000000000000000000000000000000"
+      },
+      {
+        "collateralPoolId": "ibUSDT",
+        "debtCeiling": "30000000000000000000000000000000000000000000000000000",
+        "debtFloor": "500000000000000000000000000000000000000000000000",
+        "priceFeed": "0xFB6A378b5e5bBc6F413DdDf07873076851a00fD1",
+        "liquidationRatio": "1111111111111111111111111111",
+        "stabilityFeeRate": "1000000000627937192491029810",
+        "adapter": "0x2B356b9Cd4B00658faCC35f4d031DF528eE9778D",
+        "closeFactorBps": 2500,
+        "liquidatorIncentiveBps": 10500,
+        "treasuryFeesBps": 8000,
+        "strategy": "0x9fA028cF1DdaAa514A1addE6A9fE7224ca10D6d1"
       }
     ]
   },
@@ -93,6 +106,14 @@
       "rewardToken": "0x8F0528cE5eF7B51152A59745bEfDD91D97091d2F",
       "treasuryFeeBps": "900",
       "treasuryAccount": "0x7E2308437c2f4C8934214663dc8476037625a270"
+    },
+    {
+      "address": "0x2B356b9Cd4B00658faCC35f4d031DF528eE9778D",
+      "deployedBlock": 14236879,
+      "collateralToken": "0x158Da805682BdC8ee32d52833aD41E74bb951E59",
+      "rewardToken": "0x8F0528cE5eF7B51152A59745bEfDD91D97091d2F",
+      "treasuryFeeBps": "900",
+      "treasuryAccount": "0x7E2308437c2f4C8934214663dc8476037625a270"
     }
   ],
   "StablecoinAdapters": {
@@ -126,6 +147,24 @@
         "secondary": "0x08fA2Ed02EbDc97BaD85fF6369C57c6280cA52Bd",
         "token0": "0xe9e7cea3dedca5984780bafc599bd69add087d56",
         "token1": "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff"
+      },
+      {
+        "name": "ibUSDT-USDT",
+        "address": "0xee1D99C9B85dCbbe4773767795EED23Fa8190731",
+        "deployedBlock": 14236725,
+        "primarySoure": "0x166f56F2EDa9817cAB77118AE4FCAA0002A17eC7",
+        "secondary": "0xdb4A41CdaBd4CA7AB9AF3Db346106245CB3f7968",
+        "token0": "0x158Da805682BdC8ee32d52833aD41E74bb951E59",
+        "token1": "0x55d398326f99059ff775485246999027b3197955"
+      },
+      {
+				"name": "USDT-USD",
+        "address": "0x2B9C18a7e2F067E006E4625a74174472E9F89559",
+        "deployedBlock": 14236761,
+        "primarySoure": "0x634902128543b25265da350e2d961C7ff540fC71",
+        "secondary": "0x08fA2Ed02EbDc97BaD85fF6369C57c6280cA52Bd",
+        "token0": "0x55d398326f99059ff775485246999027b3197955",
+        "token1": "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff"
       }
     ],
     "IbTokenPriceFeed": [
@@ -135,6 +174,13 @@
         "deployedBlock": 13125204,
         "ibInBasePriceFeed": "0x8CC012356E61424446646ec3B261fe5EF5B44A8a",
         "baseInUsdPriceFeed": "0x9F748f798C75EA44F86a5871045629a2aC9C0568"
+      },
+      {
+				"name": "ibUSDT-USD",
+        "address": "0xFB6A378b5e5bBc6F413DdDf07873076851a00fD1",
+        "deployedBlock": 14236810,
+        "ibInBasePriceFeed": "0xee1D99C9B85dCbbe4773767795EED23Fa8190731",
+        "baseInUsdPriceFeed": "0x2B9C18a7e2F067E006E4625a74174472E9F89559"
       }
     ],
     "StaticPriceFeed": [
@@ -161,9 +207,9 @@
         "deployedBlock": 2165210
       }
     },
-    "VaultPriceOracle": {
-      "address": "",
-      "deployedBlock": 0
+  "VaultPriceOracle": {
+      "address": "0xdb4A41CdaBd4CA7AB9AF3Db346106245CB3f7968",
+      "deployedBlock": 14234403
     }
   },
   "SystemDebtEngine": {

@@ -129,6 +129,31 @@
       "address": "0xE7a49Ae5c9500d18481e0E0EFBFF1D5d0FF75DE3",
       "txHash": "0xee9906b82b5df30bcb790df3bb9466f25ba7817f69c4948ddd35d6806a890ff3",
       "kind": "transparent"
+    },
+    {
+      "address": "0xdb4A41CdaBd4CA7AB9AF3Db346106245CB3f7968",
+      "txHash": "0x5ea806c4691b46e645dc6579a48d098103f389c15a773bed943a9e136543827b",
+      "kind": "transparent"
+    },
+    {
+      "address": "0xee1D99C9B85dCbbe4773767795EED23Fa8190731",
+      "txHash": "0xd6b91bf630f03a0f65a719cb36b73e7a22f4cb9a3a4daf9c37d69779a31c0eee",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x2B9C18a7e2F067E006E4625a74174472E9F89559",
+      "txHash": "0x994339025d8507a5d17154b88d8ab4a2d5e97dc15116874389c242ef5ee94f3a",
+      "kind": "transparent"
+    },
+    {
+      "address": "0xFB6A378b5e5bBc6F413DdDf07873076851a00fD1",
+      "txHash": "0x518f063603cbb4c77524256fa87e8298f14f501f06ce544d6cb2af58dc6ffe8e",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x2B356b9Cd4B00658faCC35f4d031DF528eE9778D",
+      "txHash": "0x36c1dd307e83b96174552b2f38abbab9c3a504ac3c190c262acc70329b2ee352",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -3236,6 +3261,43 @@
           },
           "t_array(t_uint256)50_storage": {
             "label": "uint256[50]"
+          }
+        }
+      }
+    },
+    "aee70bfcbb3a63b17b78b4bb96d0a7b11d2f60c64178ed14a1b3f73c1c7bea18": {
+      "address": "0xAbC591B524b40e3bE9EAda1143B1dbC9D67B6274",
+      "txHash": "0x3775e271221400ca39cd7fa0c02a76fc8e4e0278b27e3848d331dafb33ed1d25",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "VaultPriceOracle",
+            "label": "vaults",
+            "type": "t_mapping(t_address,t_bool)",
+            "src": "contracts/6.12/price-oracles/VaultPriceOracle.sol:26"
+          }
+        ],
+        "types": {
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_bool": {
+            "label": "bool"
           }
         }
       }
