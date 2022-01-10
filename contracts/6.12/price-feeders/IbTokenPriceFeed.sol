@@ -37,8 +37,8 @@ contract IbTokenPriceFeed is PausableUpgradeable, AccessControlUpgradeable, IPri
     uint128 ok;
   }
 
-  Feed currentPrice;
-  Feed nextPrice;
+  Feed private currentPrice;
+  Feed private nextPrice;
 
   event LogValue(bytes32 val);
   event LogSetTimeDelay(address indexed caller, uint256 newTimeDelay);
