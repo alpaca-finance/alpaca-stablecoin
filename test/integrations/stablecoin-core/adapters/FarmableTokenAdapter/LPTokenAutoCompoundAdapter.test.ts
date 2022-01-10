@@ -562,7 +562,7 @@ describe("LPTokenAutoCompoundAdapter", () => {
       })
     })
 
-    context("when some one directly transfer collateral tokens to IbTokenAdapter", async () => {
+    context("when some one directly transfer collateral tokens to LPTokenAutoCompoundAdapter", async () => {
       it("should reinvest the directly transferred fund to MasterChef", async () => {
         await busd.approve(router.address, ethers.utils.parseEther("1000"))
         await alpacaStablecoin.approve(router.address, ethers.utils.parseEther("1000"))
@@ -685,24 +685,33 @@ describe("LPTokenAutoCompoundAdapter", () => {
             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
           )
 
+          const aliceStake1 = await lpTokenAutoCompoundAdapter.stake(aliceAddress)
+          const netAssetPerShare1 = await lpTokenAutoCompoundAdapter.netAssetPerShare()
+          const aliceNetAssetValue1 = aliceStake1.mul(netAssetPerShare1)
           expect(await cake.balanceOf(lpTokenAutoCompoundAdapter.address)).to.be.eq(0)
           expect(await lpTokenAutoCompoundAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("8"))
-          expect(await lpTokenAutoCompoundAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("8"))
+          expect(aliceStake1).to.be.eq(ethers.utils.parseEther("8"))
 
-          // Now Alice harvest rewards. 1 block has been passed, hence Alice should get 90 (100 - 10%) ALPACA, treasury account should get 10 ALPACA.
+          // Now Alice harvest rewards. 1 block has been passed, hence Alice's net asset value should grow
           await lpTokenAutoCompoundAdapterAsAlice.deposit(
             aliceAddress,
             0,
             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
           )
 
+          const aliceStake2 = await lpTokenAutoCompoundAdapter.stake(aliceAddress)
+          const netAssetPerShare2 = await lpTokenAutoCompoundAdapter.netAssetPerShare()
+          const aliceNetAssetValue2 = aliceStake2.mul(netAssetPerShare2)
           expect(await cake.balanceOf(lpTokenAutoCompoundAdapter.address)).to.be.eq(0)
           expect(await lpTokenAutoCompoundAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("8"))
-          expect(await lpTokenAutoCompoundAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("8"))
-          expect(await lpTokenAutoCompoundAdapter.netAssetPerShare()).to.be.eq("1000124219245559157")
+          expect(aliceStake2).to.be.eq(ethers.utils.parseEther("8"))
+          expect(netAssetPerShare2).to.be.eq("1000124219245559157")
           expect(await lpTokenAutoCompoundAdapter.netAssetValuation()).to.be.eq("8000993753964473262")
+          expect(aliceNetAssetValue2, "Alice's net asset value should grow from reinvest.").to.be.gt(
+            aliceNetAssetValue1
+          )
 
-          // Bob join the party! As 2 blocks moved. IbTokenAdapter earned 200 ALPACA
+          // Bob join the party! As 2 blocks moved. LPTokenAutoCompoundAdapter
           await busdAsBob.approve(router.address, ethers.utils.parseEther("1000"))
           await alpacaStablecoinAsBob.approve(router.address, ethers.utils.parseEther("1000"))
 
@@ -725,21 +734,32 @@ describe("LPTokenAutoCompoundAdapter", () => {
             ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress])
           )
 
+          const aliceStake3 = await lpTokenAutoCompoundAdapter.stake(aliceAddress)
+          const netAssetPerShare3 = await lpTokenAutoCompoundAdapter.netAssetPerShare()
+          const aliceNetAssetValue3 = aliceStake3.mul(netAssetPerShare3)
+          const bobStake1 = await lpTokenAutoCompoundAdapter.stake(bobAddress)
           expect(await lpTokenAutoCompoundAdapter.totalShare()).to.be.eq("11997021032030271049")
-          expect(await lpTokenAutoCompoundAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("8"))
-          expect(await lpTokenAutoCompoundAdapter.stake(bobAddress)).to.be.eq("3997021032030271049")
-          expect(await lpTokenAutoCompoundAdapter.netAssetPerShare()).to.be.eq("1000745297046439557")
+          expect(aliceStake3).to.be.eq(ethers.utils.parseEther("8"))
+          expect(bobStake1).to.be.eq("3997021032030271049")
+          expect(netAssetPerShare3).to.be.eq("1000745297046439557")
           expect(await lpTokenAutoCompoundAdapter.netAssetValuation()).to.be.eq("12005962376371516458")
+          expect(aliceNetAssetValue3, "Alice's net asset value should grow from reinvest.").to.be.gt(
+            aliceNetAssetValue2
+          )
+          AssertHelpers.assertAlmostEqual(
+            bobStake1.mul(netAssetPerShare3).toString(),
+            ethers.utils.parseEther("3.999").toString()
+          ) // Bob's net asset value should be equal to the amount Bob deposited with some precision loss
 
-          // // Bob harvest ALPACA. IbTokenAdapter earned another 100 ALPACA.
-          // // IbTokenAdapter has another 100 ALPACA from previous block. Hence,
-          // // balanceOf(address(this)) should return 300 ALPACA.
-          // // Bob should get 72 (80 - 10%) ALPACA, treasury account should get 8 ALPACA.
-          // await ibTokenAdapterAsBob.deposit(
-          //   bobAddress,
-          //   0,
-          //   ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress])
-          // )
+          // Bob harvest ALPACA. LPTokenAutoCompoundAdapter earned another 100 ALPACA.
+          // LPTokenAutoCompoundAdapter has another 100 ALPACA from previous block. Hence,
+          // balanceOf(address(this)) should return 300 ALPACA.
+          // Bob should get 72 (80 - 10%) ALPACA, treasury account should get 8 ALPACA.
+          await lpTokenAutoCompoundAdapterAsBob.deposit(
+            bobAddress,
+            0,
+            ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress])
+          )
 
           // expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("220"))
           // expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("90"))

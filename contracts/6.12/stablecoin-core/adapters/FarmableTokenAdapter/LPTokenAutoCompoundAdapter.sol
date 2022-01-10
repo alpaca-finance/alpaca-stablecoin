@@ -465,8 +465,6 @@ contract LPTokenAutoCompoundAdapter is
       totalShare = add(totalShare, _share);
       stake[_positionAddress] = add(stake[_positionAddress], _share);
 
-      console.log("_amount", _amount);
-      console.log(address(collateralToken).myBalance());
       collateralToken.safeApprove(address(masterChef), _amount);
       masterChef.deposit(pid, _amount);
     }
