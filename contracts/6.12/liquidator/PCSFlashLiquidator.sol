@@ -29,6 +29,15 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   using SafeToken for address;
   using SafeMathUpgradeable for uint256;
 
+  struct LocalVars {
+    address liquidatorAddress;
+    IGenericTokenAdapter tokenAdapter;
+    address vaultAddress;
+    IPancakeRouter02 router;
+    address[] path;
+    address stableSwapModuleAddress;
+  }
+
   event LogFlashLiquidation(
     address indexed liquidatorAddress,
     uint256 debtValueToRepay,
@@ -36,6 +45,7 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     uint256 liquidationProfit
   );
   event LogSellCollateral(uint256 amount, uint256 minAmountOut, uint256 actualAmountOut);
+  event LogSwapTokenToStablecoin(uint256 amount, address usr, uint256 receivedAmount);
 
   // --- Math ---
   uint256 constant WAD = 10**18;
@@ -67,31 +77,45 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     uint256 _collateralAmountToLiquidate, // [wad]
     bytes calldata data
   ) external override {
+    LocalVars memory _vars;
     (
-      address _liquidatorAddress,
-      IGenericTokenAdapter _tokenAdapter,
-      address _vaultAddress,
-      IPancakeRouter02 _router,
-      address[] memory _path
-    ) = abi.decode(data, (address, IGenericTokenAdapter, address, IPancakeRouter02, address[]));
+      _vars.liquidatorAddress,
+      _vars.tokenAdapter,
+      _vars.vaultAddress,
+      _vars.router,
+      _vars.path,
+      _vars.stableSwapModuleAddress
+    ) = abi.decode(data, (address, IGenericTokenAdapter, address, IPancakeRouter02, address[], address));
 
     // Retrieve collateral token
     (address _token, uint256 _actualCollateralAmount) = _retrieveCollateral(
-      _tokenAdapter,
-      _vaultAddress,
+      _vars.tokenAdapter,
+      _vars.vaultAddress,
       _collateralAmountToLiquidate
     );
 
     // Swap token to AUSD
     require(
       _debtValueToRepay.div(RAY) + 1 <=
-        _sellCollateral(_token, _path, _router, _actualCollateralAmount, _debtValueToRepay),
+        _sellCollateral(
+          _token,
+          _vars.path,
+          _vars.router,
+          _actualCollateralAmount,
+          _debtValueToRepay,
+          _vars.stableSwapModuleAddress
+        ),
       "not enough to repay debt"
     );
 
     // Deposit Alpaca Stablecoin for liquidatorAddress
-    uint256 _liquidationProfit = _depositAlpacaStablecoin(_debtValueToRepay.div(RAY) + 1, _liquidatorAddress);
-    emit LogFlashLiquidation(_liquidatorAddress, _debtValueToRepay, _collateralAmountToLiquidate, _liquidationProfit);
+    uint256 _liquidationProfit = _depositAlpacaStablecoin(_debtValueToRepay.div(RAY) + 1, _vars.liquidatorAddress);
+    emit LogFlashLiquidation(
+      _vars.liquidatorAddress,
+      _debtValueToRepay,
+      _collateralAmountToLiquidate,
+      _liquidationProfit
+    );
   }
 
   function _retrieveCollateral(
@@ -124,9 +148,11 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     address[] memory _path,
     IPancakeRouter02 _router,
     uint256 _amount,
-    uint256 _minAmountOut
+    uint256 _minAmountOut,
+    address _stableSwapModuleAddress
   ) internal returns (uint256 receivedAmount) {
-    uint256 _alpacaStablecoinBalanceBefore = alpacaStablecoin.myBalance();
+    address _tokencoinAddress = _path[_path.length - 1];
+    uint256 _tokencoinBalanceBefore = _tokencoinAddress.myBalance();
     if (_token == wrappedNativeAddr) {
       _router.swapExactETHForTokens{ value: _amount }(_minAmountOut.div(RAY) + 1, _path, address(this), now);
     } else {
@@ -134,9 +160,30 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
       _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY) + 1, _path, address(this), now);
       _token.safeApprove(address(_router), 0);
     }
+    uint256 _tokencoinBalanceAfter = _tokencoinAddress.myBalance();
+    uint256 _tokenAmount = _tokencoinBalanceAfter.sub(_tokencoinBalanceBefore);
+
+    receivedAmount = _swapTokenToStablecoin(_stableSwapModuleAddress, address(this), _tokenAmount, _tokencoinAddress);
+
+    emit LogSellCollateral(_amount, _minAmountOut, receivedAmount);
+  }
+
+  function _swapTokenToStablecoin(
+    address _stableSwapModuleAddress,
+    address _usr,
+    uint256 _amount,
+    address _tokencoinAddress
+  ) internal returns (uint256 receivedAmount) {
+    uint256 _alpacaStablecoinBalanceBefore = alpacaStablecoin.myBalance();
+    IStableSwapModule stableSwapModule = IStableSwapModule(_stableSwapModuleAddress);
+    address authTokenApdapter = address(stableSwapModule.authTokenAdapter());
+    _tokencoinAddress.safeApprove(authTokenApdapter, uint256(-1));
+    stableSwapModule.swapTokenToStablecoin(_usr, _amount);
+    _tokencoinAddress.safeApprove(authTokenApdapter, 0);
     uint256 _alpacaStablecoinBalanceAfter = alpacaStablecoin.myBalance();
     receivedAmount = _alpacaStablecoinBalanceAfter.sub(_alpacaStablecoinBalanceBefore);
-    emit LogSellCollateral(_amount, _minAmountOut, receivedAmount);
+
+    emit LogSwapTokenToStablecoin(_amount, _usr, receivedAmount);
   }
 
   function _depositAlpacaStablecoin(uint256 _amount, address _liquidatorAddress)
