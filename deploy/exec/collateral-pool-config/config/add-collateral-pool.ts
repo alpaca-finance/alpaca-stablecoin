@@ -39,21 +39,21 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const COLLATERAL_POOLS: IAddCollateralPoolParamList = [
     {
-      COLLATERAL_POOL_ID: "ibUSDT",
+      COLLATERAL_POOL_ID: "ibWBNB",
       DEBT_CEILING: ethers.utils.parseUnits("30000000", 45), // 30M [rad]
       DEBT_FLOOR: ethers.utils.parseUnits("500", 45), // 500 AUSD [rad]
-      PRICE_FEED: "0xFB6A378b5e5bBc6F413DdDf07873076851a00fD1", // ibUSDT IbTokenPriceFeed
-      // Collateral Factor for ibUSDT = 90% = 0.90
-      // Liquidation Ratio = 1 / 0.90
+      PRICE_FEED: "0x44b930F2e53231B3F85495229eA644724C93c617", // ibWBNB IbTokenPriceFeed
+      // Collateral Factor for ibWBNB = 65% = 0.65
+      // Liquidation Ratio = 1 / 0.65
       LIQUIDATION_RATIO: ethers.utils
         .parseUnits("1", 27)
         .mul(ethers.utils.parseUnits("1", 27))
-        .div(ethers.utils.parseUnits("0.90", 27)),
-      // Stability Fee Rate for ibUSDT = 2% = 1.02
-      // Stability Fee Rate to be set = 1000000000627937192491029810
-      // Ref: https://www.wolframalpha.com/input/?i=sqrt%281.02%2C+31536000%29
-      STABILITY_FEE_RATE: BigNumber.from("1000000000627937192491029810"),
-      ADAPTER: "0x2B356b9Cd4B00658faCC35f4d031DF528eE9778D", // ibUSDT IbTokenAdapter
+        .div(ethers.utils.parseUnits("0.65", 27)),
+      // Stability Fee Rate for ibWBNB = 3% = 1.03
+      // Stability Fee Rate to be set = 1000000000937303470807876290
+      // Ref: https://www.wolframalpha.com/input/?i=sqrt%281.03%2C+31536000%29
+      STABILITY_FEE_RATE: BigNumber.from("1000000000937303470807876290"),
+      ADAPTER: "0x4Bf04730C37fc395B5F780E6Ad3E397C031F6d39", // ibWBNB IbTokenAdapter
       CLOSE_FACTOR_BPS: BigNumber.from(2500), // 25% Close Factor
       LIQUIDATOR_INCENTIVE_BPS: BigNumber.from(10500), // 5% Liquidator Incentive
       TREASURY_FEES_BPS: BigNumber.from(8000), // 80% Treasury Fee

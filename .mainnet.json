@@ -65,6 +65,19 @@
         "liquidatorIncentiveBps": 10500,
         "treasuryFeesBps": 8000,
         "strategy": "0x9fA028cF1DdaAa514A1addE6A9fE7224ca10D6d1"
+      },
+      {
+        "collateralPoolId": "ibWBNB",
+        "debtCeiling": "30000000000000000000000000000000000000000000000000000",
+        "debtFloor": "500000000000000000000000000000000000000000000000",
+        "priceFeed": "0x44b930F2e53231B3F85495229eA644724C93c617",
+        "liquidationRatio": "1538461538461538461538461538",
+        "stabilityFeeRate": "1000000000937303470807876290",
+        "adapter": "0x4Bf04730C37fc395B5F780E6Ad3E397C031F6d39",
+        "closeFactorBps": 2500,
+        "liquidatorIncentiveBps": 10500,
+        "treasuryFeesBps": 8000,
+        "strategy": "0x9fA028cF1DdaAa514A1addE6A9fE7224ca10D6d1"
       }
     ]
   },
@@ -111,6 +124,14 @@
       "address": "0x2B356b9Cd4B00658faCC35f4d031DF528eE9778D",
       "deployedBlock": 14236879,
       "collateralToken": "0x158Da805682BdC8ee32d52833aD41E74bb951E59",
+      "rewardToken": "0x8F0528cE5eF7B51152A59745bEfDD91D97091d2F",
+      "treasuryFeeBps": "900",
+      "treasuryAccount": "0x7E2308437c2f4C8934214663dc8476037625a270"
+    },
+    {
+      "address": "0x4Bf04730C37fc395B5F780E6Ad3E397C031F6d39",
+      "deployedBlock": 14239731,
+      "collateralToken": "0xd7D069493685A581d27824Fc46EdA46B7EfC0063",
       "rewardToken": "0x8F0528cE5eF7B51152A59745bEfDD91D97091d2F",
       "treasuryFeeBps": "900",
       "treasuryAccount": "0x7E2308437c2f4C8934214663dc8476037625a270"
@@ -165,6 +186,24 @@
         "secondary": "0x08fA2Ed02EbDc97BaD85fF6369C57c6280cA52Bd",
         "token0": "0x55d398326f99059ff775485246999027b3197955",
         "token1": "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff"
+      },
+      {
+				"name": "ibWBNB-WBNB",
+        "address": "0xF7E3B6C8AC5047c6aCf328C6c9c43EcDf15cD534",
+        "deployedBlock": 14239629,
+        "primarySoure": "0x166f56F2EDa9817cAB77118AE4FCAA0002A17eC7",
+        "secondary": "0xdb4A41CdaBd4CA7AB9AF3Db346106245CB3f7968",
+        "token0": "0xd7D069493685A581d27824Fc46EdA46B7EfC0063",
+        "token1": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
+      },
+      {
+				"name": "WBNB-USD",
+        "address": "0xdE375D37Be6399022D6583c954a011a9244a0b61",
+        "deployedBlock": 14239665,
+        "primarySoure": "0x634902128543b25265da350e2d961C7ff540fC71",
+        "secondary": "0x08fA2Ed02EbDc97BaD85fF6369C57c6280cA52Bd",
+        "token0": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+        "token1": "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff"
       }
     ],
     "IbTokenPriceFeed": [
@@ -181,6 +220,13 @@
         "deployedBlock": 14236810,
         "ibInBasePriceFeed": "0xee1D99C9B85dCbbe4773767795EED23Fa8190731",
         "baseInUsdPriceFeed": "0x2B9C18a7e2F067E006E4625a74174472E9F89559"
+      },
+      {
+				"name": "ibWBNB-USD",
+        "address": "0x44b930F2e53231B3F85495229eA644724C93c617",
+        "deployedBlock": 14239703,
+        "ibInBasePriceFeed": "0xF7E3B6C8AC5047c6aCf328C6c9c43EcDf15cD534",
+        "baseInUsdPriceFeed": "0xdE375D37Be6399022D6583c954a011a9244a0b61"
       }
     ],
     "StaticPriceFeed": [

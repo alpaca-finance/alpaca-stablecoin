@@ -17,7 +17,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const config = ConfigEntity.getConfig()
 
-  const ADAPTER_ADDR = "0x2B356b9Cd4B00658faCC35f4d031DF528eE9778D"
+  const ADAPTER_ADDR = "0x4Bf04730C37fc395B5F780E6Ad3E397C031F6d39"
 
   const accessContralConfig = AccessControlConfig__factory.connect(
     config.AccessControlConfig.address,
