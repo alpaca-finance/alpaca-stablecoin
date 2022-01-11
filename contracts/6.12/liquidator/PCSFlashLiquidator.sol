@@ -46,6 +46,7 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   );
   event LogSellCollateral(uint256 amount, uint256 minAmountOut, uint256 actualAmountOut);
   event LogSwapTokenToStablecoin(uint256 amount, address usr, uint256 receivedAmount);
+  event LogSetBUSDAddress(address indexed caller, address busd);
 
   // --- Math ---
   uint256 constant WAD = 10**18;
@@ -56,6 +57,7 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   IStablecoinAdapter public stablecoinAdapter;
   address public alpacaStablecoin;
   address public wrappedNativeAddr;
+  address public busd;
 
   function initialize(
     address _bookKeeper,
@@ -69,6 +71,11 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     alpacaStablecoin = _alpacaStablecoin;
     stablecoinAdapter = IStablecoinAdapter(_stablecoinAdapter);
     wrappedNativeAddr = _wrappedNativeAddr;
+  }
+
+  function setBUSDAddress(address _busd) external onlyOwner {
+    busd = _busd;
+    emit LogSetBUSDAddress(msg.sender, _busd);
   }
 
   function flashLendingCall(
@@ -151,21 +158,24 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     uint256 _minAmountOut,
     address _stableSwapModuleAddress
   ) internal returns (uint256 receivedAmount) {
-    address _tokencoinAddress = _path[_path.length - 1];
-    uint256 _tokencoinBalanceBefore = _tokencoinAddress.myBalance();
-    if (_token == wrappedNativeAddr) {
-      _router.swapExactETHForTokens{ value: _amount }(_minAmountOut.div(RAY) + 1, _path, address(this), now);
-    } else {
-      _token.safeApprove(address(_router), uint256(-1));
-      _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY) + 1, _path, address(this), now);
-      _token.safeApprove(address(_router), 0);
+    if (_path.length != 0) {
+      address _tokencoinAddress = _path[_path.length - 1];
+      uint256 _tokencoinBalanceBefore = _tokencoinAddress.myBalance();
+
+      if (_token != busd) {
+        if (_token == wrappedNativeAddr) {
+          _router.swapExactETHForTokens{ value: _amount }(_minAmountOut.div(RAY) + 1, _path, address(this), now);
+        } else {
+          _token.safeApprove(address(_router), uint256(-1));
+          _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY) + 1, _path, address(this), now);
+          _token.safeApprove(address(_router), 0);
+        }
+      }
+      uint256 _tokencoinBalanceAfter = _tokencoinAddress.myBalance();
+      uint256 _tokenAmount = _token != busd ? _tokencoinBalanceAfter.sub(_tokencoinBalanceBefore) : _amount;
+      receivedAmount = _swapTokenToStablecoin(_stableSwapModuleAddress, address(this), _tokenAmount, _tokencoinAddress);
+      emit LogSellCollateral(_amount, _minAmountOut, receivedAmount);
     }
-    uint256 _tokencoinBalanceAfter = _tokencoinAddress.myBalance();
-    uint256 _tokenAmount = _tokencoinBalanceAfter.sub(_tokencoinBalanceBefore);
-
-    receivedAmount = _swapTokenToStablecoin(_stableSwapModuleAddress, address(this), _tokenAmount, _tokencoinAddress);
-
-    emit LogSellCollateral(_amount, _minAmountOut, receivedAmount);
   }
 
   function _swapTokenToStablecoin(
