@@ -161,6 +161,15 @@
     ],
     "StrictAlpacaPriceOraclePriceFeed": [
       {
+        "name": "ibBUSD-BUSD",
+        "address": "0xEA4e46420065C7Df0B931424A75C150474d72AC7",
+        "deployedBlock": 14267902,
+        "primarySoure": "0x166f56F2EDa9817cAB77118AE4FCAA0002A17eC7",
+        "secondary": "0xdb4A41CdaBd4CA7AB9AF3Db346106245CB3f7968",
+        "token0": "0x7C9e73d4C71dae564d41F78d56439bB4ba87592f",
+        "token1": "0xe9e7cea3dedca5984780bafc599bd69add087d56"
+      },
+      {
         "name": "BUSD-USD",
         "address": "0x9F748f798C75EA44F86a5871045629a2aC9C0568",
         "deployedBlock": 13125078,
