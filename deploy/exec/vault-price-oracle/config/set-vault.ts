@@ -15,12 +15,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const config = ConfigEntity.getConfig()
-
-  const VAULT = ""
-
+  const VAULT = "0x7C9e73d4C71dae564d41F78d56439bB4ba87592f" // ibBUSD
   const IS_OK = true
 
+  const config = ConfigEntity.getConfig()
   const vaultPriceOracle = VaultPriceOracle__factory.connect(
     config.Oracle.VaultPriceOracle.address,
     (await ethers.getSigners())[0]
