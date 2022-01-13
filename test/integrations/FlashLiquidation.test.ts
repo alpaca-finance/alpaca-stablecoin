@@ -510,12 +510,12 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     alpacaStablecoin.address,
     stablecoinAdapter.address,
     wbnb.address,
+    BUSD.address,
   ])) as PCSFlashLiquidator
 
   await pcsFlashLiquidator.whitelist(liquidationEngine.address)
   await pcsFlashLiquidator.whitelist(fixedSpreadLiquidationStrategy.address)
   await pcsFlashLiquidator.whitelist(stablecoinAdapter.address)
-  await pcsFlashLiquidator.setBUSDAddress(BUSD.address)
 
   // Deploy AuthTokenAdapter
   const AuthTokenAdapter = (await ethers.getContractFactory("AuthTokenAdapter", deployer)) as AuthTokenAdapter__factory
@@ -1338,7 +1338,7 @@ describe("FlashLiquidation", () => {
                 ibBUSDAdapter.address,
                 ibBUSDVault.address,
                 pancakeRouter.address,
-                [ibBUSD.address, BUSD.address],
+                [BUSD.address],
                 stableSwapModule.address,
               ]
             )

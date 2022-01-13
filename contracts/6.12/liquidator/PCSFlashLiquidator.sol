@@ -47,6 +47,7 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   event LogSellCollateral(uint256 amount, uint256 minAmountOut, uint256 actualAmountOut);
   event LogSwapTokenToStablecoin(uint256 amount, address usr, uint256 receivedAmount);
   event LogSetBUSDAddress(address indexed caller, address busd);
+  event LogSetWrappedNativeAddress(address indexed caller, address wrappedNativeAddr);
 
   // --- Math ---
   uint256 constant WAD = 10**18;
@@ -63,7 +64,8 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     address _bookKeeper,
     address _alpacaStablecoin,
     address _stablecoinAdapter,
-    address _wrappedNativeAddr
+    address _wrappedNativeAddr,
+    address _busd
   ) external initializer {
     OwnableUpgradeable.__Ownable_init();
 
@@ -71,6 +73,12 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
     alpacaStablecoin = _alpacaStablecoin;
     stablecoinAdapter = IStablecoinAdapter(_stablecoinAdapter);
     wrappedNativeAddr = _wrappedNativeAddr;
+    busd = _busd;
+  }
+
+  function setWrappedNativeAddress(address _wrappedNativeAddr) external onlyOwner {
+    wrappedNativeAddr = _wrappedNativeAddr;
+    emit LogSetWrappedNativeAddress(msg.sender, _wrappedNativeAddr);
   }
 
   function setBUSDAddress(address _busd) external onlyOwner {
