@@ -3326,6 +3326,97 @@
           }
         }
       }
+    },
+    "31a06cfa75956807b41e6bae7b3a68be0d88fa45507bf40b1f0096e0661fa82e": {
+      "address": "0x152461ec1492611aB31e13Dc10aFBfEF2E48bf70",
+      "txHash": "0x70b44dd78449485c3c9a92da3d35331c2f1a365eb63db4ad142dc97e40e733fc",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:31"
+          },
+          {
+            "contract": "OwnableUpgradeable",
+            "label": "_owner",
+            "type": "t_address",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:20"
+          },
+          {
+            "contract": "OwnableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:74"
+          },
+          {
+            "contract": "PCSFlashLiquidator",
+            "label": "bookKeeper",
+            "type": "t_contract(IBookKeeper)4557",
+            "src": "contracts/6.12/liquidator/PCSFlashLiquidator.sol:58"
+          },
+          {
+            "contract": "PCSFlashLiquidator",
+            "label": "stablecoinAdapter",
+            "type": "t_contract(IStablecoinAdapter)5299",
+            "src": "contracts/6.12/liquidator/PCSFlashLiquidator.sol:59"
+          },
+          {
+            "contract": "PCSFlashLiquidator",
+            "label": "alpacaStablecoin",
+            "type": "t_address",
+            "src": "contracts/6.12/liquidator/PCSFlashLiquidator.sol:61"
+          },
+          {
+            "contract": "PCSFlashLiquidator",
+            "label": "wrappedNativeAddr",
+            "type": "t_address",
+            "src": "contracts/6.12/liquidator/PCSFlashLiquidator.sol:63"
+          },
+          {
+            "contract": "PCSFlashLiquidator",
+            "label": "busd",
+            "type": "t_address",
+            "src": "contracts/6.12/liquidator/PCSFlashLiquidator.sol:65"
+          }
+        ],
+        "types": {
+          "t_contract(IBookKeeper)4557": {
+            "label": "contract IBookKeeper"
+          },
+          "t_contract(IStablecoinAdapter)5299": {
+            "label": "contract IStablecoinAdapter"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          },
+          "t_bool": {
+            "label": "bool"
+          }
+        }
+      }
     }
   }
 }
