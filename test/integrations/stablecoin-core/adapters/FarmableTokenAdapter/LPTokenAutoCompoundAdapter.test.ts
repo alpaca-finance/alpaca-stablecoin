@@ -49,6 +49,8 @@ import {
   SyrupBar__factory,
   PancakeRouterV2__factory,
   PancakeRouterV2,
+  Vault__factory,
+  SimpleVaultConfig__factory,
 } from "@alpaca-finance/alpaca-contract/typechain"
 import { expect } from "chai"
 import { WeiPerRad, WeiPerRay, WeiPerWad } from "../../../../helper/unit"
@@ -121,6 +123,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
 
   await accessControlConfig.grantRole(await accessControlConfig.BOOK_KEEPER_ROLE(), bookKeeper.address)
   await accessControlConfig.grantRole(await accessControlConfig.MINTABLE_ROLE(), deployer.address)
+  await accessControlConfig.grantRole(await accessControlConfig.REINVESTOR_ROLE(), deployer.address)
 
   // Deploy ShowStopper
   const ShowStopper = (await ethers.getContractFactory("ShowStopper", deployer)) as ShowStopper__factory
@@ -164,6 +167,55 @@ const loadFixtureHandler = async (): Promise<fixture> => {
   const BUSD = (await BEP20.deploy("BUSD", "BUSD")) as BEP20
   await BUSD.deployed()
   await BUSD.mint(alice.address, ethers.utils.parseEther("100"))
+
+  const DebtToken = new DebtToken__factory(deployer)
+  const debtToken = await DebtToken.deploy()
+  await debtToken.deployed()
+  await debtToken.initialize("debtibBTOKEN_V2", "debtibBTOKEN_V2", deployer.address)
+
+  // Setup FairLaunch contract
+  // Deploy ALPACAs
+  const AlpacaToken = new AlpacaToken__factory(deployer)
+  const alpacaToken = await AlpacaToken.deploy(132, 137)
+  await alpacaToken.deployed()
+
+  const FairLaunch = new FairLaunch__factory(deployer)
+  const fairLaunch = await FairLaunch.deploy(
+    alpacaToken.address,
+    deployer.address,
+    ALPACA_REWARD_PER_BLOCK,
+    0,
+    ALPACA_BONUS_LOCK_UP_BPS,
+    0
+  )
+  await fairLaunch.deployed()
+
+  const SimpleVaultConfig = new SimpleVaultConfig__factory(deployer)
+  const simpleVaultConfig = await SimpleVaultConfig.deploy()
+  await simpleVaultConfig.deployed()
+  await simpleVaultConfig.initialize(
+    MIN_DEBT_SIZE,
+    INTEREST_RATE,
+    RESERVE_POOL_BPS,
+    KILL_PRIZE_BPS,
+    wbnb.address,
+    wNativeRelayer.address,
+    fairLaunch.address,
+    KILL_TREASURY_BPS,
+    deployer.address
+  )
+
+  const Vault = new Vault__factory(deployer)
+  const tokenVault = await Vault.deploy()
+  await tokenVault.deployed()
+  await tokenVault.initialize(
+    simpleVaultConfig.address,
+    alpaca.address,
+    "Interest Bearing ALPACA",
+    "ibBUSD",
+    18,
+    debtToken.address
+  )
 
   const TUSD = await BEP20.deploy("TUSD", "TUSD")
   await TUSD.deployed()
@@ -214,7 +266,7 @@ const loadFixtureHandler = async (): Promise<fixture> => {
     masterChef.address,
     1,
     TREASURY_FEE_BPS,
-    deployer.address,
+    dev.address,
     positionManager.address,
     router.address,
     BUSD.address,
@@ -527,6 +579,14 @@ describe("LPTokenAutoCompoundAdapter", () => {
     })
   })
 
+  describe("#initialize", async () => {
+    context("when not reinvestor role", async () => {
+      it("should revert", async () => {
+        await expect(lpTokenAutoCompoundAdapterAsAlice.reinvest()).to.be.revertedWith("!reinvestorRole")
+      })
+    })
+  })
+
   describe("#netAssetValuation", async () => {
     context("when all collateral tokens are deposited by deposit function", async () => {
       it("should return the correct net asset valuation", async () => {
@@ -687,21 +747,22 @@ describe("LPTokenAutoCompoundAdapter", () => {
 
           const aliceStake1 = await lpTokenAutoCompoundAdapter.stake(aliceAddress)
           const netAssetPerShare1 = await lpTokenAutoCompoundAdapter.netAssetPerShare()
-          const aliceNetAssetValue1 = aliceStake1.mul(netAssetPerShare1)
+          const aliceNetAssetValue1 = aliceStake1.mul(netAssetPerShare1).div(WeiPerWad)
           expect(await cake.balanceOf(lpTokenAutoCompoundAdapter.address)).to.be.eq(0)
           expect(await lpTokenAutoCompoundAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("8"))
           expect(aliceStake1).to.be.eq(ethers.utils.parseEther("8"))
 
-          // Now Alice harvest rewards. 1 block has been passed, hence Alice's net asset value should grow
+          // Now Alice trigger reinvest. 1 block has been passed, hence Alice's net asset value should grow
           await lpTokenAutoCompoundAdapterAsAlice.deposit(
             aliceAddress,
             0,
             ethers.utils.defaultAbiCoder.encode(["address"], [aliceAddress])
           )
 
+          const devFee1 = await cake.balanceOf(devAddress)
           const aliceStake2 = await lpTokenAutoCompoundAdapter.stake(aliceAddress)
           const netAssetPerShare2 = await lpTokenAutoCompoundAdapter.netAssetPerShare()
-          const aliceNetAssetValue2 = aliceStake2.mul(netAssetPerShare2)
+          const aliceNetAssetValue2 = aliceStake2.mul(netAssetPerShare2).div(WeiPerWad)
           expect(await cake.balanceOf(lpTokenAutoCompoundAdapter.address)).to.be.eq(0)
           expect(await lpTokenAutoCompoundAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("8"))
           expect(aliceStake2).to.be.eq(ethers.utils.parseEther("8"))
@@ -727,17 +788,18 @@ describe("LPTokenAutoCompoundAdapter", () => {
           )
 
           await lpTokenAsBob.approve(lpTokenAutoCompoundAdapter.address, ethers.utils.parseEther("8"))
-          console.log((await lpTokenAsBob.balanceOf(bobAddress)).toString())
           await lpTokenAutoCompoundAdapterAsBob.deposit(
             bobAddress,
             ethers.utils.parseEther("4"),
             ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress])
           )
 
+          const devFee2 = await cake.balanceOf(devAddress)
           const aliceStake3 = await lpTokenAutoCompoundAdapter.stake(aliceAddress)
           const netAssetPerShare3 = await lpTokenAutoCompoundAdapter.netAssetPerShare()
-          const aliceNetAssetValue3 = aliceStake3.mul(netAssetPerShare3)
+          const aliceNetAssetValue3 = aliceStake3.mul(netAssetPerShare3).div(WeiPerWad)
           const bobStake1 = await lpTokenAutoCompoundAdapter.stake(bobAddress)
+          const bobNetAssetValue1 = bobStake1.mul(netAssetPerShare3).div(WeiPerWad)
           expect(await lpTokenAutoCompoundAdapter.totalShare()).to.be.eq("11997021032030271049")
           expect(aliceStake3).to.be.eq(ethers.utils.parseEther("8"))
           expect(bobStake1).to.be.eq("3997021032030271049")
@@ -747,31 +809,33 @@ describe("LPTokenAutoCompoundAdapter", () => {
             aliceNetAssetValue2
           )
           AssertHelpers.assertAlmostEqual(
-            bobStake1.mul(netAssetPerShare3).toString(),
-            ethers.utils.parseEther("3.999").toString()
+            bobStake1.mul(netAssetPerShare3).div(WeiPerWad).toString(),
+            ethers.utils.parseEther("3.999999999999999999").toString()
           ) // Bob's net asset value should be equal to the amount Bob deposited with some precision loss
+          expect(devFee2, "Dev fee should increase.").to.be.gt(devFee1)
 
-          // Bob harvest ALPACA. LPTokenAutoCompoundAdapter earned another 100 ALPACA.
-          // LPTokenAutoCompoundAdapter has another 100 ALPACA from previous block. Hence,
-          // balanceOf(address(this)) should return 300 ALPACA.
-          // Bob should get 72 (80 - 10%) ALPACA, treasury account should get 8 ALPACA.
-          await lpTokenAutoCompoundAdapterAsBob.deposit(
-            bobAddress,
-            0,
-            ethers.utils.defaultAbiCoder.encode(["address"], [bobAddress])
+          // Reinvest
+          await lpTokenAutoCompoundAdapter.reinvest()
+
+          const devFee3 = await cake.balanceOf(devAddress)
+          const aliceStake4 = await lpTokenAutoCompoundAdapter.stake(aliceAddress)
+          const netAssetPerShare4 = await lpTokenAutoCompoundAdapter.netAssetPerShare()
+          const aliceNetAssetValue4 = aliceStake3.mul(netAssetPerShare4).div(WeiPerWad)
+          const bobStake2 = await lpTokenAutoCompoundAdapter.stake(bobAddress)
+          const bobNetAssetValue2 = bobStake2.mul(netAssetPerShare4).div(WeiPerWad)
+          expect(await lpTokenAutoCompoundAdapter.totalShare()).to.be.eq(
+            ethers.utils.parseEther("8").add("3997021032030271049")
           )
-
-          // expect(await alpacaToken.balanceOf(ibTokenAdapter.address)).to.be.eq(ethers.utils.parseEther("220"))
-          // expect(await alpacaToken.balanceOf(aliceAddress)).to.be.eq(ethers.utils.parseEther("90"))
-          // expect(await alpacaToken.balanceOf(bobAddress)).to.be.eq(ethers.utils.parseEther("72"))
-          // expect(await ibTokenAdapter.totalShare()).to.be.eq(ethers.utils.parseEther("5"))
-          // expect(await ibTokenAdapter.accRewardPerShare()).to.be.eq(weiToRay(ethers.utils.parseEther("320")))
-          // expect(await ibTokenAdapter.accRewardBalance()).to.be.eq(ethers.utils.parseEther("220"))
-          // expect(await ibTokenAdapter.stake(aliceAddress)).to.be.eq(ethers.utils.parseEther("1"))
-          // expect(await ibTokenAdapter.rewardDebts(aliceAddress)).to.be.eq(ethers.utils.parseEther("100"))
-          // expect(await ibTokenAdapter.stake(bobAddress)).to.be.eq(ethers.utils.parseEther("4"))
-          // expect(await ibTokenAdapter.rewardDebts(bobAddress)).to.be.eq(ethers.utils.parseEther("1280"))
-          // expect(await alpacaToken.balanceOf(devAddress)).to.be.eq(ethers.utils.parseEther("18"))
+          expect(aliceStake4).to.be.eq(ethers.utils.parseEther("8"))
+          expect(bobStake2).to.be.eq("3997021032030271049")
+          expect(aliceNetAssetValue4, "Alice's net asset value should grow from reinvest.").to.be.gt(
+            aliceNetAssetValue3
+          )
+          expect(bobNetAssetValue2, "Bob's net asset value should grow from reinvest.").to.be.gt(bobNetAssetValue1)
+          expect(
+            devFee3,
+            "Dev fee does not increase here, because Deployer call `reinvest` and therefore the CAKE dev fee goes to Deployer."
+          ).to.be.eq(devFee2)
         })
       })
     })

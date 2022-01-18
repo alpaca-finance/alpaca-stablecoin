@@ -140,7 +140,7 @@ contract LPTokenAutoCompoundAdapter is
 
   modifier onlyReinvestor() {
     IAccessControlConfig _accessControlConfig = IAccessControlConfig(bookKeeper.accessControlConfig());
-    require(_accessControlConfig.hasRole(_accessControlConfig.REINVESTOR_ROLE(), msg.sender), "!ownerRole");
+    require(_accessControlConfig.hasRole(_accessControlConfig.REINVESTOR_ROLE(), msg.sender), "!reinvestorRole");
     _;
   }
 
