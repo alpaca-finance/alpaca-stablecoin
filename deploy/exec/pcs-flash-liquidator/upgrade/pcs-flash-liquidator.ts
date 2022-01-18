@@ -17,7 +17,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     Check all variables below before execute the deployment script
     */
 
-  const EXACT_ETA = "1638963600"
+  const EXACT_ETA = "1642492500"
 
   const config = network.name === "mainnet" ? MainnetConfig : TestnetConfig
 
