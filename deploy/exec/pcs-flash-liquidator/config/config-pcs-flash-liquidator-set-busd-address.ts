@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const BUSD_ADDR = "0xe9e7cea3dedca5984780bafc599bd69add087d56"
+  const BUSD_ADDR = "0x0266693F9Df932aD7dA8a9b44C2129Ce8a87E81f"
   const config = ConfigEntity.getConfig()
 
   const FLASH_LIQUIDATOR_ADDR = config.FlashLiquidator.PCSFlashLiquidator.address
