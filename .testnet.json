@@ -38,7 +38,7 @@
         "closeFactorBps": 2500,
         "liquidatorIncentiveBps": 10500,
         "treasuryFeesBps": 8000,
-        "strategy": "0xC48C1b7410Ab164E110d92C083F137f7dBb15dE1"
+        "strategy": "0x337809569D9682C25A9dD1f24837F61D28321D9A"
       },
       {
         "collateralPoolId": "BUSD-STABLE",
@@ -64,7 +64,7 @@
         "closeFactorBps": 2500,
         "liquidatorIncentiveBps": 10500,
         "treasuryFeesBps": 8000,
-        "strategy": "0xC48C1b7410Ab164E110d92C083F137f7dBb15dE1"
+        "strategy": "0x337809569D9682C25A9dD1f24837F61D28321D9A"
       },
       {
         "collateralPoolId": "ibWBNB",
@@ -77,7 +77,7 @@
         "closeFactorBps": 2500,
         "liquidatorIncentiveBps": 10500,
         "treasuryFeesBps": 8000,
-        "strategy": "0xC48C1b7410Ab164E110d92C083F137f7dBb15dE1"
+        "strategy": "0x337809569D9682C25A9dD1f24837F61D28321D9A"
       }
     ]
   },
@@ -277,8 +277,8 @@
   },
   "Strategies": {
     "FixedSpreadLiquidationStrategy":{
-      "address": "0xC48C1b7410Ab164E110d92C083F137f7dBb15dE1",
-      "deployedBlock": 14533809
+      "address": "0x337809569D9682C25A9dD1f24837F61D28321D9A",
+      "deployedBlock": 16250400
     }
   },
   "FlashLiquidator": {
