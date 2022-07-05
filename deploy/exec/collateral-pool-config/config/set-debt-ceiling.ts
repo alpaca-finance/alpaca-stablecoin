@@ -1,13 +1,11 @@
-import { JsonRpcProvider } from "@ethersproject/providers"
-import { HardhatRuntimeEnvironment, HttpNetworkUserConfig } from "hardhat/types"
+import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
-import { ethers, network } from "hardhat"
+import { ethers } from "hardhat"
 import { ConfigEntity } from "../../../entities"
 import { CollateralPoolConfig__factory } from "../../../../typechain"
 import { formatBytes32String } from "ethers/lib/utils"
 import { CollateralPool } from "../../../interfaces/config"
 import { writeFileSync } from "fs"
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   /*
@@ -25,12 +23,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const COLLATERAL_POOL_NAMES = ["ibBUSD", "ibUSDT", "ibWBNB"]
   const DEBT_CELING_VALUE = 0
 
-  const deployer =   (await ethers.getSigners())[0]
+  const deployer = (await ethers.getSigners())[0]
 
   const collateralPoolConfig = CollateralPoolConfig__factory.connect(config.CollateralPoolConfig.address, deployer)
 
   console.log(`>> setDebtCeiling`)
-
   for (const name of COLLATERAL_POOL_NAMES) {
     const poolIdx = config.CollateralPoolConfig.collateralPools.findIndex(
       (c: CollateralPool) => c.collateralPoolId === name
