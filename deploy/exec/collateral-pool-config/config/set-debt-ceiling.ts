@@ -21,7 +21,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   let config = ConfigEntity.getConfig()
 
   const COLLATERAL_POOL_NAMES = ["ibBUSD", "ibUSDT", "ibWBNB"]
-  const DEBT_CELING_VALUE = 0
+  const DEBT_CEILING_VALUE = 0
 
   const deployer = (await ethers.getSigners())[0]
 
@@ -37,7 +37,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     }
 
     const poolId = formatBytes32String(name)
-    const tx = await collateralPoolConfig.setDebtCeiling(poolId, DEBT_CELING_VALUE, {
+    const tx = await collateralPoolConfig.setDebtCeiling(poolId, DEBT_CEILING_VALUE, {
       gasPrice: ethers.utils.parseUnits("30", "gwei"),
     })
     await tx.wait()
@@ -45,7 +45,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     config.CollateralPoolConfig.collateralPools[poolIdx] = {
       ...config.CollateralPoolConfig.collateralPools[poolIdx],
-      debtCeiling: DEBT_CELING_VALUE.toString(),
+      debtCeiling: DEBT_CEILING_VALUE.toString(),
     }
   }
   const fileName = ".mainnet.json"
