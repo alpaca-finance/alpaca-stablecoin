@@ -129,6 +129,7 @@
     "deploy:mainnet:collateral-pool-config:set-liquidation-ratio": "hardhat --network mainnet deploy --no-compile --reset --tags SetLiquidationRatio",
     "deploy:testnet:collateral-pool-config:set-liquidation-ratio": "hardhat --network testnet deploy --no-compile --reset --tags SetLiquidationRatio",
     "deploy:mainnet:collateral-pool-config:set-debt-floor": "hardhat --network mainnet deploy --no-compile --reset --tags SetDebtFloor",
+    "deploy:mainnet:collateral-pool-config:set-debt-ceiling": "hardhat --network mainnet deploy --no-compile --reset --tags SetDebtCeiling",
     "deploy:testnet:collateral-pool-config:set-debt-floor": "hardhat --network testnet deploy --no-compile --reset --tags SetDebtFloor",
     "deploy:mainnet:collateral-pool-config:set-close-factor-bps": "hardhat --network mainnet deploy --no-compile --reset --tags SetCloseFactorBps",
     "deploy:testnet:collateral-pool-config:set-close-factor-bps": "hardhat --network testnet deploy --no-compile --reset --tags SetCloseFactorBps",
