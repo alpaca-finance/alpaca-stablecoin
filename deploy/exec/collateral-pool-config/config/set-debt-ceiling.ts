@@ -3,7 +3,7 @@ import { DeployFunction } from "hardhat-deploy/types"
 import { ethers, network } from "hardhat"
 import { ConfigEntity } from "../../../entities"
 import { CollateralPoolConfig__factory } from "../../../../typechain"
-import { formatBytes32String, parseEther } from "ethers/lib/utils"
+import { formatBytes32String, parseEther, parseUnits } from "ethers/lib/utils"
 import { CollateralPool } from "../../../interfaces/config"
 import { writeFileSync } from "fs"
 import { BigNumber } from "@ethersproject/bignumber"
@@ -29,15 +29,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const COLLATERAL_POOS_CONFIG: IPoolConfig[] = [
     {
       name: "ibBUSD",
-      debtCeilingValue: parseEther("0"),
+      debtCeilingValue: parseUnits("2250000", 45),
     },
     {
       name: "ibUSDT",
-      debtCeilingValue: parseEther("0"),
+      debtCeilingValue: parseUnits("1000000", 45),
     },
     {
       name: "ibWBNB",
-      debtCeilingValue: parseEther("0"),
+      debtCeilingValue: parseUnits("1000000", 45),
     },
   ]
 
