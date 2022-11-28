@@ -29,7 +29,7 @@
     "collateralPools": [
       {
         "collateralPoolId": "ibBUSD",
-        "debtCeiling": "2250000000000000000000000000000000000000000000000000",
+        "debtCeiling": "2500000000000000000000000000000000000000000000000000",
         "debtFloor": "500000000000000000000000000000000000000000000000",
         "priceFeed": "0x4a89F897AA97D096dBeA0f874a5854662996f8ae",
         "liquidationRatio": "1111111111111111111111111111",
@@ -174,7 +174,7 @@
         "address": "0x9F748f798C75EA44F86a5871045629a2aC9C0568",
         "deployedBlock": 13125078,
         "primarySoure": "0x634902128543b25265da350e2d961C7ff540fC71",
-        "secondary": "0x08fA2Ed02EbDc97BaD85fF6369C57c6280cA52Bd",
+        "secondary": "0x634902128543b25265da350e2d961C7ff540fC71",
         "token0": "0xe9e7cea3dedca5984780bafc599bd69add087d56",
         "token1": "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff"
       },
@@ -192,7 +192,7 @@
         "address": "0x2B9C18a7e2F067E006E4625a74174472E9F89559",
         "deployedBlock": 14236761,
         "primarySoure": "0x634902128543b25265da350e2d961C7ff540fC71",
-        "secondary": "0x08fA2Ed02EbDc97BaD85fF6369C57c6280cA52Bd",
+        "secondary": "0x634902128543b25265da350e2d961C7ff540fC71",
         "token0": "0x55d398326f99059ff775485246999027b3197955",
         "token1": "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff"
       },
@@ -210,7 +210,7 @@
         "address": "0xdE375D37Be6399022D6583c954a011a9244a0b61",
         "deployedBlock": 14239665,
         "primarySoure": "0x634902128543b25265da350e2d961C7ff540fC71",
-        "secondary": "0x08fA2Ed02EbDc97BaD85fF6369C57c6280cA52Bd",
+        "secondary": "0x634902128543b25265da350e2d961C7ff540fC71",
         "token0": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
         "token1": "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff"
       }

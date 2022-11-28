@@ -17,16 +17,41 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const config = ConfigEntity.getConfig()
 
-  const ADDR = "0x97ffe64668c39dcd0a0429dc21572ff617ab920b"
-  const SECONDARY_ALPACA_ORACLE = config.Oracle.ChainLinkOracle.address // ChainLinkOracle
-  const SECONDARY_TOKEN_0 = "0xe60fa777deb72c364447bb18c823c4731fbed671" // USDT
-  const SECONDARY_TOKEN_1 = "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff" // USD
+  const INPUT = [
+    {
+      ADDR: "0x9F748f798C75EA44F86a5871045629a2aC9C0568",
+      SECONDARY_ALPACA_ORACLE: config.Oracle.ChainLinkOracle.address,
+      SECONDARY_TOKEN_0: "0xe9e7cea3dedca5984780bafc599bd69add087d56",
+      SECONDARY_TOKEN_1: "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff",
+    },
+    {
+      ADDR: "0x2B9C18a7e2F067E006E4625a74174472E9F89559",
+      SECONDARY_ALPACA_ORACLE: config.Oracle.ChainLinkOracle.address,
+      SECONDARY_TOKEN_0: "0x55d398326f99059ff775485246999027b3197955",
+      SECONDARY_TOKEN_1: "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff",
+    },
+    {
+      ADDR: "0xdE375D37Be6399022D6583c954a011a9244a0b61",
+      SECONDARY_ALPACA_ORACLE: config.Oracle.ChainLinkOracle.address,
+      SECONDARY_TOKEN_0: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+      SECONDARY_TOKEN_1: "0x115dffFFfffffffffFFFffffFFffFfFfFFFFfFff",
+    },
+  ]
 
-  const strictAlpacaOraclePriceFeed = StrictAlpacaOraclePriceFeed__factory.connect(ADDR, (await ethers.getSigners())[0])
+  for (const item of INPUT) {
+    const strictAlpacaOraclePriceFeed = StrictAlpacaOraclePriceFeed__factory.connect(
+      item.ADDR,
+      (await ethers.getSigners())[0]
+    )
 
-  console.log(">> setSecondary")
-  await strictAlpacaOraclePriceFeed.setSecondary(SECONDARY_ALPACA_ORACLE, SECONDARY_TOKEN_0, SECONDARY_TOKEN_1)
-  console.log("✅ Done")
+    console.log(">> setSecondary")
+    await strictAlpacaOraclePriceFeed.setSecondary(
+      item.SECONDARY_ALPACA_ORACLE,
+      item.SECONDARY_TOKEN_0,
+      item.SECONDARY_TOKEN_1
+    )
+    console.log("✅ Done")
+  }
 }
 
 export default func

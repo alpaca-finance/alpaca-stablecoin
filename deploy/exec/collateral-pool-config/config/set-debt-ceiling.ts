@@ -29,15 +29,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const COLLATERAL_POOS_CONFIG: IPoolConfig[] = [
     {
       name: "ibBUSD",
-      debtCeilingValue: parseUnits("2250000", 45),
-    },
-    {
-      name: "ibUSDT",
-      debtCeilingValue: parseUnits("1000000", 45),
-    },
-    {
-      name: "ibWBNB",
-      debtCeilingValue: parseUnits("1000000", 45),
+      debtCeilingValue: parseUnits("2500000", 45),
     },
   ]
 
