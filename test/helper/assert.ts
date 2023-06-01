@@ -1,9 +1,9 @@
 import chai from "chai"
-import { BigNumber } from "ethers"
+import { BigNumber, BigNumberish } from "ethers"
 
 const { expect } = chai
 
-export function assertAlmostEqual(expected: string, actual: string) {
+export function assertAlmostEqual(expected: BigNumberish, actual: BigNumberish) {
   const expectedBN = BigNumber.from(expected)
   const actualBN = BigNumber.from(actual)
   const diffBN = expectedBN.gt(actualBN) ? expectedBN.sub(actualBN) : actualBN.sub(expectedBN)

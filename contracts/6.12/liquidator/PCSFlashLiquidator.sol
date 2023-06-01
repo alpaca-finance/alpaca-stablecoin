@@ -50,9 +50,9 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   event LogSetWrappedNativeAddress(address indexed caller, address wrappedNativeAddr);
 
   // --- Math ---
-  uint256 constant WAD = 10**18;
-  uint256 constant RAY = 10**27;
-  uint256 constant RAD = 10**45;
+  uint256 internal constant WAD = 10**18;
+  uint256 internal constant RAY = 10**27;
+  uint256 internal constant RAD = 10**45;
 
   IBookKeeper public bookKeeper;
   IStablecoinAdapter public stablecoinAdapter;
@@ -87,7 +87,7 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
   }
 
   function flashLendingCall(
-    address _caller,
+    address, /* _caller */
     uint256 _debtValueToRepay, // [rad]
     uint256 _collateralAmountToLiquidate, // [wad]
     bytes calldata data
@@ -172,10 +172,15 @@ contract PCSFlashLiquidator is OwnableUpgradeable, IFlashLendingCallee {
 
       if (_token != busd) {
         if (_token == wrappedNativeAddr) {
-          _router.swapExactETHForTokens{ value: _amount }(_minAmountOut.div(RAY) + 1, _path, address(this), now);
+          _router.swapExactETHForTokens{ value: _amount }(
+            _minAmountOut.div(RAY) + 1,
+            _path,
+            address(this),
+            block.timestamp
+          );
         } else {
           _token.safeApprove(address(_router), uint256(-1));
-          _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY) + 1, _path, address(this), now);
+          _router.swapExactTokensForTokens(_amount, _minAmountOut.div(RAY), _path, address(this), block.timestamp);
           _token.safeApprove(address(_router), 0);
         }
       }
