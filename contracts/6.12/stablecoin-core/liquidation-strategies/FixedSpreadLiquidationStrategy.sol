@@ -187,7 +187,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
     info.collateralAmountToBeLiquidated = _positionCollateralAmount > _maxCollateralAmountToBeLiquidated
       ? _maxCollateralAmountToBeLiquidated
-      : info.actualDebtValueToBeLiquidated.div(_currentCollateralPrice); // [wad]
+      : _positionCollateralAmount; // [wad]
 
     info.treasuryFees = 0; // [wad]
   }
