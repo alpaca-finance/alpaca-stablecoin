@@ -173,21 +173,18 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     // full liquidation
     info.maxLiquidatableDebtShare = _positionDebtShare; // [wad]
 
-    // Choose to use the minimum amount between `_debtValueToBeLiquidated` and `_maxLiquidatableDebtShare`
-    // to not exceed the close factor
-    info.actualDebtShareToBeLiquidated = _debtShareToBeLiquidated > info.maxLiquidatableDebtShare
-      ? info.maxLiquidatableDebtShare
-      : _debtShareToBeLiquidated; // [wad]
+    info.actualDebtShareToBeLiquidated = _positionDebtShare; // [wad]
+    
     // actualDebtShareToBeLiquidated [wad] * _debtAccumulatedRate [ray]
     info.actualDebtValueToBeLiquidated = info.actualDebtShareToBeLiquidated.mul(_vars.debtAccumulatedRate); // [rad]
 
-    // Calculate the max collateral amount to be liquidated without liquidation fee
+    // Calculate the collateral amount to be liquidated with 25 bps buffer
     // ( actualDebtValueToBeLiquidated [rad]  / _currentCollateralPrice [ray]
-    uint256 _maxCollateralAmountToBeLiquidated = info.actualDebtValueToBeLiquidated.div(_currentCollateralPrice); // [wad]
+    uint256 _intendCollatAmountToBeLiquidaed = info.actualDebtValueToBeLiquidated.mul(10025).div(10000).div(_currentCollateralPrice); // [wad]
 
-    info.collateralAmountToBeLiquidated = _positionCollateralAmount > _maxCollateralAmountToBeLiquidated
-      ? _maxCollateralAmountToBeLiquidated
-      : _positionCollateralAmount; // [wad]
+    info.collateralAmountToBeLiquidated = _intendCollatAmountToBeLiquidaed > _positionCollateralAmount
+      ? _positionCollateralAmount
+      : _intendCollatAmountToBeLiquidaed; // [wad]
 
     info.treasuryFees = 0; // [wad]
   }
