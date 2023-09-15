@@ -178,9 +178,9 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
     // actualDebtShareToBeLiquidated [wad] * _debtAccumulatedRate [ray]
     info.actualDebtValueToBeLiquidated = info.actualDebtShareToBeLiquidated.mul(_vars.debtAccumulatedRate); // [rad]
 
-    // Calculate the collateral amount to be liquidated with 25 bps buffer
+    // Calculate the collateral amount to be liquidated with 50 bps buffer
     // ( actualDebtValueToBeLiquidated [rad]  / _currentCollateralPrice [ray]
-    uint256 _intendCollatAmountToBeLiquidaed = info.actualDebtValueToBeLiquidated.mul(10025).div(10000).div(_currentCollateralPrice); // [wad]
+    uint256 _intendCollatAmountToBeLiquidaed = info.actualDebtValueToBeLiquidated.mul(10050).div(10000).div(_currentCollateralPrice); // [wad]
 
     info.collateralAmountToBeLiquidated = _intendCollatAmountToBeLiquidaed > _positionCollateralAmount
       ? _positionCollateralAmount
