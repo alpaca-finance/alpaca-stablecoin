@@ -139,6 +139,9 @@
     "deploy:testnet:ib-token-price-feed:set-ib-in-base-price-feed": "hardhat --network testnet deploy --no-compile --reset --tags SetIbInBasePriceFeed",
     "deploy:mainnet:ib-token-price-feed:set-time-delay": "hardhat --network mainnet deploy --no-compile --reset --tags SetTimeDelay",
     "deploy:testnet:ib-token-price-feed:set-time-delay": "hardhat --network testnet deploy --no-compile --reset --tags SetTimeDelay",
+    "deploy:mainnet:upgrade-liquidation-engine": "hardhat --network mainnet deploy --no-compile --reset --tags UpgradeLiquidationEngine",
+    "deploy:mainnet:upgrade-fixed-spread-liquidation-strat": "hardhat --network mainnet deploy --no-compile --reset --tags UpgradeFixedSpreadLiquidationStrategy",
+    "deploy:mainnet:book-keeper:config:set-total-debt-ceiling": "hardhat --network mainnet deploy --no-compile --reset --tags SetTotalDebtCeiling",
     "test:case": "mocha --require hardhat/register --extension ts -g",
     "test:parallel": "mocha --require hardhat/register --recursive --parallel --extension ts --exit",
     "test": "hardhat test --no-compile",
@@ -179,6 +182,10 @@
     "prettier:solidity": "./node_modules/.bin/prettier --write contracts/**/*.sol"
   },
   "devDependencies": {
+    "@safe-global/safe-core-sdk": "^3.3.3",
+    "@safe-global/safe-core-sdk-types": "^1.9.1",
+    "@safe-global/safe-ethers-lib": "^1.9.3",
+    "@safe-global/safe-service-client": "^2.0.1",
     "@alpaca-finance/alpaca-contract": "1.2.22",
     "@eth-optimism/smock": "^1.1.10",
     "@ethersproject/bignumber": "^5.0.14",
@@ -202,7 +209,7 @@
     "chai-bn": "^0.2.1",
     "dotenv": "^8.2.0",
     "eth-permit": "^0.1.10",
-    "ethereum-waffle": "^3.2.2",
+    "ethereum-waffle": "^3.4.4",
     "ethereumjs-util": "^7.0.10",
     "ethers": "^5.0.31",
     "hardhat": "^2.0.10",
@@ -228,6 +235,6 @@
     ".mainnet.json"
   ],
   "engines": {
-    "node": ">=12"
+    "node": ">=16"
   }
 }
