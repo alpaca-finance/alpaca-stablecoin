@@ -150,7 +150,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
   function _calculateLiquidationInfo(
     bytes32 _collateralPoolId,
-    uint256 _debtShareToBeLiquidated,
+    uint256 /*_debtShareToBeLiquidated*/,
     uint256 _currentCollateralPrice,
     uint256 _positionCollateralAmount,
     uint256 _positionDebtShare
@@ -180,7 +180,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
     // Calculate the collateral amount to be liquidated with 50 bps buffer
     // ( actualDebtValueToBeLiquidated [rad]  / _currentCollateralPrice [ray]
-    uint256 _intendCollatAmountToBeLiquidaed = info.actualDebtValueToBeLiquidated.mul(10050).div(10000).div(_currentCollateralPrice); // [wad]
+    uint256 _intendCollatAmountToBeLiquidaed = info.actualDebtValueToBeLiquidated.mul(10150).div(10000).div(_currentCollateralPrice); // [wad]
 
     info.collateralAmountToBeLiquidated = _intendCollatAmountToBeLiquidaed > _positionCollateralAmount
       ? _positionCollateralAmount

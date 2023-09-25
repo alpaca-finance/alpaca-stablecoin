@@ -18,8 +18,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  // 30,000,000 AUSD Total Debt Ceiling
-  const TOTAL_DEBT_CEILING = ethers.utils.parseUnits("200003008325123", RAD).toString() // [RAD]
+  const TOTAL_DEBT_CEILING = ethers.utils.parseUnits("0", RAD).toString() // [RAD]
 
   const config = ConfigEntity.getConfig()
   const deployer = await getDeployer()
