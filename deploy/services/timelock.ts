@@ -39,10 +39,10 @@ export async function queueTransaction(
     await queueTx.wait();
   } else if (timelockAdmin.toLowerCase() === config.OpMultiSig.toLowerCase()) {
     // If Timelock's admin is OpMultiSig, propose queue tx to OpMultiSig
-    if (process.env.DEPLOYER_PRIVATE_KEY === undefined) throw new Error("DEPLOYER_PRIVATE_KEY is not defined");
+    if (process.env.BSC_MAINNET_PRIVATE_KEY === undefined) throw new Error("BSC_MAINNET_PRIVATE_KEY is not defined");
 
     const deployerWallet = new ethers.Wallet(
-      process.env.DEPLOYER_PRIVATE_KEY,
+      process.env.BSC_MAINNET_PRIVATE_KEY,
       new ethers.providers.JsonRpcProvider((network.config as HttpNetworkConfig).url)
     );
     if (deployerWallet.address.toLowerCase() !== deployer.address.toLowerCase()) throw new Error("Delpoyer mismatch");
