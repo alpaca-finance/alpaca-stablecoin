@@ -1,6 +1,5 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
-import { ethers, network } from "hardhat"
 import { ConfigEntity, TimelockEntity } from "../../../entities"
 import { FileService, TimelockService } from "../../../services"
 import { BigNumber } from "ethers"
@@ -52,11 +51,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const config = ConfigEntity.getConfig()
   const timelockTransactions: Array<TimelockEntity.Transaction> = []
+  const chainId = await hre.getChainId()
 
   for (let i = 0; i < COLLATERAL_POOLS.length; i++) {
     const collateralPoolConfig = COLLATERAL_POOLS[i]
     timelockTransactions.push(
       await TimelockService.queueTransaction(
+        Number(chainId),
         `add collateral pool #${collateralPoolConfig.COLLATERAL_POOL_ID}`,
         config.CollateralPoolConfig.address,
         "0",

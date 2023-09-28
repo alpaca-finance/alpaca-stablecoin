@@ -1,4 +1,5 @@
 export interface Transaction {
+  chainId: number
   info: string
   queuedAt: string
   executedAt: string

@@ -150,7 +150,7 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
 
   function _calculateLiquidationInfo(
     bytes32 _collateralPoolId,
-    uint256 _debtShareToBeLiquidated,
+    uint256 /*_debtShareToBeLiquidated*/,
     uint256 _currentCollateralPrice,
     uint256 _positionCollateralAmount,
     uint256 _positionDebtShare
@@ -170,80 +170,23 @@ contract FixedSpreadLiquidationStrategy is PausableUpgradeable, ReentrancyGuardU
       _collateralPoolId
     );
 
-    uint256 _positionDebtValue = _positionDebtShare.mul(_vars.debtAccumulatedRate);
+    // full liquidation
+    info.maxLiquidatableDebtShare = _positionDebtShare; // [wad]
 
-    // Calculate max liquidatable debt value based on the close factor
-    // (_positionDebtShare [wad] * closeFactorBps [bps]) / 10000
-    require(_vars.closeFactorBps > 0, "FixedSpreadLiquidationStrategy/close-factor-bps-not-set");
-    info.maxLiquidatableDebtShare = _positionDebtShare.mul(_vars.closeFactorBps).div(10000); // [wad]
-
-    // Choose to use the minimum amount between `_debtValueToBeLiquidated` and `_maxLiquidatableDebtShare`
-    // to not exceed the close factor
-    info.actualDebtShareToBeLiquidated = _debtShareToBeLiquidated > info.maxLiquidatableDebtShare
-      ? info.maxLiquidatableDebtShare
-      : _debtShareToBeLiquidated; // [wad]
+    info.actualDebtShareToBeLiquidated = _positionDebtShare; // [wad]
+    
     // actualDebtShareToBeLiquidated [wad] * _debtAccumulatedRate [ray]
     info.actualDebtValueToBeLiquidated = info.actualDebtShareToBeLiquidated.mul(_vars.debtAccumulatedRate); // [rad]
 
-    // Calculate the max collateral amount to be liquidated by taking all the fees into account
-    // ( actualDebtValueToBeLiquidated [rad] * liquidatorIncentiveBps [bps] / 10000 / _currentCollateralPrice [ray]
-    uint256 _maxCollateralAmountToBeLiquidated = info
-      .actualDebtValueToBeLiquidated
-      .mul(_vars.liquidatorIncentiveBps)
-      .div(10000)
-      .div(_currentCollateralPrice); // [wad]
+    // Calculate the collateral amount to be liquidated with 50 bps buffer
+    // ( actualDebtValueToBeLiquidated [rad]  / _currentCollateralPrice [ray]
+    uint256 _intendCollatAmountToBeLiquidaed = info.actualDebtValueToBeLiquidated.mul(10150).div(10000).div(_currentCollateralPrice); // [wad]
 
-    // If the calculated collateral amount to be liquidated exceeds the position collateral amount,
-    // then we need to recalculate the debt value to be liquidated that would be enough to liquidate the position entirely
-    // Or if the remaining collateral or the remaining debt is very small and smaller than `debtFloor`, we will force full collateral liquidation
-    if (
-      // If the max collateral amount (including liquidator incentive) that should be liquidated exceeds the total collateral amount of that position
-      _maxCollateralAmountToBeLiquidated > _positionCollateralAmount ||
-      // If the remaining collateral amount value in stablecoin is smaller than `debtFloor`
-      // (_positionCollateralAmount [wad] - _maxCollateralAmountToBeLiquidated [wad]) * _currentCollateralPrice [ray] = [rad]
-      _positionCollateralAmount.sub(_maxCollateralAmountToBeLiquidated).mul(_currentCollateralPrice) <
-      _positionDebtValue.sub(info.actualDebtValueToBeLiquidated)
-    ) {
-      // Full Collateral Liquidation
-      // Take all collateral amount of the position
-      info.collateralAmountToBeLiquidated = _positionCollateralAmount;
+    info.collateralAmountToBeLiquidated = _intendCollatAmountToBeLiquidaed > _positionCollateralAmount
+      ? _positionCollateralAmount
+      : _intendCollatAmountToBeLiquidaed; // [wad]
 
-      // Calculate how much debt value to be liquidated should be
-      // based on the entire collateral amount of the position
-      // (_currentCollateralPrice [ray] * _positionCollateralAmount [wad]) * 10000 / liquidatorIncentiveBps [bps])
-
-      info.actualDebtValueToBeLiquidated = _currentCollateralPrice.mul(_positionCollateralAmount).mul(10000).div(
-        _vars.liquidatorIncentiveBps
-      ); // [rad]
-    } else {
-      // If the remaining debt after liquidation is smaller than `debtFloor`
-      if (
-        _positionDebtValue > info.actualDebtValueToBeLiquidated &&
-        _positionDebtValue.sub(info.actualDebtValueToBeLiquidated) < _vars.debtFloor
-      ) {
-        // Full Debt Liquidation
-        info.actualDebtValueToBeLiquidated = _positionDebtValue; // [rad]
-
-        // actualDebtValueToBeLiquidated [rad] * liquidatorIncentiveBps [bps] / 10000 / _currentCollateralPrice [ray] /
-        info.collateralAmountToBeLiquidated = info
-          .actualDebtValueToBeLiquidated
-          .mul(_vars.liquidatorIncentiveBps)
-          .div(10000)
-          .div(_currentCollateralPrice); // [wad]
-      } else {
-        // Partial Liquidation
-        info.collateralAmountToBeLiquidated = _maxCollateralAmountToBeLiquidated; // [wad]
-      }
-    }
-
-    info.actualDebtShareToBeLiquidated = info.actualDebtValueToBeLiquidated.div(_vars.debtAccumulatedRate); // [wad]
-
-    // collateralAmountToBeLiquidated - (collateralAmountToBeLiquidated * 10000 / liquidatorIncentiveBps)
-    uint256 liquidatorIncentiveCollectedFromPosition = info.collateralAmountToBeLiquidated.sub(
-      info.collateralAmountToBeLiquidated.mul(10000).div(_vars.liquidatorIncentiveBps)
-    ); // [wad]
-
-    info.treasuryFees = liquidatorIncentiveCollectedFromPosition.mul(_vars.treasuryFeesBps).div(10000); // [wad]
+    info.treasuryFees = 0; // [wad]
   }
 
   function execute(

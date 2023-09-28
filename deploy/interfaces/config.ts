@@ -1,4 +1,5 @@
 export interface Config {
+  OpMultiSig: string
   Timelock: string
   ProxyAdmin: string
   ProxyWalletFactory: ProxyWalletFactory

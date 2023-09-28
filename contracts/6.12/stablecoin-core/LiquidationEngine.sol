@@ -121,14 +121,15 @@ contract LiquidationEngine is PausableUpgradeable, ReentrancyGuardUpgradeable, I
     ILiquidationStrategy _strategy = ILiquidationStrategy(_collateralPoolLocalVars.strategy);
     require(address(_strategy) != address(0), "LiquidationEngine/not-set-strategy");
 
+    // note: overwrite this to bypass health check
     // (positionLockedCollateral [wad] * priceWithSafetyMargin [ray]) [rad]
     // (positionDebtShare [wad] * debtAccumulatedRate [ray]) [rad]
-    require(
-      _collateralPoolLocalVars.priceWithSafetyMargin > 0 &&
-        _vars.positionLockedCollateral.mul(_collateralPoolLocalVars.priceWithSafetyMargin) <
-        _vars.positionDebtShare.mul(_collateralPoolLocalVars.debtAccumulatedRate),
-      "LiquidationEngine/position-is-safe"
-    );
+    // require(
+    //   _collateralPoolLocalVars.priceWithSafetyMargin > 0 &&
+    //     _vars.positionLockedCollateral.mul(_collateralPoolLocalVars.priceWithSafetyMargin) <
+    //     _vars.positionDebtShare.mul(_collateralPoolLocalVars.debtAccumulatedRate),
+    //   "LiquidationEngine/position-is-safe"
+    // );
 
     _vars.systemDebtEngineStablecoinBefore = bookKeeper.stablecoin(address(systemDebtEngine));
 
