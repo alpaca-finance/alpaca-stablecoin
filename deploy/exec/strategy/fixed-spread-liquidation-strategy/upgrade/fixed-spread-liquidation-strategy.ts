@@ -16,8 +16,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
 
-  const TITLE = "upgrade_fixed_spread_liquidation_strategy";
-  const EXACT_ETA = "1695343525";
+  const TITLE = "upgrade_fix_spread_liquidation_strategy";
+  const EXACT_ETA = "1697529600";
 
   const deployer = await getDeployer();
   const chainId = await deployer.getChainId();

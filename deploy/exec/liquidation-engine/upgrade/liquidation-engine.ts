@@ -17,7 +17,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
 
   const TITLE = "upgrade_liquidation_engine";
-  const EXACT_ETA = "1695343525";
+  const EXACT_ETA = "1697529600";
 
   const deployer = await getDeployer();
   const chainId = await deployer.getChainId();

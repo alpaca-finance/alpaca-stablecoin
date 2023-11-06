@@ -26,7 +26,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const bookKeeper = BookKeeper__factory.connect(config.BookKeeper.address, deployer)
 
   console.log(">> set TOTAL_DEBT_SHARE")
-  await bookKeeper.setTotalDebtCeiling(TOTAL_DEBT_CEILING)
+  await bookKeeper.setTotalDebtCeiling(TOTAL_DEBT_CEILING, { gasPrice: ethers.utils.parseUnits("8", "gwei")})
   console.log("✅ Done")
 }
 

@@ -3528,6 +3528,260 @@
           }
         }
       }
+    },
+    "46ad7758bccb77e70446051b08f2ee458dcc6b3e55260a4ae6d81311d6eb2f5f": {
+      "address": "0x9b649c96D2C5568D03b90401f171F4eae47E993c",
+      "txHash": "0x94408d43e7e310a512f43db45b9a6a3ac5e118cc390bc3046f4a18f46364a8e3",
+      "layout": {
+        "solcVersion": "0.6.12",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:31"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:28"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:96"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:37"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:67"
+          },
+          {
+            "label": "bookKeeper",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_contract(IBookKeeper)4557",
+            "contract": "LiquidationEngine",
+            "src": "contracts/6.12/stablecoin-core/LiquidationEngine.sol:53"
+          },
+          {
+            "label": "systemDebtEngine",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_contract(ISystemDebtEngine)5346",
+            "contract": "LiquidationEngine",
+            "src": "contracts/6.12/stablecoin-core/LiquidationEngine.sol:54"
+          },
+          {
+            "label": "live",
+            "offset": 0,
+            "slot": "153",
+            "type": "t_uint256",
+            "contract": "LiquidationEngine",
+            "src": "contracts/6.12/stablecoin-core/LiquidationEngine.sol:56"
+          }
+        ],
+        "types": {
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(IBookKeeper)4557": {
+            "label": "contract IBookKeeper",
+            "numberOfBytes": "20"
+          },
+          "t_contract(ISystemDebtEngine)5346": {
+            "label": "contract ISystemDebtEngine",
+            "numberOfBytes": "20"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        }
+      }
+    },
+    "d018ccde2193abbfd94634e5458b7e209651bfd1b4d7a446f05c6903068a4017": {
+      "address": "0x4F2BaCb6Da348242E79dbBa05E91D207C8f9ea07",
+      "txHash": "0x6dd6fd3e84ae820a26d3f60c6ff00f0dba2d2cfeb71cd72c2d1b89c186a84e9f",
+      "layout": {
+        "solcVersion": "0.6.12",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:31"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:28"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:96"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:37"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:67"
+          },
+          {
+            "label": "bookKeeper",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_contract(IBookKeeper)4557",
+            "contract": "FixedSpreadLiquidationStrategy",
+            "src": "contracts/6.12/stablecoin-core/liquidation-strategies/FixedSpreadLiquidationStrategy.sol:57"
+          },
+          {
+            "label": "liquidationEngine",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_contract(ILiquidationEngine)4958",
+            "contract": "FixedSpreadLiquidationStrategy",
+            "src": "contracts/6.12/stablecoin-core/liquidation-strategies/FixedSpreadLiquidationStrategy.sol:58"
+          },
+          {
+            "label": "systemDebtEngine",
+            "offset": 0,
+            "slot": "153",
+            "type": "t_contract(ISystemDebtEngine)5346",
+            "contract": "FixedSpreadLiquidationStrategy",
+            "src": "contracts/6.12/stablecoin-core/liquidation-strategies/FixedSpreadLiquidationStrategy.sol:58"
+          },
+          {
+            "label": "priceOracle",
+            "offset": 0,
+            "slot": "154",
+            "type": "t_contract(IPriceOracle)5152",
+            "contract": "FixedSpreadLiquidationStrategy",
+            "src": "contracts/6.12/stablecoin-core/liquidation-strategies/FixedSpreadLiquidationStrategy.sol:61"
+          },
+          {
+            "label": "flashLendingEnabled",
+            "offset": 0,
+            "slot": "155",
+            "type": "t_uint256",
+            "contract": "FixedSpreadLiquidationStrategy",
+            "src": "contracts/6.12/stablecoin-core/liquidation-strategies/FixedSpreadLiquidationStrategy.sol:63"
+          }
+        ],
+        "types": {
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(IBookKeeper)4557": {
+            "label": "contract IBookKeeper",
+            "numberOfBytes": "20"
+          },
+          "t_contract(ILiquidationEngine)4958": {
+            "label": "contract ILiquidationEngine",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IPriceOracle)5152": {
+            "label": "contract IPriceOracle",
+            "numberOfBytes": "20"
+          },
+          "t_contract(ISystemDebtEngine)5346": {
+            "label": "contract ISystemDebtEngine",
+            "numberOfBytes": "20"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        }
+      }
     }
   }
 }
